@@ -1,0 +1,10 @@
+
+*.zip
+
+*.zip
+
+*.zip
+node_modules/
+dist/
+pg_data/
+.env

@@ -1,0 +1,221 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  TRAINER
+}
+
+enum LessonStatus {
+  SCHEDULED
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+enum MembershipOpType {
+  DEBIT
+  CREDIT
+  REFUND
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+}
+
+model Service {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String
+  title           String   @default("")
+  maxCapacity     Int      @default(1)
+  cancellationWindowHours Int @default(24)
+  allowMembership Boolean  @default(true)
+  durationMinutes Int
+  price           Decimal  @default(0) @db.Decimal(12, 2)
+  lessons         Lesson[]
+  leadRequests    LeadRequest[]
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+}
+
+model Trainer {
+  id       String   @id @default(uuid()) @db.Uuid
+  name     String   @default("")
+  phone    String?
+  vkUserId BigInt? @unique
+  qualification String?
+  maxDailyLoad Int @default(480)
+  baseRate Decimal  @default(0) @db.Decimal(12, 2)
+  lessons  Lesson[]
+}
+
+model Horse {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String
+  breed           String?
+  riderLevel      String?
+  isUnavailable   Boolean @default(false)
+  maxDailyMinutes Int      @default(240)
+  minRestMinutes  Int      @default(15)
+  lessons         Lesson[]
+}
+
+model Client {
+  id           String    @id @default(uuid()) @db.Uuid
+  name         String    @default("")
+  firstName    String    @default("")
+  lastName     String    @default("")
+  isRider      Boolean   @default(true)
+  isPayer      Boolean   @default(false)
+  preferences  String?
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  phone        String?   @unique
+  vkUserId     BigInt?   @unique
+  email        String?
+  medicalNotes String?
+  bookings     Booking[]
+  leadRequests LeadRequest[]
+  memberships Membership[]
+  isLead Boolean @default(false)
+}
+
+model LeadRequest {
+  id        String   @id @default(uuid()) @db.Uuid
+  clientId  String   @db.Uuid
+  serviceId String   @db.Uuid
+  client    Client   @relation(fields: [clientId], references: [id])
+  service   Service  @relation(fields: [serviceId], references: [id])
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  // An unassigned request; a Booking still always belongs to an actual Lesson.
+  @@unique([clientId, serviceId])
+  @@index([serviceId])
+}
+
+model Lesson {
+  id         String         @id @default(uuid()) @db.Uuid
+  trainerId  String         @db.Uuid
+  horseId    String         @db.Uuid
+  serviceId  String         @db.Uuid
+  startTime  DateTime       @db.Timestamptz(6)
+  endTime    DateTime       @db.Timestamptz(6)
+  status     LessonStatus   @default(SCHEDULED)
+  trainer    Trainer        @relation(fields: [trainerId], references: [id])
+  horse      Horse          @relation(fields: [horseId], references: [id])
+  service    Service        @relation(fields: [serviceId], references: [id])
+  bookings   Booking[]
+  operations MembershipOp[]
+  createdAt  DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime       @updatedAt @db.Timestamptz(6)
+
+  @@index([trainerId, startTime, endTime])
+  @@index([horseId, startTime, endTime])
+}
+
+model Membership {
+  id              String         @id @default(uuid()) @db.Uuid
+  totalLessons    Int            @default(0)
+  remainedLessons Int
+  validUntil      DateTime       @db.Timestamptz(6)
+  clientId        String?        @db.Uuid
+  client          Client?        @relation(fields: [clientId], references: [id])
+  pricingPlanId   String?        @db.Uuid
+  pricingPlan     PricingPlan?   @relation(fields: [pricingPlanId], references: [id])
+  bookings        Booking[]
+  operations      MembershipOp[]
+  createdAt       DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @db.Timestamptz(6)
+
+  @@index([pricingPlanId])
+}
+
+model PricingPlan {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String
+  totalLessons Int
+  validDays    Int
+  price        Decimal      @default(0) @db.Decimal(12, 2)
+  memberships  Membership[]
+  createdAt    DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @db.Timestamptz(6)
+}
+
+model Booking {
+  id           String      @id @default(uuid()) @db.Uuid
+  lessonId     String      @db.Uuid
+  clientId     String      @db.Uuid
+  membershipId String?     @db.Uuid
+  attended     Boolean     @default(false)
+  attendanceStatus BookingAttendance @default(PENDING)
+  lesson       Lesson      @relation(fields: [lessonId], references: [id])
+  client       Client      @relation(fields: [clientId], references: [id])
+  membership   Membership? @relation(fields: [membershipId], references: [id])
+  createdAt    DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime    @updatedAt @db.Timestamptz(6)
+
+  @@index([lessonId])
+  @@index([clientId])
+  @@index([membershipId])
+}
+
+enum BookingAttendance {
+  PENDING
+  ATTENDED
+  NO_SHOW
+}
+
+model VkLinkCode {
+  id String @id @default(uuid()) @db.Uuid
+  codeHash String @unique
+  phone String
+  kind String
+  recordId String @db.Uuid
+  expiresAt DateTime @db.Timestamptz(6)
+  usedBy BigInt?
+}
+
+model VkNotification {
+  id String @id @default(uuid()) @db.Uuid
+  key String @unique
+  peerId BigInt
+  message String
+  sentAt DateTime? @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model MembershipOp {
+  id           String           @id @default(uuid()) @db.Uuid
+  membershipId String           @db.Uuid
+  lessonId     String?          @db.Uuid
+  type         MembershipOpType
+  amount       Int
+  reason       String
+  membership   Membership       @relation(fields: [membershipId], references: [id])
+  lesson       Lesson?          @relation(fields: [lessonId], references: [id])
+  createdAt    DateTime         @default(now()) @db.Timestamptz(6)
+
+  // PostgreSQL допускает несколько строк с lessonId = NULL, но запрещает
+  // повтор одного типа операции для конкретной пары абонемент/занятие.
+  @@unique([membershipId, lessonId, type])
+  @@index([lessonId])
+}
+
+model ClubSchedule {
+  id           Int      @id @default(1)
+  openTime     String   @default("09:00")
+  closeTime    String   @default("21:00")
+  dayOfWeekOff Int      @default(1)
+  updatedAt    DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+}

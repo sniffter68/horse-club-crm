@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: hcos_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: horse_club_db
+      POSTGRES_USER: hcos_admin
+      POSTGRES_PASSWORD: hcos_secure_dev_pass
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+volumes:
+  pg_data:

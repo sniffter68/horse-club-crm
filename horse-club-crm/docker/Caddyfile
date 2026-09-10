@@ -1,0 +1,39 @@
+(common) {
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+	}
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy backend:3000
+	}
+}
+
+{$API_SITE} {
+	import common
+	handle {
+		respond "Not Found" 404
+	}
+}
+
+{$CRM_SITE} {
+	import common
+	handle {
+		root * /var/www/crm-dist
+		try_files {path} /index.html
+		header Cache-Control "no-cache"
+		file_server
+	}
+}
+
+{$LANDING_SITE} {
+	import common
+	handle {
+		root * /var/www/landing-dist
+		try_files {path} /index.html
+		header Cache-Control "no-cache"
+		file_server
+	}
+}

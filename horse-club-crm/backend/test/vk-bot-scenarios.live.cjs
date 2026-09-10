@@ -1,0 +1,61 @@
+const assert = require('node:assert/strict');
+const { test } = require('node:test');
+const { randomUUID, randomInt } = require('node:crypto');
+require('reflect-metadata');
+const { Test } = require('@nestjs/testing');
+const { ValidationPipe } = require('@nestjs/common');
+const request = require('supertest');
+const { AppModule } = require('../dist/app.module');
+const { PrismaService } = require('../dist/prisma/prisma.service');
+const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
+const { VkNotifications } = require('../dist/vk-bot/vk-delivery.module');
+
+test('real DB: protected link-code, VK binding, ownership and idempotent attendance debit', async () => {
+  const module = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(VkNotifications).useValue({}).compile();
+  const app = module.createNestApplication();
+  app.setGlobalPrefix('api'); app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+  await app.init();
+  const p = app.get(PrismaService), bot = app.get(VkBotService);
+  const messages = [], answers = [];
+  bot.vk = { api: { messages: { send: async value => messages.push(value), sendMessageEventAnswer: async value => answers.push(value) } } };
+  const ids = Object.fromEntries(['trainer', 'client', 'horse', 'service', 'lesson', 'booking', 'membership'].map(key => [key, randomUUID()]));
+  const phone = '+79991234567';
+  let vkId;
+  do { vkId = randomInt(100000000, 1000000000); } while (await p.trainer.findUnique({ where: { vkUserId: BigInt(vkId) } }) || await p.client.findUnique({ where: { vkUserId: BigInt(vkId) } }));
+  try {
+    await p.trainer.create({ data: { id: ids.trainer, name: 'QA VK trainer', phone } });
+    await p.client.create({ data: { id: ids.client, name: 'QA VK rider' } });
+    await p.horse.create({ data: { id: ids.horse, name: 'QA VK horse' } });
+    await p.service.create({ data: { id: ids.service, name: 'QA VK service', durationMinutes: 60 } });
+    await p.membership.create({ data: { id: ids.membership, clientId: ids.client, remainedLessons: 2, validUntil: new Date(Date.now() + 86400000) } });
+    await p.lesson.create({ data: { id: ids.lesson, trainerId: ids.trainer, horseId: ids.horse, serviceId: ids.service, startTime: new Date(Date.now() - 3600000), endTime: new Date(), bookings: { create: { id: ids.booking, clientId: ids.client, membershipId: ids.membership } } } });
+    await request(app.getHttpServer()).post('/api/vk/link-codes').send({ kind: 'TRAINER', id: ids.trainer }).expect(401);
+    const auth = await request(app.getHttpServer()).post('/api/auth/login').send({ email: 'admin@test.ru', password: 'admin123' }).expect(200);
+    const code = await request(app.getHttpServer()).post('/api/vk/link-codes').set('Authorization', `Bearer ${auth.body.access_token}`).send({ kind: 'TRAINER', id: ids.trainer }).expect(201);
+    await bot.handleMessage({ message: { from_id: vkId, peer_id: vkId, out: 0, text: code.body.instruction } }, 'link');
+    assert.equal((await p.trainer.findUnique({ where: { id: ids.trainer } })).vkUserId, BigInt(vkId));
+    const action = { user_id: vkId, peer_id: vkId, event_id: 'attendance', payload: { action: 'attendance', bookingId: ids.booking, attended: true } };
+    await bot.handleEvent(action); await bot.handleEvent(action);
+    assert.equal((await p.membership.findUnique({ where: { id: ids.membership } })).remainedLessons, 1);
+    assert.equal(await p.membershipOp.count({ where: { lessonId: ids.lesson, type: 'DEBIT' } }), 1);
+    await bot.handleEvent({ ...action, event_id: 'no-show', payload: { ...action.payload, attended: false } });
+    assert.equal((await p.booking.findUnique({ where: { id: ids.booking } })).attendanceStatus, 'NO_SHOW');
+    assert.equal((await p.membership.findUnique({ where: { id: ids.membership } })).remainedLessons, 1);
+    await p.lesson.update({ where: { id: ids.lesson }, data: { status: 'CANCELLED' } });
+    await bot.handleEvent({ ...action, event_id: 'cancelled' });
+    assert.match(answers.at(-1).event_data, /отменено/);
+    assert.equal((await p.booking.findUnique({ where: { id: ids.booking } })).attendanceStatus, 'NO_SHOW');
+    assert.match(messages[0].message, /успешно привязан/);
+  } finally {
+    await p.vkLinkCode.deleteMany({ where: { recordId: ids.trainer } });
+    await p.membershipOp.deleteMany({ where: { membershipId: ids.membership } });
+    await p.booking.deleteMany({ where: { id: ids.booking } });
+    await p.lesson.deleteMany({ where: { id: ids.lesson } });
+    await p.membership.deleteMany({ where: { id: ids.membership } });
+    await p.trainer.deleteMany({ where: { id: ids.trainer } });
+    await p.client.deleteMany({ where: { id: ids.client } });
+    await p.horse.deleteMany({ where: { id: ids.horse } });
+    await p.service.deleteMany({ where: { id: ids.service } });
+    await app.close();
+  }
+});

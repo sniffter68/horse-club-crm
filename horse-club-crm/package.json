@@ -1,0 +1,9 @@
+{
+  "name": "horse-club-crm",
+  "private": true,
+  "scripts": {
+    "build:frontends": "npm --prefix frontend run build && npm --prefix landing run build",
+    "test:concurrency": "npm --prefix backend run build && node backend/test/concurrency-hardening.test.cjs",
+    "prod:validate": "docker compose --env-file .env.production -f docker-compose.prod.yml config --quiet"
+  }
+}

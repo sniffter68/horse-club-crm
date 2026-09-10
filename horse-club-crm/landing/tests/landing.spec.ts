@@ -1,0 +1,58 @@
+import { expect, test } from '@playwright/test'
+for (const width of [390, 768, 1440]) test(`responsive layout ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  if (width === 390) {
+    await page.getByRole('button', { name: 'Открыть меню' }).click()
+    await page.getByRole('navigation').getByRole('link', { name: 'Контакты' }).click()
+    await expect(page.getByRole('button', { name: 'Открыть меню' })).toHaveAttribute('aria-expanded', 'false')
+  }
+  await page.getByRole('link', { name: 'Записаться на занятие' }).click()
+  await expect(page.locator('#lead-form')).toBeInViewport()
+  await page.screenshot({ path: `artifacts/landing-${width}.png`, fullPage: true })
+  expect(errors).toEqual([])
+})
+test('validates, masks phone, sends minimal JSON, prevents double submit and confirms', async ({ page }) => {
+  let sent: unknown, requests = 0
+  await page.route('**/api/leads', async route => {
+    requests++; sent = route.request().postDataJSON()
+    await new Promise(resolve => setTimeout(resolve, 200))
+    await route.fulfill({ status: 201, json: { success: true, clientId: 'test', message: 'OK' } })
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Отправить заявку' }).click()
+  await expect(page.getByText('Пожалуйста, укажите имя')).toBeVisible()
+  expect(requests).toBe(0)
+  await page.getByLabel('Ваше имя').fill('Анна')
+  await page.locator('#phone').fill('8999')
+  await page.locator('#phone').press('Backspace')
+  await expect(page.locator('#phone')).toHaveValue('+7 (99')
+  await page.getByLabel('Телефон', { exact: false }).fill('89991234567')
+  await expect(page.locator('#phone')).toHaveValue('+7 (999) 123-45-67')
+  await page.getByLabel('Что вам интересно?').selectOption('lesson')
+  await page.getByLabel('Опыт и пожелания').fill('Первый раз')
+  await page.getByRole('button', { name: 'Отправить заявку' }).click()
+  await expect(page.getByRole('button', { name: 'Отправляем…' })).toBeDisabled()
+  await expect(page.getByRole('heading', { name: 'Заявка принята!' })).toBeVisible()
+  expect(sent).toEqual({ firstName: 'Анна', phone: '+79991234567', preferences: 'Направление: Верховая езда\nПервый раз' })
+  expect(requests).toBe(1)
+})
+test('server validation preserves form and honeypot prevents requests', async ({ page }) => {
+  let requests = 0
+  await page.route('**/api/leads', route => { requests++; return route.fulfill({ status: 400, json: { message: ['Проверьте телефон'] } }) })
+  await page.goto('/')
+  await page.locator('#firstName').fill('Анна')
+  await page.locator('#phone').fill('+79991234567')
+  await page.getByRole('button', { name: 'Отправить заявку' }).click()
+  await expect(page.getByRole('alert')).toHaveText('Проверьте телефон')
+  await expect(page.locator('#firstName')).toHaveValue('Анна')
+  await page.locator('#website').evaluate((element: HTMLInputElement) => { element.value = 'bot.example' })
+  await page.getByRole('button', { name: 'Отправить заявку' }).click()
+  await expect(page.getByRole('heading', { name: 'Заявка принята!' })).toBeVisible()
+  expect(requests).toBe(1)
+})
