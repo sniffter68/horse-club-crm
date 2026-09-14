@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { ClientsModule } from './clients/clients.module';
 import { CommonModule } from './common/common.module';
 import { HealthModule } from './health/health.module';
+import { HorseHealthLogsModule } from './horse-health-logs/horse-health-logs.module';
 import { HorsesModule } from './horses/horses.module';
 import { LessonsModule } from './lessons/lessons.module';
 import { MembershipsModule } from './memberships/memberships.module';
@@ -23,6 +24,7 @@ import { UsersModule } from './users/users.module';
     PrismaModule,
     CommonModule,
     HealthModule,
+    HorseHealthLogsModule,
     AuthModule,
     LessonsModule,
     MembershipsModule,
