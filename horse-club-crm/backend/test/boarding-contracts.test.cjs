@@ -48,6 +48,13 @@ test('active boarding contract is created in a serializable transaction', async 
   await new BoardingContractsService(prisma).create({ ...activeContract, notes: '  Полный пансион  ' });
   assert.equal(state.transactionOptions.isolationLevel, 'Serializable');
   assert.equal(state.createArgs.data.notes, 'Полный пансион');
+  assert.deepEqual(state.createArgs.data.payments, { create: {
+    clientId: activeContract.clientId,
+    amount: activeContract.monthlyRate,
+    method: 'UNSPECIFIED',
+    status: 'PENDING',
+    description: 'Начисление за первый месяц постоя',
+  } });
   assert.equal(state.findFirstArgs.length, 2);
   assert.equal(state.findFirstArgs[0].where.horseId, activeContract.horseId);
   assert.equal(state.findFirstArgs[1].where.stallId, activeContract.stallId);

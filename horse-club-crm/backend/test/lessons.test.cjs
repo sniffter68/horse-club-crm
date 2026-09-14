@@ -121,7 +121,7 @@ test('excludeLessonId omits the edited lesson from conflict detection', async ()
   );
 });
 
-test('create uses service duration and creates the first booking atomically', async () => {
+test('create uses service duration and adds a pending payment for a booking without membership', async () => {
   let createArgs;
   let transactionOptions;
   const tx = {
@@ -131,7 +131,7 @@ test('create uses service duration and creates the first booking atomically', as
     horse: {
       findUnique: async () => ({ name: 'Буран', maxDailyMinutes: 240 }),
     },
-    service: { findUnique: async () => ({ durationMinutes: 45 }) },
+    service: { findUnique: async () => ({ durationMinutes: 45, price: 1500, title: 'Тренировка', name: 'Тренировка' }) },
     lesson: {
       findMany: async () => [],
       create: async (args) => {
@@ -152,14 +152,16 @@ test('create uses service duration and creates the first booking atomically', as
     horseId: 'horse-1',
     serviceId: 'service-1',
     clientId: 'client-1',
-    membershipId: 'membership-1',
     startTime: '2026-09-08T10:00:00.000Z',
   });
 
   assert.equal(createArgs.data.endTime.toISOString(), '2026-09-08T10:45:00.000Z');
   assert.equal(createArgs.data.status, LessonStatus.SCHEDULED);
   assert.deepEqual(createArgs.data.bookings.create, {
-    clientId: 'client-1', horseId: 'horse-1', membershipId: 'membership-1',
+    clientId: 'client-1', horseId: 'horse-1', payments: { create: {
+      clientId: 'client-1', amount: 1500, method: 'UNSPECIFIED', status: 'PENDING',
+      description: 'Начисление за занятие: Тренировка',
+    } },
   });
   assert.equal(result.id, 'lesson-new');
   assert.deepEqual(transactionOptions, {

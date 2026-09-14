@@ -34,6 +34,7 @@ enum HealthLogType {
 }
 
 enum PaymentMethod {
+  UNSPECIFIED
   CASH
   CARD
   TRANSFER
@@ -170,6 +171,7 @@ model Membership {
   pricingPlan     PricingPlan?   @relation(fields: [pricingPlanId], references: [id])
   bookings        Booking[]
   operations      MembershipOp[]
+  payments        Payment[]
   createdAt       DateTime       @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime       @updatedAt @db.Timestamptz(6)
 
@@ -272,6 +274,7 @@ model Payment {
   clientId           String            @db.Uuid
   bookingId          String?           @db.Uuid
   boardingContractId String?           @db.Uuid
+  membershipId       String?           @unique @db.Uuid
   amount             Decimal           @db.Decimal(12, 2)
   method             PaymentMethod
   status             PaymentStatus     @default(PENDING)
@@ -280,6 +283,7 @@ model Payment {
   client             Client            @relation(fields: [clientId], references: [id])
   booking            Booking?          @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   boardingContract   BoardingContract? @relation(fields: [boardingContractId], references: [id], onDelete: SetNull)
+  membership         Membership?       @relation(fields: [membershipId], references: [id], onDelete: SetNull)
   createdAt          DateTime          @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime          @updatedAt @db.Timestamptz(6)
 

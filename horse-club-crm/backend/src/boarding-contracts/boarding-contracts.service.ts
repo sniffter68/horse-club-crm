@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { BoardingContractStatus, Prisma } from '@prisma/client';
+import { BoardingContractStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import { isSerializationFailure } from '../common/serialization-failure';
 import type { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { rethrowCatalogMutation } from '../common/prisma-errors';
@@ -85,7 +85,21 @@ export class BoardingContractsService {
       return await this.runSerializable(async tx => {
         const data = this.createData(dto);
         await this.validate(tx, data);
-        return tx.boardingContract.create({ data, include: contractInclude.include });
+        return tx.boardingContract.create({
+          data: {
+            ...data,
+            ...(Number(data.monthlyRate) > 0 ? {
+              payments: { create: {
+                clientId: data.clientId,
+                amount: data.monthlyRate,
+                method: PaymentMethod.UNSPECIFIED,
+                status: PaymentStatus.PENDING,
+                description: 'Начисление за первый месяц постоя',
+              } },
+            } : {}),
+          },
+          include: contractInclude.include,
+        });
       });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Договор постоя');

@@ -12,6 +12,7 @@ const paymentInclude = Prisma.validator<Prisma.PaymentDefaultArgs>()({
     client: { select: { id: true, name: true, firstName: true, lastName: true } },
     boardingContract: { include: { horse: { select: { id: true, name: true } }, stall: { select: { id: true, name: true } } } },
     booking: { include: { lesson: { include: { service: { select: { id: true, title: true, name: true, price: true } } } } } },
+    membership: { include: { pricingPlan: { select: { id: true, name: true, price: true } } } },
   },
 });
 export type PaymentWithRelations = Prisma.PaymentGetPayload<typeof paymentInclude>;
@@ -28,6 +29,7 @@ type PaymentData = {
   clientId: string;
   bookingId: string | null;
   boardingContractId: string | null;
+  membershipId: string | null;
   amount: number | Prisma.Decimal;
   method: CreatePaymentDto['method'];
   status: NonNullable<CreatePaymentDto['status']>;
@@ -89,6 +91,7 @@ export class PaymentsService {
         clientId: dto.clientId ?? current.clientId,
         bookingId: dto.bookingId === undefined ? current.bookingId : dto.bookingId,
         boardingContractId: dto.boardingContractId === undefined ? current.boardingContractId : dto.boardingContractId,
+        membershipId: dto.membershipId === undefined ? current.membershipId : dto.membershipId,
         amount: dto.amount ?? current.amount.toNumber(),
         method: dto.method ?? current.method,
         status: dto.status ?? current.status,
@@ -110,8 +113,9 @@ export class PaymentsService {
   }
 
   private async resolveData(dto: CreatePaymentDto): Promise<PaymentData> {
-    if (dto.bookingId && dto.boardingContractId) {
-      throw new BadRequestException('Платёж нельзя одновременно связать с занятием и договором постоя');
+    const linkedRecords = [dto.bookingId, dto.boardingContractId, dto.membershipId].filter(Boolean);
+    if (linkedRecords.length > 1) {
+      throw new BadRequestException('Платёж можно связать только с одним основанием');
     }
     let clientId = dto.clientId;
     let amount = dto.amount;
@@ -134,6 +138,17 @@ export class PaymentsService {
       clientId = booking.clientId;
       amount ??= booking.lesson.service.price.toNumber();
     }
+    if (dto.membershipId) {
+      const membership = await this.prisma.membership.findUnique({
+        where: { id: dto.membershipId },
+        select: { clientId: true, pricingPlan: { select: { price: true } } },
+      });
+      if (!membership) throw new NotFoundException('Абонемент не найден');
+      if (!membership.clientId) throw new ConflictException('У абонемента не указан клиент');
+      if (clientId && clientId !== membership.clientId) throw new ConflictException('Клиент не соответствует абонементу');
+      clientId = membership.clientId;
+      amount ??= membership.pricingPlan?.price.toNumber();
+    }
     if (!clientId) throw new BadRequestException('Укажите клиента или выберите связанную запись');
     if (amount === undefined || amount <= 0) throw new BadRequestException('Сумма платежа должна быть больше нуля');
     const client = await this.prisma.client.findUnique({ where: { id: clientId }, select: { id: true } });
@@ -143,6 +158,7 @@ export class PaymentsService {
       clientId,
       bookingId: dto.bookingId ?? null,
       boardingContractId: dto.boardingContractId ?? null,
+      membershipId: dto.membershipId ?? null,
       amount,
       method: dto.method,
       status,

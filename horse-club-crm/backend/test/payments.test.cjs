@@ -38,7 +38,7 @@ test('payment cannot reference a booking and boarding contract simultaneously', 
       boardingContractId: '8e5e03af-cb29-4689-be60-a07188174e26',
       method: 'CASH',
     }),
-    error => error.status === 400 && error.message === 'Платёж нельзя одновременно связать с занятием и договором постоя',
+    error => error.status === 400 && error.message === 'Платёж можно связать только с одним основанием',
   );
 });
 

@@ -9,7 +9,8 @@ import type { BoardingContract } from '../boarding-contracts/types'
 import type { BookingPaymentOption, Payment, PaymentMethod, PaymentStatus, PaymentValues } from './types'
 
 const methodOptions: Array<{ value: PaymentMethod; label: string }> = [
-  { value: 'CASH', label: 'Наличные' }, { value: 'CARD', label: 'Карта' }, { value: 'TRANSFER', label: 'Перевод' },
+  { value: 'UNSPECIFIED', label: 'Не указан' }, { value: 'CASH', label: 'Наличные' },
+  { value: 'CARD', label: 'Карта' }, { value: 'TRANSFER', label: 'Перевод' },
 ]
 const statusOptions: Array<{ value: PaymentStatus; label: string }> = [
   { value: 'PENDING', label: 'Ожидается' }, { value: 'PAID', label: 'Оплачен' },
@@ -68,11 +69,12 @@ export function PaymentForm({ action }: { action: 'create' | 'edit' }) {
       description="Запись не формирует кассовый чек и не передаётся в бухгалтерию или онлайн-кассу." style={{ marginBottom: 24 }} />
     {query?.error ? <Alert type="error" showIcon message="Не удалось загрузить платёж" description={query.error.message} /> :
       <Form<PaymentValues> {...formProps} layout="vertical" style={{ maxWidth: 760 }}
-        initialValues={action === 'create' ? { method: 'TRANSFER', status: 'PAID' } : formProps.initialValues}
+        initialValues={action === 'create' ? { method: 'UNSPECIFIED', status: 'PENDING' } : formProps.initialValues}
         onFinish={values => formProps.onFinish?.({
           ...values,
           bookingId: values.bookingId || null,
           boardingContractId: values.boardingContractId || null,
+          membershipId: values.membershipId || null,
           amount: values.amount === undefined ? undefined : Number(values.amount),
           paidAt: values.paidAt ? dayjs(values.paidAt).toISOString() : null,
           description: values.description?.trim() || null,

@@ -131,7 +131,7 @@ export class LessonsService {
     return this.runSerializable(async (tx) => {
       const service = await tx.service.findUnique({
         where: { id: dto.serviceId },
-        select: { durationMinutes: true },
+        select: { durationMinutes: true, price: true, title: true, name: true },
       });
       if (!service) {
         throw new NotFoundException('Услуга не найдена');
@@ -192,6 +192,15 @@ export class LessonsService {
                     ...(dto.horseId ? { horseId: dto.horseId } : {}),
                     ...(dto.membershipId
                       ? { membershipId: dto.membershipId }
+                      : {}),
+                    ...(!dto.membershipId && Number(service.price) > 0
+                      ? { payments: { create: {
+                          clientId: dto.clientId,
+                          amount: service.price,
+                          method: 'UNSPECIFIED',
+                          status: 'PENDING',
+                          description: `Начисление за занятие: ${service.title || service.name}`,
+                        } } }
                       : {}),
                   },
                 },

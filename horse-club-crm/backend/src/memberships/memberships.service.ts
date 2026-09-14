@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import type { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { parseRefineQuery, type PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
@@ -55,6 +55,15 @@ export class MembershipsService {
       data: {
         clientId: client.id, pricingPlanId: plan?.id, totalLessons, remainedLessons: totalLessons, validUntil,
         operations: { create: { type: 'CREDIT', amount: totalLessons, reason: dto.reason?.trim() || 'Initial membership issue' } },
+        ...(plan && Number(plan.price) > 0 ? {
+          payments: { create: {
+            clientId: client.id,
+            amount: plan.price,
+            method: PaymentMethod.UNSPECIFIED,
+            status: PaymentStatus.PENDING,
+            description: `Продажа абонемента: ${plan.name}`,
+          } },
+        } : {}),
       }, include: membershipInclude,
     });
     return this.withActive(membership);

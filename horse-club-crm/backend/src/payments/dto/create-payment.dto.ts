@@ -18,6 +18,11 @@ export class CreatePaymentDto {
   @IsUUID()
   boardingContractId?: string | null;
 
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  membershipId?: string | null;
+
   @ApiPropertyOptional({ minimum: 0.01, maximum: 9999999999.99 })
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
