@@ -21,6 +21,10 @@ export interface BoardingContract extends Omit<BoardingContractValues, 'startsAt
   client: { id: string; name: string; firstName: string; lastName: string }
   horse: { id: string; name: string }
   stall: { id: string; name: string; isUnavailable: boolean } | null
+  payments: Array<{
+    id: string; amount: string | number; method: 'CASH' | 'CARD' | 'TRANSFER';
+    status: 'PENDING' | 'PAID' | 'REFUNDED' | 'CANCELLED'; paidAt: string | null; createdAt: string;
+  }>
   createdAt: string
   updatedAt: string
 }

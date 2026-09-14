@@ -32,5 +32,11 @@ export function BoardingContractList() {
     { key: 'endsAt', dataIndex: 'endsAt', title: 'Окончание', sorter: true, render: (value: string | null) => date(value) },
     { key: 'monthlyRate', dataIndex: 'monthlyRate', title: 'В месяц', sorter: true,
       render: (value: string | number) => money(value) },
+    { key: 'payments', title: 'Оплаты', render: (_: unknown, record) => {
+      const paid = record.payments.filter(payment => payment.status === 'PAID')
+      const total = paid.reduce((sum, payment) => sum + Number(payment.amount), 0)
+      const latest = paid[0]
+      return latest ? `${money(total)} · последняя ${date(latest.paidAt || latest.createdAt)}` : 'Нет оплат'
+    } },
   ]} />
 }

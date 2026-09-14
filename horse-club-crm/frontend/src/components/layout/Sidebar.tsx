@@ -25,7 +25,8 @@ export function Sidebar() {
       (item.name !== 'settings' || role === 'ADMIN' || role === 'MANAGER') &&
       (item.name !== 'users' || role === 'ADMIN') &&
       (item.name !== 'memberships' || role !== 'TRAINER') &&
-      (item.name !== 'pricing-plans' || role !== 'TRAINER'),
+      (item.name !== 'pricing-plans' || role !== 'TRAINER') &&
+      (item.name !== 'payments' || role !== 'TRAINER'),
     )),
     { key: 'logout', icon: <LogoutOutlined />, label: 'Выход', disabled: isPending, onClick: () => logout() },
   ]

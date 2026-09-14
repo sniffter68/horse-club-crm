@@ -13,6 +13,10 @@ const contractInclude = Prisma.validator<Prisma.BoardingContractDefaultArgs>()({
     client: { select: { id: true, name: true, firstName: true, lastName: true } },
     horse: { select: { id: true, name: true } },
     stall: { select: { id: true, name: true, isUnavailable: true } },
+    payments: {
+      select: { id: true, amount: true, method: true, status: true, paidAt: true, createdAt: true },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+    },
   },
 });
 export type BoardingContractWithRelations = Prisma.BoardingContractGetPayload<typeof contractInclude>;

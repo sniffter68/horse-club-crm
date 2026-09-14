@@ -9,6 +9,7 @@ import { HorseHealthLogsModule } from './horse-health-logs/horse-health-logs.mod
 import { HorsesModule } from './horses/horses.module';
 import { LessonsModule } from './lessons/lessons.module';
 import { MembershipsModule } from './memberships/memberships.module';
+import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PricingPlansModule } from './pricing-plans/pricing-plans.module';
 import { ArenasModule } from './arenas/arenas.module';
@@ -30,6 +31,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     LessonsModule,
     MembershipsModule,
+    PaymentsModule,
     PricingPlansModule,
     ArenasModule,
     BoardingContractsModule,
