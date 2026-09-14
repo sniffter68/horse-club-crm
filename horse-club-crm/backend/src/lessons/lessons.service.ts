@@ -25,10 +25,10 @@ const ALLOWED_FINAL_STATUSES: ReadonlySet<LessonStatus> = new Set([
 const lessonDetails = Prisma.validator<Prisma.LessonDefaultArgs>()({
   include: {
     trainer: true,
-    horse: true,
     service: true,
+    arena: true,
     bookings: {
-      include: { client: true, membership: true },
+      include: { client: true, horse: true, membership: true },
       orderBy: { createdAt: 'asc' },
     },
   },
@@ -68,10 +68,11 @@ export class LessonsService {
 
   async validateNoConflicts(
     trainerId: string,
-    horseId: string,
+    horseId: string | undefined,
     start: Date,
     end: Date,
     excludeLessonId?: string,
+    arenaId?: string,
   ): Promise<void> {
     this.assertValidInterval(start, end);
     await this.validateNoConflictsWithClient(
@@ -81,6 +82,7 @@ export class LessonsService {
       start,
       end,
       excludeLessonId,
+      arenaId,
     );
   }
 
@@ -121,6 +123,9 @@ export class LessonsService {
     if (dto.membershipId && !dto.clientId) {
       throw new BadRequestException('membershipId можно передать только вместе с clientId');
     }
+    if (dto.horseId && !dto.clientId) {
+      throw new BadRequestException('horseId можно передать только вместе с clientId');
+    }
     const start = this.parseDate(dto.startTime, 'Некорректное время начала занятия');
 
     return this.runSerializable(async (tx) => {
@@ -151,19 +156,23 @@ export class LessonsService {
         dto.horseId,
         start,
         end,
+        undefined,
+        dto.arenaId,
       );
-      await this.getHorseWorkloadWithClient(
-        tx,
-        dto.horseId,
-        this.getLocalDateParts(start),
-        durationMinutes,
-      );
+      if (dto.horseId) {
+        await this.getHorseWorkloadWithClient(
+          tx,
+          dto.horseId,
+          this.getLocalDateParts(start),
+          durationMinutes,
+        );
+      }
 
       return tx.lesson.create({
         data: {
           trainerId: dto.trainerId,
-          horseId: dto.horseId,
           serviceId: dto.serviceId,
+          ...(dto.arenaId ? { arenaId: dto.arenaId } : {}),
           startTime: start,
           endTime: end,
           status: LessonStatus.SCHEDULED,
@@ -172,6 +181,7 @@ export class LessonsService {
                 bookings: {
                   create: {
                     clientId: dto.clientId,
+                    ...(dto.horseId ? { horseId: dto.horseId } : {}),
                     ...(dto.membershipId
                       ? { membershipId: dto.membershipId }
                       : {}),
@@ -195,7 +205,7 @@ export class LessonsService {
     return this.prisma.lesson.findMany({
       where: {
         ...(query.trainerId ? { trainerId: query.trainerId } : {}),
-        ...(query.horseId ? { horseId: query.horseId } : {}),
+        ...(query.horseId ? { bookings: { some: { horseId: query.horseId } } } : {}),
         ...(query.status ? { status: query.status } : {}),
         // Возвращаем занятия, пересекающие полуоткрытый интервал [from, to).
         endTime: { gt: from },
@@ -345,27 +355,38 @@ export class LessonsService {
   private async validateNoConflictsWithClient(
     client: LessonReader,
     trainerId: string,
-    horseId: string,
+    horseId: string | undefined,
     start: Date,
     end: Date,
     excludeLessonId?: string,
+    arenaId?: string,
   ): Promise<void> {
+    const resources: Prisma.LessonWhereInput[] = [{ trainerId }];
+    if (horseId) resources.push({ bookings: { some: { horseId } } });
+    if (arenaId) resources.push({ arenaId });
     const conflicts = await client.lesson.findMany({
       where: {
         status: { not: LessonStatus.CANCELLED },
-        OR: [{ trainerId }, { horseId }],
+        OR: resources,
         startTime: { lt: end },
         endTime: { gt: start },
         ...(excludeLessonId ? { id: { not: excludeLessonId } } : {}),
       },
-      select: { trainerId: true, horseId: true },
+      select: {
+        trainerId: true,
+        arenaId: true,
+        bookings: { where: horseId ? { horseId } : undefined, select: { horseId: true } },
+      },
     });
 
     if (conflicts.some((lesson) => lesson.trainerId === trainerId)) {
       throw new ConflictException('Тренер уже занят в этот интервал времени');
     }
-    if (conflicts.some((lesson) => lesson.horseId === horseId)) {
+    if (horseId && conflicts.some((lesson) => lesson.bookings.some((booking) => booking.horseId === horseId))) {
       throw new ConflictException('Лошадь уже забронирована на это время');
+    }
+    if (arenaId && conflicts.some((lesson) => lesson.arenaId === arenaId)) {
+      throw new ConflictException('Манеж уже занят в это время');
     }
   }
 
@@ -388,7 +409,7 @@ export class LessonsService {
 
     const lessons = await client.lesson.findMany({
       where: {
-        horseId,
+        bookings: { some: { horseId } },
         status: { not: LessonStatus.CANCELLED },
         startTime: { lt: close },
         endTime: { gt: open },

@@ -28,7 +28,7 @@ test('real DB: protected link-code, VK binding, ownership and idempotent attenda
     await p.horse.create({ data: { id: ids.horse, name: 'QA VK horse' } });
     await p.service.create({ data: { id: ids.service, name: 'QA VK service', durationMinutes: 60 } });
     await p.membership.create({ data: { id: ids.membership, clientId: ids.client, remainedLessons: 2, validUntil: new Date(Date.now() + 86400000) } });
-    await p.lesson.create({ data: { id: ids.lesson, trainerId: ids.trainer, horseId: ids.horse, serviceId: ids.service, startTime: new Date(Date.now() - 3600000), endTime: new Date(), bookings: { create: { id: ids.booking, clientId: ids.client, membershipId: ids.membership } } } });
+    await p.lesson.create({ data: { id: ids.lesson, trainerId: ids.trainer, serviceId: ids.service, startTime: new Date(Date.now() - 3600000), endTime: new Date(), bookings: { create: { id: ids.booking, clientId: ids.client, horseId: ids.horse, membershipId: ids.membership } } } });
     await request(app.getHttpServer()).post('/api/vk/link-codes').send({ kind: 'TRAINER', id: ids.trainer }).expect(401);
     const auth = await request(app.getHttpServer()).post('/api/auth/login').send({ email: 'admin@test.ru', password: 'admin123' }).expect(200);
     const code = await request(app.getHttpServer()).post('/api/vk/link-codes').set('Authorization', `Bearer ${auth.body.access_token}`).send({ kind: 'TRAINER', id: ids.trainer }).expect(201);

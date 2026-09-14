@@ -23,6 +23,7 @@ async function catalog<T>(resource: string, signal: AbortSignal): Promise<T[]> {
 }
 const personName = (client: Client) => [client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || client.id
 const membershipDate = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeZone: CLUB_TIME_ZONE })
+const lessonHorses = (lesson: Lesson) => [...new Set(lesson.bookings.map(booking => booking.horse?.name).filter((name): name is string => Boolean(name)))]
 
 export function SchedulePage() {
   const { canManage } = useCatalogPermissions()
@@ -190,7 +191,7 @@ export function SchedulePage() {
         selectable={canManage && ready} selectMirror selectOverlap={false} eventDisplay="block"
         datesSet={({ start, end }) => setRange(previous => previous?.from === start.toISOString() && previous.to === end.toISOString() ? previous : { from: start.toISOString(), to: end.toISOString() })}
         select={({ start, end, view }) => { openBooking(start, Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000))); view.calendar.unselect() }}
-        events={lessons.map(lesson => ({ id: lesson.id, title: `${lesson.service.title || lesson.service.name} · ${lesson.trainer.name} · ${lesson.horse.name}`, start: lesson.startTime, end: lesson.endTime, backgroundColor: statuses[lesson.status].color, borderColor: statuses[lesson.status].color }))}
+        events={lessons.map(lesson => ({ id: lesson.id, title: `${lesson.service.title || lesson.service.name} · ${lesson.trainer.name}${lessonHorses(lesson).length ? ` · ${lessonHorses(lesson).join(', ')}` : ''}`, start: lesson.startTime, end: lesson.endTime, backgroundColor: statuses[lesson.status].color, borderColor: statuses[lesson.status].color }))}
         eventClick={({ event }) => { setError(undefined); setDetail(lessons.find(lesson => lesson.id === event.id)) }} />}
     </Spin></Card>
     <Modal title="Быстрое бронирование" open={bookingOpen} onCancel={() => { if (!saving) setBookingOpen(false) }} footer={null} forceRender>
@@ -206,7 +207,7 @@ export function SchedulePage() {
         </Form.Item>}
         {membershipsError && <Alert type="error" showIcon message="Не удалось загрузить абонементы" description={membershipsError} />}
         <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
-        <Form.Item name="horseId" label="Лошадь" rules={[{ required: true, message: 'Выберите лошадь' }]}><Select showSearch optionFilterProp="label" options={horseOptions} /></Form.Item>
+        <Form.Item name="horseId" label="Лошадь участника" extra="Оставьте пустым для теоретического занятия или занятия без клубной лошади."><Select allowClear showSearch optionFilterProp="label" options={horseOptions} /></Form.Item>
         <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><Input type="datetime-local" /></Form.Item>
         <Form.Item name="durationMinutes" label="Длительность, мин" rules={[{ required: true }, { type: 'integer', min: 1 }]}><InputNumber min={1} precision={0} /></Form.Item>
         {workloadLoading && <Spin size="small" />}
@@ -224,9 +225,10 @@ export function SchedulePage() {
           { key: 'start', label: 'Начало', children: formatTime(detail.startTime) },
           { key: 'end', label: 'Окончание', children: formatTime(detail.endTime) },
           { key: 'trainer', label: 'Тренер', children: detail.trainer.name },
-          { key: 'horse', label: 'Лошадь', children: detail.horse.name },
+          { key: 'arena', label: 'Манеж', children: detail.arena?.name || 'Не указан' },
           { key: 'clients', label: 'Участники', children: detail.bookings.length ? <Space direction="vertical" size={4}>{detail.bookings.map(booking => <Space key={booking.id} wrap>
             <span>{personName(booking.client)}</span>
+            <Tag>{booking.horse?.name || 'Без лошади'}</Tag>
             {booking.membership && <Tag color="green">Абонемент: {booking.membership.remainedLessons} / {booking.membership.totalLessons}</Tag>}
           </Space>)}</Space> : 'Нет участников' },
         ]} />

@@ -81,14 +81,14 @@ test('today uses club day bounds and includes lessons without bookings', async (
   let query;
   const { service, sent } = bot({
     client: { findUnique: async () => null }, trainer: { findUnique: async () => ({ id: 'trainer' }) },
-    lesson: { findMany: async args => { query = args; return [{ id: 'lesson', startTime: new Date(), horse: { name: 'Звезда' }, bookings: [] }]; } },
+    lesson: { findMany: async args => { query = args; return [{ id: 'lesson', startTime: new Date(), bookings: [] }]; } },
   });
   try {
     await service.handleMessage(message('Расписание на сегодня'), 'today');
     assert.equal(query.where.trainerId, 'trainer');
     assert.equal(query.where.startTime.gte.getUTCHours(), 21);
     assert.equal(query.where.startTime.lt - query.where.startTime.gte, 86400000);
-    assert.match(sent[0].message, /Участников пока нет/); assert.match(sent[0].message, /Звезда/);
+    assert.match(sent[0].message, /Участников пока нет/);
   } finally { if (oldZone === undefined) delete process.env.CLUB_TIME_ZONE; else process.env.CLUB_TIME_ZONE = oldZone; }
 });
 test('ledger denies another trainer before making changes', async () => {

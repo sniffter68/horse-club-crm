@@ -2,8 +2,8 @@ import type { Client, Horse, Service, Trainer } from '../catalogs/types'
 export type Status = 'SCHEDULED' | 'COMPLETED' | 'NO_SHOW' | 'CANCELLED'
 export interface Lesson {
   id: string; startTime: string; endTime: string; status: Status;
-  trainer: Trainer; horse: Horse; service: Service;
-  bookings: { id: string; client: Client; membership: MembershipSummary | null }[];
+  trainer: Trainer; service: Service; arena: { id: string; name: string } | null;
+  bookings: { id: string; client: Client; horse: Horse | null; membership: MembershipSummary | null }[];
 }
 export interface MembershipSummary {
   id: string; totalLessons: number; remainedLessons: number; validUntil: string; isActive?: boolean;
@@ -13,7 +13,7 @@ export interface ClientWithMemberships extends Client { memberships: MembershipS
 export interface ClubSchedule { openTime: string; closeTime: string; dayOfWeekOff: number }
 export interface Workload { maxDailyMinutes: number; usedMinutes: number; remainingMinutes: number }
 export interface BookingValues {
-  clientId: string; membershipId?: string; serviceId: string; trainerId: string; horseId: string; startTime: string; durationMinutes: number;
+  clientId: string; membershipId?: string; serviceId: string; trainerId: string; horseId?: string; arenaId?: string; startTime: string; durationMinutes: number;
 }
 export const statuses: Record<Status, { color: string; label: string }> = {
   SCHEDULED: { color: '#1677ff', label: 'Запланировано' },

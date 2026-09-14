@@ -8,7 +8,8 @@ const { LessonsService } = require('../dist/lessons/lessons.service');
 const scheduled = {
   id: 'lesson-1',
   trainerId: 'trainer-1',
-  horseId: 'horse-1',
+  arenaId: null,
+  bookings: [{ horseId: 'horse-1' }],
   status: LessonStatus.SCHEDULED,
   startTime: new Date('2026-09-07T10:00:00.000Z'),
   endTime: new Date('2026-09-07T11:00:00.000Z'),
@@ -17,7 +18,8 @@ const scheduled = {
 function matchesConflict(lesson, where) {
   const resourceMatches = where.OR.some((condition) =>
     (condition.trainerId && lesson.trainerId === condition.trainerId) ||
-    (condition.horseId && lesson.horseId === condition.horseId));
+    (condition.arenaId && lesson.arenaId === condition.arenaId) ||
+    (condition.bookings?.some?.horseId && lesson.bookings.some((booking) => booking.horseId === condition.bookings.some.horseId)));
   return (
     lesson.status !== where.status.not &&
     resourceMatches &&
@@ -32,7 +34,7 @@ function prismaWithLessons(lessons) {
     lesson: {
       findMany: async ({ where }) => lessons
         .filter((lesson) => matchesConflict(lesson, where))
-        .map(({ trainerId, horseId }) => ({ trainerId, horseId })),
+        .map(({ trainerId, arenaId, bookings }) => ({ trainerId, arenaId, bookings })),
     },
   };
 }
@@ -137,7 +139,7 @@ test('create uses service duration and creates the first booking atomically', as
   assert.equal(createArgs.data.endTime.toISOString(), '2026-09-08T10:45:00.000Z');
   assert.equal(createArgs.data.status, LessonStatus.SCHEDULED);
   assert.deepEqual(createArgs.data.bookings.create, {
-    clientId: 'client-1', membershipId: 'membership-1',
+    clientId: 'client-1', horseId: 'horse-1', membershipId: 'membership-1',
   });
   assert.equal(result.id, 'lesson-new');
   assert.deepEqual(transactionOptions, {
@@ -186,7 +188,6 @@ test('creation retries P2034 and list query uses interval intersection filters',
   const service = new LessonsService(prisma, unusedLedger);
   await service.createLesson({
     trainerId: 'trainer-1',
-    horseId: 'horse-1',
     serviceId: 'service-1',
     startTime: '2026-09-08T10:00:00.000Z',
   });

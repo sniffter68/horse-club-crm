@@ -75,8 +75,8 @@ export class VkBotService {
       }
       if (client && ['bookings', 'мои тренировки'].includes(command)) {
         const rows = await this.prisma.booking.findMany({ where: { clientId: client.id, lesson: { status: 'SCHEDULED', startTime: { gte: new Date() } } },
-          include: { lesson: { include: { trainer: true, horse: true } } }, orderBy: [{ lesson: { startTime: 'asc' } }, { id: 'asc' }], skip: offset, take: 11 });
-        await this.send(peer, eventId, rows.length ? rows.slice(0, 10).map(row => `${date(row.lesson.startTime)} — ${row.lesson.trainer.name}, лошадь ${row.lesson.horse.name}`).join('\n') : 'Предстоящих тренировок нет.', rows.length > 10 ? this.next('bookings', offset) : menu(false)); return;
+          include: { horse: true, lesson: { include: { trainer: true } } }, orderBy: [{ lesson: { startTime: 'asc' } }, { id: 'asc' }], skip: offset, take: 11 });
+        await this.send(peer, eventId, rows.length ? rows.slice(0, 10).map(row => `${date(row.lesson.startTime)} — ${row.lesson.trainer.name}${row.horse ? `, лошадь ${row.horse.name}` : ''}`).join('\n') : 'Предстоящих тренировок нет.', rows.length > 10 ? this.next('bookings', offset) : menu(false)); return;
       }
       await this.send(peer, eventId, `Здравствуйте, ${trainer?.name || client?.firstName || 'всадник'}! Выберите действие. Время: ${zone()}.`, menu(Boolean(trainer)));
     } catch (error) {
@@ -89,12 +89,12 @@ export class VkBotService {
     const start = DateTime.now().setZone(zone()).startOf('day');
     if (!start.isValid) throw new ServiceUnavailableException('Неверный часовой пояс клуба');
     const rows = await this.prisma.lesson.findMany({ where: { trainerId, status: { not: 'CANCELLED' }, startTime: { gte: start.toJSDate(), lt: start.plus({ days: 1 }).toJSDate() } },
-      include: { horse: true, bookings: { include: { client: true }, orderBy: { id: 'asc' } } }, orderBy: [{ startTime: 'asc' }, { id: 'asc' }], skip: offset, take: 11 });
+      include: { bookings: { include: { client: true, horse: true }, orderBy: { id: 'asc' } } }, orderBy: [{ startTime: 'asc' }, { id: 'asc' }], skip: offset, take: 11 });
     if (!rows.length) { await this.send(peer, event, 'На сегодня занятий нет.', menu(true)); return; }
     for (const lesson of rows.slice(0, 10)) {
-      if (!lesson.bookings.length) await this.send(peer, `${event}:${lesson.id}`, `${date(lesson.startTime)} — лошадь ${lesson.horse.name}. Участников пока нет.`);
+      if (!lesson.bookings.length) await this.send(peer, `${event}:${lesson.id}`, `${date(lesson.startTime)} — Участников пока нет.`);
       for (const row of lesson.bookings) {
-      await this.send(peer, `${event}:${row.id}`, `${date(lesson.startTime)} — ${row.client.name}, лошадь ${lesson.horse.name}\nОтметка: ${row.attendanceStatus}`,
+      await this.send(peer, `${event}:${row.id}`, `${date(lesson.startTime)} — ${row.client.name}${row.horse ? `, лошадь ${row.horse.name}` : ''}\nОтметка: ${row.attendanceStatus}`,
         Keyboard.keyboard([
           Keyboard.callbackButton({ label: '✅ Присутствовал', payload: { action: 'attendance', bookingId: row.id, attended: true } }),
           Keyboard.callbackButton({ label: '❌ Неявка', payload: { action: 'attendance', bookingId: row.id, attended: false } }),

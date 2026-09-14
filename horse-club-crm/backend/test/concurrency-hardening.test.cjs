@@ -24,7 +24,7 @@ test('PostgreSQL: resource and last-balance races', { skip: !enabled, timeout: 6
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
   await app.init();
   const p = app.get(PrismaService), ledger = app.get(MembershipLedgerService);
-  const trainers = [], horses = [], lessons = [];
+  const trainers = [], horses = [], clients = [], lessons = [];
   const serviceId = randomUUID(), membershipId = randomUUID();
   try {
     await p.service.create({ data: { id: serviceId, name: 'QA concurrency', durationMinutes: 30 } });
@@ -38,7 +38,8 @@ test('PostgreSQL: resource and last-balance races', { skip: !enabled, timeout: 6
       for (let i = 0; i < 5; i++) {
         const trainer = await p.trainer.create({ data: { name: 'QA race trainer' } }); trainers.push(trainer.id);
         const horse = await p.horse.create({ data: { name: 'QA race horse' } }); horses.push(horse.id);
-        pairs.push({ trainerId: trainer.id, horseId: horse.id });
+        const client = await p.client.create({ data: { name: 'QA race client', firstName: 'QA', lastName: 'Client' } }); clients.push(client.id);
+        pairs.push({ trainerId: trainer.id, horseId: horse.id, clientId: client.id });
       }
       const responses = await Promise.all(pairs.map(pair => request(app.getHttpServer()).post('/api/lessons').send({
         ...pair, [resource === 'trainer' ? 'trainerId' : 'horseId']: pairs[0][resource === 'trainer' ? 'trainerId' : 'horseId'],
@@ -60,10 +61,12 @@ test('PostgreSQL: resource and last-balance races', { skip: !enabled, timeout: 6
   } finally {
     await p.membershipOp.deleteMany({ where: { membershipId } });
     await p.membership.deleteMany({ where: { id: membershipId } });
+    await p.booking.deleteMany({ where: { lessonId: { in: lessons } } });
     await p.lesson.deleteMany({ where: { serviceId } });
     await p.service.deleteMany({ where: { id: serviceId } });
     await p.trainer.deleteMany({ where: { id: { in: trainers } } });
     await p.horse.deleteMany({ where: { id: { in: horses } } });
+    await p.client.deleteMany({ where: { id: { in: clients } } });
     await app.close();
   }
 });

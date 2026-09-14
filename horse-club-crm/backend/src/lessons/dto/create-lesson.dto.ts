@@ -7,9 +7,15 @@ export class CreateLessonDto {
   @IsUUID()
   trainerId!: string;
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiPropertyOptional({ format: 'uuid', description: 'Лошадь участника. Не требуется для теоретического занятия.' })
+  @IsOptional()
   @IsUUID()
-  horseId!: string;
+  horseId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Манеж или площадка проведения занятия.' })
+  @IsOptional()
+  @IsUUID()
+  arenaId?: string;
 
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
