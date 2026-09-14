@@ -230,7 +230,8 @@ export class LessonsService {
         where: { id: lessonId },
         select: {
           status: true,
-          bookings: { select: { membershipId: true } },
+          service: { select: { allowMembership: true } },
+          bookings: { select: { id: true, clientId: true, membershipId: true } },
           operations: {
             where: {
               type: { in: [MembershipOpType.DEBIT, MembershipOpType.REFUND] },
@@ -257,11 +258,37 @@ export class LessonsService {
       // Один абонемент может быть указан в нескольких bookings одного урока.
       // Дедупликация не допускает второго списания, а сортировка задаёт единый
       // порядок advisory-lock и предотвращает взаимные блокировки.
+      const resolvedMembershipIds: Array<string | null> = [];
+      for (const booking of lesson.bookings) {
+        let membershipId = booking.membershipId;
+        if (
+          !membershipId &&
+          lesson.service.allowMembership &&
+          (newStatus === LessonStatus.COMPLETED || newStatus === LessonStatus.NO_SHOW)
+        ) {
+          const membership = await tx.membership.findFirst({
+            where: {
+              clientId: booking.clientId,
+              remainedLessons: { gt: 0 },
+              validUntil: { gte: new Date() },
+            },
+            orderBy: [{ validUntil: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+            select: { id: true },
+          });
+          membershipId = membership?.id ?? null;
+          if (membershipId) {
+            await tx.booking.update({
+              where: { id: booking.id },
+              data: { membershipId },
+            });
+          }
+        }
+        resolvedMembershipIds.push(membershipId);
+      }
+
       const membershipIds = [
         ...new Set(
-          lesson.bookings
-            .map((booking) => booking.membershipId)
-            .filter((id): id is string => id !== null),
+          resolvedMembershipIds.filter((id): id is string => id !== null),
         ),
       ].sort();
       const debitedMembershipIds = new Set(

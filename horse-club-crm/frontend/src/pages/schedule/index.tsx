@@ -11,7 +11,7 @@ import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { useCatalogPermissions } from '../catalogs/permissions'
 import type { Client, Horse, Service, Trainer } from '../catalogs/types'
 import { CLUB_TIME_ZONE, formatTime, toInstant, toLocalInput } from './time'
-import { statuses, type BookingValues, type ClubSchedule, type Lesson, type Status, type Workload } from './types'
+import { statuses, type BookingValues, type ClientWithMemberships, type ClubSchedule, type Lesson, type MembershipSummary, type Status, type Workload } from './types'
 
 async function catalog<T>(resource: string, signal: AbortSignal): Promise<T[]> {
   const records: T[] = []
@@ -22,6 +22,7 @@ async function catalog<T>(resource: string, signal: AbortSignal): Promise<T[]> {
   }
 }
 const personName = (client: Client) => [client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || client.id
+const membershipDate = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeZone: CLUB_TIME_ZONE })
 
 export function SchedulePage() {
   const { canManage } = useCatalogPermissions()
@@ -53,11 +54,16 @@ export function SchedulePage() {
   const savingRef = useRef(false)
   const [form] = Form.useForm<BookingValues>()
   const selectedHorse = Form.useWatch('horseId', form) as string | undefined
+  const selectedClient = Form.useWatch('clientId', form) as string | undefined
+  const selectedService = Form.useWatch('serviceId', form) as string | undefined
   const selectedStart = Form.useWatch('startTime', form) as string | undefined
   const duration = Form.useWatch('durationMinutes', form) as number | undefined
   const [workload, setWorkload] = useState<Workload>()
   const [workloadLoading, setWorkloadLoading] = useState(false)
   const [workloadError, setWorkloadError] = useState<string>()
+  const [memberships, setMemberships] = useState<MembershipSummary[]>([])
+  const [membershipsLoading, setMembershipsLoading] = useState(false)
+  const [membershipsError, setMembershipsError] = useState<string>()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -102,6 +108,39 @@ export function SchedulePage() {
     return () => controller.abort()
   }, [bookingOpen, selectedHorse, selectedStart, revision, report])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    const loadMemberships = async () => {
+      await Promise.resolve()
+      if (controller.signal.aborted) return
+      const service = services.find(item => item.id === selectedService)
+      setMemberships([]); setMembershipsError(undefined)
+      if (!bookingOpen || !selectedClient || !service?.allowMembership) {
+        setMembershipsLoading(false)
+        form.setFieldValue('membershipId', undefined)
+        return
+      }
+      setMembershipsLoading(true)
+      try {
+        const response = await httpClient.get<ClientWithMemberships>(`${API_URL}/clients/${selectedClient}`, { signal: controller.signal })
+        if (controller.signal.aborted) return
+        const active = response.data.memberships
+          .filter(membership => membership.isActive)
+          .sort((left, right) => new Date(left.validUntil).getTime() - new Date(right.validUntil).getTime())
+        setMemberships(active)
+        form.setFieldValue('membershipId', active[0]?.id)
+      } catch (cause) {
+        if (controller.signal.aborted) return
+        setMembershipsError(toHttpError(cause).message)
+        form.setFieldValue('membershipId', undefined)
+      } finally {
+        if (!controller.signal.aborted) setMembershipsLoading(false)
+      }
+    }
+    void loadMemberships()
+    return () => controller.abort()
+  }, [bookingOpen, selectedClient, selectedService, services, form])
+
   function openBooking(start: Date, minutes = 60) {
     if (!canManage || !ready || savingRef.current) return
     form.resetFields()
@@ -123,7 +162,9 @@ export function SchedulePage() {
     try {
       const response = await httpClient.patch<Lesson>(`${API_URL}/lessons/${detail.id}/status`, { status })
       setDetail(response.data); setLessons(rows => rows.map(row => row.id === response.data.id ? response.data : row))
-      setRevision(value => value + 1); void message.success('Статус обновлён')
+      setRevision(value => value + 1)
+      const membershipWasDebited = status === 'COMPLETED' && response.data.bookings.some(booking => booking.membership)
+      void message.success(membershipWasDebited ? 'Явка отмечена. Занятие списано из абонемента' : 'Статус обновлён')
     } catch (cause) { report(cause) }
     finally { savingRef.current = false; setSaving(false) }
   }
@@ -157,6 +198,13 @@ export function SchedulePage() {
       <Form form={form} layout="vertical" onFinish={createBooking} disabled={saving}>
         <Form.Item name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}><Select showSearch optionFilterProp="label" options={clients.map(row => ({ value: row.id, label: personName(row) }))} /></Form.Item>
         <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} onChange={id => form.setFieldsValue({ durationMinutes: services.find(row => row.id === id)?.durationMinutes })} /></Form.Item>
+        {services.find(item => item.id === selectedService)?.allowMembership && <Form.Item name="membershipId" label="Абонемент" extra="Активный абонемент с ближайшим сроком окончания выбирается автоматически.">
+          <Select allowClear loading={membershipsLoading} placeholder={memberships.length ? 'Выберите абонемент' : 'Активных абонементов нет'} options={memberships.map(membership => ({
+            value: membership.id,
+            label: `${membership.pricingPlan?.name || 'Абонемент'} · ${membership.remainedLessons} / ${membership.totalLessons} · до ${membershipDate.format(new Date(membership.validUntil))}`,
+          }))} />
+        </Form.Item>}
+        {membershipsError && <Alert type="error" showIcon message="Не удалось загрузить абонементы" description={membershipsError} />}
         <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
         <Form.Item name="horseId" label="Лошадь" rules={[{ required: true, message: 'Выберите лошадь' }]}><Select showSearch optionFilterProp="label" options={horseOptions} /></Form.Item>
         <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><Input type="datetime-local" /></Form.Item>
@@ -177,7 +225,10 @@ export function SchedulePage() {
           { key: 'end', label: 'Окончание', children: formatTime(detail.endTime) },
           { key: 'trainer', label: 'Тренер', children: detail.trainer.name },
           { key: 'horse', label: 'Лошадь', children: detail.horse.name },
-          { key: 'clients', label: 'Участники', children: detail.bookings.length ? detail.bookings.map(booking => personName(booking.client)).join(', ') : 'Нет участников' },
+          { key: 'clients', label: 'Участники', children: detail.bookings.length ? <Space direction="vertical" size={4}>{detail.bookings.map(booking => <Space key={booking.id} wrap>
+            <span>{personName(booking.client)}</span>
+            {booking.membership && <Tag color="green">Абонемент: {booking.membership.remainedLessons} / {booking.membership.totalLessons}</Tag>}
+          </Space>)}</Space> : 'Нет участников' },
         ]} />
         <Space wrap>
           <Button disabled={saving || detail.status === 'CANCELLED' || detail.status === 'COMPLETED'} onClick={() => void changeStatus('COMPLETED')}>Отметить присутствие</Button>
