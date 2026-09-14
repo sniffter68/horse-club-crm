@@ -3,6 +3,13 @@ const { test } = require('node:test');
 require('reflect-metadata');
 
 const { HorseHealthLogsService } = require('../dist/horse-health-logs/horse-health-logs.service');
+const { HorseHealthLogsModule } = require('../dist/horse-health-logs/horse-health-logs.module');
+const { AuthModule } = require('../dist/auth/auth.module');
+
+test('health logs module imports authentication providers for its guards', () => {
+  const imports = Reflect.getMetadata('imports', HorseHealthLogsModule) ?? [];
+  assert.ok(imports.includes(AuthModule));
+});
 
 test('health log list searches horse names and notes', async () => {
   let findManyArgs;
