@@ -24,7 +24,8 @@ export function Sidebar() {
     ...toMenuItems(menuItems.filter(item =>
       (item.name !== 'settings' || role === 'ADMIN' || role === 'MANAGER') &&
       (item.name !== 'users' || role === 'ADMIN') &&
-      (item.name !== 'memberships' || role !== 'TRAINER'),
+      (item.name !== 'memberships' || role !== 'TRAINER') &&
+      (item.name !== 'pricing-plans' || role !== 'TRAINER'),
     )),
     { key: 'logout', icon: <LogoutOutlined />, label: 'Выход', disabled: isPending, onClick: () => logout() },
   ]

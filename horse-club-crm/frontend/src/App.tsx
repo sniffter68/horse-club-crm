@@ -16,6 +16,9 @@ import { UserList } from './pages/users/list'
 import { UserCreate } from './pages/users/create'
 import { MembershipList } from './pages/memberships/list'
 import { MembershipCreate } from './pages/memberships/create'
+import { PricingPlanList } from './pages/pricing-plans/list'
+import { PricingPlanCreate } from './pages/pricing-plans/create'
+import { PricingPlanEdit } from './pages/pricing-plans/edit'
 import { Authenticated, Refine, type ResourceProps } from '@refinedev/core'
 import { ThemedLayout as ThemedLayoutV2, ThemedTitle as ThemedTitleV2, useNotificationProvider } from '@refinedev/antd'
 import routerProvider, { CatchAllNavigate } from '@refinedev/react-router'
@@ -40,6 +43,7 @@ const resources: ResourceProps[] = [
   { name: 'lessons', list: '/schedule', meta: { label: 'Расписание' } },
   { name: 'settings', list: '/settings', meta: { label: 'Настройки' } },
   { name: 'memberships', list: '/memberships', create: '/memberships/new', meta: { label: 'Абонементы' } },
+  { name: 'pricing-plans', list: '/pricing-plans', create: '/pricing-plans/new', edit: '/pricing-plans/edit/:id', meta: { label: 'Тарифы' } },
   { name: 'users', list: '/users', create: '/users/new', meta: { label: 'Пользователи' } },
 ]
 function LoadingPage() {
@@ -68,6 +72,7 @@ export default function App() {
                 <Route path="schedule" element={<Suspense fallback={<LoadingPage />}><SchedulePage /></Suspense>} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="memberships"><Route index element={<MembershipList />} /><Route path="new" element={<MembershipCreate />} /></Route>
+                <Route path="pricing-plans"><Route index element={<PricingPlanList />} /><Route path="new" element={<PricingPlanCreate />} /><Route path="edit/:id" element={<PricingPlanEdit />} /></Route>
                 <Route path="users"><Route index element={<UserList />} /><Route path="new" element={<UserCreate />} /></Route>
                 <Route path="*" element={<Result status="404" title="404" subTitle="Страница не найдена" />} />
               </Route>
