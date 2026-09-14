@@ -9,6 +9,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { CreateClientDto } from './dto/create-client.dto';
 import type { UpdateClientDto } from './dto/update-client.dto';
 
+const clientMembershipSelect = {
+  id: true,
+  totalLessons: true,
+  remainedLessons: true,
+  validUntil: true,
+  createdAt: true,
+  pricingPlan: { select: { id: true, name: true } },
+} satisfies Prisma.MembershipSelect;
+
+type ClientMembership = Prisma.MembershipGetPayload<{ select: typeof clientMembershipSelect }> & { isActive: boolean };
+export type ClientDetailsResponse = Client & { memberships: ClientMembership[] };
+
 @Injectable()
 export class ClientsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -37,10 +49,25 @@ export class ClientsService {
     return { data, total };
   }
 
-  async findOne(id: string): Promise<Client> {
-    const client = await this.prisma.client.findUnique({ where: { id } });
+  async findOne(id: string): Promise<ClientDetailsResponse> {
+    const client = await this.prisma.client.findUnique({
+      where: { id },
+      include: {
+        memberships: {
+          select: clientMembershipSelect,
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        },
+      },
+    });
     if (!client) throw new NotFoundException('Клиент не найден');
-    return client;
+    const now = new Date();
+    return {
+      ...client,
+      memberships: client.memberships.map((membership) => ({
+        ...membership,
+        isActive: membership.remainedLessons > 0 && membership.validUntil >= now,
+      })),
+    };
   }
 
   async create(dto: CreateClientDto): Promise<Client> {

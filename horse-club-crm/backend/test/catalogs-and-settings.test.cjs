@@ -22,6 +22,14 @@ const clients = [
   { id: '33333333-3333-4333-8333-333333333333', name: 'Вера', phone: '+70000000003', email: null, medicalNotes: 'Ограничение' },
   { id: '44444444-4444-4444-8444-444444444444', name: 'Глеб', phone: '+70000000004', email: null, medicalNotes: null },
 ];
+const membership = {
+  id: '55555555-5555-4555-8555-555555555555',
+  totalLessons: 8,
+  remainedLessons: 6,
+  validUntil: new Date('2099-12-31T00:00:00.000Z'),
+  createdAt: new Date('2026-09-01T00:00:00.000Z'),
+  pricingPlan: { id: '66666666-6666-4666-8666-666666666666', name: '8 занятий' },
+};
 
 let schedule = {
   id: 1,
@@ -35,7 +43,13 @@ const prisma = {
   client: {
     count: async () => clients.length,
     findMany: async ({ skip, take }) => clients.slice(skip, skip + take),
-    findUnique: async ({ where }) => clients.find((client) => client.id === where.id) ?? null,
+    findUnique: async ({ where, include }) => {
+      const client = clients.find((item) => item.id === where.id);
+      if (!client) return null;
+      return include?.memberships
+        ? { ...client, memberships: client.id === clientId ? [membership] : [] }
+        : client;
+    },
   },
   clubSchedule: {
     upsert: async () => schedule,
@@ -106,12 +120,15 @@ test('client medical notes are hidden from TRAINER and preserved for ADMIN', asy
     .set('x-test-role', Role.TRAINER)
     .expect(200);
   assert.equal(Object.hasOwn(trainerResponse.body, 'medicalNotes'), false);
+  assert.equal(trainerResponse.body.memberships[0].pricingPlan.name, '8 занятий');
+  assert.equal(trainerResponse.body.memberships[0].isActive, true);
 
   const adminResponse = await request(app.getHttpServer())
     .get(`/api/clients/${clientId}`)
     .set('x-test-role', Role.ADMIN)
     .expect(200);
   assert.equal(adminResponse.body.medicalNotes, 'Аллергия');
+  assert.equal(adminResponse.body.memberships[0].remainedLessons, 6);
 });
 
 test('ADMIN updates club schedule while TRAINER receives 403', async () => {

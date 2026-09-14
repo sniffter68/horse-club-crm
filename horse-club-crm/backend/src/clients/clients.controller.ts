@@ -13,7 +13,7 @@ import { SanitizeTrainerFields } from '../common/decorators/sanitize-trainer-fie
 import { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { SanitizeRbacInterceptor } from '../common/interceptors/sanitize-rbac.interceptor';
 import { setRefineTotalHeaders } from '../common/refine';
-import { ClientsService } from './clients.service';
+import { ClientsService, type ClientDetailsResponse } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
@@ -36,7 +36,7 @@ export class ClientsController {
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
-  findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<Client> {
+  findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<ClientDetailsResponse> {
     return this.clientsService.findOne(id);
   }
 
