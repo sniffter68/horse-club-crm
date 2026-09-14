@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, type Stall } from '@prisma/client';
+import { BoardingContractStatus, Prisma } from '@prisma/client';
 import type { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { rethrowCatalogMutation } from '../common/prisma-errors';
 import { parseRefineQuery, type PaginatedResult } from '../common/refine';
@@ -7,11 +7,25 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { CreateStallDto } from './dto/create-stall.dto';
 import type { UpdateStallDto } from './dto/update-stall.dto';
 
+const stallInclude = Prisma.validator<Prisma.StallDefaultArgs>()({
+  include: {
+    contracts: {
+      where: { status: { in: [BoardingContractStatus.DRAFT, BoardingContractStatus.ACTIVE, BoardingContractStatus.SUSPENDED] } },
+      include: {
+        horse: { select: { id: true, name: true } },
+        client: { select: { id: true, name: true, firstName: true, lastName: true } },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+    },
+  },
+});
+export type StallWithContracts = Prisma.StallGetPayload<typeof stallInclude>;
+
 @Injectable()
 export class StallsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(query: RefineQueryDto): Promise<PaginatedResult<Stall>> {
+  async findAll(query: RefineQueryDto): Promise<PaginatedResult<StallWithContracts>> {
     const options = parseRefineQuery(
       query,
       ['id', 'name', 'isUnavailable', 'createdAt', 'updatedAt'],
@@ -30,6 +44,7 @@ export class StallsService {
       this.prisma.stall.count({ where }),
       this.prisma.stall.findMany({
         where,
+        include: stallInclude.include,
         orderBy: [orderBy, { id: 'asc' }],
         skip: options.skip,
         take: options.take,
@@ -38,31 +53,31 @@ export class StallsService {
     return { total, data };
   }
 
-  async findOne(id: string): Promise<Stall> {
-    const stall = await this.prisma.stall.findUnique({ where: { id } });
+  async findOne(id: string): Promise<StallWithContracts> {
+    const stall = await this.prisma.stall.findUnique({ where: { id }, include: stallInclude.include });
     if (!stall) throw new NotFoundException('Денник не найден');
     return stall;
   }
 
-  async create(dto: CreateStallDto): Promise<Stall> {
+  async create(dto: CreateStallDto): Promise<StallWithContracts> {
     try {
-      return await this.prisma.stall.create({ data: this.normalize(dto) });
+      return await this.prisma.stall.create({ data: this.normalize(dto), include: stallInclude.include });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Денник');
     }
   }
 
-  async update(id: string, dto: UpdateStallDto): Promise<Stall> {
+  async update(id: string, dto: UpdateStallDto): Promise<StallWithContracts> {
     try {
-      return await this.prisma.stall.update({ where: { id }, data: this.normalize(dto) });
+      return await this.prisma.stall.update({ where: { id }, data: this.normalize(dto), include: stallInclude.include });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Денник');
     }
   }
 
-  async remove(id: string): Promise<Stall> {
+  async remove(id: string): Promise<StallWithContracts> {
     try {
-      return await this.prisma.stall.delete({ where: { id } });
+      return await this.prisma.stall.delete({ where: { id }, include: stallInclude.include });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Денник');
     }

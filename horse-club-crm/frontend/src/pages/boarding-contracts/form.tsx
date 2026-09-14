@@ -55,7 +55,7 @@ export function BoardingContractForm({ action }: { action: 'create' | 'edit' }) 
     resource="boarding-contracts"
     action={action}
     title={action === 'create' ? 'Новый договор постоя' : 'Редактирование договора постоя'}
-    defaults={{ status: 'DRAFT', startsAt: dayjs(), monthlyRate: 0 }}
+    defaults={{ status: 'ACTIVE', startsAt: dayjs(), monthlyRate: 0 }}
     toPayload={toPayload}
   >
     <Form.Item name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}>

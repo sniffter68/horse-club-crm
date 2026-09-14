@@ -35,6 +35,8 @@ test('stall list supports Refine pagination, search and sorting', async () => {
     ],
   });
   assert.deepEqual(findManyArgs.orderBy, [{ isUnavailable: 'desc' }, { id: 'asc' }]);
+  assert.deepEqual(findManyArgs.include.contracts.where, { status: { in: ['DRAFT', 'ACTIVE', 'SUSPENDED'] } });
+  assert.deepEqual(findManyArgs.include.contracts.include.horse, { select: { id: true, name: true } });
   assert.equal(findManyArgs.skip, 10);
   assert.equal(findManyArgs.take, 10);
 });

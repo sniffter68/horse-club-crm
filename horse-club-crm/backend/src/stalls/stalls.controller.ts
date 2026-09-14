@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Role, type Stall } from '@prisma/client';
+import { Role } from '@prisma/client';
 import type { Response } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -9,7 +9,7 @@ import { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { setRefineTotalHeaders } from '../common/refine';
 import { CreateStallDto } from './dto/create-stall.dto';
 import { UpdateStallDto } from './dto/update-stall.dto';
-import { StallsService } from './stalls.service';
+import { StallsService, type StallWithContracts } from './stalls.service';
 
 @ApiTags('Stalls')
 @ApiBearerAuth()
@@ -20,7 +20,7 @@ export class StallsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
-  async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) response: Response): Promise<Stall[]> {
+  async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) response: Response): Promise<StallWithContracts[]> {
     const { data, total } = await this.service.findAll(query);
     setRefineTotalHeaders(response, total);
     return data;
@@ -28,25 +28,25 @@ export class StallsController {
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
-  findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<Stall> {
+  findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<StallWithContracts> {
     return this.service.findOne(id);
   }
 
   @Post()
   @Roles(Role.ADMIN, Role.MANAGER)
-  create(@Body() dto: CreateStallDto): Promise<Stall> {
+  create(@Body() dto: CreateStallDto): Promise<StallWithContracts> {
     return this.service.create(dto);
   }
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
-  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateStallDto): Promise<Stall> {
+  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateStallDto): Promise<StallWithContracts> {
     return this.service.update(id, dto);
   }
 
   @Delete(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
-  remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<Stall> {
+  remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<StallWithContracts> {
     return this.service.remove(id);
   }
 }
