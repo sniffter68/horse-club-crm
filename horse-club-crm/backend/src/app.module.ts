@@ -12,6 +12,7 @@ import { MembershipsModule } from './memberships/memberships.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PricingPlansModule } from './pricing-plans/pricing-plans.module';
 import { ArenasModule } from './arenas/arenas.module';
+import { BoardingContractsModule } from './boarding-contracts/boarding-contracts.module';
 import { ServicesModule } from './services/services.module';
 import { SettingsModule } from './settings/settings.module';
 import { StallsModule } from './stalls/stalls.module';
@@ -31,6 +32,7 @@ import { UsersModule } from './users/users.module';
     MembershipsModule,
     PricingPlansModule,
     ArenasModule,
+    BoardingContractsModule,
     StallsModule,
     SettingsModule,
     ClientsModule,
