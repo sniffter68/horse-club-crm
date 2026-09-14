@@ -20,3 +20,5 @@ export interface ServiceValues {
 export interface Service extends Omit<ServiceValues, 'price'> { id: string; price?: string | number }
 export interface ArenaValues { name: string; description?: string; capacity: number; isUnavailable: boolean }
 export interface Arena extends Omit<ArenaValues, 'description'> { id: string; description: string | null; createdAt: string; updatedAt: string }
+export interface StallValues { name: string; description?: string; isUnavailable: boolean }
+export interface Stall extends Omit<StallValues, 'description'> { id: string; description: string | null; createdAt: string; updatedAt: string }

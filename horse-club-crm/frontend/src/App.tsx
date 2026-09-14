@@ -25,6 +25,9 @@ import { ArenaEdit } from './pages/arenas/edit'
 import { HorseHealthLogList } from './pages/horse-health-logs/list'
 import { HorseHealthLogCreate } from './pages/horse-health-logs/create'
 import { HorseHealthLogEdit } from './pages/horse-health-logs/edit'
+import { StallList } from './pages/stalls/list'
+import { StallCreate } from './pages/stalls/create'
+import { StallEdit } from './pages/stalls/edit'
 import { Authenticated, Refine, type ResourceProps } from '@refinedev/core'
 import { ThemedLayout as ThemedLayoutV2, ThemedTitle as ThemedTitleV2, useNotificationProvider } from '@refinedev/antd'
 import routerProvider, { CatchAllNavigate } from '@refinedev/react-router'
@@ -44,6 +47,7 @@ const catalogs = [
   { name: 'services', ListPage: ServiceList, CreatePage: ServiceCreate, EditPage: ServiceEdit, label: 'Услуги' },
   { name: 'arenas', ListPage: ArenaList, CreatePage: ArenaCreate, EditPage: ArenaEdit, label: 'Манежи' },
   { name: 'horse-health-logs', ListPage: HorseHealthLogList, CreatePage: HorseHealthLogCreate, EditPage: HorseHealthLogEdit, label: 'Журнал здоровья' },
+  { name: 'stalls', ListPage: StallList, CreatePage: StallCreate, EditPage: StallEdit, label: 'Денники' },
 ] as const
 const SchedulePage = lazy(() => import('./pages/schedule').then(module => ({ default: module.SchedulePage })))
 const resources: ResourceProps[] = [

@@ -14,6 +14,7 @@ import { PricingPlansModule } from './pricing-plans/pricing-plans.module';
 import { ArenasModule } from './arenas/arenas.module';
 import { ServicesModule } from './services/services.module';
 import { SettingsModule } from './settings/settings.module';
+import { StallsModule } from './stalls/stalls.module';
 import { TrainersModule } from './trainers/trainers.module';
 import { UsersModule } from './users/users.module';
 
@@ -30,6 +31,7 @@ import { UsersModule } from './users/users.module';
     MembershipsModule,
     PricingPlansModule,
     ArenasModule,
+    StallsModule,
     SettingsModule,
     ClientsModule,
     HorsesModule,
