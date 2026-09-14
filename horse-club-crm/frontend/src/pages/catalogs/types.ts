@@ -18,3 +18,5 @@ export interface ServiceValues {
   price?: number; cancellationWindowHours: number; allowMembership: boolean;
 }
 export interface Service extends Omit<ServiceValues, 'price'> { id: string; price?: string | number }
+export interface ArenaValues { name: string; description?: string; capacity: number; isUnavailable: boolean }
+export interface Arena extends Omit<ArenaValues, 'description'> { id: string; description: string | null; createdAt: string; updatedAt: string }

@@ -21,6 +21,11 @@ export class ListLessonsQueryDto {
   @IsUUID()
   horseId?: string;
 
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  arenaId?: string;
+
   @ApiPropertyOptional({ enum: LessonStatus })
   @IsOptional()
   @IsEnum(LessonStatus)

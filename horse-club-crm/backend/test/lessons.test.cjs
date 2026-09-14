@@ -69,6 +69,26 @@ test('blocks a mathematically overlapping horse interval', async () => {
   );
 });
 
+test('blocks a mathematically overlapping arena interval', async () => {
+  const service = new LessonsService(prismaWithLessons([{
+    ...scheduled,
+    trainerId: 'trainer-2',
+    arenaId: 'arena-1',
+    bookings: [],
+  }]), unusedLedger);
+  await assert.rejects(
+    service.validateNoConflicts(
+      'trainer-1',
+      undefined,
+      new Date('2026-09-07T10:15:00.000Z'),
+      new Date('2026-09-07T10:45:00.000Z'),
+      undefined,
+      'arena-1',
+    ),
+    (error) => error.getStatus() === 409 && error.message === 'Манеж уже занят в это время',
+  );
+});
+
 test('CANCELLED lessons do not block the same slot and touching intervals are allowed', async () => {
   const service = new LessonsService(
     prismaWithLessons([{ ...scheduled, status: LessonStatus.CANCELLED }]),
@@ -149,6 +169,24 @@ test('create uses service duration and creates the first booking atomically', as
   });
 });
 
+test('creation rejects an unavailable arena', async () => {
+  const tx = {
+    service: { findUnique: async () => ({ durationMinutes: 45 }) },
+    arena: { findUnique: async () => ({ name: 'Открытый плац', isUnavailable: true }) },
+  };
+  const prisma = { $transaction: async callback => callback(tx) };
+  const service = new LessonsService(prisma, unusedLedger);
+  await assert.rejects(
+    service.createLesson({
+      trainerId: 'trainer-1',
+      serviceId: 'service-1',
+      arenaId: 'arena-1',
+      startTime: '2026-09-08T10:00:00.000Z',
+    }),
+    (error) => error.getStatus() === 409 && error.message === 'Манеж "Открытый плац" недоступен',
+  );
+});
+
 test('creation retries P2034 and list query uses interval intersection filters', async () => {
   let attempts = 0;
   let listArgs;
@@ -197,10 +235,12 @@ test('creation retries P2034 and list query uses interval intersection filters',
     from: '2026-09-07T00:00:00.000Z',
     to: '2026-09-08T00:00:00.000Z',
     trainerId: 'trainer-1',
+    arenaId: 'arena-1',
     status: LessonStatus.SCHEDULED,
   });
   assert.deepEqual(listArgs.where, {
     trainerId: 'trainer-1',
+    arenaId: 'arena-1',
     status: LessonStatus.SCHEDULED,
     endTime: { gt: new Date('2026-09-07T00:00:00.000Z') },
     startTime: { lt: new Date('2026-09-08T00:00:00.000Z') },

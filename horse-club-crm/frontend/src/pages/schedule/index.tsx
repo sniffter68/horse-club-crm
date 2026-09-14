@@ -9,7 +9,7 @@ import { Alert, App, Button, Card, Descriptions, Form, Input, InputNumber, Modal
 import { useOnError } from '@refinedev/core'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { useCatalogPermissions } from '../catalogs/permissions'
-import type { Client, Horse, Service, Trainer } from '../catalogs/types'
+import type { Arena, Client, Horse, Service, Trainer } from '../catalogs/types'
 import { CLUB_TIME_ZONE, formatTime, toInstant, toLocalInput } from './time'
 import { statuses, type BookingValues, type ClientWithMemberships, type ClubSchedule, type Lesson, type MembershipSummary, type Status, type Workload } from './types'
 
@@ -42,11 +42,13 @@ export function SchedulePage() {
   const [horses, setHorses] = useState<Horse[]>([])
   const [trainers, setTrainers] = useState<Trainer[]>([])
   const [services, setServices] = useState<Service[]>([])
+  const [arenas, setArenas] = useState<Arena[]>([])
   const [ready, setReady] = useState(false)
   const [revision, setRevision] = useState(0)
   const [range, setRange] = useState<{ from: string; to: string }>()
   const [trainerId, setTrainerId] = useState<string>()
   const [horseId, setHorseId] = useState<string>()
+  const [arenaId, setArenaId] = useState<string>()
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [loading, setLoading] = useState(false)
   const [bookingOpen, setBookingOpen] = useState(false)
@@ -75,9 +77,10 @@ export function SchedulePage() {
       httpClient.get<ClubSchedule>(`${API_URL}/settings/club-schedule`, { signal: controller.signal }),
       catalog<Client>('clients', controller.signal), catalog<Horse>('horses', controller.signal),
       catalog<Trainer>('trainers', controller.signal), catalog<Service>('services', controller.signal),
-    ]).then(([settings, clientRows, horseRows, trainerRows, serviceRows]) => {
+      catalog<Arena>('arenas', controller.signal),
+    ]).then(([settings, clientRows, horseRows, trainerRows, serviceRows, arenaRows]) => {
       if (controller.signal.aborted) return
-      setSchedule(settings.data); setClients(clientRows); setHorses(horseRows); setTrainers(trainerRows); setServices(serviceRows); setReady(true)
+      setSchedule(settings.data); setClients(clientRows); setHorses(horseRows); setTrainers(trainerRows); setServices(serviceRows); setArenas(arenaRows); setReady(true)
     }).catch(cause => { if (!controller.signal.aborted) report(cause) })
     return () => controller.abort()
   }, [report, revision])
@@ -88,12 +91,12 @@ export function SchedulePage() {
     // Synchronize the loading indicator with this abortable request.
     // oxlint-disable-next-line react/set-state-in-effect
     setLoading(true)
-    httpClient.get<Lesson[]>(`${API_URL}/lessons`, { signal: controller.signal, params: { ...range, trainerId, horseId } })
+    httpClient.get<Lesson[]>(`${API_URL}/lessons`, { signal: controller.signal, params: { ...range, trainerId, horseId, arenaId } })
       .then(response => { if (!controller.signal.aborted) setLessons(response.data) })
       .catch(cause => { if (!controller.signal.aborted) { setLessons([]); report(cause) } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [range, trainerId, horseId, revision, report])
+  }, [range, trainerId, horseId, arenaId, revision, report])
 
   useEffect(() => {
     // Invalidate the previous horse/date result before requesting the next one.
@@ -145,7 +148,7 @@ export function SchedulePage() {
   function openBooking(start: Date, minutes = 60) {
     if (!canManage || !ready || savingRef.current) return
     form.resetFields()
-    form.setFieldsValue({ startTime: toLocalInput(start), durationMinutes: minutes, trainerId, horseId })
+    form.setFieldsValue({ startTime: toLocalInput(start), durationMinutes: minutes, trainerId, horseId, arenaId })
     setError(undefined); setBookingOpen(true)
   }
   async function createBooking(values: BookingValues) {
@@ -171,6 +174,7 @@ export function SchedulePage() {
   }
   const trainerOptions = trainers.map(row => ({ value: row.id, label: row.name }))
   const horseOptions = horses.map(row => ({ value: row.id, label: row.name, disabled: row.isUnavailable }))
+  const arenaOptions = arenas.map(row => ({ value: row.id, label: row.name, disabled: row.isUnavailable }))
   const failure = error ? <Alert type="error" showIcon message={error} /> : null
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
     <Typography.Title level={2}>Расписание занятий</Typography.Title>
@@ -179,6 +183,7 @@ export function SchedulePage() {
     <Space wrap>
       <Select aria-label="Фильтр по тренеру" placeholder="Все тренеры" allowClear showSearch optionFilterProp="label" style={{ width: 240 }} options={trainerOptions} value={trainerId} onChange={setTrainerId} />
       <Select aria-label="Фильтр по лошади" placeholder="Все лошади" allowClear showSearch optionFilterProp="label" style={{ width: 240 }} options={horseOptions.map(option => ({ ...option, disabled: false }))} value={horseId} onChange={setHorseId} />
+      <Select aria-label="Фильтр по манежу" placeholder="Все манежи" allowClear showSearch optionFilterProp="label" style={{ width: 240 }} options={arenaOptions.map(option => ({ ...option, disabled: false }))} value={arenaId} onChange={setArenaId} />
       <Button onClick={() => { setError(undefined); setRevision(value => value + 1) }}>Обновить</Button>
       {canManage && <Button type="primary" disabled={!ready} onClick={() => openBooking(new Date())}>Новое занятие</Button>}
     </Space>
@@ -208,6 +213,7 @@ export function SchedulePage() {
         {membershipsError && <Alert type="error" showIcon message="Не удалось загрузить абонементы" description={membershipsError} />}
         <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
         <Form.Item name="horseId" label="Лошадь участника" extra="Оставьте пустым для теоретического занятия или занятия без клубной лошади."><Select allowClear showSearch optionFilterProp="label" options={horseOptions} /></Form.Item>
+        <Form.Item name="arenaId" label="Манеж" extra="Необязательно для выездного или теоретического занятия."><Select allowClear showSearch optionFilterProp="label" options={arenaOptions} /></Form.Item>
         <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><Input type="datetime-local" /></Form.Item>
         <Form.Item name="durationMinutes" label="Длительность, мин" rules={[{ required: true }, { type: 'integer', min: 1 }]}><InputNumber min={1} precision={0} /></Form.Item>
         {workloadLoading && <Spin size="small" />}

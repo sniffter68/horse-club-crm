@@ -1,8 +1,8 @@
-import type { Client, Horse, Service, Trainer } from '../catalogs/types'
+import type { Arena, Client, Horse, Service, Trainer } from '../catalogs/types'
 export type Status = 'SCHEDULED' | 'COMPLETED' | 'NO_SHOW' | 'CANCELLED'
 export interface Lesson {
   id: string; startTime: string; endTime: string; status: Status;
-  trainer: Trainer; service: Service; arena: { id: string; name: string } | null;
+  trainer: Trainer; service: Service; arena: Arena | null;
   bookings: { id: string; client: Client; horse: Horse | null; membership: MembershipSummary | null }[];
 }
 export interface MembershipSummary {

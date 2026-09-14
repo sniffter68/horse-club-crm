@@ -136,6 +136,14 @@ export class LessonsService {
       if (!service) {
         throw new NotFoundException('Услуга не найдена');
       }
+      if (dto.arenaId) {
+        const arena = await tx.arena.findUnique({
+          where: { id: dto.arenaId },
+          select: { name: true, isUnavailable: true },
+        });
+        if (!arena) throw new NotFoundException('Манеж не найден');
+        if (arena.isUnavailable) throw new ConflictException(`Манеж "${arena.name}" недоступен`);
+      }
 
       const durationMinutes = dto.durationMinutes ?? service.durationMinutes;
       if (!Number.isSafeInteger(durationMinutes) || durationMinutes <= 0) {
@@ -206,6 +214,7 @@ export class LessonsService {
       where: {
         ...(query.trainerId ? { trainerId: query.trainerId } : {}),
         ...(query.horseId ? { bookings: { some: { horseId: query.horseId } } } : {}),
+        ...(query.arenaId ? { arenaId: query.arenaId } : {}),
         ...(query.status ? { status: query.status } : {}),
         // Возвращаем занятия, пересекающие полуоткрытый интервал [from, to).
         endTime: { gt: from },

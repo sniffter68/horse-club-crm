@@ -10,6 +10,7 @@ import { LessonsModule } from './lessons/lessons.module';
 import { MembershipsModule } from './memberships/memberships.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PricingPlansModule } from './pricing-plans/pricing-plans.module';
+import { ArenasModule } from './arenas/arenas.module';
 import { ServicesModule } from './services/services.module';
 import { SettingsModule } from './settings/settings.module';
 import { TrainersModule } from './trainers/trainers.module';
@@ -26,6 +27,7 @@ import { UsersModule } from './users/users.module';
     LessonsModule,
     MembershipsModule,
     PricingPlansModule,
+    ArenasModule,
     SettingsModule,
     ClientsModule,
     HorsesModule,
