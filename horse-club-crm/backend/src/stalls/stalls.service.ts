@@ -14,6 +14,10 @@ const stallInclude = Prisma.validator<Prisma.StallDefaultArgs>()({
       include: {
         horse: { select: { id: true, name: true } },
         client: { select: { id: true, name: true, firstName: true, lastName: true } },
+        payments: {
+          select: { id: true, amount: true, status: true, paidAt: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
     },

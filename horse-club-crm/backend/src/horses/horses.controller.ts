@@ -13,7 +13,7 @@ import { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { setRefineTotalHeaders } from '../common/refine';
 import { CreateHorseDto } from './dto/create-horse.dto';
 import { UpdateHorseDto } from './dto/update-horse.dto';
-import { HorsesService } from './horses.service';
+import { HorsesService, type HorseDetailsResponse } from './horses.service';
 
 @ApiTags('Horses')
 @ApiBearerAuth()
@@ -32,7 +32,7 @@ export class HorsesController {
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
-  findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<Horse> {
+  findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<HorseDetailsResponse> {
     return this.horsesService.findOne(id);
   }
 

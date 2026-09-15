@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useOne, type HttpError } from '@refinedev/core'
 import { Alert, Button, Descriptions, Empty, List, Modal, Progress, Skeleton, Space, Tag, Typography } from 'antd'
 import { CatalogList } from '../catalogs/shared'
-import type { Client } from '../catalogs/types'
+import { money } from '../catalogs/format'
+import type { Client, RelationBooking, RelationPayment } from '../catalogs/types'
+import { dateOnly, dateTime } from '../cards/format'
 
 type ClientMembership = {
   id: string
@@ -12,9 +14,16 @@ type ClientMembership = {
   createdAt: string
   isActive: boolean
   pricingPlan: { id: string; name: string } | null
+  payments: RelationPayment[]
 }
 
-type ClientDetails = Client & { memberships: ClientMembership[] }
+type ClientDetails = Client & {
+  memberships: ClientMembership[]
+  boardingContracts: Array<{ id: string; status: string; startsAt: string; endsAt: string | null; monthlyRate: string | number;
+    horse: { id: string; name: string }; stall: { id: string; name: string } | null; payments: RelationPayment[] }>
+  bookings: Array<RelationBooking & { horse: { id: string; name: string } | null }>
+  payments: Array<RelationPayment & { bookingId: string | null; boardingContractId: string | null; membershipId: string | null }>
+}
 
 const dateFormatter = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeZone: 'Europe/Moscow' })
 
@@ -72,6 +81,34 @@ export function ClientList() {
                 />
                 <Typography.Text type="secondary">Действует до {dateFormatter.format(new Date(membership.validUntil))}</Typography.Text>
               </div>
+            </List.Item>} />}
+        </div>
+        <div>
+          <Typography.Title level={5}>Постой</Typography.Title>
+          {client.boardingContracts.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Договоров постоя нет" /> :
+            <List dataSource={client.boardingContracts} renderItem={contract => <List.Item>
+              <Space wrap><Tag color={contract.status === 'ACTIVE' ? 'green' : 'default'}>{contract.status}</Tag>
+                <strong>{contract.horse.name}</strong><span>Денник: {contract.stall?.name || 'не назначен'}</span>
+                <span>{money(contract.monthlyRate)} / мес.</span><span>с {dateOnly(contract.startsAt)}</span></Space>
+            </List.Item>} />}
+        </div>
+        <div>
+          <Typography.Title level={5}>Последние занятия</Typography.Title>
+          {client.bookings.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Занятий нет" /> :
+            <List dataSource={client.bookings} renderItem={booking => <List.Item>
+              <Space wrap><span>{dateTime(booking.lesson.startTime)}</span>
+                <strong>{booking.lesson.service.title || booking.lesson.service.name}</strong>
+                <span>{booking.horse?.name || 'Без лошади'}</span><Tag>{booking.attendanceStatus}</Tag>
+                {booking.membership && <Tag color="blue">По абонементу</Tag>}</Space>
+            </List.Item>} />}
+        </div>
+        <div>
+          <Typography.Title level={5}>Начисления и оплаты</Typography.Title>
+          {client.payments.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Начислений нет" /> :
+            <List dataSource={client.payments} renderItem={payment => <List.Item>
+              <Space wrap><Tag color={payment.status === 'PAID' ? 'green' : payment.status === 'PENDING' ? 'gold' : 'default'}>{payment.status}</Tag>
+                <strong>{money(payment.amount)}</strong><span>{payment.description || 'Начисление'}</span>
+                <span>{dateTime(payment.paidAt || payment.createdAt)}</span></Space>
             </List.Item>} />}
         </div>
       </Space>}

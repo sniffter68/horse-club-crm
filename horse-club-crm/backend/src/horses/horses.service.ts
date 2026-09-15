@@ -9,6 +9,44 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { CreateHorseDto } from './dto/create-horse.dto';
 import type { UpdateHorseDto } from './dto/update-horse.dto';
 
+const horseDetailsInclude = Prisma.validator<Prisma.HorseDefaultArgs>()({
+  include: {
+    healthLogs: { orderBy: [{ occurredAt: 'desc' }, { id: 'asc' }], take: 20 },
+    boardingContracts: {
+      include: {
+        client: { select: { id: true, name: true, firstName: true, lastName: true } },
+        stall: { select: { id: true, name: true } },
+        payments: {
+          select: { id: true, amount: true, status: true, paidAt: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      take: 20,
+    },
+    bookings: {
+      include: {
+        client: { select: { id: true, name: true, firstName: true, lastName: true } },
+        membership: { select: { id: true } },
+        payments: {
+          select: { id: true, amount: true, status: true, paidAt: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        },
+        lesson: {
+          include: {
+            service: { select: { id: true, title: true, name: true } },
+            trainer: { select: { id: true, name: true } },
+            arena: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: [{ lesson: { startTime: 'desc' } }, { id: 'asc' }],
+      take: 20,
+    },
+  },
+});
+export type HorseDetailsResponse = Prisma.HorseGetPayload<typeof horseDetailsInclude>;
+
 @Injectable()
 export class HorsesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -35,8 +73,8 @@ export class HorsesService {
     return { data, total };
   }
 
-  async findOne(id: string): Promise<Horse> {
-    const horse = await this.prisma.horse.findUnique({ where: { id } });
+  async findOne(id: string): Promise<HorseDetailsResponse> {
+    const horse = await this.prisma.horse.findUnique({ where: { id }, include: horseDetailsInclude.include });
     if (!horse) throw new NotFoundException('Лошадь не найдена');
     return horse;
   }

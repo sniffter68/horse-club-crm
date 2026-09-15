@@ -6,7 +6,30 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { CreateMembershipDto } from './dto/create-membership.dto';
 
 const membershipInclude = { client: true, pricingPlan: true } satisfies Prisma.MembershipInclude;
-const membershipDetailsInclude = { ...membershipInclude, operations: { orderBy: { createdAt: 'desc' as const }, include: { lesson: true } } } satisfies Prisma.MembershipInclude;
+const membershipDetailsInclude = {
+  ...membershipInclude,
+  operations: {
+    orderBy: { createdAt: 'desc' as const },
+    include: { lesson: { include: { service: true, trainer: true, arena: true } } },
+  },
+  bookings: {
+    orderBy: [{ lesson: { startTime: 'desc' as const } }, { id: 'asc' as const }],
+    include: {
+      horse: { select: { id: true, name: true } },
+      lesson: {
+        include: {
+          service: { select: { id: true, title: true, name: true } },
+          trainer: { select: { id: true, name: true } },
+          arena: { select: { id: true, name: true } },
+        },
+      },
+    },
+  },
+  payments: {
+    select: { id: true, amount: true, status: true, paidAt: true, description: true, createdAt: true },
+    orderBy: { createdAt: 'desc' as const },
+  },
+} satisfies Prisma.MembershipInclude;
 type MembershipRecord = Prisma.MembershipGetPayload<{ include: typeof membershipInclude }>;
 type MembershipDetails = Prisma.MembershipGetPayload<{ include: typeof membershipDetailsInclude }>;
 export type MembershipResponse = MembershipRecord & { isActive: boolean };

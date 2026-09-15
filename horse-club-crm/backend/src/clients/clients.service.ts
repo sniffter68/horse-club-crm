@@ -9,6 +9,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { CreateClientDto } from './dto/create-client.dto';
 import type { UpdateClientDto } from './dto/update-client.dto';
 
+const paymentSummarySelect = {
+  id: true,
+  amount: true,
+  status: true,
+  paidAt: true,
+  description: true,
+  createdAt: true,
+} satisfies Prisma.PaymentSelect;
+
 const clientMembershipSelect = {
   id: true,
   totalLessons: true,
@@ -16,10 +25,52 @@ const clientMembershipSelect = {
   validUntil: true,
   createdAt: true,
   pricingPlan: { select: { id: true, name: true } },
+  payments: { select: paymentSummarySelect, orderBy: { createdAt: 'desc' as const } },
 } satisfies Prisma.MembershipSelect;
 
 type ClientMembership = Prisma.MembershipGetPayload<{ select: typeof clientMembershipSelect }> & { isActive: boolean };
-export type ClientDetailsResponse = Client & { memberships: ClientMembership[] };
+const clientDetailsInclude = Prisma.validator<Prisma.ClientDefaultArgs>()({
+  include: {
+    memberships: { select: clientMembershipSelect, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }] },
+    boardingContracts: {
+      include: {
+        horse: { select: { id: true, name: true } },
+        stall: { select: { id: true, name: true } },
+        payments: { select: paymentSummarySelect, orderBy: { createdAt: 'desc' } },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      take: 20,
+    },
+    bookings: {
+      include: {
+        horse: { select: { id: true, name: true } },
+        membership: { select: { id: true } },
+        payments: { select: paymentSummarySelect, orderBy: { createdAt: 'desc' } },
+        lesson: {
+          include: {
+            service: { select: { id: true, title: true, name: true } },
+            trainer: { select: { id: true, name: true } },
+            arena: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: [{ lesson: { startTime: 'desc' } }, { id: 'asc' }],
+      take: 20,
+    },
+    payments: {
+      select: {
+        ...paymentSummarySelect,
+        bookingId: true,
+        boardingContractId: true,
+        membershipId: true,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      take: 20,
+    },
+  },
+});
+type ClientDetails = Prisma.ClientGetPayload<typeof clientDetailsInclude>;
+export type ClientDetailsResponse = Omit<ClientDetails, 'memberships'> & { memberships: ClientMembership[] };
 
 @Injectable()
 export class ClientsService {
@@ -52,12 +103,7 @@ export class ClientsService {
   async findOne(id: string): Promise<ClientDetailsResponse> {
     const client = await this.prisma.client.findUnique({
       where: { id },
-      include: {
-        memberships: {
-          select: clientMembershipSelect,
-          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-        },
-      },
+      include: clientDetailsInclude.include,
     });
     if (!client) throw new NotFoundException('Клиент не найден');
     const now = new Date();
