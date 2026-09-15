@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useLogout, useMenu, usePermissions, type TreeMenuItem } from '@refinedev/core'
 import type { Role } from '../../authStorage'
 import { ThemedTitle } from '@refinedev/antd'
-import { LogoutOutlined, UnorderedListOutlined } from '@ant-design/icons'
-import { Layout, Menu, type MenuProps } from 'antd'
-import { Link, useLocation } from 'react-router-dom'
+import { LogoutOutlined, MenuOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import { Button, Drawer, Grid, Layout, Menu, type MenuProps } from 'antd'
+import { Link } from 'react-router-dom'
 
 function toMenuItems(resources: TreeMenuItem[]): NonNullable<MenuProps['items']> {
   return resources.map((item) => ({
@@ -17,8 +17,8 @@ function toMenuItems(resources: TreeMenuItem[]): NonNullable<MenuProps['items']>
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
-  const mobileRef = useRef(false)
-  const { pathname } = useLocation()
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const screens = Grid.useBreakpoint()
   const { menuItems, selectedKey, defaultOpenKeys } = useMenu()
   const { mutate: logout, isPending } = useLogout()
   const { data: role } = usePermissions<Role>({})
@@ -33,15 +33,37 @@ export function Sidebar() {
     )),
     { key: 'logout', icon: <LogoutOutlined />, label: 'Выход', disabled: isPending, onClick: () => logout() },
   ]
-  useEffect(() => {
-    if (mobileRef.current) setCollapsed(true)
-  }, [pathname])
+  if (!screens.lg) {
+    return <>
+      <Button
+        className="mobile-menu-button"
+        type="primary"
+        shape="round"
+        size="large"
+        icon={<MenuOutlined />}
+        aria-label="Открыть меню навигации"
+        onClick={() => setMobileOpen(true)}
+      >
+        Меню
+      </Button>
+      <Drawer
+        className="mobile-navigation-drawer"
+        placement="left"
+        width="min(86vw, 340px)"
+        title={<ThemedTitle collapsed={false} text="Horse CRM" />}
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        styles={{ body: { padding: 0 } }}
+      >
+        <Menu mode="inline" items={items} selectedKeys={[selectedKey]} defaultOpenKeys={defaultOpenKeys}
+          onClick={() => setMobileOpen(false)} />
+      </Drawer>
+    </>
+  }
+
   return (
     <Layout.Sider theme="light" collapsible collapsed={collapsed} onCollapse={setCollapsed}
-      breakpoint="lg" collapsedWidth={0} onBreakpoint={broken => {
-        mobileRef.current = broken
-        setCollapsed(broken)
-      }} style={{ minHeight: '100vh' }}>
+      breakpoint="lg" collapsedWidth={80} style={{ minHeight: '100vh' }}>
       <div style={{ height: 64, display: 'flex', alignItems: 'center', padding: '0 16px' }}>
         <ThemedTitle collapsed={collapsed} text="Horse CRM" />
       </div>
