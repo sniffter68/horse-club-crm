@@ -32,8 +32,6 @@ import { BoardingContractList } from './pages/boarding-contracts/list'
 import { BoardingContractCreate } from './pages/boarding-contracts/create'
 import { BoardingContractEdit } from './pages/boarding-contracts/edit'
 import { PaymentList } from './pages/payments/list'
-import { PaymentCreate } from './pages/payments/create'
-import { PaymentEdit } from './pages/payments/edit'
 import { Authenticated, Refine, type ResourceProps } from '@refinedev/core'
 import { ThemedLayout as ThemedLayoutV2, ThemedTitle as ThemedTitleV2, useNotificationProvider } from '@refinedev/antd'
 import routerProvider, { CatchAllNavigate } from '@refinedev/react-router'
@@ -55,7 +53,6 @@ const catalogs = [
   { name: 'horse-health-logs', ListPage: HorseHealthLogList, CreatePage: HorseHealthLogCreate, EditPage: HorseHealthLogEdit, label: 'Журнал здоровья' },
   { name: 'stalls', ListPage: StallList, CreatePage: StallCreate, EditPage: StallEdit, label: 'Денники' },
   { name: 'boarding-contracts', ListPage: BoardingContractList, CreatePage: BoardingContractCreate, EditPage: BoardingContractEdit, label: 'Договоры постоя' },
-  { name: 'payments', ListPage: PaymentList, CreatePage: PaymentCreate, EditPage: PaymentEdit, label: 'Платежи' },
 ] as const
 const SchedulePage = lazy(() => import('./pages/schedule').then(module => ({ default: module.SchedulePage })))
 const resources: ResourceProps[] = [
@@ -65,6 +62,7 @@ const resources: ResourceProps[] = [
   { name: 'memberships', list: '/memberships', create: '/memberships/new', meta: { label: 'Абонементы' } },
   { name: 'pricing-plans', list: '/pricing-plans', create: '/pricing-plans/new', edit: '/pricing-plans/edit/:id', meta: { label: 'Тарифы' } },
   { name: 'users', list: '/users', create: '/users/new', meta: { label: 'Пользователи' } },
+  { name: 'payments', list: '/payments', meta: { label: 'Оплаты' } },
 ]
 function LoadingPage() {
   return <div className="loading-page"><Spin size="large" aria-label="Загрузка" /></div>
@@ -94,6 +92,7 @@ export default function App() {
                 <Route path="memberships"><Route index element={<MembershipList />} /><Route path="new" element={<MembershipCreate />} /></Route>
                 <Route path="pricing-plans"><Route index element={<PricingPlanList />} /><Route path="new" element={<PricingPlanCreate />} /><Route path="edit/:id" element={<PricingPlanEdit />} /></Route>
                 <Route path="users"><Route index element={<UserList />} /><Route path="new" element={<UserCreate />} /></Route>
+                <Route path="payments" element={<PaymentList />} />
                 <Route path="*" element={<Result status="404" title="404" subTitle="Страница не найдена" />} />
               </Route>
               <Route element={<Authenticated key="public" fallback={<Outlet />} loading={<LoadingPage />}><Navigate to="/clients" replace /></Authenticated>}>
