@@ -1,4 +1,4 @@
-import { Tag } from 'antd'
+import { Space, Tag } from 'antd'
 import dayjs from 'dayjs'
 import { money } from '../catalogs/format'
 import { CatalogList } from '../catalogs/shared'
@@ -34,9 +34,16 @@ export function BoardingContractList() {
       render: (value: string | number) => money(value) },
     { key: 'payments', title: 'Оплаты', render: (_: unknown, record) => {
       const paid = record.payments.filter(payment => payment.status === 'PAID')
-      const total = paid.reduce((sum, payment) => sum + Number(payment.amount), 0)
+      const pending = record.payments.filter(payment => payment.status === 'PENDING')
+      const paidTotal = paid.reduce((sum, payment) => sum + Number(payment.amount), 0)
+      const pendingTotal = pending.reduce((sum, payment) => sum + Number(payment.amount), 0)
       const latest = paid[0]
-      return latest ? `${money(total)} · последняя ${date(latest.paidAt || latest.createdAt)}` : 'Нет оплат'
+      if (!paid.length && !pending.length) return 'Нет начислений'
+      return <Space direction="vertical" size={2}>
+        {paid.length > 0 && <Tag color="green">Оплачено: {money(paidTotal)}</Tag>}
+        {pending.length > 0 && <Tag color="gold">Ожидается: {money(pendingTotal)}</Tag>}
+        {latest && <span>Последняя оплата: {date(latest.paidAt || latest.createdAt)}</span>}
+      </Space>
     } },
   ]} />
 }
