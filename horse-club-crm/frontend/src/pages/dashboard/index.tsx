@@ -1,0 +1,263 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useOnError } from '@refinedev/core'
+import type { ColumnsType } from 'antd/es/table'
+import { Alert, App, Button, Card, Col, Progress, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
+import { API_URL, httpClient, toHttpError } from '../../httpClient'
+
+type FinalLessonStatus = 'COMPLETED' | 'NO_SHOW'
+
+interface DashboardAlertBooking {
+  id: string
+  client: { id: string; name: string; firstName: string; lastName: string }
+  horse: { id: string; name: string } | null
+  membershipId: string | null
+}
+
+interface DashboardAlert {
+  id: string
+  startTime: string
+  endTime: string
+  trainer: { id: string; name: string }
+  service: { id: string; name: string; title: string }
+  bookings: DashboardAlertBooking[]
+  unlinkedBookingsCount: number
+  hasUnlinkedMembership: boolean
+}
+
+interface HorseWorkload {
+  horseId: string
+  horseName: string
+  maxDailyMinutes: number
+  usedMinutes: number
+  remainingMinutes: number
+  loadPercent: number
+}
+
+interface DashboardSummary {
+  generatedAt: string
+  workDay: { date: string; openAt: string; closeAt: string; timeZone: string }
+  alerts: DashboardAlert[]
+  horseWorkloads: HorseWorkload[]
+  kpi: {
+    lessonsTotal: number
+    lessonsCompleted: number
+    newLeads: number
+    activeMemberships: number
+  }
+}
+
+interface UpdatedLesson {
+  id: string
+  bookings: Array<{
+    membership: {
+      id: string
+      remainedLessons: number
+      validUntil: string
+    } | null
+  }>
+}
+
+const clientName = (booking: DashboardAlertBooking): string =>
+  [booking.client.firstName, booking.client.lastName].filter(Boolean).join(' ') ||
+  booking.client.name ||
+  booking.client.id
+
+function workloadColor(percent: number): string {
+  if (percent >= 100) return '#cf1322'
+  if (percent >= 75) return '#1677ff'
+  return '#389e0d'
+}
+
+export function DashboardPage() {
+  const { message } = App.useApp()
+  const { mutate: onError } = useOnError()
+  const onErrorRef = useRef(onError)
+  useEffect(() => { onErrorRef.current = onError }, [onError])
+
+  const [summary, setSummary] = useState<DashboardSummary>()
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>()
+  const [updatingIds, setUpdatingIds] = useState<Set<string>>(() => new Set())
+  const updatingIdsRef = useRef<Set<string>>(new Set())
+
+  const reportError = useCallback((cause: unknown) => {
+    const failure = toHttpError(cause)
+    setError(failure.message)
+    if (failure.statusCode === 401) onErrorRef.current(failure)
+  }, [])
+
+  const loadSummary = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true)
+    setError(undefined)
+    try {
+      const response = await httpClient.get<DashboardSummary>(`${API_URL}/dashboard/summary`, { signal })
+      if (!signal?.aborted) setSummary(response.data)
+    } catch (cause) {
+      if (!signal?.aborted) reportError(cause)
+    } finally {
+      if (!signal?.aborted) setLoading(false)
+    }
+  }, [reportError])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    // oxlint-disable-next-line react/set-state-in-effect
+    void loadSummary(controller.signal)
+    return () => controller.abort()
+  }, [loadSummary])
+
+  const updateStatus = useCallback(async (lessonId: string, status: FinalLessonStatus) => {
+    if (updatingIdsRef.current.has(lessonId)) return
+    updatingIdsRef.current.add(lessonId)
+    setUpdatingIds(current => new Set(current).add(lessonId))
+    setError(undefined)
+    try {
+      const response = await httpClient.patch<UpdatedLesson>(
+        `${API_URL}/lessons/${lessonId}/status`,
+        { status },
+      )
+      const now = Date.now()
+      const membershipsMadeInactive = new Set(
+        response.data.bookings
+          .map(booking => booking.membership)
+          .filter((membership): membership is NonNullable<typeof membership> =>
+            membership !== null &&
+            membership.remainedLessons === 0 &&
+            new Date(membership.validUntil).getTime() >= now,
+          )
+          .map(membership => membership.id),
+      ).size
+      setSummary(current => current ? {
+        ...current,
+        alerts: current.alerts.filter(alert => alert.id !== lessonId),
+        kpi: {
+          ...current.kpi,
+          lessonsCompleted: current.kpi.lessonsCompleted + (status === 'COMPLETED' ? 1 : 0),
+          activeMemberships: Math.max(0, current.kpi.activeMemberships - membershipsMadeInactive),
+        },
+      } : current)
+      void message.success(status === 'COMPLETED' ? 'Занятие отмечено как проведённое' : 'Неявка зафиксирована')
+    } catch (cause) {
+      reportError(cause)
+    } finally {
+      updatingIdsRef.current.delete(lessonId)
+      setUpdatingIds(current => {
+        const next = new Set(current)
+        next.delete(lessonId)
+        return next
+      })
+    }
+  }, [message, reportError])
+
+  const timeFormatter = new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: summary?.workDay.timeZone,
+  })
+  const formatTime = (value: string): string => timeFormatter.format(new Date(value))
+
+  const alertColumns: ColumnsType<DashboardAlert> = [
+    {
+      title: 'Время',
+      key: 'time',
+      width: 130,
+      render: (_, row) => `${formatTime(row.startTime)}–${formatTime(row.endTime)}`,
+    },
+    {
+      title: 'Занятие',
+      key: 'lesson',
+      render: (_, row) => <Space direction="vertical" size={0}>
+        <Typography.Text strong>{row.service.title || row.service.name}</Typography.Text>
+        <Typography.Text type="secondary">{row.trainer.name}</Typography.Text>
+      </Space>,
+    },
+    {
+      title: 'Клиенты и лошади',
+      key: 'bookings',
+      render: (_, row) => row.bookings.length ? <Space direction="vertical" size={4}>
+        {row.bookings.map(booking => <Space key={booking.id} wrap size={4}>
+          <span>{clientName(booking)}</span>
+          {booking.horse && <Tag>{booking.horse.name}</Tag>}
+          {!booking.membershipId && <Tag color="warning">Без абонемента</Tag>}
+        </Space>)}
+      </Space> : <Typography.Text type="secondary">Нет участников</Typography.Text>,
+    },
+    {
+      title: 'Действия',
+      key: 'actions',
+      width: 230,
+      render: (_, row) => {
+        const updating = updatingIds.has(row.id)
+        return <Space wrap>
+          <Button type="primary" loading={updating} disabled={updating} onClick={() => void updateStatus(row.id, 'COMPLETED')}>Был</Button>
+          <Button danger loading={updating} disabled={updating} onClick={() => void updateStatus(row.id, 'NO_SHOW')}>Не явился</Button>
+        </Space>
+      },
+    },
+  ]
+
+  return <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <Space align="center" wrap style={{ justifyContent: 'space-between', width: '100%' }}>
+      <div>
+        <Typography.Title level={2} style={{ marginBottom: 0 }}>Главная панель</Typography.Title>
+        {summary && <Typography.Text type="secondary">
+          Рабочий день: {formatTime(summary.workDay.openAt)}–{formatTime(summary.workDay.closeAt)}
+        </Typography.Text>}
+      </div>
+      <Button onClick={() => void loadSummary()} loading={loading}>Обновить</Button>
+    </Space>
+
+    {error && <Alert type="error" showIcon message="Не удалось загрузить сводку" description={error} />}
+
+    <Row gutter={[16, 16]}>
+      <Col xs={24} sm={12} lg={8}>
+        <Card><Statistic title="Тренировки сегодня" value={summary?.kpi.lessonsCompleted ?? 0} suffix={`/ ${summary?.kpi.lessonsTotal ?? 0}`} loading={loading && !summary} /></Card>
+      </Col>
+      <Col xs={24} sm={12} lg={8}>
+        <Card><Statistic title="Новые заявки за 24 часа" value={summary?.kpi.newLeads ?? 0} loading={loading && !summary} /></Card>
+      </Col>
+      <Col xs={24} sm={12} lg={8}>
+        <Card><Statistic title="Активные абонементы" value={summary?.kpi.activeMemberships ?? 0} loading={loading && !summary} /></Card>
+      </Col>
+    </Row>
+
+    <Card title={<Space><span>Требуют внимания</span>{summary && <Tag color={summary.alerts.length ? 'error' : 'success'}>{summary.alerts.length}</Tag>}</Space>}>
+      <Table<DashboardAlert>
+        rowKey="id"
+        columns={alertColumns}
+        dataSource={summary?.alerts ?? []}
+        loading={loading && !summary}
+        pagination={false}
+        scroll={{ x: 850 }}
+        locale={{ emptyText: 'Занятий без отметки нет' }}
+      />
+    </Card>
+
+    <Card title="Загрузка лошадей на сегодня" loading={loading && !summary}>
+      <Row gutter={[16, 16]}>
+        {(summary?.horseWorkloads ?? []).map(horse => <Col key={horse.horseId} xs={24} md={12} xl={8}>
+          <Card size="small">
+            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+              <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+                <Typography.Text strong>{horse.horseName}</Typography.Text>
+                <Typography.Text type="secondary">{horse.usedMinutes} / {horse.maxDailyMinutes} мин</Typography.Text>
+              </Space>
+              <Progress
+                percent={Math.min(100, Math.max(0, horse.loadPercent))}
+                strokeColor={workloadColor(horse.loadPercent)}
+                status={horse.loadPercent >= 100 ? 'exception' : 'normal'}
+                format={() => `${horse.loadPercent}%`}
+              />
+              <Typography.Text type={horse.remainingMinutes === 0 ? 'danger' : 'secondary'}>
+                {horse.remainingMinutes > 0 ? `Осталось ${horse.remainingMinutes} мин` : 'Суточный лимит исчерпан'}
+              </Typography.Text>
+            </Space>
+          </Card>
+        </Col>)}
+        {summary && summary.horseWorkloads.length === 0 && <Col span={24}>
+          <Typography.Text type="secondary">Нет активных лошадей</Typography.Text>
+        </Col>}
+      </Row>
+    </Card>
+  </Space>
+}

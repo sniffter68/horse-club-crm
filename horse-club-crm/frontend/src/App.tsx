@@ -32,7 +32,7 @@ import { BoardingContractList } from './pages/boarding-contracts/list'
 import { BoardingContractCreate } from './pages/boarding-contracts/create'
 import { BoardingContractEdit } from './pages/boarding-contracts/edit'
 import { PaymentList } from './pages/payments/list'
-import { Authenticated, Refine, type ResourceProps } from '@refinedev/core'
+import { Authenticated, Refine, usePermissions, type ResourceProps } from '@refinedev/core'
 import { ThemedLayout as ThemedLayoutV2, ThemedTitle as ThemedTitleV2, useNotificationProvider } from '@refinedev/antd'
 import routerProvider, { CatchAllNavigate } from '@refinedev/react-router'
 import { App as AntdApp, ConfigProvider, Result, Spin } from 'antd'
@@ -42,6 +42,8 @@ import { authProvider } from './authProvider'
 import { dataProvider } from './dataProvider'
 import { LoginPage } from './pages/login'
 import { Sidebar } from './components/layout/Sidebar'
+import { DashboardPage } from './pages/dashboard'
+import type { Role } from './authStorage'
 import '@refinedev/antd/dist/reset.css'
 
 const catalogs = [
@@ -56,8 +58,9 @@ const catalogs = [
 ] as const
 const SchedulePage = lazy(() => import('./pages/schedule').then(module => ({ default: module.SchedulePage })))
 const resources: ResourceProps[] = [
-  ...catalogs.map(({ name, label }) => ({ name, list: `/${name}`, create: `/${name}/new`, edit: `/${name}/edit/:id`, meta: { label } })),
+  { name: 'dashboard', list: '/', meta: { label: 'Дашборд' } },
   { name: 'lessons', list: '/schedule', meta: { label: 'Расписание' } },
+  ...catalogs.map(({ name, label }) => ({ name, list: `/${name}`, create: `/${name}/new`, edit: `/${name}/edit/:id`, meta: { label } })),
   { name: 'settings', list: '/settings', meta: { label: 'Настройки' } },
   { name: 'memberships', list: '/memberships', create: '/memberships/new', meta: { label: 'Абонементы' } },
   { name: 'pricing-plans', list: '/pricing-plans', create: '/pricing-plans/new', edit: '/pricing-plans/edit/:id', meta: { label: 'Тарифы' } },
@@ -66,6 +69,12 @@ const resources: ResourceProps[] = [
 ]
 function LoadingPage() {
   return <div className="loading-page"><Spin size="large" aria-label="Загрузка" /></div>
+}
+function DashboardRoute() {
+  const { data: role, isLoading } = usePermissions<Role>({})
+  if (isLoading) return <LoadingPage />
+  if (role === 'TRAINER') return <Navigate to="/schedule" replace />
+  return <DashboardPage />
 }
 export default function App() {
   return (
@@ -79,7 +88,7 @@ export default function App() {
               <Route element={<Authenticated key="private" fallback={<CatchAllNavigate to="/login" />} loading={<LoadingPage />}>
                 <ThemedLayoutV2 Sider={() => <Sidebar />} Title={(props) => <ThemedTitleV2 {...props} text="Horse CRM" />}><Outlet /></ThemedLayoutV2>
               </Authenticated>}>
-                <Route index element={<Navigate to="/clients" replace />} />
+                <Route index element={<DashboardRoute />} />
                 {catalogs.map(({ name, ListPage, CreatePage, EditPage }) => (
                   <Route key={name} path={name}>
                     <Route index element={<ListPage />} />
@@ -95,7 +104,7 @@ export default function App() {
                 <Route path="payments" element={<PaymentList />} />
                 <Route path="*" element={<Result status="404" title="404" subTitle="Страница не найдена" />} />
               </Route>
-              <Route element={<Authenticated key="public" fallback={<Outlet />} loading={<LoadingPage />}><Navigate to="/clients" replace /></Authenticated>}>
+              <Route element={<Authenticated key="public" fallback={<Outlet />} loading={<LoadingPage />}><Navigate to="/" replace /></Authenticated>}>
                 <Route path="login" element={<LoginPage />} />
               </Route>
             </Routes>

@@ -15,7 +15,7 @@ export const authProvider = {
         throw new Error('Сервер вернул некорректные данные авторизации')
       }
       saveSession(data.access_token, { email: data.user.email, role: data.user.role })
-      return { success: true, redirectTo: '/clients' }
+      return { success: true, redirectTo: '/' }
     } catch (error: unknown) {
       clearSession()
       const failure = toHttpError(error)

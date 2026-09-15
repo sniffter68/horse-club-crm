@@ -19,6 +19,7 @@ import { SettingsModule } from './settings/settings.module';
 import { StallsModule } from './stalls/stalls.module';
 import { TrainersModule } from './trainers/trainers.module';
 import { UsersModule } from './users/users.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { UsersModule } from './users/users.module';
     TrainersModule,
     ServicesModule,
     UsersModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}
