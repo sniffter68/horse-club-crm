@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { CreateButton, List as RefineList, useTable } from '@refinedev/antd'
 import type { HttpError } from '@refinedev/core'
-import { Descriptions, Empty, Form, Input, List, Progress, Space, Table, Tag, Typography } from 'antd'
+import { Descriptions, Empty, Form, Input, List, Progress, Space, Tag, Typography } from 'antd'
 import { money } from '../catalogs/format'
 import type { RelationLesson, RelationPayment } from '../catalogs/types'
 import { dateOnly, dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
+import { ResponsiveTable } from '../../components/ResponsiveTable'
 
 type Membership = {
   id: string; totalLessons: number; remainedLessons: number; validUntil: string; isActive: boolean;
@@ -30,7 +31,7 @@ export function MembershipList() {
       <Form {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q">
         <Input.Search placeholder="Поиск клиента" allowClear onSearch={() => searchFormProps.form?.submit()} />
       </Form.Item></Form>
-      <Table<Membership> {...tableProps} rowKey="id" columns={[
+      <ResponsiveTable<Membership> {...tableProps} rowKey="id" columns={[
         { key: 'client', title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : '—'}</CardLink> },
         { key: 'plan', title: 'Тариф', render: (_: unknown, record) => record.pricingPlan?.name || 'Индивидуальный' },
         { key: 'lessons', title: 'Остаток занятий', render: (_: unknown, record) => `${record.remainedLessons} / ${record.totalLessons}` },
@@ -40,7 +41,7 @@ export function MembershipList() {
     </RefineList>
     <DetailsModal<MembershipDetails> resource="memberships" id={selectedId} title="Карточка абонемента" onClose={() => setSelectedId(undefined)}>
       {membership => <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <Descriptions bordered size="small" column={2} items={[
+        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'client', label: 'Клиент', children: membership.client ? personName(membership.client) : '—' },
           { key: 'plan', label: 'Тариф', children: membership.pricingPlan?.name || 'Индивидуальный' },
           { key: 'validUntil', label: 'Действует до', children: dateOnly(membership.validUntil) },

@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { type BaseRecord, type HttpError } from '@refinedev/core'
 import { Create, Edit, List, EditButton, DeleteButton, useForm, useTable } from '@refinedev/antd'
-import { Alert, Button, Checkbox, Form, Input, InputNumber, Result, Space, Spin, Table, type TableColumnsType } from 'antd'
+import { Alert, Button, Checkbox, Form, Input, InputNumber, Result, Space, Spin, type TableColumnsType } from 'antd'
 import { useCatalogPermissions } from './permissions'
+import { ResponsiveTable } from '../../components/ResponsiveTable'
 
 export function CatalogList<T extends BaseRecord>({ resource, title, columns }: {
   resource: string; title: string; columns: TableColumnsType<T>
@@ -33,7 +34,7 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns }: 
       <Button htmlType="submit">Найти</Button>
     </Form>
     {tableQuery.error && <Alert type="error" showIcon message="Не удалось загрузить каталог" description={tableQuery.error.message} />}
-    <Table<T> {...tableProps} rowKey="id" columns={[...sortedColumns, ...actions]} scroll={{ x: 'max-content' }}
+    <ResponsiveTable<T> {...tableProps} rowKey="id" columns={[...sortedColumns, ...actions]} scroll={{ x: 'max-content' }}
       pagination={{ ...tableProps.pagination, showSizeChanger: true, pageSizeOptions: [10, 20, 50], showTotal: total => `Всего: ${total}` }} />
   </List>
 }

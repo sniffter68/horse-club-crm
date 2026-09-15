@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useUpdate, type HttpError } from '@refinedev/core'
 import { List, useTable } from '@refinedev/antd'
-import { Alert, Button, Descriptions, Form, Input, Space, Table, Tag } from 'antd'
+import { Alert, Button, Descriptions, Form, Input, Space, Tag } from 'antd'
 import { money } from '../catalogs/format'
 import { dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
 import type { Payment, PaymentStatus } from './types'
+import { ResponsiveTable } from '../../components/ResponsiveTable'
 
 const statuses: Record<PaymentStatus, string> = { PENDING: 'Не оплачено', PAID: 'Оплачено', REFUNDED: 'Возвращено', CANCELLED: 'Отменено' }
 const colors: Record<PaymentStatus, string> = { PENDING: 'gold', PAID: 'green', REFUNDED: 'blue', CANCELLED: 'default' }
@@ -44,7 +45,7 @@ export function PaymentList() {
         <Button htmlType="submit">Найти</Button>
       </Form>
       {tableQuery.error && <Alert type="error" showIcon message="Не удалось загрузить оплаты" description={tableQuery.error.message} />}
-      <Table<Payment> {...tableProps} rowKey="id" scroll={{ x: 'max-content' }} pagination={{
+      <ResponsiveTable<Payment> {...tableProps} rowKey="id" scroll={{ x: 'max-content' }} pagination={{
         ...tableProps.pagination, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showTotal: total => `Всего: ${total}`,
       }} columns={[
         { key: 'client', title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{personName(record.client)}</CardLink> },
@@ -60,7 +61,7 @@ export function PaymentList() {
       ]} />
     </List>
     <DetailsModal<Payment> resource="payments" id={selectedId} title="Карточка начисления" onClose={() => setSelectedId(undefined)}>
-      {payment => <Descriptions bordered size="small" column={2} items={[
+      {payment => <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
         { key: 'client', label: 'Клиент', children: personName(payment.client) },
         { key: 'source', label: 'Основание', children: source(payment) },
         { key: 'amount', label: 'Сумма', children: money(payment.amount) },

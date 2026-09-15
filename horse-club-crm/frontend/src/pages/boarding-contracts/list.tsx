@@ -32,7 +32,7 @@ export function BoardingContractList() {
     ]} />
     <DetailsModal<BoardingContract> resource="boarding-contracts" id={selectedId} title="Карточка договора постоя" onClose={() => setSelectedId(undefined)}>
       {contract => <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <Descriptions bordered size="small" column={2} items={[
+        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'client', label: 'Клиент', children: personName(contract.client) },
           { key: 'horse', label: 'Лошадь', children: contract.horse.name },
           { key: 'stall', label: 'Денник', children: contract.stall?.name || 'Не назначен' },

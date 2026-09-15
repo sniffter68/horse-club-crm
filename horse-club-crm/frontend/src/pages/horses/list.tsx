@@ -22,7 +22,7 @@ export function HorseList() {
     ]} />
     <DetailsModal<HorseDetails> resource="horses" id={selectedId} title="Карточка лошади" onClose={() => setSelectedId(undefined)}>
       {horse => <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <Descriptions bordered size="small" column={2} items={[
+        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'name', label: 'Кличка', children: horse.name },
           { key: 'status', label: 'Статус', children: <Tag color={horse.isUnavailable ? 'red' : 'green'}>{horse.isUnavailable ? 'Недоступна' : 'Доступна'}</Tag> },
           { key: 'breed', label: 'Порода', children: horse.breed || '—' },

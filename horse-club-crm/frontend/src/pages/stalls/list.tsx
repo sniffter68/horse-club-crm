@@ -25,7 +25,7 @@ export function StallList() {
     ]} />
     <DetailsModal<Stall> resource="stalls" id={selectedId} title="Карточка денника" onClose={() => setSelectedId(undefined)}>
       {stall => <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <Descriptions bordered size="small" column={2} items={[
+        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'name', label: 'Денник', children: stall.name },
           { key: 'status', label: 'Статус', children: <Tag color={stall.isUnavailable ? 'red' : 'green'}>{stall.isUnavailable ? 'Недоступен' : 'Доступен'}</Tag> },
           { key: 'description', label: 'Описание', span: 2, children: stall.description || '—' },

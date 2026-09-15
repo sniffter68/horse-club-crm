@@ -6,6 +6,17 @@ body { margin: 0; }
 .dashboard-alert-item > .ant-card { width: 100%; }
 .dashboard-alert-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .schedule-toolbar { width: 100%; }
+.responsive-record-item { display: block !important; padding-inline: 0 !important; }
+.responsive-record-item > .ant-card { width: 100%; }
+.responsive-record-field { display: grid; grid-template-columns: minmax(105px, 38%) minmax(0, 1fr); gap: 12px; padding-block: 8px; border-bottom: 1px solid #f0f0f0; }
+.responsive-record-field:first-child { padding-top: 0; }
+.responsive-record-field:last-child { padding-bottom: 0; border-bottom: 0; }
+.responsive-record-label { line-height: 1.45; }
+.responsive-record-value { min-width: 0; overflow-wrap: anywhere; }
+.responsive-record-value .ant-space { flex-wrap: wrap; }
+.responsive-record-field--actions { display: block; padding-top: 12px; }
+.responsive-record-field--actions .ant-space { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+.responsive-record-field--actions .ant-btn { width: 100%; min-height: 40px; }
 
 @media (max-width: 767px) {
   .ant-layout-content { min-width: 0; padding: 12px !important; }
@@ -24,7 +35,18 @@ body { margin: 0; }
   .fc .fc-button { padding: 0.4em 0.55em; }
   .ant-modal { max-width: calc(100vw - 16px); margin: 8px auto; top: 8px; }
   .ant-modal .ant-modal-content { padding: 16px; }
+  .ant-page-header-heading { flex-wrap: wrap; gap: 12px; }
+  .ant-page-header-heading-extra { width: 100%; margin-inline-start: 0 !important; }
+  .ant-page-header-heading-extra .ant-btn { min-height: 40px; }
   .ant-form-inline .ant-form-item { flex: 1 1 100%; margin-inline-end: 0; }
+  .ant-form-inline > .ant-btn { width: 100%; min-height: 40px; }
+  .ant-list-pagination { text-align: center; }
+  .ant-pagination-simple { justify-content: center; }
+  .ant-descriptions-view { overflow-x: auto; }
+  .ant-descriptions-row > th,
+  .ant-descriptions-row > td { padding: 10px 12px !important; }
+  .ant-picker,
+  .ant-input-number { min-height: 40px; }
 }
 .login-page, .loading-page { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
 .login-card { width: 100%; max-width: 420px; }
