@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOnError } from '@refinedev/core'
 import type { ColumnsType } from 'antd/es/table'
 import { Alert, App, Button, Card, Col, Progress, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
+import { Link } from 'react-router-dom'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 
 type FinalLessonStatus = 'COMPLETED' | 'NO_SHOW'
@@ -161,14 +162,16 @@ export function DashboardPage() {
       title: 'Время',
       key: 'time',
       width: 130,
-      render: (_, row) => `${formatTime(row.startTime)}–${formatTime(row.endTime)}`,
+      render: (_, row) => <Link to="/schedule" title="Открыть расписание">
+        {formatTime(row.startTime)}–{formatTime(row.endTime)}
+      </Link>,
     },
     {
       title: 'Занятие',
       key: 'lesson',
       render: (_, row) => <Space direction="vertical" size={0}>
-        <Typography.Text strong>{row.service.title || row.service.name}</Typography.Text>
-        <Typography.Text type="secondary">{row.trainer.name}</Typography.Text>
+        <Link to={`/services/edit/${row.service.id}`}><Typography.Text strong>{row.service.title || row.service.name}</Typography.Text></Link>
+        <Link to={`/trainers/edit/${row.trainer.id}`}><Typography.Text type="secondary">{row.trainer.name}</Typography.Text></Link>
       </Space>,
     },
     {
@@ -176,9 +179,9 @@ export function DashboardPage() {
       key: 'bookings',
       render: (_, row) => row.bookings.length ? <Space direction="vertical" size={4}>
         {row.bookings.map(booking => <Space key={booking.id} wrap size={4}>
-          <span>{clientName(booking)}</span>
-          {booking.horse && <Tag>{booking.horse.name}</Tag>}
-          {!booking.membershipId && <Tag color="warning">Без абонемента</Tag>}
+          <Link to={`/clients/edit/${booking.client.id}`}>{clientName(booking)}</Link>
+          {booking.horse && <Link to={`/horses/edit/${booking.horse.id}`}><Tag>{booking.horse.name}</Tag></Link>}
+          {!booking.membershipId && <Link to="/memberships/new"><Tag color="warning">Без абонемента</Tag></Link>}
         </Space>)}
       </Space> : <Typography.Text type="secondary">Нет участников</Typography.Text>,
     },
@@ -211,17 +214,23 @@ export function DashboardPage() {
 
     <Row gutter={[16, 16]}>
       <Col xs={24} sm={12} lg={8}>
-        <Card><Statistic title="Тренировки сегодня" value={summary?.kpi.lessonsCompleted ?? 0} suffix={`/ ${summary?.kpi.lessonsTotal ?? 0}`} loading={loading && !summary} /></Card>
+        <Link to="/schedule" aria-label="Открыть расписание" style={{ display: 'block' }}>
+          <Card hoverable><Statistic title="Тренировки сегодня" value={summary?.kpi.lessonsCompleted ?? 0} suffix={`/ ${summary?.kpi.lessonsTotal ?? 0}`} loading={loading && !summary} /></Card>
+        </Link>
       </Col>
       <Col xs={24} sm={12} lg={8}>
-        <Card><Statistic title="Новые заявки за 24 часа" value={summary?.kpi.newLeads ?? 0} loading={loading && !summary} /></Card>
+        <Link to="/clients" aria-label="Открыть клиентов" style={{ display: 'block' }}>
+          <Card hoverable><Statistic title="Новые заявки за 24 часа" value={summary?.kpi.newLeads ?? 0} loading={loading && !summary} /></Card>
+        </Link>
       </Col>
       <Col xs={24} sm={12} lg={8}>
-        <Card><Statistic title="Активные абонементы" value={summary?.kpi.activeMemberships ?? 0} loading={loading && !summary} /></Card>
+        <Link to="/memberships" aria-label="Открыть абонементы" style={{ display: 'block' }}>
+          <Card hoverable><Statistic title="Активные абонементы" value={summary?.kpi.activeMemberships ?? 0} loading={loading && !summary} /></Card>
+        </Link>
       </Col>
     </Row>
 
-    <Card title={<Space><span>Требуют внимания</span>{summary && <Tag color={summary.alerts.length ? 'error' : 'success'}>{summary.alerts.length}</Tag>}</Space>}>
+    <Card title={<Space><Link to="/schedule">Требуют внимания</Link>{summary && <Tag color={summary.alerts.length ? 'error' : 'success'}>{summary.alerts.length}</Tag>}</Space>}>
       <Table<DashboardAlert>
         rowKey="id"
         columns={alertColumns}
@@ -233,13 +242,13 @@ export function DashboardPage() {
       />
     </Card>
 
-    <Card title="Загрузка лошадей на сегодня" loading={loading && !summary}>
+    <Card title={<Link to="/horses">Загрузка лошадей на сегодня</Link>} loading={loading && !summary}>
       <Row gutter={[16, 16]}>
         {(summary?.horseWorkloads ?? []).map(horse => <Col key={horse.horseId} xs={24} md={12} xl={8}>
-          <Card size="small">
+          <Card size="small" title={<Link to={`/horses/edit/${horse.horseId}`}>{horse.horseName}</Link>} extra={<Link to={`/horses/edit/${horse.horseId}`}>Открыть</Link>}>
             <Space direction="vertical" size={4} style={{ width: '100%' }}>
               <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-                <Typography.Text strong>{horse.horseName}</Typography.Text>
+                <Typography.Text type="secondary">Нагрузка</Typography.Text>
                 <Typography.Text type="secondary">{horse.usedMinutes} / {horse.maxDailyMinutes} мин</Typography.Text>
               </Space>
               <Progress
