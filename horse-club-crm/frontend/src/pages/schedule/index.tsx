@@ -5,7 +5,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import luxonPlugin from '@fullcalendar/luxon3'
 import ruLocale from '@fullcalendar/core/locales/ru'
-import { Alert, App, Button, Card, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Progress, Select, Space, Spin, Tag, Typography } from 'antd'
+import { Alert, App, Button, Card, Descriptions, Form, Grid, Input, InputNumber, Modal, Popconfirm, Progress, Select, Space, Spin, Tag, Typography } from 'antd'
 import { useOnError } from '@refinedev/core'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { useCatalogPermissions } from '../catalogs/permissions'
@@ -26,6 +26,8 @@ const membershipDate = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', ti
 const lessonHorses = (lesson: Lesson) => [...new Set(lesson.bookings.map(booking => booking.horse?.name).filter((name): name is string => Boolean(name)))]
 
 export function SchedulePage() {
+  const screens = Grid.useBreakpoint()
+  const compactLayout = !screens.md
   const { canManage } = useCatalogPermissions()
   const { message } = App.useApp()
   const { mutate: onError } = useOnError()
@@ -180,17 +182,18 @@ export function SchedulePage() {
     <Typography.Title level={2}>Расписание занятий</Typography.Title>
     <Typography.Text type="secondary">Часовой пояс клуба: {CLUB_TIME_ZONE}</Typography.Text>
     {failure}
-    <Space wrap>
-      <Select aria-label="Фильтр по тренеру" placeholder="Все тренеры" allowClear showSearch optionFilterProp="label" style={{ width: 240 }} options={trainerOptions} value={trainerId} onChange={setTrainerId} />
-      <Select aria-label="Фильтр по лошади" placeholder="Все лошади" allowClear showSearch optionFilterProp="label" style={{ width: 240 }} options={horseOptions.map(option => ({ ...option, disabled: false }))} value={horseId} onChange={setHorseId} />
-      <Select aria-label="Фильтр по манежу" placeholder="Все манежи" allowClear showSearch optionFilterProp="label" style={{ width: 240 }} options={arenaOptions.map(option => ({ ...option, disabled: false }))} value={arenaId} onChange={setArenaId} />
+    <Space className="schedule-toolbar" wrap>
+      <Select aria-label="Фильтр по тренеру" placeholder="Все тренеры" allowClear showSearch optionFilterProp="label" style={{ width: compactLayout ? '100%' : 240 }} options={trainerOptions} value={trainerId} onChange={setTrainerId} />
+      <Select aria-label="Фильтр по лошади" placeholder="Все лошади" allowClear showSearch optionFilterProp="label" style={{ width: compactLayout ? '100%' : 240 }} options={horseOptions.map(option => ({ ...option, disabled: false }))} value={horseId} onChange={setHorseId} />
+      <Select aria-label="Фильтр по манежу" placeholder="Все манежи" allowClear showSearch optionFilterProp="label" style={{ width: compactLayout ? '100%' : 240 }} options={arenaOptions.map(option => ({ ...option, disabled: false }))} value={arenaId} onChange={setArenaId} />
       <Button onClick={() => { setError(undefined); setRevision(value => value + 1) }}>Обновить</Button>
       {canManage && <Button type="primary" disabled={!ready} onClick={() => openBooking(new Date())}>Новое занятие</Button>}
     </Space>
     <Space wrap>{Object.entries(statuses).map(([status, item]) => <Tag key={status} color={item.color}>{item.label}</Tag>)}</Space>
     <Card><Spin spinning={loading || (!ready && !error)}>
       {schedule && <FullCalendar plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin, luxonPlugin]} locale={ruLocale}
-        timeZone={CLUB_TIME_ZONE} initialView="timeGridWeek" headerToolbar={{ left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' }}
+        timeZone={CLUB_TIME_ZONE} initialView={compactLayout ? 'timeGridDay' : 'timeGridWeek'}
+        headerToolbar={compactLayout ? { left: 'prev,next', center: 'title', right: 'today' } : { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' }}
         buttonText={{ today: 'Сегодня', week: 'Неделя', day: 'День' }} firstDay={1} allDaySlot={false} nowIndicator height="auto"
         slotMinTime={schedule.openTime} slotMaxTime={schedule.closeTime} hiddenDays={[schedule.dayOfWeekOff]}
         selectable={canManage && ready} selectMirror selectOverlap={false} eventDisplay="block"

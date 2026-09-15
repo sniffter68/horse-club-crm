@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOnError } from '@refinedev/core'
 import type { ColumnsType } from 'antd/es/table'
-import { Alert, App, Button, Card, Col, Progress, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
+import { Alert, App, Button, Card, Col, Grid, List, Progress, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
 import { Link } from 'react-router-dom'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 
@@ -70,6 +70,8 @@ function workloadColor(percent: number): string {
 }
 
 export function DashboardPage() {
+  const screens = Grid.useBreakpoint()
+  const isMobile = !screens.md
   const { message } = App.useApp()
   const { mutate: onError } = useOnError()
   const onErrorRef = useRef(onError)
@@ -156,6 +158,13 @@ export function DashboardPage() {
     timeZone: summary?.workDay.timeZone,
   })
   const formatTime = (value: string): string => timeFormatter.format(new Date(value))
+  const renderBookings = (row: DashboardAlert) => row.bookings.length ? <Space direction="vertical" size={4}>
+    {row.bookings.map(booking => <Space key={booking.id} wrap size={4}>
+      <Link to={`/clients/edit/${booking.client.id}`}>{clientName(booking)}</Link>
+      {booking.horse && <Link to={`/horses/edit/${booking.horse.id}`}><Tag>{booking.horse.name}</Tag></Link>}
+      {!booking.membershipId && <Link to="/memberships/new"><Tag color="warning">Без абонемента</Tag></Link>}
+    </Space>)}
+  </Space> : <Typography.Text type="secondary">Нет участников</Typography.Text>
 
   const alertColumns: ColumnsType<DashboardAlert> = [
     {
@@ -177,13 +186,7 @@ export function DashboardPage() {
     {
       title: 'Клиенты и лошади',
       key: 'bookings',
-      render: (_, row) => row.bookings.length ? <Space direction="vertical" size={4}>
-        {row.bookings.map(booking => <Space key={booking.id} wrap size={4}>
-          <Link to={`/clients/edit/${booking.client.id}`}>{clientName(booking)}</Link>
-          {booking.horse && <Link to={`/horses/edit/${booking.horse.id}`}><Tag>{booking.horse.name}</Tag></Link>}
-          {!booking.membershipId && <Link to="/memberships/new"><Tag color="warning">Без абонемента</Tag></Link>}
-        </Space>)}
-      </Space> : <Typography.Text type="secondary">Нет участников</Typography.Text>,
+      render: (_, row) => renderBookings(row),
     },
     {
       title: 'Действия',
@@ -199,47 +202,71 @@ export function DashboardPage() {
     },
   ]
 
-  return <Space direction="vertical" size="large" style={{ width: '100%' }}>
-    <Space align="center" wrap style={{ justifyContent: 'space-between', width: '100%' }}>
+  return <Space className="dashboard-page" direction="vertical" size={isMobile ? 'middle' : 'large'} style={{ width: '100%' }}>
+    <Space className="dashboard-header" align="center" wrap style={{ justifyContent: 'space-between', width: '100%' }}>
       <div>
         <Typography.Title level={2} style={{ marginBottom: 0 }}>Главная панель</Typography.Title>
         {summary && <Typography.Text type="secondary">
           Рабочий день: {formatTime(summary.workDay.openAt)}–{formatTime(summary.workDay.closeAt)}
         </Typography.Text>}
       </div>
-      <Button onClick={() => void loadSummary()} loading={loading}>Обновить</Button>
+      <Button className="dashboard-refresh" onClick={() => void loadSummary()} loading={loading}>Обновить</Button>
     </Space>
 
     {error && <Alert type="error" showIcon message="Не удалось загрузить сводку" description={error} />}
 
     <Row gutter={[16, 16]}>
       <Col xs={24} sm={12} lg={8}>
-        <Link to="/schedule" aria-label="Открыть расписание" style={{ display: 'block' }}>
+        <Link className="dashboard-kpi-link" to="/schedule" aria-label="Открыть расписание">
           <Card hoverable><Statistic title="Тренировки сегодня" value={summary?.kpi.lessonsCompleted ?? 0} suffix={`/ ${summary?.kpi.lessonsTotal ?? 0}`} loading={loading && !summary} /></Card>
         </Link>
       </Col>
       <Col xs={24} sm={12} lg={8}>
-        <Link to="/clients" aria-label="Открыть клиентов" style={{ display: 'block' }}>
+        <Link className="dashboard-kpi-link" to="/clients" aria-label="Открыть клиентов">
           <Card hoverable><Statistic title="Новые заявки за 24 часа" value={summary?.kpi.newLeads ?? 0} loading={loading && !summary} /></Card>
         </Link>
       </Col>
       <Col xs={24} sm={12} lg={8}>
-        <Link to="/memberships" aria-label="Открыть абонементы" style={{ display: 'block' }}>
+        <Link className="dashboard-kpi-link" to="/memberships" aria-label="Открыть абонементы">
           <Card hoverable><Statistic title="Активные абонементы" value={summary?.kpi.activeMemberships ?? 0} loading={loading && !summary} /></Card>
         </Link>
       </Col>
     </Row>
 
     <Card title={<Space><Link to="/schedule">Требуют внимания</Link>{summary && <Tag color={summary.alerts.length ? 'error' : 'success'}>{summary.alerts.length}</Tag>}</Space>}>
-      <Table<DashboardAlert>
-        rowKey="id"
-        columns={alertColumns}
-        dataSource={summary?.alerts ?? []}
+      {isMobile ? <List<DashboardAlert>
         loading={loading && !summary}
-        pagination={false}
-        scroll={{ x: 850 }}
+        dataSource={summary?.alerts ?? []}
         locale={{ emptyText: 'Занятий без отметки нет' }}
-      />
+        renderItem={row => {
+          const updating = updatingIds.has(row.id)
+          return <List.Item className="dashboard-alert-item">
+            <Card size="small" title={<Link to="/schedule">{formatTime(row.startTime)}–{formatTime(row.endTime)}</Link>}
+              extra={row.hasUnlinkedMembership ? <Tag color="warning">Без абонемента</Tag> : undefined}>
+              <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                <div>
+                  <Link to={`/services/edit/${row.service.id}`}><Typography.Text strong>{row.service.title || row.service.name}</Typography.Text></Link>
+                  <br />
+                  <Link to={`/trainers/edit/${row.trainer.id}`}><Typography.Text type="secondary">{row.trainer.name}</Typography.Text></Link>
+                </div>
+                {renderBookings(row)}
+                <div className="dashboard-alert-actions">
+                  <Button type="primary" size="large" loading={updating} disabled={updating} onClick={() => void updateStatus(row.id, 'COMPLETED')}>Был</Button>
+                  <Button danger size="large" loading={updating} disabled={updating} onClick={() => void updateStatus(row.id, 'NO_SHOW')}>Не явился</Button>
+                </div>
+              </Space>
+            </Card>
+          </List.Item>
+        }}
+      /> : <Table<DashboardAlert>
+          rowKey="id"
+          columns={alertColumns}
+          dataSource={summary?.alerts ?? []}
+          loading={loading && !summary}
+          pagination={false}
+          scroll={{ x: 850 }}
+          locale={{ emptyText: 'Занятий без отметки нет' }}
+        />}
     </Card>
 
     <Card title={<Link to="/horses">Загрузка лошадей на сегодня</Link>} loading={loading && !summary}>
