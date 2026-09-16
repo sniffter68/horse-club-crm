@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { SettingsPage } from './pages/settings'
 import { ClientList } from './pages/clients/list'
 import { ClientCreate } from './pages/clients/create'
@@ -35,7 +35,7 @@ import { PaymentList } from './pages/payments/list'
 import { Authenticated, Refine, usePermissions, type ResourceProps } from '@refinedev/core'
 import { ThemedLayout as ThemedLayoutV2, ThemedTitle as ThemedTitleV2, useNotificationProvider } from '@refinedev/antd'
 import routerProvider, { CatchAllNavigate } from '@refinedev/react-router'
-import { App as AntdApp, ConfigProvider, Result, Spin } from 'antd'
+import { App as AntdApp, ConfigProvider, Result, Spin, theme as antdTheme } from 'antd'
 import ruRU from 'antd/locale/ru_RU'
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { authProvider } from './authProvider'
@@ -58,6 +58,7 @@ const catalogs = [
   { name: 'boarding-contracts', ListPage: BoardingContractList, CreatePage: BoardingContractCreate, EditPage: BoardingContractEdit, label: 'Договоры постоя' },
 ] as const
 const SchedulePage = lazy(() => import('./pages/schedule').then(module => ({ default: module.SchedulePage })))
+const THEME_STORAGE_KEY = 'horsecrm.color_mode'
 const resources: ResourceProps[] = [
   { name: 'dashboard', list: '/', meta: { label: 'Дашборд' } },
   { name: 'lessons', list: '/schedule', meta: { label: 'Расписание' } },
@@ -79,16 +80,27 @@ function DashboardRoute() {
   return <DashboardPage />
 }
 export default function App() {
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem(THEME_STORAGE_KEY) === 'dark')
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? 'dark' : 'light'
+    document.documentElement.style.colorScheme = darkMode ? 'dark' : 'light'
+  }, [darkMode])
+  const toggleTheme = () => setDarkMode(current => {
+    const next = !current
+    localStorage.setItem(THEME_STORAGE_KEY, next ? 'dark' : 'light')
+    return next
+  })
+
   return (
     <BrowserRouter>
-      <ConfigProvider locale={ruRU}>
+      <ConfigProvider locale={ruRU} theme={{ algorithm: darkMode ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}>
         <AntdApp>
           <Refine dataProvider={dataProvider} authProvider={authProvider} routerProvider={routerProvider}
             notificationProvider={useNotificationProvider} resources={resources}
             options={{ syncWithLocation: true, disableTelemetry: true }}>
             <Routes>
               <Route element={<Authenticated key="private" fallback={<CatchAllNavigate to="/login" />} loading={<LoadingPage />}>
-                <ThemedLayoutV2 Sider={() => <Sidebar />} Title={(props) => <ThemedTitleV2 {...props} text="Horse CRM" />}><Outlet /></ThemedLayoutV2>
+                <ThemedLayoutV2 Sider={() => <Sidebar darkMode={darkMode} onToggleTheme={toggleTheme} />} Title={(props) => <ThemedTitleV2 {...props} text="Horse CRM" />}><Outlet /></ThemedLayoutV2>
               </Authenticated>}>
                 <Route index element={<DashboardRoute />} />
                 {catalogs.map(({ name, ListPage, CreatePage, EditPage }) => (
