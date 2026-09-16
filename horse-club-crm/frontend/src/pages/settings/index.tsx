@@ -5,13 +5,13 @@ import dayjs, { type Dayjs } from 'dayjs'
 import type { Role } from '../../authStorage'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 
-interface ClubSchedule { id: number; openTime: string; closeTime: string; dayOfWeekOff: number }
-interface ScheduleForm { openTime: Dayjs; closeTime: Dayjs; dayOfWeekOff: number }
+interface ClubSchedule { id: number; openTime: string; closeTime: string; daysOfWeekOff: number[] }
+interface ScheduleForm { openTime: Dayjs; closeTime: Dayjs; daysOfWeekOff: number[] }
 const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
 const toForm = (schedule: ClubSchedule): ScheduleForm => ({
   openTime: dayjs(`2000-01-01T${schedule.openTime}:00`),
   closeTime: dayjs(`2000-01-01T${schedule.closeTime}:00`),
-  dayOfWeekOff: schedule.dayOfWeekOff,
+  daysOfWeekOff: schedule.daysOfWeekOff,
 })
 
 export function SettingsPage() {
@@ -50,7 +50,7 @@ export function SettingsPage() {
     savingRef.current = true; setSaving(true); setError(undefined)
     try {
       const { data } = await httpClient.patch<ClubSchedule>(`${API_URL}/settings/club-schedule`, {
-        openTime: values.openTime.format('HH:mm'), closeTime: values.closeTime.format('HH:mm'), dayOfWeekOff: values.dayOfWeekOff,
+        openTime: values.openTime.format('HH:mm'), closeTime: values.closeTime.format('HH:mm'), daysOfWeekOff: values.daysOfWeekOff,
       })
       form.setFieldsValue(toForm(data))
       void message.success('График работы сохранён')
@@ -84,8 +84,8 @@ export function SettingsPage() {
         ]}>
           <TimePicker format="HH:mm" needConfirm={false} style={{ width: '100%' }} />
         </Form.Item>
-        <Form.Item name="dayOfWeekOff" label="Выходной день" rules={[{ required: true, message: 'Выберите выходной день' }]}>
-          <Select options={days.map((label, value) => ({ label, value }))} />
+        <Form.Item name="daysOfWeekOff" label="Выходные дни" extra="Можно выбрать несколько дней или оставить поле пустым, если клуб работает ежедневно.">
+          <Select mode="multiple" allowClear placeholder="Клуб работает без выходных" options={days.map((label, value) => ({ label, value }))} />
         </Form.Item>
         {canManage && <Button aria-label="Сохранить" type="primary" htmlType="submit" loading={saving}>Сохранить</Button>}
       </Form>

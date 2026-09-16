@@ -18,7 +18,7 @@ async function main() {
       id: 1,
       openTime: '09:00',
       closeTime: '21:00',
-      dayOfWeekOff: 1,
+      daysOfWeekOff: [1],
     },
   });
 }

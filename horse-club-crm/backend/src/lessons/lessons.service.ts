@@ -51,7 +51,7 @@ type WorkloadReader =
 interface ClubScheduleConfig {
   openTime: string;
   closeTime: string;
-  dayOfWeekOff: number;
+  daysOfWeekOff: number[];
 }
 
 interface LocalDateParts {
@@ -511,7 +511,7 @@ export class LessonsService {
   ): Promise<ClubScheduleConfig> {
     const schedule = await client.clubSchedule.findUnique({
       where: { id: CLUB_SCHEDULE_ID },
-      select: { openTime: true, closeTime: true, dayOfWeekOff: true },
+      select: { openTime: true, closeTime: true, daysOfWeekOff: true },
     });
     if (!schedule) {
       throw new InternalServerErrorException('Расписание клуба не настроено');
@@ -536,7 +536,7 @@ export class LessonsService {
     const { open, close } = this.getWorkDayBounds(startDate, schedule);
 
     if (
-      dayOfWeek === schedule.dayOfWeekOff ||
+      schedule.daysOfWeekOff.includes(dayOfWeek) ||
       !sameLocalDate ||
       startTime < open ||
       endTime > close
@@ -550,11 +550,12 @@ export class LessonsService {
     schedule: ClubScheduleConfig,
   ): { open: Date; close: Date } {
     if (
-      !Number.isInteger(schedule.dayOfWeekOff) ||
-      schedule.dayOfWeekOff < 0 ||
-      schedule.dayOfWeekOff > 6
+      !Array.isArray(schedule.daysOfWeekOff) ||
+      schedule.daysOfWeekOff.length > 7 ||
+      new Set(schedule.daysOfWeekOff).size !== schedule.daysOfWeekOff.length ||
+      schedule.daysOfWeekOff.some((day) => !Number.isInteger(day) || day < 0 || day > 6)
     ) {
-      throw new InternalServerErrorException('Некорректно настроен выходной день клуба');
+      throw new InternalServerErrorException('Некорректно настроены выходные дни клуба');
     }
     const openTime = this.parseClock(schedule.openTime);
     const closeTime = this.parseClock(schedule.closeTime);

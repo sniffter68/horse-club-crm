@@ -10,7 +10,7 @@ export interface MembershipSummary {
   pricingPlan?: { id: string; name: string } | null;
 }
 export interface ClientWithMemberships extends Client { memberships: MembershipSummary[] }
-export interface ClubSchedule { openTime: string; closeTime: string; dayOfWeekOff: number }
+export interface ClubSchedule { openTime: string; closeTime: string; daysOfWeekOff: number[] }
 export interface Workload { maxDailyMinutes: number; usedMinutes: number; remainingMinutes: number }
 export interface BookingValues {
   clientId: string; membershipId?: string; serviceId: string; trainerId: string; horseId?: string; arenaId?: string; startTime: string; durationMinutes: number;

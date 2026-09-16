@@ -26,7 +26,10 @@ export class SettingsService {
     }
     return this.prisma.clubSchedule.update({
       where: { id: SCHEDULE_ID },
-      data: dto,
+      data: {
+        ...dto,
+        ...(dto.daysOfWeekOff ? { daysOfWeekOff: [...dto.daysOfWeekOff].sort((left, right) => left - right) } : {}),
+      },
     });
   }
 }

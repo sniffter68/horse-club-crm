@@ -349,9 +349,9 @@ model MembershipOp {
 }
 
 model ClubSchedule {
-  id           Int      @id @default(1)
-  openTime     String   @default("09:00")
-  closeTime    String   @default("21:00")
-  dayOfWeekOff Int      @default(1)
-  updatedAt    DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  id            Int      @id @default(1)
+  openTime      String   @default("09:00")
+  closeTime     String   @default("21:00")
+  daysOfWeekOff Int[]    @default([1])
+  updatedAt     DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 }

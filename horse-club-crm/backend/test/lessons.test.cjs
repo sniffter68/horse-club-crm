@@ -157,7 +157,7 @@ test('create uses service duration and adds a pending payment for a booking with
   let transactionOptions;
   const tx = {
     clubSchedule: {
-      findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', dayOfWeekOff: 1 }),
+      findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] }),
     },
     horse: {
       findUnique: async () => ({ name: 'Буран', maxDailyMinutes: 240 }),
@@ -232,7 +232,7 @@ test('creation retries P2034 and list query uses interval intersection filters',
   );
   const tx = {
     clubSchedule: {
-      findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', dayOfWeekOff: 1 }),
+      findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] }),
     },
     horse: {
       findUnique: async () => ({ name: 'Буран', maxDailyMinutes: 240 }),
@@ -283,7 +283,7 @@ test('creation retries P2034 and list query uses interval intersection filters',
 test('rejects lessons on the configured club day off', async () => {
   const prisma = {
     clubSchedule: {
-      findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', dayOfWeekOff: 1 }),
+      findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1, 2] }),
     },
   };
   const service = new LessonsService(prisma, unusedLedger);
@@ -297,12 +297,20 @@ test('rejects lessons on the configured club day off', async () => {
     (error) => error.getStatus() === 400 &&
       error.message === 'Клуб закрыт в выбранное время/день',
   );
+  await assert.rejects(
+    service.validateClubWorkingHours(
+      new Date('2026-09-08T07:00:00.000Z'),
+      new Date('2026-09-08T08:00:00.000Z'),
+    ),
+    (error) => error.getStatus() === 400 &&
+      error.message === 'Клуб закрыт в выбранное время/день',
+  );
 });
 
 test('rejects lessons outside club working hours', async () => {
   const prisma = {
     clubSchedule: {
-      findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', dayOfWeekOff: 1 }),
+      findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] }),
     },
   };
   const service = new LessonsService(prisma, unusedLedger);
@@ -321,7 +329,7 @@ test('rejects lessons outside club working hours', async () => {
 test('rejects an exact horse daily workload overflow with the required message', async () => {
   const prisma = {
     clubSchedule: {
-      findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', dayOfWeekOff: 1 }),
+      findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] }),
     },
     horse: {
       findUnique: async () => ({ name: 'Буран', maxDailyMinutes: 120 }),
@@ -356,7 +364,7 @@ test('rejects an exact horse daily workload overflow with the required message',
 test('returns horse workload values for the booking progress bar', async () => {
   const prisma = {
     clubSchedule: {
-      findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', dayOfWeekOff: 1 }),
+      findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] }),
     },
     horse: {
       findUnique: async () => ({ name: 'Буран', maxDailyMinutes: 240 }),

@@ -35,7 +35,7 @@ let schedule = {
   id: 1,
   openTime: '09:00',
   closeTime: '21:00',
-  dayOfWeekOff: 1,
+  daysOfWeekOff: [1],
   updatedAt: new Date('2026-09-01T00:00:00.000Z'),
 };
 
@@ -135,11 +135,11 @@ test('ADMIN updates club schedule while TRAINER receives 403', async () => {
   const updated = await request(app.getHttpServer())
     .patch('/api/settings/club-schedule')
     .set('x-test-role', Role.ADMIN)
-    .send({ openTime: '08:00', closeTime: '20:00', dayOfWeekOff: 0 })
+    .send({ openTime: '08:00', closeTime: '20:00', daysOfWeekOff: [0, 6] })
     .expect(200);
   assert.equal(updated.body.openTime, '08:00');
   assert.equal(updated.body.closeTime, '20:00');
-  assert.equal(updated.body.dayOfWeekOff, 0);
+  assert.deepEqual(updated.body.daysOfWeekOff, [0, 6]);
 
   await request(app.getHttpServer())
     .patch('/api/settings/club-schedule')

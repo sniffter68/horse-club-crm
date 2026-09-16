@@ -1,7 +1,7 @@
 ﻿import { test, expect, type Page } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
-  await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', dayOfWeekOff: 1 } }))
+  await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] } }))
   await page.route('**/api/lessons?*', route => route.fulfill({ json: [] }))
   await page.route(/\/api\/(clients|horses|trainers|services)\?/, route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
 })

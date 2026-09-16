@@ -28,7 +28,7 @@ test('schedule: real booking, workload, filters, attendance and cancellation', a
     }
     const settings = await (await request.get('http://localhost:3000/api/settings/club-schedule', { headers })).json()
     let start = DateTime.now().setZone('Europe/Moscow').startOf('week').plus({ days: 1 })
-    if (start.weekday % 7 === settings.dayOfWeekOff) start = start.plus({ days: 1 })
+    while (settings.daysOfWeekOff.includes(start.weekday % 7)) start = start.plus({ days: 1 })
     const [hour, minute] = settings.openTime.split(':').map(Number)
     start = start.set({ hour, minute })
     await page.goto('/login')

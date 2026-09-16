@@ -30,7 +30,7 @@ test('PostgreSQL: resource and last-balance races', { skip: !enabled, timeout: 6
     await p.service.create({ data: { id: serviceId, name: 'QA concurrency', durationMinutes: 30 } });
     const schedule = await p.clubSchedule.findUniqueOrThrow({ where: { id: 1 } });
     let start = DateTime.now().setZone(process.env.CLUB_TIME_ZONE || 'Europe/Moscow').plus({ days: 7 }).startOf('day');
-    while (start.weekday % 7 === schedule.dayOfWeekOff) start = start.plus({ days: 1 });
+    while (schedule.daysOfWeekOff.includes(start.weekday % 7)) start = start.plus({ days: 1 });
     const [hour, minute] = schedule.openTime.split(':').map(Number);
     start = start.set({ hour, minute });
     for (const resource of ['trainer', 'horse']) await t.test(`five simultaneous HTTP requests competing for one ${resource}`, async () => {
