@@ -168,6 +168,7 @@ test('create uses service duration and adds a pending payment for a booking with
     service: { findUnique: async () => ({ durationMinutes: 45, price: 1500, title: 'Тренировка', name: 'Тренировка', maxCapacity: 1 }) },
     lesson: {
       findMany: async () => [],
+      findFirst: async () => null,
       create: async (args) => {
         createArgs = args;
         return { id: 'lesson-new', ...args.data, bookings: [] };
@@ -214,6 +215,7 @@ test('creates one group lesson with separate riders, horses, memberships and pay
     arena: { findUnique: async () => ({ name: 'Большой манеж', isUnavailable: false, capacity: 6 }) },
     lesson: {
       findMany: async () => [],
+      findFirst: async () => null,
       create: async args => { createArgs = args; return { id: 'group-lesson', ...args.data, bookings: [] }; },
     },
   };
@@ -234,6 +236,38 @@ test('creates one group lesson with separate riders, horses, memberships and pay
       description: 'Начисление за занятие: Групповая тренировка',
     } } },
   ]);
+});
+
+test('adds a later rider to the matching scheduled lesson instead of reporting a trainer conflict', async () => {
+  let updateArgs;
+  const matchingLesson = {
+    id: 'existing-lesson',
+    bookings: [{ clientId: 'client-1', horseId: 'horse-1' }],
+  };
+  const tx = {
+    clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] }) },
+    horse: { findUnique: async ({ where }) => ({ name: where.id, maxDailyMinutes: 240 }) },
+    service: { findUnique: async () => ({ durationMinutes: 60, price: 1500, title: 'Конкур', name: 'Конкур', maxCapacity: 3 }) },
+    lesson: {
+      findFirst: async () => matchingLesson,
+      findMany: async () => [],
+      update: async args => { updateArgs = args; return { id: matchingLesson.id, bookings: [] }; },
+    },
+  };
+  const service = new LessonsService({ $transaction: async callback => callback(tx) }, unusedLedger);
+  const result = await service.createLesson({
+    trainerId: 'trainer-1', serviceId: 'service-1', startTime: '2026-09-08T10:00:00.000Z',
+    clientId: 'client-2', horseId: 'horse-2',
+  });
+
+  assert.equal(result.id, 'existing-lesson');
+  assert.equal(updateArgs.where.id, 'existing-lesson');
+  assert.deepEqual(updateArgs.data.bookings.create, [{
+    clientId: 'client-2', horseId: 'horse-2', payments: { create: {
+      clientId: 'client-2', amount: 1500, method: 'UNSPECIFIED', status: 'PENDING',
+      description: 'Начисление за занятие: Конкур',
+    } },
+  }]);
 });
 
 test('rejects duplicate clients and horses inside one group lesson', async () => {

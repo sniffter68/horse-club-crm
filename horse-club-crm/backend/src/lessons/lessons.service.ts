@@ -167,6 +167,7 @@ export class LessonsService {
       if (participants.length > service.maxCapacity) {
         throw new BadRequestException(`Для услуги разрешено не более ${service.maxCapacity} участников`);
       }
+      let arenaCapacity: number | undefined;
       if (dto.arenaId) {
         const arena = await tx.arena.findUnique({
           where: { id: dto.arenaId },
@@ -174,6 +175,7 @@ export class LessonsService {
         });
         if (!arena) throw new NotFoundException('Манеж не найден');
         if (arena.isUnavailable) throw new ConflictException(`Манеж "${arena.name}" недоступен`);
+        arenaCapacity = arena.capacity;
         if (participants.length > arena.capacity) {
           throw new BadRequestException(`Вместимость манежа "${arena.name}" — ${arena.capacity} участников`);
         }
@@ -192,13 +194,44 @@ export class LessonsService {
       this.assertValidInterval(start, end);
       const schedule = await this.getClubSchedule(tx);
       this.assertClubWorkingHours(start, end, schedule);
+      const matchingLesson = participants.length
+        ? await tx.lesson.findFirst({
+            where: {
+              trainerId: dto.trainerId,
+              serviceId: dto.serviceId,
+              arenaId: dto.arenaId ?? null,
+              startTime: start,
+              endTime: end,
+              status: LessonStatus.SCHEDULED,
+            },
+            select: {
+              id: true,
+              bookings: { select: { clientId: true, horseId: true } },
+            },
+          })
+        : null;
+      if (matchingLesson) {
+        const totalParticipants = matchingLesson.bookings.length + participants.length;
+        if (totalParticipants > service.maxCapacity) {
+          throw new ConflictException(`В занятии уже достигнута вместимость услуги: ${service.maxCapacity}`);
+        }
+        if (arenaCapacity !== undefined && totalParticipants > arenaCapacity) {
+          throw new ConflictException(`В занятии уже достигнута вместимость манежа: ${arenaCapacity}`);
+        }
+        if (matchingLesson.bookings.some(booking => clientIds.includes(booking.clientId))) {
+          throw new ConflictException('Клиент уже записан на это занятие');
+        }
+        if (matchingLesson.bookings.some(booking => booking.horseId && horseIds.includes(booking.horseId))) {
+          throw new ConflictException('Лошадь уже назначена участнику этого занятия');
+        }
+      }
       await this.validateNoConflictsWithClient(
         tx,
         dto.trainerId,
         horseIds,
         start,
         end,
-        undefined,
+        matchingLesson?.id,
         dto.arenaId,
       );
       for (const horseId of horseIds) {
@@ -208,6 +241,29 @@ export class LessonsService {
           this.getLocalDateParts(start),
           durationMinutes,
         );
+      }
+
+      const bookingCreateData = participants.map(participant => ({
+        clientId: participant.clientId,
+        ...(participant.horseId ? { horseId: participant.horseId } : {}),
+        ...(participant.membershipId ? { membershipId: participant.membershipId } : {}),
+        ...(!participant.membershipId && Number(service.price) > 0
+          ? { payments: { create: {
+              clientId: participant.clientId,
+              amount: service.price,
+              method: 'UNSPECIFIED' as const,
+              status: 'PENDING' as const,
+              description: `Начисление за занятие: ${service.title || service.name}`,
+            } } }
+          : {}),
+      }));
+
+      if (matchingLesson) {
+        return tx.lesson.update({
+          where: { id: matchingLesson.id },
+          data: { bookings: { create: bookingCreateData } },
+          ...lessonDetails,
+        });
       }
 
       return tx.lesson.create({
@@ -221,22 +277,7 @@ export class LessonsService {
           ...(participants.length
             ? {
                 bookings: {
-                  create: participants.map(participant => ({
-                    clientId: participant.clientId,
-                    ...(participant.horseId ? { horseId: participant.horseId } : {}),
-                    ...(participant.membershipId
-                      ? { membershipId: participant.membershipId }
-                      : {}),
-                    ...(!participant.membershipId && Number(service.price) > 0
-                      ? { payments: { create: {
-                          clientId: participant.clientId,
-                          amount: service.price,
-                          method: 'UNSPECIFIED',
-                          status: 'PENDING',
-                          description: `Начисление за занятие: ${service.title || service.name}`,
-                        } } }
-                      : {}),
-                  })),
+                  create: bookingCreateData,
                 },
               }
             : {}),
