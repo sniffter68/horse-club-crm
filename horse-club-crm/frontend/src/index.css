@@ -21,9 +21,10 @@ html[data-theme='dark'] body { background: #141414; }
 .mobile-navigation-drawer .ant-drawer-header { min-height: 64px; padding: 12px 16px; }
 .mobile-navigation-drawer .ant-drawer-title { display: flex; align-items: center; }
 .mobile-navigation-drawer .ant-menu-item { height: 48px; line-height: 48px; margin-block: 4px; }
-.mobile-theme-toggle { padding: 16px; }
 .crm-sidebar .ant-layout-sider-children { display: flex; flex-direction: column; }
-.sidebar-theme-toggle { padding: 12px; }
+.sidebar-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+.sidebar-title-row--desktop { box-sizing: border-box; height: 64px; padding: 0 12px 0 16px; }
+.ant-layout-sider-collapsed .sidebar-title-row--desktop { flex-direction: column; justify-content: center; height: 104px; padding: 8px; }
 .responsive-record-item { display: block !important; padding-inline: 0 !important; }
 .responsive-record-item > .ant-card { width: 100%; }
 .responsive-record-field { display: grid; grid-template-columns: minmax(105px, 38%) minmax(0, 1fr); gap: 12px; padding-block: 8px; border-bottom: 1px solid #f0f0f0; }

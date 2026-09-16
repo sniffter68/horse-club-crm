@@ -50,18 +50,17 @@ export function Sidebar({ darkMode, onToggleTheme }: { darkMode: boolean; onTogg
         className="mobile-navigation-drawer"
         placement="left"
         width="min(86vw, 340px)"
-        title={<ThemedTitle collapsed={false} text="Horse CRM" />}
+        title={<div className="sidebar-title-row">
+          <ThemedTitle collapsed={false} text="Horse CRM" />
+          <Button type="text" shape="circle" icon={darkMode ? <BulbOutlined /> : <MoonOutlined />}
+            aria-label={darkMode ? 'Включить светлую тему' : 'Включить тёмную тему'} onClick={onToggleTheme} />
+        </div>}
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
         styles={{ body: { padding: 0 } }}
       >
         <Menu theme={darkMode ? 'dark' : 'light'} mode="inline" items={items} selectedKeys={[selectedKey]} defaultOpenKeys={defaultOpenKeys}
           onClick={() => setMobileOpen(false)} />
-        <div className="mobile-theme-toggle">
-          <Button block size="large" icon={darkMode ? <BulbOutlined /> : <MoonOutlined />} onClick={onToggleTheme}>
-            {darkMode ? 'Светлая тема' : 'Тёмная тема'}
-          </Button>
-        </div>
       </Drawer>
     </>
   }
@@ -69,15 +68,12 @@ export function Sidebar({ darkMode, onToggleTheme }: { darkMode: boolean; onTogg
   return (
     <Layout.Sider className="crm-sidebar" theme={darkMode ? 'dark' : 'light'} collapsible collapsed={collapsed} onCollapse={setCollapsed}
       breakpoint="lg" collapsedWidth={80} style={{ minHeight: '100vh' }}>
-      <div style={{ height: 64, display: 'flex', alignItems: 'center', padding: '0 16px' }}>
+      <div className="sidebar-title-row sidebar-title-row--desktop">
         <ThemedTitle collapsed={collapsed} text="Horse CRM" />
+        <Button type="text" shape="circle" icon={darkMode ? <BulbOutlined /> : <MoonOutlined />}
+          aria-label={darkMode ? 'Включить светлую тему' : 'Включить тёмную тему'} onClick={onToggleTheme} />
       </div>
       <Menu theme={darkMode ? 'dark' : 'light'} mode="inline" items={items} selectedKeys={[selectedKey]} defaultOpenKeys={defaultOpenKeys} style={{ flex: 1, overflowY: 'auto' }} />
-      <div className="sidebar-theme-toggle">
-        <Button block icon={darkMode ? <BulbOutlined /> : <MoonOutlined />} aria-label={darkMode ? 'Включить светлую тему' : 'Включить тёмную тему'} onClick={onToggleTheme}>
-          {!collapsed && (darkMode ? 'Светлая тема' : 'Тёмная тема')}
-        </Button>
-      </div>
     </Layout.Sider>
   )
 }
