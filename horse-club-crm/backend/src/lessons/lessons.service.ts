@@ -8,9 +8,11 @@ import {
 } from '@nestjs/common';
 import { LessonStatus, MembershipOpType, Prisma } from '@prisma/client';
 import { MembershipLedgerService } from '../memberships/membership-ledger.service';
+import { parseRefineQuery, type PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateLessonDto } from './dto/create-lesson.dto';
 import type { ListLessonsQueryDto } from './dto/list-lessons-query.dto';
+import type { LessonHistoryQueryDto } from './dto/lesson-history-query.dto';
 
 const SERIALIZATION_RETRIES = 5;
 const MILLISECONDS_PER_MINUTE = 60_000;
@@ -28,7 +30,12 @@ const lessonDetails = Prisma.validator<Prisma.LessonDefaultArgs>()({
     service: true,
     arena: true,
     bookings: {
-      include: { client: true, horse: true, membership: true },
+      include: {
+        client: true,
+        horse: true,
+        membership: true,
+        payments: { orderBy: { createdAt: 'desc' } },
+      },
       orderBy: { createdAt: 'asc' },
     },
   },
@@ -232,6 +239,50 @@ export class LessonsService {
       orderBy: [{ startTime: 'asc' }, { id: 'asc' }],
       ...lessonDetails,
     });
+  }
+
+  async findHistory(query: LessonHistoryQueryDto): Promise<PaginatedResult<LessonDetails>> {
+    const options = parseRefineQuery(query, ['startTime', 'endTime', 'status', 'createdAt', 'updatedAt'], 'startTime');
+    const from = query.from ? this.parseDate(query.from, 'Некорректный параметр from') : undefined;
+    const to = query.to ? this.parseDate(query.to, 'Некорректный параметр to') : undefined;
+    if (from && to && from > to) throw new BadRequestException('Параметр from должен быть раньше параметра to');
+
+    const where: Prisma.LessonWhereInput = {
+      ...(from || to ? { startTime: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.trainerId ? { trainerId: query.trainerId } : {}),
+      ...(query.serviceId ? { serviceId: query.serviceId } : {}),
+      ...(query.arenaId ? { arenaId: query.arenaId } : {}),
+      ...(query.clientId ? { bookings: { some: { clientId: query.clientId } } } : {}),
+      ...(query.horseId ? { bookings: { some: { horseId: query.horseId } } } : {}),
+      ...(options.search ? {
+        OR: [
+          { service: { is: { title: { contains: options.search, mode: 'insensitive' } } } },
+          { service: { is: { name: { contains: options.search, mode: 'insensitive' } } } },
+          { trainer: { is: { name: { contains: options.search, mode: 'insensitive' } } } },
+          { arena: { is: { name: { contains: options.search, mode: 'insensitive' } } } },
+          { bookings: { some: { client: { is: { OR: [
+            { name: { contains: options.search, mode: 'insensitive' } },
+            { firstName: { contains: options.search, mode: 'insensitive' } },
+            { lastName: { contains: options.search, mode: 'insensitive' } },
+            { phone: { contains: options.search, mode: 'insensitive' } },
+          ] } } } } },
+          { bookings: { some: { horse: { is: { name: { contains: options.search, mode: 'insensitive' } } } } } },
+        ],
+      } : {}),
+    };
+    const orderBy = { [options.sort]: options.order } as Prisma.LessonOrderByWithRelationInput;
+    const [total, data] = await this.prisma.$transaction([
+      this.prisma.lesson.count({ where }),
+      this.prisma.lesson.findMany({
+        where,
+        orderBy: [orderBy, { id: 'asc' }],
+        skip: options.skip,
+        take: options.take,
+        ...lessonDetails,
+      }),
+    ]);
+    return { total, data };
   }
 
   async findOne(lessonId: string): Promise<LessonDetails> {

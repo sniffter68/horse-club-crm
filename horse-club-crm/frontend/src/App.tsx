@@ -43,6 +43,7 @@ import { dataProvider } from './dataProvider'
 import { LoginPage } from './pages/login'
 import { Sidebar } from './components/layout/Sidebar'
 import { DashboardPage } from './pages/dashboard'
+import { LessonHistoryPage } from './pages/lesson-history'
 import type { Role } from './authStorage'
 import '@refinedev/antd/dist/reset.css'
 
@@ -60,6 +61,7 @@ const SchedulePage = lazy(() => import('./pages/schedule').then(module => ({ def
 const resources: ResourceProps[] = [
   { name: 'dashboard', list: '/', meta: { label: 'Дашборд' } },
   { name: 'lessons', list: '/schedule', meta: { label: 'Расписание' } },
+  { name: 'lesson-history', list: '/lesson-history', meta: { label: 'Журнал занятий' } },
   ...catalogs.map(({ name, label }) => ({ name, list: `/${name}`, create: `/${name}/new`, edit: `/${name}/edit/:id`, meta: { label } })),
   { name: 'settings', list: '/settings', meta: { label: 'Настройки' } },
   { name: 'memberships', list: '/memberships', create: '/memberships/new', meta: { label: 'Абонементы' } },
@@ -97,6 +99,7 @@ export default function App() {
                   </Route>
                 ))}
                 <Route path="schedule" element={<Suspense fallback={<LoadingPage />}><SchedulePage /></Suspense>} />
+                <Route path="lesson-history" element={<LessonHistoryPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="memberships"><Route index element={<MembershipList />} /><Route path="new" element={<MembershipCreate />} /></Route>
                 <Route path="pricing-plans"><Route index element={<PricingPlanList />} /><Route path="new" element={<PricingPlanCreate />} /><Route path="edit/:id" element={<PricingPlanEdit />} /></Route>

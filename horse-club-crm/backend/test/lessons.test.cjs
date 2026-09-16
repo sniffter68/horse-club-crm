@@ -41,6 +41,37 @@ function prismaWithLessons(lessons) {
 
 const unusedLedger = {};
 
+test('lesson history applies server pagination and relation filters', async () => {
+  let countArgs;
+  let listArgs;
+  const prisma = {
+    $transaction: async operations => Promise.all(operations),
+    lesson: {
+      count: async args => { countArgs = args; return 1; },
+      findMany: async args => { listArgs = args; return [{ id: 'lesson-history-1' }]; },
+    },
+  };
+  const service = new LessonsService(prisma, unusedLedger);
+  const result = await service.findHistory({
+    _start: 20, _end: 40, _sort: 'startTime', _order: 'DESC', q: 'Анна',
+    from: '2026-09-01T00:00:00.000Z', to: '2026-09-30T23:59:59.999Z',
+    status: LessonStatus.COMPLETED, trainerId: '11111111-1111-4111-8111-111111111111',
+    clientId: '22222222-2222-4222-8222-222222222222', horseId: '33333333-3333-4333-8333-333333333333',
+  });
+  assert.equal(result.total, 1);
+  assert.equal(result.data[0].id, 'lesson-history-1');
+  assert.equal(listArgs.skip, 20);
+  assert.equal(listArgs.take, 20);
+  assert.deepEqual(listArgs.orderBy, [{ startTime: 'desc' }, { id: 'asc' }]);
+  assert.equal(listArgs.where.status, LessonStatus.COMPLETED);
+  assert.equal(listArgs.where.trainerId, '11111111-1111-4111-8111-111111111111');
+  assert.deepEqual(listArgs.where.startTime, {
+    gte: new Date('2026-09-01T00:00:00.000Z'), lte: new Date('2026-09-30T23:59:59.999Z'),
+  });
+  assert.equal(countArgs.where, listArgs.where);
+  assert.equal(listArgs.where.OR.length, 6);
+});
+
 test('blocks a mathematically overlapping trainer interval', async () => {
   const service = new LessonsService(prismaWithLessons([scheduled]), unusedLedger);
   await assert.rejects(
