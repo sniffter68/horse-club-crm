@@ -12,8 +12,11 @@ export interface MembershipSummary {
 export interface ClientWithMemberships extends Client { memberships: MembershipSummary[] }
 export interface ClubSchedule { openTime: string; closeTime: string; daysOfWeekOff: number[] }
 export interface Workload { maxDailyMinutes: number; usedMinutes: number; remainingMinutes: number }
+export interface BookingParticipantValues {
+  clientId?: string; membershipId?: string; horseId?: string;
+}
 export interface BookingValues {
-  clientId: string; membershipId?: string; serviceId: string; trainerId: string; horseId?: string; arenaId?: string; startTime: string; durationMinutes: number;
+  participants: BookingParticipantValues[]; serviceId: string; trainerId: string; arenaId?: string; startTime: string; durationMinutes: number;
 }
 export const statuses: Record<Status, { color: string; label: string }> = {
   SCHEDULED: { color: '#1677ff', label: 'Запланировано' },

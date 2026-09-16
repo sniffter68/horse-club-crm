@@ -19,7 +19,10 @@ function matchesConflict(lesson, where) {
   const resourceMatches = where.OR.some((condition) =>
     (condition.trainerId && lesson.trainerId === condition.trainerId) ||
     (condition.arenaId && lesson.arenaId === condition.arenaId) ||
-    (condition.bookings?.some?.horseId && lesson.bookings.some((booking) => booking.horseId === condition.bookings.some.horseId)));
+    (condition.bookings?.some?.horseId && lesson.bookings.some((booking) =>
+      Array.isArray(condition.bookings.some.horseId.in)
+        ? condition.bookings.some.horseId.in.includes(booking.horseId)
+        : booking.horseId === condition.bookings.some.horseId)));
   return (
     lesson.status !== where.status.not &&
     resourceMatches &&
@@ -162,7 +165,7 @@ test('create uses service duration and adds a pending payment for a booking with
     horse: {
       findUnique: async () => ({ name: 'Буран', maxDailyMinutes: 240 }),
     },
-    service: { findUnique: async () => ({ durationMinutes: 45, price: 1500, title: 'Тренировка', name: 'Тренировка' }) },
+    service: { findUnique: async () => ({ durationMinutes: 45, price: 1500, title: 'Тренировка', name: 'Тренировка', maxCapacity: 1 }) },
     lesson: {
       findMany: async () => [],
       create: async (args) => {
@@ -188,12 +191,12 @@ test('create uses service duration and adds a pending payment for a booking with
 
   assert.equal(createArgs.data.endTime.toISOString(), '2026-09-08T10:45:00.000Z');
   assert.equal(createArgs.data.status, LessonStatus.SCHEDULED);
-  assert.deepEqual(createArgs.data.bookings.create, {
+  assert.deepEqual(createArgs.data.bookings.create, [{
     clientId: 'client-1', horseId: 'horse-1', payments: { create: {
       clientId: 'client-1', amount: 1500, method: 'UNSPECIFIED', status: 'PENDING',
       description: 'Начисление за занятие: Тренировка',
     } },
-  });
+  }]);
   assert.equal(result.id, 'lesson-new');
   assert.deepEqual(transactionOptions, {
     isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
@@ -202,10 +205,57 @@ test('create uses service duration and adds a pending payment for a booking with
   });
 });
 
+test('creates one group lesson with separate riders, horses, memberships and payments', async () => {
+  let createArgs;
+  const tx = {
+    clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] }) },
+    horse: { findUnique: async ({ where }) => ({ name: where.id, maxDailyMinutes: 240 }) },
+    service: { findUnique: async () => ({ durationMinutes: 60, price: 2000, title: 'Групповая тренировка', name: 'Групповая тренировка', maxCapacity: 4 }) },
+    arena: { findUnique: async () => ({ name: 'Большой манеж', isUnavailable: false, capacity: 6 }) },
+    lesson: {
+      findMany: async () => [],
+      create: async args => { createArgs = args; return { id: 'group-lesson', ...args.data, bookings: [] }; },
+    },
+  };
+  const service = new LessonsService({ $transaction: async callback => callback(tx) }, unusedLedger);
+  const result = await service.createLesson({
+    trainerId: 'trainer-1', serviceId: 'service-1', arenaId: 'arena-1', startTime: '2026-09-08T10:00:00.000Z',
+    participants: [
+      { clientId: 'client-1', horseId: 'horse-1', membershipId: 'membership-1' },
+      { clientId: 'client-2', horseId: 'horse-2' },
+    ],
+  });
+
+  assert.equal(result.id, 'group-lesson');
+  assert.deepEqual(createArgs.data.bookings.create, [
+    { clientId: 'client-1', horseId: 'horse-1', membershipId: 'membership-1' },
+    { clientId: 'client-2', horseId: 'horse-2', payments: { create: {
+      clientId: 'client-2', amount: 2000, method: 'UNSPECIFIED', status: 'PENDING',
+      description: 'Начисление за занятие: Групповая тренировка',
+    } } },
+  ]);
+});
+
+test('rejects duplicate clients and horses inside one group lesson', async () => {
+  const service = new LessonsService({}, unusedLedger);
+  const base = { trainerId: 'trainer-1', serviceId: 'service-1', startTime: '2026-09-08T10:00:00.000Z' };
+  await assert.rejects(
+    service.createLesson({ ...base, participants: [{ clientId: 'client-1' }, { clientId: 'client-1' }] }),
+    error => error.getStatus() === 400 && error.message === 'Один клиент не может быть добавлен в занятие дважды',
+  );
+  await assert.rejects(
+    service.createLesson({ ...base, participants: [
+      { clientId: 'client-1', horseId: 'horse-1' },
+      { clientId: 'client-2', horseId: 'horse-1' },
+    ] }),
+    error => error.getStatus() === 400 && error.message === 'Одна лошадь не может быть назначена нескольким участникам занятия',
+  );
+});
+
 test('creation rejects an unavailable arena', async () => {
   const tx = {
-    service: { findUnique: async () => ({ durationMinutes: 45 }) },
-    arena: { findUnique: async () => ({ name: 'Открытый плац', isUnavailable: true }) },
+    service: { findUnique: async () => ({ durationMinutes: 45, maxCapacity: 1 }) },
+    arena: { findUnique: async () => ({ name: 'Открытый плац', isUnavailable: true, capacity: 1 }) },
   };
   const prisma = { $transaction: async callback => callback(tx) };
   const service = new LessonsService(prisma, unusedLedger);
@@ -237,7 +287,7 @@ test('creation retries P2034 and list query uses interval intersection filters',
     horse: {
       findUnique: async () => ({ name: 'Буран', maxDailyMinutes: 240 }),
     },
-    service: { findUnique: async () => ({ durationMinutes: 30 }) },
+    service: { findUnique: async () => ({ durationMinutes: 30, maxCapacity: 1 }) },
     lesson: {
       findMany: async () => [],
       create: async ({ data }) => ({ id: 'lesson-new', ...data }),
