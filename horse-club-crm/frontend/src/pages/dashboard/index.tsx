@@ -6,7 +6,14 @@ import { Link } from 'react-router-dom'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { PendingLeads, type PendingLead } from './PendingLeads'
 
+const DASHBOARD_REFRESH_INTERVAL_MS = 15_000
+
 type FinalLessonStatus = 'COMPLETED' | 'NO_SHOW'
+
+interface LoadSummaryOptions {
+  signal?: AbortSignal
+  silent?: boolean
+}
 
 interface DashboardAlertBooking {
   id: string
@@ -74,7 +81,7 @@ function workloadColor(percent: number): string {
 export function DashboardPage() {
   const screens = Grid.useBreakpoint()
   const isMobile = !screens.md
-  const { message } = App.useApp()
+  const { message, notification } = App.useApp()
   const { mutate: onError } = useOnError()
   const onErrorRef = useRef(onError)
   useEffect(() => { onErrorRef.current = onError }, [onError])
@@ -84,6 +91,8 @@ export function DashboardPage() {
   const [error, setError] = useState<string>()
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(() => new Set())
   const updatingIdsRef = useRef<Set<string>>(new Set())
+  const knownLeadIdsRef = useRef<Set<string> | undefined>(undefined)
+  const loadingSummaryRef = useRef(false)
 
   const reportError = useCallback((cause: unknown) => {
     const failure = toHttpError(cause)
@@ -91,24 +100,67 @@ export function DashboardPage() {
     if (failure.statusCode === 401) onErrorRef.current(failure)
   }, [])
 
-  const loadSummary = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true)
-    setError(undefined)
+  const loadSummary = useCallback(async ({ signal, silent = false }: LoadSummaryOptions = {}) => {
+    if (loadingSummaryRef.current) return
+    loadingSummaryRef.current = true
+    if (!silent) {
+      setLoading(true)
+      setError(undefined)
+    }
     try {
       const response = await httpClient.get<DashboardSummary>(`${API_URL}/dashboard/summary`, { signal })
-      if (!signal?.aborted) setSummary(response.data)
+      if (!signal?.aborted) {
+        const nextLeadIds = new Set(response.data.leadRequests.map(lead => lead.id))
+        const knownLeadIds = knownLeadIdsRef.current
+        if (knownLeadIds) {
+          const newLeads = response.data.leadRequests.filter(lead => !knownLeadIds.has(lead.id))
+          if (newLeads.length) {
+            notification.info({
+              key: 'dashboard-new-leads',
+              message: newLeads.length === 1 ? 'Новая заявка с сайта' : `Новые заявки с сайта: ${newLeads.length}`,
+              description: newLeads.length === 1 ? `${newLeads[0].firstName}, ${newLeads[0].phone}` : 'Откройте раздел новых заявок на дашборде.',
+              placement: 'topRight',
+              duration: 8,
+            })
+          }
+        }
+        knownLeadIdsRef.current = nextLeadIds
+        setSummary(response.data)
+        setError(undefined)
+      }
     } catch (cause) {
-      if (!signal?.aborted) reportError(cause)
+      if (!signal?.aborted) {
+        if (silent) {
+          const failure = toHttpError(cause)
+          if (failure.statusCode === 401) onErrorRef.current(failure)
+        } else {
+          reportError(cause)
+        }
+      }
     } finally {
       if (!signal?.aborted) setLoading(false)
+      loadingSummaryRef.current = false
     }
-  }, [reportError])
+  }, [notification, reportError])
 
   useEffect(() => {
     const controller = new AbortController()
     // oxlint-disable-next-line react/set-state-in-effect
-    void loadSummary(controller.signal)
-    return () => controller.abort()
+    void loadSummary({ signal: controller.signal })
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void loadSummary({ signal: controller.signal, silent: true })
+      }
+    }
+    const intervalId = window.setInterval(refreshWhenVisible, DASHBOARD_REFRESH_INTERVAL_MS)
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      controller.abort()
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
   }, [loadSummary])
 
   const updateStatus = useCallback(async (lessonId: string, status: FinalLessonStatus) => {
@@ -216,9 +268,10 @@ export function DashboardPage() {
     <Space className="dashboard-header" align="center" wrap style={{ justifyContent: 'space-between', width: '100%' }}>
       <div>
         <Typography.Title level={2} style={{ marginBottom: 0 }}>Главная панель</Typography.Title>
-        {summary && <Typography.Text type="secondary">
-          Рабочий день: {formatTime(summary.workDay.openAt)}–{formatTime(summary.workDay.closeAt)}
-        </Typography.Text>}
+        {summary && <Space direction="vertical" size={0}>
+          <Typography.Text type="secondary">Рабочий день: {formatTime(summary.workDay.openAt)}–{formatTime(summary.workDay.closeAt)}</Typography.Text>
+          <Typography.Text type="secondary">Автообновление каждые 15 секунд · обновлено {new Date(summary.generatedAt).toLocaleTimeString('ru-RU')}</Typography.Text>
+        </Space>}
       </div>
       <Button className="dashboard-refresh" onClick={() => void loadSummary()} loading={loading}>Обновить</Button>
     </Space>
