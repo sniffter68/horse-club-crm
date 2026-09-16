@@ -8,8 +8,8 @@ body { margin: 0; }
 .schedule-toolbar { width: 100%; }
 .mobile-menu-button {
   position: fixed;
+  top: max(12px, env(safe-area-inset-top));
   inset-inline-end: 16px;
-  bottom: max(20px, env(safe-area-inset-bottom));
   z-index: 1000;
   height: 48px;
   padding-inline: 20px;
