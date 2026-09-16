@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import { LessonStatus, Prisma } from '@prisma/client';
+import { LeadRequestStatus, LessonStatus, Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -39,6 +39,16 @@ export interface DashboardHorseWorkload {
   loadPercent: number;
 }
 
+export interface DashboardLeadRequest {
+  id: string;
+  firstName: string;
+  phone: string;
+  email: string | null;
+  preferences: string | null;
+  createdAt: Date;
+  service: { id: string; name: string; title: string } | null;
+}
+
 export interface DashboardSummary {
   generatedAt: Date;
   workDay: {
@@ -49,6 +59,7 @@ export interface DashboardSummary {
   };
   alerts: DashboardAlert[];
   horseWorkloads: DashboardHorseWorkload[];
+  leadRequests: DashboardLeadRequest[];
   kpi: {
     lessonsTotal: number;
     lessonsCompleted: number;
@@ -91,7 +102,7 @@ export class DashboardService {
       endTime: { lte: closeAt },
     };
 
-    const [alertRows, horses, lessonsTotal, lessonsCompleted, newLeads, activeMemberships] =
+    const [alertRows, horses, lessonsTotal, lessonsCompleted, newLeads, activeMemberships, leadRequests] =
       await Promise.all([
         this.prisma.lesson.findMany({
           where: {
@@ -156,10 +167,24 @@ export class DashboardService {
           where: { ...lessonDayFilter, status: LessonStatus.COMPLETED },
         }),
         this.prisma.leadRequest.count({
-          where: { createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60_000), lte: now } },
+          where: { status: LeadRequestStatus.PENDING },
         }),
         this.prisma.membership.count({
           where: { validUntil: { gte: now }, remainedLessons: { gt: 0 } },
+        }),
+        this.prisma.leadRequest.findMany({
+          where: { status: LeadRequestStatus.PENDING },
+          select: {
+            id: true,
+            firstName: true,
+            phone: true,
+            email: true,
+            preferences: true,
+            createdAt: true,
+            service: { select: { id: true, name: true, title: true } },
+          },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          take: 100,
         }),
       ]);
 
@@ -213,6 +238,7 @@ export class DashboardService {
       },
       alerts,
       horseWorkloads,
+      leadRequests,
       kpi: { lessonsTotal, lessonsCompleted, newLeads, activeMemberships },
     };
   }

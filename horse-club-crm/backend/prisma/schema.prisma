@@ -55,6 +55,12 @@ enum BoardingContractStatus {
   EXPIRED
 }
 
+enum LeadRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -128,15 +134,22 @@ model Client {
 }
 
 model LeadRequest {
-  id        String   @id @default(uuid()) @db.Uuid
-  clientId  String   @db.Uuid
-  serviceId String   @db.Uuid
-  client    Client   @relation(fields: [clientId], references: [id])
-  service   Service  @relation(fields: [serviceId], references: [id])
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  id          String            @id @default(uuid()) @db.Uuid
+  firstName   String
+  phone       String
+  email       String?
+  preferences String?
+  status      LeadRequestStatus @default(PENDING)
+  clientId    String?           @db.Uuid
+  serviceId   String?           @db.Uuid
+  client      Client?           @relation(fields: [clientId], references: [id])
+  service     Service?          @relation(fields: [serviceId], references: [id])
+  processedAt DateTime?         @db.Timestamptz(6)
+  createdAt   DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime          @updatedAt @db.Timestamptz(6)
 
-  // An unassigned request; a Booking still always belongs to an actual Lesson.
-  @@unique([clientId, serviceId])
+  @@index([status, createdAt])
+  @@index([phone, status])
   @@index([serviceId])
 }
 

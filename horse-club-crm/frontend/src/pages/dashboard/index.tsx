@@ -4,6 +4,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { Alert, App, Button, Card, Col, Grid, List, Progress, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
 import { Link } from 'react-router-dom'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
+import { PendingLeads, type PendingLead } from './PendingLeads'
 
 type FinalLessonStatus = 'COMPLETED' | 'NO_SHOW'
 
@@ -39,6 +40,7 @@ interface DashboardSummary {
   workDay: { date: string; openAt: string; closeAt: string; timeZone: string }
   alerts: DashboardAlert[]
   horseWorkloads: HorseWorkload[]
+  leadRequests: PendingLead[]
   kpi: {
     lessonsTotal: number
     lessonsCompleted: number
@@ -152,6 +154,14 @@ export function DashboardPage() {
     }
   }, [message, reportError])
 
+  const removeProcessedLead = useCallback((leadId: string) => {
+    setSummary(current => current ? {
+      ...current,
+      leadRequests: current.leadRequests.filter(lead => lead.id !== leadId),
+      kpi: { ...current.kpi, newLeads: Math.max(0, current.kpi.newLeads - 1) },
+    } : current)
+  }, [])
+
   const timeFormatter = new Intl.DateTimeFormat('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
@@ -222,9 +232,9 @@ export function DashboardPage() {
         </Link>
       </Col>
       <Col xs={24} sm={12} lg={8}>
-        <Link className="dashboard-kpi-link" to="/clients" aria-label="Открыть клиентов">
-          <Card hoverable><Statistic title="Новые заявки за 24 часа" value={summary?.kpi.newLeads ?? 0} loading={loading && !summary} /></Card>
-        </Link>
+        <a className="dashboard-kpi-link" href="#pending-leads" aria-label="Открыть новые заявки">
+          <Card hoverable><Statistic title="Необработанные заявки" value={summary?.kpi.newLeads ?? 0} loading={loading && !summary} /></Card>
+        </a>
       </Col>
       <Col xs={24} sm={12} lg={8}>
         <Link className="dashboard-kpi-link" to="/memberships" aria-label="Открыть абонементы">
@@ -232,6 +242,8 @@ export function DashboardPage() {
         </Link>
       </Col>
     </Row>
+
+    <PendingLeads leads={summary?.leadRequests ?? []} loading={loading && !summary} onProcessed={removeProcessedLead} />
 
     <Card title={<Space><Link to="/schedule">Требуют внимания</Link>{summary && <Tag color={summary.alerts.length ? 'error' : 'success'}>{summary.alerts.length}</Tag>}</Space>}>
       {isMobile ? <List<DashboardAlert>
