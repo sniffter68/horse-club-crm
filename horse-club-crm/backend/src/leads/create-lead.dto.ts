@@ -1,7 +1,15 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
+import { Equals, IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
 
 export class CreateLeadDto {
+  @IsBoolean()
+  @Equals(true, { message: 'Необходимо подтвердить согласие на обработку персональных данных' })
+  consentAccepted!: boolean;
+
+  @IsString()
+  @Matches(/^[a-zA-Z0-9._-]{1,64}$/, { message: 'Некорректная версия согласия' })
+  consentVersion!: string;
+
   @IsString()
   @Transform(({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value)
   @IsNotEmpty()

@@ -1,0 +1,17 @@
+{
+  "profile": "marketing-landing",
+  "sourceRoots": ["src"],
+  "locale": "ru-RU",
+  "requiredCapabilities": ["Select/Listbox", "Form"],
+  "ownership": {
+    "Select/Listbox": "native"
+  },
+  "requiredCommands": ["build", "e2e"],
+  "commands": {
+    "build": "npm run build",
+    "e2e": "npx playwright test tests/landing.spec.ts"
+  },
+  "evidence": {
+    "failurePaths": "tests/landing.spec.ts"
+  }
+}

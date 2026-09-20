@@ -21,7 +21,7 @@ test('real PostgreSQL: public parallel submissions create one client and draft',
   let clientId;
   try {
     await prisma.service.create({ data: { id: serviceId, name: 'QA-lead-service', title: 'QA-lead-service', durationMinutes: 60 } });
-    const responses = await Promise.all(Array.from({ length: 3 }, () => request(app.getHttpServer()).post('/api/leads').send({ firstName: 'QA lead', phone, serviceId }).expect(201)));
+    const responses = await Promise.all(Array.from({ length: 3 }, () => request(app.getHttpServer()).post('/api/leads').send({ consentAccepted: true, consentVersion: process.env.LEAD_CONSENT_VERSION || '2026-09-19', firstName: 'QA lead', phone, serviceId }).expect(201)));
     clientId = responses[0].body.clientId;
     assert.ok(responses.every(response => response.body.clientId === clientId));
     assert.equal(await prisma.client.count({ where: { phone } }), 1);

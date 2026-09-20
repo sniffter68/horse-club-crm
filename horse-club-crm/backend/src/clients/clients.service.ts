@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Client } from '@prisma/client';
 import type { RefineQueryDto } from '../common/dto/refine-query.dto';
@@ -76,6 +76,12 @@ export type ClientDetailsResponse = Omit<ClientDetails, 'memberships'> & { membe
 export class ClientsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private ensureSpecialCategoryAllowed(medicalNotes: string | undefined): void {
+    if (medicalNotes?.trim() && process.env.ENABLE_MEDICAL_NOTES !== 'true') {
+      throw new BadRequestException('Медицинские сведения отключены до оформления отдельного письменного согласия');
+    }
+  }
+
   async findAll(query: RefineQueryDto): Promise<PaginatedResult<Client>> {
     const options = parseRefineQuery(query, ['id', 'name', 'phone', 'email', 'firstName', 'lastName', 'createdAt'], 'name');
     const where: Prisma.ClientWhereInput = options.search
@@ -117,6 +123,7 @@ export class ClientsService {
   }
 
   async create(dto: CreateClientDto): Promise<Client> {
+    this.ensureSpecialCategoryAllowed(dto.medicalNotes);
     const firstName = dto.firstName ?? dto.name;
     const lastName = dto.lastName ?? '';
     try {
@@ -127,6 +134,7 @@ export class ClientsService {
   }
 
   async update(id: string, dto: UpdateClientDto): Promise<Client> {
+    this.ensureSpecialCategoryAllowed(dto.medicalNotes);
     try {
       const current = await this.findOne(id);
       const firstName = dto.firstName ?? (dto.name !== undefined ? dto.name : current.firstName);

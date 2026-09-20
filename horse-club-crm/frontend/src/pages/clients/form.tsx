@@ -4,6 +4,7 @@ import type { Client, ClientValues } from '../catalogs/types'
 
 export function ClientForm({ action }: { action: 'create' | 'edit' }) {
   const { canManage } = useCatalogPermissions()
+  const medicalNotesEnabled = import.meta.env.VITE_ENABLE_MEDICAL_NOTES === 'true'
   return <CatalogForm<Client, ClientValues> resource="clients" action={action}
     title={action === 'create' ? 'Новый клиент' : 'Редактирование клиента'} defaults={{ isRider: true, isPayer: false }}
     toPayload={values => ({ ...values, firstName: values.firstName.trim(), lastName: values.lastName?.trim() ?? '',
@@ -15,6 +16,6 @@ export function ClientForm({ action }: { action: 'create' | 'edit' }) {
     <BooleanField name="isRider" label="Всадник" />
     <BooleanField name="isPayer" label="Плательщик" />
     <TextField name="preferences" label="Заметки и предпочтения" multiline max={5000} />
-    {canManage && <TextField name="medicalNotes" label="Медицинские заметки" multiline max={5000} />}
+    {canManage && medicalNotesEnabled && <TextField name="medicalNotes" label="Медицинские заметки" multiline max={5000} />}
   </CatalogForm>
 }

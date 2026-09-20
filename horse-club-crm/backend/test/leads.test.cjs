@@ -42,7 +42,7 @@ before(async () => {
 beforeEach(() => { clients = []; leads = []; });
 after(async () => app?.close());
 
-const lead = { firstName: 'Анна', phone: '+79991234567' };
+const lead = { consentAccepted: true, consentVersion: '2026-09-19', firstName: 'Анна', phone: '+79991234567' };
 
 test('public valid lead creates a pending request without creating a client', async () => {
   const response = await request(app.getHttpServer()).post('/api/leads').send(lead).expect(201);
@@ -51,6 +51,9 @@ test('public valid lead creates a pending request without creating a client', as
   assert.equal(leads.length, 1);
   assert.equal(leads[0].status, 'PENDING');
   assert.equal(leads[0].firstName, 'Анна');
+  assert.equal(leads[0].consentVersion, '2026-09-19');
+  assert.equal(leads[0].consentSource, 'LANDING');
+  assert.ok(leads[0].consentedAt instanceof Date);
 });
 
 for (const [title, input] of Object.entries({
@@ -58,6 +61,8 @@ for (const [title, input] of Object.entries({
   'empty name': { ...lead, firstName: '  ' }, 'invalid phone': { ...lead, phone: '123' },
   'numeric name': { ...lead, firstName: 123 }, 'invalid email': { ...lead, email: 'bad' },
   'invalid service': { ...lead, serviceId: 'bad' }, 'unknown field': { ...lead, medicalNotes: 'private' },
+  'missing consent': { firstName: lead.firstName, phone: lead.phone, consentVersion: lead.consentVersion },
+  'false consent': { ...lead, consentAccepted: false }, 'invalid consent version': { ...lead, consentVersion: 'draft consent' },
 })) test(`lead rejects ${title}`, async () => {
   await request(app.getHttpServer()).post('/api/leads').send(input).expect(400);
   assert.equal(clients.length, 0);
@@ -72,6 +77,11 @@ test('repeat submission updates one pending request and still creates no client'
   assert.equal(leads[0].firstName, 'Анна Мария');
   assert.equal(leads[0].email, 'anna@example.com');
   assert.equal(leads[0].preferences, 'Новичок');
+});
+
+test('lead rejects a stale consent version', async () => {
+  await request(app.getHttpServer()).post('/api/leads').send({ ...lead, consentVersion: '2026-01-01' }).expect(400);
+  assert.equal(leads.length, 0);
 });
 
 test('administrator acceptance creates a client and closes the request', async () => {

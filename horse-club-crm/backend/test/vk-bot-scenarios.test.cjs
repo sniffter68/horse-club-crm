@@ -62,6 +62,23 @@ test('unlinked visitor is offered supported VK keyboard and a lead form', async 
   assert.match(String(sent[0].keyboard), /Привязать профиль/);
   assert.doesNotMatch(String(sent[0].keyboard), /request_contact/);
 });
+test('VK lead requires a separately recorded current consent', async () => {
+  let accepted, created;
+  const prisma = {
+    client: { findUnique: async () => null }, trainer: { findUnique: async () => null },
+    vkConsent: {
+      findUnique: async () => accepted,
+      upsert: async ({ create }) => { accepted = create; return create; },
+    },
+  };
+  const { service, sent } = bot(prisma, { leads: { create: async (payload, source) => { created = { payload, source }; } } });
+  await service.handleMessage(message('заявка Анна; +79991234567'), 'lead-before-consent');
+  assert.equal(created, undefined); assert.match(sent.at(-1).message, /сначала ознакомьтесь/i);
+  await service.handleMessage(message('согласен 2026-09-19'), 'consent');
+  assert.equal(accepted.consentVersion, '2026-09-19'); assert.ok(accepted.consentedAt instanceof Date);
+  await service.handleMessage(message('заявка Анна; +79991234567'), 'lead-after-consent');
+  assert.deepEqual(created, { payload: { consentAccepted: true, consentVersion: '2026-09-19', firstName: 'Анна', phone: '+79991234567' }, source: 'VK' });
+});
 test('inline attendance invokes billing with authenticated trainer context', async () => {
   const calls = [];
   const { service, answers } = bot({ trainer: { findUnique: async () => ({ id: 'trainer' }) } }, { ledger: { markAttendance: async (...args) => calls.push(args) } });

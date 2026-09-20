@@ -1,20 +1,24 @@
 import './style.css'
 import { club, type Direction, type Profile } from './content'
 import { phoneDigits, phoneMask, sendLead, type LeadPayload } from './lead'
+import { consentText, legal, legalReady, missingLegalFields, privacyPolicy } from './legal'
 
 const escape = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!)
 const safeUrl = (value: string): string => {
   try { const url = new URL(value); return url.protocol === 'https:' ? escape(url.href) : '' } catch { return '' }
 }
+const safeImageUrl = (value: string): string => {
+  try { const url = new URL(value, location.origin); return url.origin === location.origin ? escape(`${url.pathname}${url.search}`) : '' } catch { return '' }
+}
 const arrow = '<span aria-hidden="true">↗</span>'
 const logo = '<span class="brand-mark" aria-hidden="true">♞</span>'
-const profiles = (rows: Profile[]) => rows.map(row => `<article class="profile">${row.image && safeUrl(row.image) ? `<img src="${safeUrl(row.image)}" alt="${escape(row.name)}" loading="lazy" width="500" height="560">` : '<div class="profile-symbol" aria-hidden="true">♞</div>'}<p class="eyebrow">${escape(row.specialty)}</p><h3>${escape(row.name)}</h3><p>${escape(row.description)}</p></article>`).join('')
+const profiles = (rows: Profile[]) => rows.map(row => { const image = row.image ? safeImageUrl(row.image) : ''; return `<article class="profile">${image ? `<img src="${image}" alt="${escape(row.name)}" loading="lazy" width="500" height="560">` : '<div class="profile-symbol" aria-hidden="true">♞</div>'}<p class="eyebrow">${escape(row.specialty)}</p><h3>${escape(row.name)}</h3><p>${escape(row.description)}</p></article>` }).join('')
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <a class="skip-link" href="#main">Перейти к содержимому</a>
   <header class="site-header wrap flex items-center justify-between gap-4">
-    <a href="#" class="brand" aria-label="${escape(club.name)} — главная">${logo}<span>${escape(club.name)}<small>ВЕРХОВАЯ ЕЗДА · НОВЫЙ ОПЫТ</small></span></a>
-    <button class="menu-toggle" aria-expanded="false" aria-controls="navigation" aria-label="Открыть меню">☰</button>
+    <a href="/" class="brand" aria-label="${escape(club.name)} — главная">${logo}<span>${escape(club.name)}<small>ВЕРХОВАЯ ЕЗДА · НОВЫЙ ОПЫТ</small></span></a>
+    <a class="menu-toggle" href="#navigation" role="button" aria-expanded="false" aria-controls="navigation" aria-label="Открыть меню">☰</a>
     <nav id="navigation" aria-label="Основная навигация"><a href="#directions">Направления</a><a href="#team">О клубе</a><a href="#contacts">Контакты</a><a class="button button-small" href="#booking">Записаться ${arrow}</a></nav>
   </header>
   <main id="main">
@@ -46,24 +50,28 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           <div class="grid gap-x-5 sm:grid-cols-2"><div class="field"><label for="firstName">Ваше имя *</label><input id="firstName" name="firstName" autocomplete="given-name" maxlength="100" required placeholder="Как к вам обращаться"><small id="firstName-error" class="field-error"></small></div><div class="field"><label for="phone">Телефон *</label><input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required placeholder="+7 (___) ___-__-__" aria-describedby="phone-help"><small id="phone-help">Российский номер, +7 или 8</small><small id="phone-error" class="field-error"></small></div></div>
           <div class="field"><label for="email">Email <span>необязательно</span></label><input id="email" name="email" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com"><small id="email-error" class="field-error"></small></div>
           <div class="field"><label for="direction">Что вам интересно?</label><select id="direction" name="direction"><option value="">Помогите определиться</option>${club.directions.map(item => `<option value="${item.key}">${escape(item.title)}</option>`).join('')}</select></div>
-          <div class="field"><label for="preferences">Опыт и пожелания <span>необязательно</span></label><textarea id="preferences" name="preferences" rows="3" maxlength="1500" placeholder="Например: никогда не сидел(а) в седле, хочу попробовать"></textarea></div>
+          <div class="field"><label for="preferences">Опыт и пожелания <span>необязательно</span></label><textarea id="preferences" name="preferences" rows="3" maxlength="1500" style="resize:none" placeholder="Например: никогда не сидел(а) в седле, хочу попробовать"></textarea></div>
           <div class="honeypot" aria-hidden="true"><label for="website">Ваш сайт</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+          <div class="consent-field"><input id="personal-data-consent" name="personalDataConsent" type="checkbox" required><label for="personal-data-consent">Я даю <a href="#consent" data-legal="consent">согласие на обработку персональных данных</a> для рассмотрения заявки.</label></div>
+          <small id="personal-data-consent-error" class="consent-error" aria-live="polite"></small>
+          ${legalReady ? '' : `<p class="legal-setup-warning" role="status">Приём заявок выключен до заполнения реквизитов оператора: ${missingLegalFields.map(escape).join(', ')}.</p>`}
           <p id="form-error" role="alert" class="form-error" hidden></p>
-          <button id="submit-lead" class="button w-full" type="submit"><span>Отправить заявку</span>${arrow}</button>
-          <p class="form-caption">Оставляя контакты, вы просите администратора связаться с вами по поводу занятия.</p>
+          <button id="submit-lead" class="button w-full" type="submit" ${legalReady ? '' : 'disabled'}><span>Отправить заявку</span>${arrow}</button>
+          <p class="form-caption">Контакты используются только для ответа на заявку. Рекламные рассылки не подключены.</p>
         </form>
-        <div id="success" tabindex="-1" role="status" hidden><div class="success-icon">✓</div><p class="eyebrow">ДО СКОРОЙ ВСТРЕЧИ</p><h3>Заявка принята!</h3><p>Администратор свяжется с вами, чтобы обсудить занятие.</p><button class="text-link" id="another-request" type="button">Отправить ещё одну заявку ${arrow}</button></div>
+        <div id="success" tabindex="-1" role="status" hidden><div class="success-icon">✓</div><p class="eyebrow">ДО СКОРОЙ ВСТРЕЧИ</p><h3>Заявка принята!</h3><p>Администратор свяжется с вами, чтобы обсудить занятие.</p><form id="another-request-form" novalidate><button class="text-link" id="another-request" type="submit">Отправить ещё одну заявку ${arrow}</button></form></div>
       </div>
     </section>
     <section id="contacts" class="contacts-section"><div class="wrap grid gap-12 lg:grid-cols-2"><div><p class="eyebrow">04 / СТАНЕМ БЛИЖЕ</p><h2>Вдали от суеты.<br><em>На связи с вами.</em></h2><div class="contact-details"><p><span>ЛОКАЦИЯ</span>${club.address ? escape(club.address) : 'Администратор пришлёт адрес и маршрут перед визитом.'}</p><p><span>ЧАСЫ РАБОТЫ</span>${club.hours ? escape(club.hours) : 'Посещение по предварительной записи. Уточните удобное время в заявке.'}</p>${club.phone ? `<p><span>ТЕЛЕФОН</span><a href="tel:${escape(club.phone.replace(/[^+\d]/g, ''))}">${escape(club.phone)}</a></p>` : ''}</div><div class="flex flex-wrap gap-4">${safeUrl(club.vkUrl) ? `<a class="button button-light" href="${safeUrl(club.vkUrl)}" target="_blank" rel="noopener noreferrer">Написать ВКонтакте ${arrow}</a>` : '<a class="button button-light" href="#booking">Связаться с клубом ↗</a>'}${safeUrl(club.mapUrl) ? `<a class="text-link" href="${safeUrl(club.mapUrl)}" target="_blank" rel="noopener noreferrer">Построить маршрут ${arrow}</a>` : ''}</div></div><div class="location-card"><span class="location-icon" aria-hidden="true">⌖</span><p class="eyebrow">СПЛАНИРУЕМ ВСТРЕЧУ</p><h3>Путь к вашему<br>новому увлечению.</h3><p>${club.address ? escape(club.address) : 'Оставьте заявку — уточним время и подскажем, как добраться.'}</p><a href="${safeUrl(club.mapUrl) || '#booking'}" class="text-link">${club.mapUrl ? 'Открыть карту' : 'Уточнить маршрут'} ${arrow}</a></div></div></section>
   </main>
-  <footer class="wrap footer"><a class="brand" href="#">${logo}<span>${escape(club.name)}</span></a><p>Для тех, кто любит лошадей. И тех, кто только влюбится.</p><a href="#">Наверх ↑</a></footer>
+  <footer class="wrap footer"><a class="brand" href="/">${logo}<span>${escape(club.name)}</span></a><div class="footer-legal"><a href="#privacy" data-legal="privacy">Политика обработки персональных данных</a><a href="#consent" data-legal="consent">Согласие на обработку персональных данных</a>${legalReady ? `<span>${escape(legal.operatorName)} · ${escape(legal.registration)}</span>` : '<span>Реквизиты оператора не настроены</span>'}</div><a href="#main">Наверх ↑</a></footer>
+  <dialog id="legal-dialog" aria-labelledby="legal-title"><form method="dialog" class="legal-dialog-head" novalidate><span>Документы сайта</span><button type="submit" aria-label="Закрыть документ">×</button></form><article id="legal-document" class="legal-document"></article></dialog>
 `
 
-const toggle = document.querySelector<HTMLButtonElement>('.menu-toggle')!
+const toggle = document.querySelector<HTMLAnchorElement>('.menu-toggle')!
 const nav = document.querySelector<HTMLElement>('#navigation')!
 function closeMenu() { nav.classList.remove('open'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-label', 'Открыть меню') }
-toggle.addEventListener('click', () => { const open = nav.classList.toggle('open'); toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню') })
+toggle.addEventListener('click', event => { event.preventDefault(); const open = nav.classList.toggle('open'); toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню') })
 nav.addEventListener('click', event => { if ((event.target as HTMLElement).closest('a')) closeMenu() })
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && nav.classList.contains('open')) { closeMenu(); toggle.focus() } })
 const form = document.querySelector<HTMLFormElement>('#lead-form')!
@@ -93,6 +101,8 @@ phone.addEventListener('input', () => {
   }
 })
 const submit = document.querySelector<HTMLButtonElement>('#submit-lead')!
+const consent = input('personalDataConsent')
+const consentError = document.querySelector<HTMLElement>('#personal-data-consent-error')!
 const success = document.querySelector<HTMLElement>('#success')!
 const errorBox = document.querySelector<HTMLElement>('#form-error')!
 let pending = false
@@ -104,7 +114,7 @@ function fieldError(name: string, message: string) {
 }
 form.addEventListener('submit', async event => {
   event.preventDefault()
-  if (pending) return
+  if (pending || !legalReady) return
   errorBox.hidden = true
   const firstName = input('firstName').value.trim()
   const digits = phoneDigits(phone.value)
@@ -112,17 +122,44 @@ form.addEventListener('submit', async event => {
   fieldError('firstName', firstName ? '' : 'Пожалуйста, укажите имя')
   fieldError('phone', /^7\d{10}$/.test(digits) ? '' : 'Введите номер полностью: 11 цифр')
   fieldError('email', !email || input('email').validity.valid ? '' : 'Проверьте адрес электронной почты')
+  consentError.textContent = consent.checked ? '' : 'Подтвердите согласие, чтобы отправить заявку'
+  consent.setAttribute('aria-invalid', String(!consent.checked))
+  consent.setAttribute('aria-describedby', 'personal-data-consent-error')
   const invalid = form.querySelector<HTMLInputElement>('[aria-invalid="true"]')
   if (invalid) { invalid.focus(); return }
   if (input('website').value) { form.hidden = true; success.hidden = false; success.focus(); return }
   const direction = (club.directions as Direction[]).find(item => item.key === directionSelect.value)
   const wishes = (form.elements.namedItem('preferences') as HTMLTextAreaElement).value.trim()
   const preferences = [direction ? `Направление: ${direction.title}` : '', wishes].filter(Boolean).join('\n')
-  const payload: LeadPayload = { firstName, phone: `+${digits}`, ...(email ? { email } : {}), ...(preferences ? { preferences } : {}) }
+  const payload: LeadPayload = { consentAccepted: true, consentVersion: legal.consentVersion, firstName, phone: `+${digits}`, ...(email ? { email } : {}), ...(preferences ? { preferences } : {}) }
   if (direction?.serviceId && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(direction.serviceId)) payload.serviceId = direction.serviceId
   pending = true; submit.disabled = true; form.setAttribute('aria-busy', 'true'); submit.querySelector('span')!.textContent = 'Отправляем…'
   try { await sendLead(payload); form.hidden = true; success.hidden = false; success.focus() }
   catch (error) { errorBox.textContent = error instanceof Error ? error.message : 'Не удалось отправить заявку'; errorBox.hidden = false }
   finally { pending = false; submit.disabled = false; form.removeAttribute('aria-busy'); submit.querySelector('span')!.textContent = 'Отправить заявку' }
 })
-document.querySelector('#another-request')!.addEventListener('click', () => { form.reset(); success.hidden = true; form.hidden = false; input('firstName').focus() })
+document.querySelector('#another-request-form')!.addEventListener('submit', event => { event.preventDefault(); form.reset(); success.hidden = true; form.hidden = false; input('firstName').focus() })
+
+const legalDialog = document.querySelector<HTMLDialogElement>('#legal-dialog')!
+const legalDocument = document.querySelector<HTMLElement>('#legal-document')!
+const legalClose = legalDialog.querySelector<HTMLButtonElement>('button')!
+function openLegal(kind: 'privacy' | 'consent') {
+  legalDocument.innerHTML = kind === 'privacy' ? privacyPolicy() : consentText()
+  const heading = legalDocument.querySelector('h2')!
+  heading.id = 'legal-title'
+  if (!legalDialog.open) legalDialog.showModal()
+  document.title = `${kind === 'privacy' ? 'Политика обработки персональных данных' : 'Согласие на обработку персональных данных'} — ${club.name}`
+  legalDialog.scrollTop = 0
+  legalClose.focus()
+}
+document.addEventListener('click', event => {
+  const link = (event.target as HTMLElement).closest<HTMLAnchorElement>('[data-legal]')
+  if (!link) return
+  event.preventDefault()
+  const kind = link.dataset.legal === 'privacy' ? 'privacy' : 'consent'
+  history.replaceState(null, '', `#${kind}`)
+  openLegal(kind)
+})
+legalDialog.addEventListener('click', event => { if (event.target === legalDialog) legalDialog.close() })
+legalDialog.addEventListener('close', () => { history.replaceState(null, '', `${location.pathname}${location.search}`); document.title = `${club.name} — ваш первый шаг в седло` })
+if (location.hash === '#privacy' || location.hash === '#consent') openLegal(location.hash.slice(1) as 'privacy' | 'consent')

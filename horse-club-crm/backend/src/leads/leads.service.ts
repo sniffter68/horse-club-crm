@@ -8,7 +8,12 @@ import type { CreateLeadDto } from './create-lead.dto';
 export class LeadsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateLeadDto): Promise<{ success: true; leadId: string; message: string }> {
+  async create(dto: CreateLeadDto, consentSource: 'LANDING' | 'VK' = 'LANDING'): Promise<{ success: true; leadId: string; message: string }> {
+    const currentConsentVersion = process.env.LEAD_CONSENT_VERSION?.trim() || '2026-09-19';
+    if (dto.consentVersion !== currentConsentVersion) {
+      throw new BadRequestException('Текст согласия обновился. Обновите страницу и подтвердите актуальную редакцию');
+    }
+    const consentedAt = new Date();
     return this.retrySerializable(async tx => {
       if (dto.serviceId && !await tx.service.findUnique({ where: { id: dto.serviceId }, select: { id: true } })) {
         throw new NotFoundException('Услуга не найдена');
@@ -25,6 +30,9 @@ export class LeadsService {
               email: dto.email ?? null,
               preferences: dto.preferences ?? null,
               serviceId: dto.serviceId ?? null,
+              consentVersion: dto.consentVersion,
+              consentedAt,
+              consentSource,
             },
           })
         : await tx.leadRequest.create({
@@ -34,6 +42,9 @@ export class LeadsService {
               email: dto.email,
               preferences: dto.preferences,
               serviceId: dto.serviceId,
+              consentVersion: dto.consentVersion,
+              consentedAt,
+              consentSource,
             },
           });
       await this.notifyAdministrator(tx, lead.id, dto);

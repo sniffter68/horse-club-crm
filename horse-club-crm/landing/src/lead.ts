@@ -11,7 +11,7 @@ export function phoneMask(value: string): string {
   return '+7' + (rest ? ' (' + rest.slice(0, 3) : '') + (rest.length >= 3 ? ')' : '')
     + (rest.length > 3 ? ' ' + rest.slice(3, 6) : '') + (rest.length > 6 ? '-' + rest.slice(6, 8) : '') + (rest.length > 8 ? '-' + rest.slice(8, 10) : '')
 }
-export interface LeadPayload { firstName: string; phone: string; email?: string; serviceId?: string; preferences?: string }
+export interface LeadPayload { consentAccepted: true; consentVersion: string; firstName: string; phone: string; email?: string; serviceId?: string; preferences?: string }
 export async function sendLead(payload: LeadPayload): Promise<void> {
   const base = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '')
   let response: Response

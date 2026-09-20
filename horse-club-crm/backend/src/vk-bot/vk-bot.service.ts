@@ -14,6 +14,8 @@ const menu = (trainer: boolean) => Keyboard.keyboard(trainer
   : [Keyboard.textButton({ label: 'Баланс абонемента', payload: { command: 'balance' } }), Keyboard.textButton({ label: 'Мои тренировки', payload: { command: 'bookings' } })]);
 const welcome = Keyboard.keyboard([Keyboard.textButton({ label: 'Привязать профиль' }), Keyboard.textButton({ label: 'Первичная заявка' })]);
 const zone = () => process.env.CLUB_TIME_ZONE || 'Europe/Moscow';
+const consentVersion = () => process.env.LEAD_CONSENT_VERSION?.trim() || '2026-09-19';
+const consentUrl = () => `${(process.env.PUBLIC_LANDING_URL || '').replace(/\/$/, '')}/#consent`;
 const date = (value: Date) => DateTime.fromJSDate(value, { zone: zone() }).setLocale('ru').toFormat('dd.MM.yyyy HH:mm');
 
 @Injectable()
@@ -49,6 +51,17 @@ export class VkBotService {
       } catch { /* Ordinary text routes without a payload. */ }
     }
     try {
+      const consent = /^согласен\s+([a-zA-Z0-9._-]{1,64})$/i.exec(text.trim());
+      if (consent) {
+        if (consent[1] !== consentVersion()) throw new BadRequestException('Редакция согласия изменилась. Запросите актуальную ссылку командой «Первичная заявка»');
+        const consentedAt = new Date();
+        await this.prisma.vkConsent.upsert({
+          where: { vkUserId: BigInt(sender) },
+          update: { consentVersion: consentVersion(), consentedAt },
+          create: { vkUserId: BigInt(sender), consentVersion: consentVersion(), consentedAt },
+        });
+        await this.send(peer, eventId, 'Согласие принято. Теперь отправьте: заявка Имя; +79991234567', welcome); return;
+      }
       const binding = /^привязать\s+(.+?)\s+([a-f0-9]{32})$/i.exec(text.trim());
       if (binding) {
         const kind = await this.links.bind(sender, binding[1], binding[2]);
@@ -60,11 +73,15 @@ export class VkBotService {
       if (!client && !trainer) {
         const lead = /^заявка\s+([^;]{1,100});\s*(.+)$/i.exec(text.trim());
         if (lead) {
+          const accepted = await this.prisma.vkConsent.findUnique({ where: { vkUserId: BigInt(sender) } });
+          if (!accepted || accepted.consentVersion !== consentVersion()) {
+            await this.send(peer, eventId, `Сначала ознакомьтесь с согласием: ${consentUrl()}\nЗатем отдельным сообщением отправьте: согласен ${consentVersion()}`, welcome); return;
+          }
           if (!lead[1].trim()) throw new BadRequestException('Укажите имя');
-          await this.leads.create({ firstName: lead[1].trim(), phone: normalizePhone(lead[2]) });
+          await this.leads.create({ consentAccepted: true, consentVersion: accepted.consentVersion, firstName: lead[1].trim(), phone: normalizePhone(lead[2]) }, 'VK');
           await this.send(peer, eventId, 'Заявка принята. Администратор свяжется с вами и выдаст код привязки.', welcome); return;
         }
-        await this.send(peer, eventId, command === 'первичная заявка' ? 'Отправьте: заявка Имя; +79991234567'
+        await this.send(peer, eventId, command === 'первичная заявка' ? `Ознакомьтесь с согласием: ${consentUrl()}\nЗатем отдельным сообщением отправьте: согласен ${consentVersion()}`
           : 'Здравствуйте! Получите у администратора код и отправьте: привязать +79991234567 КОД. Если вы ещё не записаны в клуб, выберите «Первичная заявка».', welcome);
         return;
       }

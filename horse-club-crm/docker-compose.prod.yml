@@ -51,6 +51,9 @@ services:
       VK_CONFIRMATION_CODE: ${VK_CONFIRMATION_CODE:-}
       VK_SECRET_KEY: ${VK_SECRET_KEY:-}
       VK_ADMIN_PEER_ID: ${VK_ADMIN_PEER_ID:-}
+      LEAD_CONSENT_VERSION: ${LEAD_CONSENT_VERSION:?Set the published consent version}
+      PUBLIC_LANDING_URL: https://${LANDING_SITE:?Set LANDING_SITE}
+      ENABLE_MEDICAL_NOTES: ${ENABLE_MEDICAL_NOTES:-false}
     depends_on:
       postgres: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }

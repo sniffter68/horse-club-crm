@@ -5,6 +5,12 @@ import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
 
 async function bootstrap(): Promise<void> {
+  if (process.env.NODE_ENV === 'production' && !process.env.LEAD_CONSENT_VERSION?.trim()) {
+    throw new Error('LEAD_CONSENT_VERSION is required in production');
+  }
+  if (process.env.NODE_ENV === 'production' && process.env.VK_BOT_TOKEN?.trim() && !process.env.PUBLIC_LANDING_URL?.trim()) {
+    throw new Error('PUBLIC_LANDING_URL is required when VK bot is enabled');
+  }
   const app = await NestFactory.create(AppModule);
 
   app.get(PrismaService).enableShutdownHooks(app);
@@ -20,13 +26,15 @@ async function bootstrap(): Promise<void> {
       }),
     );
 
-    const swaggerConfig = new DocumentBuilder()
-      .setTitle('Horse Club OS API')
-      .setVersion('1.0.0')
-      .addBearerAuth()
-      .build();
-    const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup('api/docs', app, document);
+    if (process.env.NODE_ENV !== 'production') {
+      const swaggerConfig = new DocumentBuilder()
+        .setTitle('Horse Club OS API')
+        .setVersion('1.0.0')
+        .addBearerAuth()
+        .build();
+      const document = SwaggerModule.createDocument(app, swaggerConfig);
+      SwaggerModule.setup('api/docs', app, document);
+    }
 
     await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
   } catch (error: unknown) {
