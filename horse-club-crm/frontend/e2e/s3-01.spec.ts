@@ -1,6 +1,7 @@
 ﻿import { test, expect, type Page } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/auth/logout', route => route.fulfill({ json: { success: true } }))
   await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] } }))
   await page.route('**/api/lessons?*', route => route.fulfill({ json: [] }))
   await page.route(/\/api\/(clients|horses|trainers|services)\?/, route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
@@ -68,7 +69,7 @@ async function login(page: Page, role = 'ADMIN') {
 for (const role of ['ADMIN', 'MANAGER', 'TRAINER']) {
   test(`login and permissions ${role} (mock API)`, async ({ page }) => {
     await login(page, role)
-    expect(await page.evaluate(() => localStorage.getItem('horsecrm.access_token'))).toBe('qa-token')
+    expect(await page.evaluate(() => localStorage.getItem('horsecrm.access_token'))).toBe('cookie-session')
     expect(await page.evaluate(() => localStorage.getItem('horsecrm.role'))).toBe(role)
     expect(await page.evaluate(async () => {
       const path = '/src/authProvider.ts'
@@ -92,11 +93,11 @@ test('admin navigation and logout (mock API)', async ({ page }) => {
   expect(await page.evaluate(() => localStorage.getItem('horsecrm.access_token'))).toBeNull()
   expect(errors).toEqual([])
 })
-test('all catalogs use bearer, pagination and total (mock API)', async ({ page }) => {
+test('all catalogs use cookies, pagination and total (mock API)', async ({ page }) => {
   await login(page)
   for (const resource of catalogs) {
     await page.route(`**/api/${resource}?*`, async route => {
-      expect(route.request().headers().authorization).toBe('Bearer qa-token')
+      expect(route.request().headers().authorization).toBeUndefined()
       const params = new URL(route.request().url()).searchParams
       if (params.get('_end') !== '40') { await route.fallback(); return }
       expect(params.get('_start')).toBe('20')

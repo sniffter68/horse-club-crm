@@ -28,26 +28,32 @@ export class AuthService implements OnModuleInit {
     this.dummyHash = await hash(randomBytes(32).toString('hex'), BCRYPT_ROUNDS);
   }
 
-  async validateUser(email: string, password: string): Promise<AuthUser> {
+  async validateUser(email: string, password: string): Promise<AuthUser & { authVersion: string }> {
     if (Buffer.byteLength(password, 'utf8') > 72) {
       throw new UnauthorizedException('Invalid email or password');
     }
     const user = await this.prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, role: true, passwordHash: true },
+      select: { id: true, email: true, role: true, passwordHash: true, updatedAt: true },
     });
     // Perform bcrypt work for unknown emails as well.
     const valid = await compare(password, user?.passwordHash ?? this.dummyHash);
     if (!user || !valid) {
       throw new UnauthorizedException('Invalid email or password');
     }
-    return { id: user.id, email: user.email, role: user.role };
+    return { id: user.id, email: user.email, role: user.role, authVersion: user.updatedAt.toISOString() };
   }
 
   async login(dto: LoginDto): Promise<AccessTokenResponse> {
-    const user = await this.validateUser(dto.email, dto.password);
-    const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role };
+    const { authVersion, ...user } = await this.validateUser(dto.email, dto.password);
+    const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role, authVersion };
     return { access_token: await this.jwt.signAsync(payload), user };
+  }
+
+  async logout(user: AuthUser): Promise<{ success: true }> {
+    // Revoke every previously issued token for this account, including stolen copies.
+    await this.prisma.user.update({ where: { id: user.id }, data: { updatedAt: new Date() } });
+    return { success: true };
   }
 
   async register(dto: RegisterDto): Promise<AuthUser> {

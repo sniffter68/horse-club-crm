@@ -1,5 +1,7 @@
 (common) {
 	encode zstd gzip
+	@privateFiles path_regexp privateFiles (?i)(^|/)(\.[^/]+|[^/]+\.(env|sql|dump|bak|log|gz))($|/)
+	respond @privateFiles 404
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin

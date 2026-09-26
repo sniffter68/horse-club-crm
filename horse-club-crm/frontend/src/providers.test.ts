@@ -28,7 +28,7 @@ describe('Authentication', () => {
     const post = vi.spyOn(axios, 'post').mockResolvedValue({ data: { access_token: 'test-token', user: { id: '1', ...identity } } })
     expect(await authProvider.login({ email: identity.email, password: 'test-password' })).toMatchObject({ success: true })
     expect(post).toHaveBeenCalledWith('/api/auth/login', { email: identity.email, password: 'test-password' }, { timeout: 15_000 })
-    expect(getToken()).toBe('test-token')
+    expect(getToken()).toBe('cookie-session')
     expect(await authProvider.getIdentity()).toEqual(identity)
     expect(await authProvider.getPermissions()).toBe('ADMIN')
     expect(await authProvider.check()).toEqual({ authenticated: true })
@@ -40,6 +40,7 @@ describe('Authentication', () => {
     expect(getToken()).toBeNull()
   })
   it('logs out without deleting unrelated application storage', async () => {
+    vi.spyOn(axios, 'post').mockResolvedValue({ data: { success: true } })
     localStorage.setItem('preference', 'dark')
     saveSession('test-token', identity)
     expect(await authProvider.logout()).toEqual({ success: true, redirectTo: '/login' })
@@ -50,7 +51,7 @@ describe('Authentication', () => {
   it('clears authentication on a Refine 401 but preserves it on 403', async () => {
     saveSession('test-token', identity)
     expect(await authProvider.onError({ statusCode: 403, message: 'Forbidden' })).not.toHaveProperty('logout')
-    expect(getToken()).toBe('test-token')
+    expect(getToken()).toBe('cookie-session')
     expect(await authProvider.onError({ statusCode: 401 })).toEqual({ logout: true, redirectTo: '/login' })
     expect(getToken()).toBeNull()
   })
@@ -59,7 +60,7 @@ describe('Data provider', () => {
   it('maps pagination, sorting and Unicode search to the backend contract', async () => {
     saveSession('first', identity)
     httpClient.defaults.adapter = async (config) => {
-      expect(config.headers.get('Authorization')).toBe('Bearer first')
+      expect(config.headers.get('Authorization')).toBeUndefined()
       const url = new URL(config.url ?? '', 'http://localhost')
       expect(Object.fromEntries(url.searchParams)).toEqual({ _start: '20', _end: '40', _sort: 'email', _order: 'DESC', q: 'Анна & Иван' })
       return response(config, [{ id: '1' }])
@@ -68,7 +69,7 @@ describe('Data provider', () => {
   })
   it('supports legacy current pagination and reads the token for every request', async () => {
     httpClient.defaults.adapter = async (config) => {
-      expect(config.headers.get('Authorization')).toBe(getToken() ? `Bearer ${getToken()}` : undefined)
+      expect(config.headers.get('Authorization')).toBeUndefined()
       expect(config.url).toContain('_start=10&_end=20')
       return response(config, [])
     }

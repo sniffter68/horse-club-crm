@@ -60,7 +60,7 @@ export class LessonsController {
   }
 
   @Patch(':id/status')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOkResponse({ description: 'Статус занятия изменён.' })
   updateStatus(
     @Param('id', new ParseUUIDPipe()) lessonId: string,

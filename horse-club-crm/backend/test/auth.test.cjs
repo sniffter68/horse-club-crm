@@ -31,7 +31,8 @@ const { Reflector } = require('@nestjs/core');
 const { JwtService } = require('@nestjs/jwt');
 const bcrypt = require('bcrypt');
 const secret = 'test-only-secret-abcdefghijklmnopqrstuvwxyz0123456789';
-const jwt = new JwtService({ secret, signOptions: { algorithm: 'HS256', expiresIn: '7d' } });
+const jwt = new JwtService({ secret, signOptions: { algorithm: 'HS256', expiresIn: '30m' } });
+const updatedAt = new Date('2026-09-21T00:00:00Z');
 const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true,
   transform: true, transformOptions: { enableImplicitConversion: true } });
 const validate = (value, metatype) => pipe.transform(value, { type: 'body', metatype });
@@ -47,10 +48,10 @@ test('DTO rejects extra fields, invalid roles and numeric credentials', async ()
   await assert.rejects(validate({ ...login, password: 'short', role: Role.ADMIN }, RegisterDto), status(400));
 });
 
-test('login verifies bcrypt, signs seven-day claims and does not expose the hash', async () => {
+test('login verifies bcrypt, signs short-lived versioned claims and does not expose the hash', async () => {
   const password = 'test-password-123';
   const user = { id: 'user-1', email: 'admin@example.com', role: Role.ADMIN,
-    passwordHash: await bcrypt.hash(password, 12) };
+    updatedAt, passwordHash: await bcrypt.hash(password, 12) };
   const service = new AuthService({ user: { findUnique: async () => user } }, jwt);
   await service.onModuleInit();
   const response = await service.login({ email: user.email, password });
@@ -60,7 +61,8 @@ test('login verifies bcrypt, signs seven-day claims and does not expose the hash
   assert.equal(payload.sub, user.id);
   assert.equal(payload.email, user.email);
   assert.equal(payload.role, user.role);
-  assert.equal(payload.exp - payload.iat, 7 * 24 * 60 * 60);
+  assert.equal(payload.exp - payload.iat, 30 * 60);
+  assert.equal(payload.authVersion, updatedAt.toISOString());
   assert.equal(payload.passwordHash, undefined);
   await assert.rejects(service.validateUser(user.email, 'wrong'), status(401));
   const missing = new AuthService({ user: { findUnique: async () => null } }, jwt);
@@ -86,7 +88,7 @@ test('registration hashes passwords, rejects bcrypt truncation and maps duplicat
 
 function authenticate(token) {
   return new Promise((resolve, reject) => {
-    const strategy = new JwtStrategy({ secret });
+    const strategy = new JwtStrategy({ secret }, { user: { findUnique: async () => ({ id: 'user-1', email: 'admin@example.com', role: Role.ADMIN, updatedAt }) } });
     strategy.success = resolve;
     strategy.fail = () => reject(new Error('Unauthorized'));
     strategy.error = reject;
@@ -95,12 +97,14 @@ function authenticate(token) {
 }
 
 test('JWT strategy rejects expired, forged and malformed tokens', async () => {
-  const claims = { sub: 'user-1', email: 'admin@example.com', role: Role.ADMIN };
+  const claims = { sub: 'user-1', email: 'admin@example.com', role: Role.ADMIN, authVersion: updatedAt.toISOString() };
   assert.deepEqual(await authenticate(jwt.sign(claims)), { id: claims.sub, email: claims.email, role: claims.role });
   await assert.rejects(authenticate(jwt.sign(claims, { expiresIn: -1 })));
   await assert.rejects(authenticate(jwt.sign(claims, { secret: 'another-secret' })));
   await assert.rejects(authenticate(jwt.sign({ ...claims, role: 'OWNER' })));
   await assert.rejects(authenticate(jwt.sign(claims, { algorithm: 'HS384' })));
+  await assert.rejects(authenticate(jwt.sign({ ...claims, authVersion: 'old' })));
+  await assert.rejects(authenticate(jwt.sign({ ...claims, authVersion: undefined })));
 });
 
 test('roles deny missing users and wrong roles; method metadata overrides class metadata', () => {

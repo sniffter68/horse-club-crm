@@ -23,6 +23,16 @@ export const authProvider = {
     }
   },
   logout: async () => {
+    const token = getToken();
+    if (token) {
+      try {
+        await axios.post(`${API_URL}/auth/logout`, {}, { timeout: 15_000 });
+      } catch (error) {
+        if (!axios.isAxiosError(error) || error.response?.status !== 401) {
+          return { success: false, error: { name: 'Выход не подтверждён', message: 'Не удалось отозвать сессии на сервере. Повторите выход.' } };
+        }
+      }
+    }
     clearSession()
     return { success: true, redirectTo: '/login' }
   },

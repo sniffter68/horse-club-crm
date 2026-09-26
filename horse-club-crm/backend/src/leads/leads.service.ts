@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { LeadRequestStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AcceptLeadDto } from './accept-lead.dto';
@@ -9,6 +9,9 @@ export class LeadsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateLeadDto, consentSource: 'LANDING' | 'VK' = 'LANDING'): Promise<{ success: true; leadId: string; message: string }> {
+    if (process.env.PUBLIC_LEADS_ENABLED !== 'true' && process.env.NODE_ENV === 'production') {
+      throw new ServiceUnavailableException('Приём заявок временно отключён');
+    }
     const currentConsentVersion = process.env.LEAD_CONSENT_VERSION?.trim() || '2026-09-19';
     if (dto.consentVersion !== currentConsentVersion) {
       throw new BadRequestException('Текст согласия обновился. Обновите страницу и подтвердите актуальную редакцию');
@@ -23,18 +26,7 @@ export class LeadsService {
         orderBy: { createdAt: 'desc' },
       });
       const lead = pending
-        ? await tx.leadRequest.update({
-            where: { id: pending.id },
-            data: {
-              firstName: dto.firstName,
-              email: dto.email ?? null,
-              preferences: dto.preferences ?? null,
-              serviceId: dto.serviceId ?? null,
-              consentVersion: dto.consentVersion,
-              consentedAt,
-              consentSource,
-            },
-          })
+        ? pending
         : await tx.leadRequest.create({
             data: {
               firstName: dto.firstName,
@@ -47,8 +39,8 @@ export class LeadsService {
               consentSource,
             },
           });
-      await this.notifyAdministrator(tx, lead.id, dto);
-      return { success: true as const, leadId: lead.id, message: 'Заявка успешно принята' };
+      if (!pending) await this.notifyAdministrator(tx, lead.id, dto);
+      return { success: true as const, leadId: '', message: 'Заявка успешно принята' };
     });
   }
 
@@ -85,10 +77,11 @@ export class LeadsService {
     const lead = await this.prisma.leadRequest.findUnique({ where: { id }, select: { id: true, status: true } });
     if (!lead) throw new NotFoundException('Заявка не найдена');
     if (lead.status !== LeadRequestStatus.PENDING) throw new BadRequestException('Заявка уже обработана');
-    await this.prisma.leadRequest.update({
-      where: { id },
+    const changed = await this.prisma.leadRequest.updateMany({
+      where: { id, status: LeadRequestStatus.PENDING },
       data: { status: LeadRequestStatus.REJECTED, processedAt: new Date() },
     });
+    if (changed.count !== 1) throw new BadRequestException('Заявка уже обработана');
     return { success: true as const, message: 'Заявка отклонена' };
   }
 

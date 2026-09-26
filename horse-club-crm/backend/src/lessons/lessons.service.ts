@@ -156,7 +156,7 @@ export class LessonsService {
     return this.runSerializable(async (tx) => {
       const service = await tx.service.findUnique({
         where: { id: dto.serviceId },
-        select: { durationMinutes: true, price: true, title: true, name: true, maxCapacity: true },
+        select: { durationMinutes: true, price: true, title: true, name: true, maxCapacity: true, allowMembership: true },
       });
       if (!service) {
         throw new NotFoundException('Услуга не найдена');
@@ -192,6 +192,18 @@ export class LessonsService {
         start.getTime() + durationMinutes * MILLISECONDS_PER_MINUTE,
       );
       this.assertValidInterval(start, end);
+      for (const participant of participants) {
+        if (!participant.membershipId) continue;
+        if (!service.allowMembership) throw new BadRequestException('Услуга не допускает оплату абонементом');
+        const membership = await tx.membership.findUnique({ where: { id: participant.membershipId },
+          select: { clientId: true, remainedLessons: true, validUntil: true } });
+        if (!membership || membership.clientId !== participant.clientId) {
+          throw new BadRequestException('Абонемент не принадлежит участнику');
+        }
+        if (membership.remainedLessons <= 0 || membership.validUntil < end) {
+          throw new BadRequestException('Абонемент недоступен на время занятия');
+        }
+      }
       const schedule = await this.getClubSchedule(tx);
       this.assertClubWorkingHours(start, end, schedule);
       const matchingLesson = participants.length
@@ -290,6 +302,7 @@ export class LessonsService {
   async findAll(query: ListLessonsQueryDto): Promise<LessonDetails[]> {
     const from = this.parseDate(query.from, 'Некорректный параметр from');
     const to = this.parseDate(query.to, 'Некорректный параметр to');
+    if (to.getTime() - from.getTime() > 93 * 86_400_000) throw new BadRequestException('Выберите период не более 93 дней');
     if (from >= to) {
       throw new BadRequestException('Параметр from должен быть раньше параметра to');
     }
@@ -428,6 +441,9 @@ export class LessonsService {
               where: { id: booking.id },
               data: { membershipId },
             });
+            const paid = await tx.payment.count({ where: { bookingId: booking.id, status: 'PAID' } });
+            if (paid) throw new ConflictException('Занятие уже оплачено деньгами: сначала согласуйте способ оплаты');
+            await tx.payment.updateMany({ where: { bookingId: booking.id, status: 'PENDING' }, data: { status: 'CANCELLED' } });
           }
         }
         resolvedMembershipIds.push(membershipId);

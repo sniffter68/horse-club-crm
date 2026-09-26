@@ -46,7 +46,7 @@ const lead = { consentAccepted: true, consentVersion: '2026-09-19', firstName: '
 
 test('public valid lead creates a pending request without creating a client', async () => {
   const response = await request(app.getHttpServer()).post('/api/leads').send(lead).expect(201);
-  assert.deepEqual(response.body, { success: true, leadId, message: 'Заявка успешно принята' });
+  assert.deepEqual(response.body, { success: true, leadId: '', message: 'Заявка успешно принята' });
   assert.equal(clients.length, 0);
   assert.equal(leads.length, 1);
   assert.equal(leads[0].status, 'PENDING');
@@ -69,14 +69,14 @@ for (const [title, input] of Object.entries({
   assert.equal(leads.length, 0);
 });
 
-test('repeat submission updates one pending request and still creates no client', async () => {
+test('repeat submission cannot overwrite an existing request by knowing its phone', async () => {
   await request(app.getHttpServer()).post('/api/leads').send({ ...lead, serviceId }).expect(201);
   await request(app.getHttpServer()).post('/api/leads').send({ ...lead, firstName: 'Анна Мария', email: 'anna@example.com', preferences: 'Новичок', serviceId }).expect(201);
   assert.equal(clients.length, 0);
   assert.equal(leads.length, 1);
-  assert.equal(leads[0].firstName, 'Анна Мария');
-  assert.equal(leads[0].email, 'anna@example.com');
-  assert.equal(leads[0].preferences, 'Новичок');
+  assert.equal(leads[0].firstName, 'Анна');
+  assert.equal(leads[0].email, undefined);
+  assert.equal(leads[0].preferences, undefined);
 });
 
 test('lead rejects a stale consent version', async () => {

@@ -312,11 +312,11 @@ export function SchedulePage() {
             {booking.membership && <Tag color="green">Абонемент: {booking.membership.remainedLessons} / {booking.membership.totalLessons}</Tag>}
           </Space>)}</Space> : 'Нет участников' },
         ]} />
-        <Space wrap>
+        {canManage && <Space wrap>
           <Button disabled={saving || detail.status === 'CANCELLED' || detail.status === 'COMPLETED'} onClick={() => void changeStatus('COMPLETED')}>Отметить присутствие</Button>
           <Button disabled={saving || detail.status === 'CANCELLED' || detail.status === 'NO_SHOW'} onClick={() => void changeStatus('NO_SHOW')}>Неявка</Button>
           <Popconfirm title="Отменить занятие?" description="Списанные занятия абонемента будут возвращены." okText="Да" cancelText="Нет" onConfirm={() => changeStatus('CANCELLED')}><Button danger disabled={saving || detail.status === 'CANCELLED'}>Отменить занятие</Button></Popconfirm>
-        </Space>
+        </Space>}
       </Space>}
     </Modal>
   </Space>

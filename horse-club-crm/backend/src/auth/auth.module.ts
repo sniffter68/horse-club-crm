@@ -20,7 +20,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       inject: [AUTH_OPTIONS],
       useFactory: (options: AuthOptions): JwtModuleOptions => ({
         secret: options.secret,
-        signOptions: { algorithm: 'HS256', expiresIn: '7d' },
+        signOptions: { algorithm: 'HS256', expiresIn: '30m' },
         verifyOptions: { algorithms: ['HS256'] },
       }),
     }),

@@ -211,7 +211,8 @@ test('creates one group lesson with separate riders, horses, memberships and pay
   const tx = {
     clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] }) },
     horse: { findUnique: async ({ where }) => ({ name: where.id, maxDailyMinutes: 240 }) },
-    service: { findUnique: async () => ({ durationMinutes: 60, price: 2000, title: 'Групповая тренировка', name: 'Групповая тренировка', maxCapacity: 4 }) },
+    service: { findUnique: async () => ({ durationMinutes: 60, price: 2000, title: 'Групповая тренировка', name: 'Групповая тренировка', maxCapacity: 4, allowMembership: true }) },
+    membership: { findUnique: async () => ({ clientId: 'client-1', remainedLessons: 5, validUntil: new Date('2099-01-01') }) },
     arena: { findUnique: async () => ({ name: 'Большой манеж', isUnavailable: false, capacity: 6 }) },
     lesson: {
       findMany: async () => [],
@@ -472,7 +473,9 @@ function createStatusHarness(newStatus, operations = [], options = {}) {
   const debitCalls = [];
   const refundCalls = [];
   const bookingUpdates = [];
+  const paymentUpdates = [];
   const tx = {
+    payment: { count: async () => options.paid ? 1 : 0, updateMany: async args => { paymentUpdates.push(args); return { count: 1 }; } },
     lesson: {
       findUnique: async () => ({
         status: LessonStatus.SCHEDULED,
@@ -501,7 +504,7 @@ function createStatusHarness(newStatus, operations = [], options = {}) {
   };
   const service = new LessonsService(prisma, ledger);
   return service.updateLessonStatus('lesson-1', newStatus).then((result) => ({
-    result, debitCalls, refundCalls, bookingUpdates, tx,
+    result, debitCalls, refundCalls, bookingUpdates, paymentUpdates, tx,
   }));
 }
 
@@ -519,7 +522,7 @@ test('COMPLETED and NO_SHOW debit every distinct linked membership', async () =>
 });
 
 test('COMPLETED automatically links and debits an active client membership', async () => {
-  const { debitCalls, bookingUpdates } = await createStatusHarness(
+  const { debitCalls, bookingUpdates, paymentUpdates } = await createStatusHarness(
     LessonStatus.COMPLETED,
     [],
     { allowMembership: true, automaticMembershipId: 'membership-3' },
@@ -528,9 +531,14 @@ test('COMPLETED automatically links and debits an active client membership', asy
     where: { id: 'booking-4' },
     data: { membershipId: 'membership-3' },
   }]);
+  assert.deepEqual(paymentUpdates,[{where:{bookingId:'booking-4',status:'PENDING'},data:{status:'CANCELLED'}}]);
   assert.deepEqual(debitCalls.map((call) => call[0]), [
     'membership-1', 'membership-2', 'membership-3',
   ]);
+});
+
+test('automatic membership selection rejects an already paid cash booking', async()=>{
+  await assert.rejects(createStatusHarness(LessonStatus.COMPLETED,[],{allowMembership:true,automaticMembershipId:'m',paid:true}),e=>e.getStatus()===409);
 });
 
 test('CANCELLED refunds only memberships with DEBIT and without REFUND', async () => {

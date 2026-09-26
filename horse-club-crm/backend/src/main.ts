@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
+import { requestLimits } from './common/request-limits';
 
 async function bootstrap(): Promise<void> {
   if (process.env.NODE_ENV === 'production' && !process.env.LEAD_CONSENT_VERSION?.trim()) {
@@ -12,6 +13,9 @@ async function bootstrap(): Promise<void> {
     throw new Error('PUBLIC_LANDING_URL is required when VK bot is enabled');
   }
   const app = await NestFactory.create(AppModule);
+  // Backend is reachable only via Caddy on the private production network.
+  app.getHttpAdapter().getInstance().set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : false);
+  app.use(requestLimits());
 
   app.get(PrismaService).enableShutdownHooks(app);
 

@@ -8,3 +8,9 @@ node_modules/
 dist/
 pg_data/
 .env
+.env.*
+!.env.example
+!.env.production.example
+!.env.test
+*.sql.gz
+**/.tmp/

@@ -120,8 +120,7 @@ test('client medical notes are hidden from TRAINER and preserved for ADMIN', asy
     .set('x-test-role', Role.TRAINER)
     .expect(200);
   assert.equal(Object.hasOwn(trainerResponse.body, 'medicalNotes'), false);
-  assert.equal(trainerResponse.body.memberships[0].pricingPlan.name, '8 занятий');
-  assert.equal(trainerResponse.body.memberships[0].isActive, true);
+  assert.deepEqual(trainerResponse.body.memberships, []);
 
   const adminResponse = await request(app.getHttpServer())
     .get(`/api/clients/${clientId}`)

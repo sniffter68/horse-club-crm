@@ -5,7 +5,7 @@ import { SanitizeRbacInterceptor } from './interceptors/sanitize-rbac.intercepto
 
 @Global()
 @Module({
-  providers: [SanitizeRbacInterceptor, { provide: APP_INTERCEPTOR, useClass: BigIntJsonInterceptor }],
+  providers: [SanitizeRbacInterceptor, { provide: APP_INTERCEPTOR, useExisting: SanitizeRbacInterceptor }, { provide: APP_INTERCEPTOR, useClass: BigIntJsonInterceptor }],
   exports: [SanitizeRbacInterceptor],
 })
 export class CommonModule {}

@@ -9,9 +9,9 @@ test('real API authenticates the seeded administrator', async ({ request }) => {
   const data = await response.json()
   expect(data.user).toMatchObject({ email: credentials.email, role: 'ADMIN' })
   expect(typeof data.access_token).toBe('string')
-  expect(data.access_token.split('.')).toHaveLength(3)
+  expect(data.access_token).toBe('cookie-session')
   const clients = await request.get(`${api}/clients?_start=0&_end=10`, {
-    headers: { Authorization: `Bearer ${data.access_token}` },
+    headers: {},
   })
   expect(clients.status()).toBe(200)
   expect(Array.isArray(await clients.json())).toBe(true)
@@ -65,8 +65,8 @@ test('real UI login, catalog requests, navigation, session persistence and logou
     const url = new URL(response.url())
     expect(url.searchParams.get('_start')).toBe('10')
     expect(url.searchParams.get('_end')).toBe('20')
-    const bearerMatches = await page.evaluate(header => header === `Bearer ${localStorage.getItem('horsecrm.access_token')}`, response.request().headers().authorization)
-    expect(bearerMatches).toBe(true)
+    expect(response.request().headers().authorization).toBeUndefined()
+    expect(await page.evaluate(() => localStorage.getItem('horsecrm.access_token'))).toBe('cookie-session')
     expect(result.total).toBe(Number(response.headers()['x-total-count']))
     expect(result.data).toEqual(await response.json())
   }

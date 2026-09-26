@@ -1,13 +1,10 @@
 import axios from 'axios'
 import type { HttpError } from '@refinedev/core'
-import { getToken } from './authStorage'
 
 export const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '')
 export const httpClient = axios.create({ timeout: 15_000 })
 httpClient.interceptors.request.use((config) => {
-  const token = getToken()
-  if (token) config.headers.set('Authorization', `Bearer ${token}`)
-  else config.headers.delete('Authorization')
+  config.headers.delete('Authorization')
   return config
 })
 export function toHttpError(error: unknown): HttpError {

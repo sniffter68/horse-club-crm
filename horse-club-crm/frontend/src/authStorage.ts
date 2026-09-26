@@ -5,7 +5,9 @@ export function isRole(value: unknown): value is Role {
   return value === 'ADMIN' || value === 'MANAGER' || value === 'TRAINER'
 }
 export function getToken(): string | null {
-  return localStorage.getItem(keys.token)
+  const value = localStorage.getItem(keys.token)
+  if (value !== 'cookie-session') { localStorage.removeItem(keys.token); return null }
+  return value
 }
 export function getIdentity(): Identity | null {
   const role = localStorage.getItem(keys.role)
@@ -15,11 +17,11 @@ export function getIdentity(): Identity | null {
 export function clearSession(): void {
   Object.values(keys).forEach((key) => localStorage.removeItem(key))
 }
-export function saveSession(token: string, identity: Identity): void {
+export function saveSession(_token: string, identity: Identity): void {
   try {
     localStorage.setItem(keys.email, identity.email)
     localStorage.setItem(keys.role, identity.role)
-    localStorage.setItem(keys.token, token)
+    localStorage.setItem(keys.token, 'cookie-session')
   } catch (error) {
     clearSession()
     throw error

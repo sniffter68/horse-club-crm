@@ -6,6 +6,7 @@ export interface JwtPayload {
   sub: User['id'];
   email: User['email'];
   role: User['role'];
+  authVersion?: string;
 }
 
 export interface AuthRequest {

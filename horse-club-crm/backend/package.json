@@ -45,6 +45,7 @@
     "typescript": "^7.0.2"
   },
   "overrides": {
+    "multer": "2.4.0",
     "deepmerge-ts": "8.0.0"
   }
 }
