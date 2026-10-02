@@ -45,6 +45,15 @@ export interface HorseProfile {
   imageUrl: string;
 }
 
+export interface ContactInfo {
+  address: string;
+  phone: string;
+  altPhone: string;
+  workingHours: string;
+  vkGroup: string;
+  coordinates: [number, number];
+}
+
 export interface BrandMetadata {
   name: string;
   logoUrl: string;
@@ -70,4 +79,5 @@ export interface ClubLandingContent {
   services: ServiceItem[];
   horsesSection: SectionMetadata;
   horses: HorseProfile[];
+  contacts: ContactInfo;
 }

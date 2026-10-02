@@ -49,7 +49,7 @@ export function HeroSection({ content }: Props): ReactElement {
             <p className="max-w-xl text-pretty text-base leading-7 text-zinc-200 sm:text-lg">{content.subtitle}</p>
             <div className="mt-7 flex flex-wrap gap-3">
               <a
-                href="#contact"
+                href="#contacts"
                 className="inline-flex min-h-12 items-center gap-2 rounded-full bg-white px-5 text-sm font-medium text-zinc-950 transition-transform hover:scale-[1.03] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/80 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
               >
                 {content.primaryCtaText}
