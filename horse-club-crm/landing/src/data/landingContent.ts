@@ -3,6 +3,7 @@ import type { ClubLandingContent } from '../types/content';
 export const landingData: ClubLandingContent = {
   brand: {
     name: 'Élan Equestrian Club',
+    logoUrl: '/club.svg',
     legalName: 'Конноспортивный клуб «Элан»',
     description: 'Премиальный конный клуб для спорта, отдыха и осознанного общения с лошадью.',
     locale: 'ru-RU',

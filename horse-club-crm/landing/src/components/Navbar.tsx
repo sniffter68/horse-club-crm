@@ -1,13 +1,14 @@
-import { ArrowUpRight, Crown } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import type { ReactElement } from 'react';
 import type { NavItem } from '../types/content';
 
 interface Props {
   brandName: string;
+  logoUrl: string;
   items: NavItem[];
 }
 
-export function Navbar({ brandName, items }: Props): ReactElement {
+export function Navbar({ brandName, logoUrl, items }: Props): ReactElement {
   return (
     <header className="pointer-events-none fixed inset-x-0 top-6 z-50 px-4">
       <nav
@@ -19,7 +20,14 @@ export function Navbar({ brandName, items }: Props): ReactElement {
           aria-label={`${brandName} — на главную`}
           className="flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium tracking-tight text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/80 sm:px-4"
         >
-          <Crown aria-hidden="true" className="h-4 w-4 text-amber-100" strokeWidth={1.5} />
+          <img
+            src={logoUrl}
+            alt=""
+            aria-hidden="true"
+            width={32}
+            height={32}
+            className="h-8 w-8 shrink-0 rounded-[0.6rem] object-cover ring-1 ring-white/10"
+          />
           <span className="hidden max-w-36 truncate sm:inline">{brandName}</span>
         </a>
 

@@ -10,7 +10,7 @@ export default function App(): ReactElement {
 
   return (
     <SmoothScroll>
-      <Navbar brandName={brand.name} items={navigation} />
+      <Navbar brandName={brand.name} logoUrl={brand.logoUrl} items={navigation} />
       <main>
         <HeroSection content={hero} />
         <section id="infrastructure" className="relative overflow-hidden bg-[#0B0C0E] px-6 py-24 sm:px-10 sm:py-32 lg:px-12">

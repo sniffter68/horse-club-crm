@@ -47,6 +47,7 @@ export interface HorseProfile {
 
 export interface BrandMetadata {
   name: string;
+  logoUrl: string;
   legalName: string;
   description: string;
   locale: string;
