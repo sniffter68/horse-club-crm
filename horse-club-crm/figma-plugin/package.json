@@ -1,0 +1,13 @@
+{
+  "name": "figma-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.140.0",
+    "typescript": "^7.0.2"
+  }
+}
