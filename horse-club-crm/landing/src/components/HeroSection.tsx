@@ -24,7 +24,7 @@ export function HeroSection({ content }: Props): ReactElement {
         src={content.mediaUrl}
         alt=""
         aria-hidden="true"
-        className="absolute inset-0 h-full w-full object-cover object-center"
+        className="absolute inset-0 h-full w-full object-cover object-[60%_center] sm:object-center"
         fetchPriority="high"
       />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(11,12,14,0.35)_0%,rgba(11,12,14,0.2)_42%,rgba(11,12,14,0.92)_100%)]" />

@@ -21,8 +21,7 @@ export const landingData: ClubLandingContent = {
       'Семейный конный клуб «Союз любителей конного спорта». Обучение верховой езде детей и взрослых, профессиональный тренинг, конкур и забота о каждой лошади.',
     primaryCtaText: 'Записаться на занятие',
     secondaryCtaText: 'Узнать о клубе',
-    mediaUrl:
-      'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=2400&q=90',
+    mediaUrl: '/images/hero-rider.webp',
   },
   infrastructureSection: {
     eyebrow: 'Инфраструктура',
