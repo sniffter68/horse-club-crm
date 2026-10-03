@@ -24,9 +24,9 @@ export function Navbar({ brandName, logoUrl, items }: Props): ReactElement {
             src={logoUrl}
             alt=""
             aria-hidden="true"
-            width={32}
-            height={32}
-            className="h-8 w-8 shrink-0 rounded-[0.6rem] object-cover ring-1 ring-white/10"
+            width={40}
+            height={40}
+            className="h-9 w-9 shrink-0 object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)] sm:h-10 sm:w-10"
           />
           <span className="hidden max-w-36 truncate sm:inline">{brandName}</span>
         </a>

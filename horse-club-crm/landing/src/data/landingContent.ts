@@ -3,7 +3,7 @@ import type { ClubLandingContent } from '../types/content';
 export const landingData: ClubLandingContent = {
   brand: {
     name: 'СЛКС Тамбов',
-    logoUrl: '/club.svg',
+    logoUrl: '/images/slks-logo-transparent.png',
     legalName: 'Союз любителей конного спорта',
     description: 'Семейный конный клуб для детей и взрослых в Тамбове.',
     locale: 'ru-RU',
