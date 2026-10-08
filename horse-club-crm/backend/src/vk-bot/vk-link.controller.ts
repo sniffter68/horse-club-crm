@@ -16,4 +16,7 @@ export class VkLinkController {
   @Post()
   @Roles(Role.ADMIN, Role.MANAGER)
   issue(@Body() dto: IssueVkLinkDto) { return this.links.issue(dto.kind, dto.id); }
+  @Post('unlink')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  unlink(@Body() dto: IssueVkLinkDto) { return this.links.unlink(dto.kind, dto.id); }
 }

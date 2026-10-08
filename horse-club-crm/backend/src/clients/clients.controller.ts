@@ -13,7 +13,7 @@ import { SanitizeTrainerFields } from '../common/decorators/sanitize-trainer-fie
 import { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { SanitizeRbacInterceptor } from '../common/interceptors/sanitize-rbac.interceptor';
 import { setRefineTotalHeaders } from '../common/refine';
-import { ClientsService, type ClientDetailsResponse } from './clients.service';
+import { ClientsService, type ClientDetailsResponse, type ClientListResponse } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
@@ -28,7 +28,7 @@ export class ClientsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
-  async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) res: Response): Promise<Client[]> {
+  async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) res: Response): Promise<ClientListResponse[]> {
     const { data, total } = await this.clientsService.findAll(query);
     setRefineTotalHeaders(res, total);
     return data;
@@ -38,6 +38,15 @@ export class ClientsController {
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
   findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<ClientDetailsResponse> {
     return this.clientsService.findOne(id);
+  }
+
+  @Get(':id/membership-ledger')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  async findLedger(@Param('id', new ParseUUIDPipe()) id: string, @Query() query: RefineQueryDto,
+    @Res({ passthrough: true }) res: Response) {
+    const { data, total } = await this.clientsService.findLedger(id, query);
+    setRefineTotalHeaders(res, total);
+    return data;
   }
 
   @Post()

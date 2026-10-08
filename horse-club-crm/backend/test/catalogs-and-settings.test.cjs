@@ -42,7 +42,8 @@ let schedule = {
 const prisma = {
   client: {
     count: async () => clients.length,
-    findMany: async ({ skip, take }) => clients.slice(skip, skip + take),
+    findMany: async ({ skip, take }) => clients.slice(skip, skip + take)
+      .map(client => ({ ...client, memberships: client.id === clientId ? [membership] : [] })),
     findUnique: async ({ where, include }) => {
       const client = clients.find((item) => item.id === where.id);
       if (!client) return null;
@@ -128,6 +129,14 @@ test('client medical notes are hidden from TRAINER and preserved for ADMIN', asy
     .expect(200);
   assert.equal(adminResponse.body.medicalNotes, 'Аллергия');
   assert.equal(adminResponse.body.memberships[0].remainedLessons, 6);
+});
+
+test('TRAINER cannot access ledger or membership summary in the client list', async () => {
+  await request(app.getHttpServer()).get(`/api/clients/${clientId}/membership-ledger`)
+    .set('x-test-role', Role.TRAINER).expect(403);
+  const response = await request(app.getHttpServer()).get('/api/clients')
+    .set('x-test-role', Role.TRAINER).expect(200);
+  assert.equal(Object.hasOwn(response.body[0], 'membership'), false);
 });
 
 test('ADMIN updates club schedule while TRAINER receives 403', async () => {

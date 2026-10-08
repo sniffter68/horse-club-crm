@@ -1,4 +1,6 @@
 import { isSerializationFailure } from '../common/serialization-failure';
+import { randomUUID } from 'node:crypto';
+import { queueVkNotification } from '../vk-bot/vk-delivery.module';
 import {
   BadRequestException,
   ConflictException,
@@ -66,6 +68,14 @@ export interface HorseWorkload {
   remainingMinutes: number;
 }
 
+export interface DailyHorseWorkload {
+  horseId: string;
+  horseName: string;
+  currentWorkloadMinutes: number;
+  maxDailyWorkloadMinutes: number;
+  status: 'AVAILABLE' | 'AT_LIMIT' | 'OVERLOADED' | 'UNAVAILABLE';
+}
+
 @Injectable()
 export class LessonsService {
   constructor(
@@ -117,13 +127,71 @@ export class LessonsService {
     );
   }
 
-  async getHorseWorkload(horseId: string, date: string): Promise<HorseWorkload> {
+  async getHorseWorkload(horseId: string, date: string, excludeLessonId?: string): Promise<HorseWorkload> {
     return this.getHorseWorkloadWithClient(
       this.prisma,
       horseId,
       this.parseCalendarDate(date),
       0,
+      excludeLessonId,
     );
+  }
+
+  async getDailyHorseWorkload(date: string, excludeLessonId?: string): Promise<DailyHorseWorkload[]> {
+    const schedule = await this.getClubSchedule(this.prisma);
+    const { open, close } = this.getWorkDayBounds(this.parseCalendarDate(date), schedule);
+    const [horses, lessons] = await this.prisma.$transaction([
+      this.prisma.horse.findMany({ select: { id: true, name: true, maxDailyMinutes: true, isUnavailable: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
+      this.prisma.lesson.findMany({
+        where: { status: { not: LessonStatus.CANCELLED }, startTime: { lt: close }, endTime: { gt: open },
+          ...(excludeLessonId ? { id: { not: excludeLessonId } } : {}) },
+        select: { startTime: true, endTime: true, bookings: { select: { horseId: true } } },
+      }),
+    ]);
+    const minutes = new Map<string, number>();
+    for (const lesson of lessons) {
+      const duration = Math.ceil(Math.max(0, (lesson.endTime.getTime() - lesson.startTime.getTime()) / MILLISECONDS_PER_MINUTE));
+      for (const horseId of new Set(lesson.bookings.map(booking => booking.horseId))) {
+        if (horseId) minutes.set(horseId, (minutes.get(horseId) ?? 0) + duration);
+      }
+    }
+    return horses.map(horse => {
+      const currentWorkloadMinutes = minutes.get(horse.id) ?? 0;
+      return { horseId: horse.id, horseName: horse.name, currentWorkloadMinutes, maxDailyWorkloadMinutes: horse.maxDailyMinutes,
+        status: horse.isUnavailable ? 'UNAVAILABLE' : currentWorkloadMinutes > horse.maxDailyMinutes ? 'OVERLOADED'
+          : currentWorkloadMinutes === horse.maxDailyMinutes ? 'AT_LIMIT' : 'AVAILABLE' };
+    });
+  }
+
+  async rescheduleLesson(lessonId: string, startTime: string, durationMinutes: number): Promise<LessonDetails> {
+    const eventId = randomUUID();
+    if (!Number.isSafeInteger(durationMinutes) || durationMinutes <= 0) throw new BadRequestException('Укажите положительную длительность занятия');
+    const start = this.parseDate(startTime, 'Некорректное время начала занятия');
+    const end = new Date(start.getTime() + durationMinutes * MILLISECONDS_PER_MINUTE);
+    this.assertValidInterval(start, end);
+    return this.runSerializable(async tx => {
+      const lesson = await tx.lesson.findUnique({ where: { id: lessonId }, ...lessonDetails });
+      if (!lesson) throw new NotFoundException('Занятие не найдено');
+      if (lesson.status !== LessonStatus.SCHEDULED) throw new ConflictException('Переносить можно только запланированные занятия');
+      if (lesson.arena?.isUnavailable) throw new ConflictException('Манеж недоступен на новое время занятия');
+      const schedule = await this.getClubSchedule(tx);
+      this.assertClubWorkingHours(start, end, schedule);
+      for (const booking of lesson.bookings) {
+        if (booking.membership && (booking.membership.remainedLessons <= 0 || booking.membership.validUntil < end)) {
+          throw new ConflictException('Абонемент участника недоступен на новое время занятия');
+        }
+      }
+      const horseIds = [...new Set(lesson.bookings.map(booking => booking.horseId).filter((id): id is string => Boolean(id)))];
+      await this.validateNoConflictsWithClient(tx, lesson.trainerId, horseIds, start, end, lessonId, lesson.arenaId ?? undefined);
+      for (const horseId of horseIds) {
+        await this.getHorseWorkloadWithClient(tx, horseId, this.getLocalDateParts(start), durationMinutes, lessonId);
+      }
+      const updated = await tx.lesson.update({ where: { id: lessonId }, data: { startTime: start, endTime: end }, ...lessonDetails });
+      if (lesson.startTime.getTime() !== start.getTime() || lesson.endTime.getTime() !== end.getTime()) {
+        await this.notifyLesson(tx, updated, `rescheduled:${eventId}`, 'Тренировка перенесена', undefined, lesson.startTime);
+      }
+      return updated;
+    });
   }
 
   async createLesson(dto: CreateLessonDto): Promise<LessonDetails> {
@@ -271,14 +339,16 @@ export class LessonsService {
       }));
 
       if (matchingLesson) {
-        return tx.lesson.update({
+        const updated = await tx.lesson.update({
           where: { id: matchingLesson.id },
           data: { bookings: { create: bookingCreateData } },
           ...lessonDetails,
         });
+        await this.notifyLesson(tx, updated, `booking:${[...clientIds].sort().join(',')}`, 'Новая запись на тренировку', clientIds);
+        return updated;
       }
 
-      return tx.lesson.create({
+      const created = await tx.lesson.create({
         data: {
           trainerId: dto.trainerId,
           serviceId: dto.serviceId,
@@ -296,6 +366,8 @@ export class LessonsService {
         },
         ...lessonDetails,
       });
+      await this.notifyLesson(tx, created, 'created', 'Запись на тренировку подтверждена');
+      return created;
     });
   }
 
@@ -497,12 +569,28 @@ export class LessonsService {
         }
       }
 
-      return tx.lesson.update({
+      const updated = await tx.lesson.update({
         where: { id: lessonId },
         data: { status: newStatus },
         ...lessonDetails,
       });
+      if (newStatus === LessonStatus.CANCELLED) await this.notifyLesson(tx, updated, 'cancelled', 'Тренировка отменена');
+      return updated;
     });
+  }
+
+  private async notifyLesson(tx: TransactionClient, lesson: LessonDetails, event: string, title: string,
+    clientIds?: string[], previousStart?: Date): Promise<void> {
+    const recipients = new Set<bigint>();
+    if (lesson.trainer?.vkUserId) recipients.add(lesson.trainer.vkUserId);
+    for (const booking of lesson.bookings ?? []) {
+      if ((!clientIds || clientIds.includes(booking.clientId)) && booking.client?.vkUserId) recipients.add(booking.client.vkUserId);
+    }
+    if (!recipients.size) return;
+    const format = (date: Date) => new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short', timeZone: CLUB_TIME_ZONE }).format(date);
+    const message = `${title}: ${lesson.service.title || lesson.service.name}\n${format(lesson.startTime)} — ${format(lesson.endTime)} (${CLUB_TIME_ZONE})`
+      + (previousStart ? `\nРанее: ${format(previousStart)}` : '') + `\nТренер: ${lesson.trainer.name}`;
+    for (const peer of recipients) await queueVkNotification(tx, `lesson:${lesson.id}:${event}:${peer}`, peer, message);
   }
 
   private async validateNoConflictsWithClient(
@@ -554,7 +642,7 @@ export class LessonsService {
     const { open, close } = this.getWorkDayBounds(date, schedule);
     const horse = await client.horse.findUnique({
       where: { id: horseId },
-      select: { name: true, maxDailyMinutes: true },
+      select: { name: true, maxDailyMinutes: true, isUnavailable: true },
     });
     if (!horse) {
       throw new NotFoundException('Лошадь не найдена');
@@ -576,7 +664,8 @@ export class LessonsService {
       return total + Math.ceil(Math.max(0, duration));
     }, 0);
 
-    if (usedMinutes + additionalMinutes > horse.maxDailyMinutes) {
+    if (additionalMinutes > 0 && horse.isUnavailable) throw new ConflictException(`Лошадь "${horse.name}" недоступна`);
+    if (additionalMinutes > 0 && usedMinutes + additionalMinutes > horse.maxDailyMinutes) {
       throw new ConflictException(
         `Превышен суточный лимит нагрузки лошади "${horse.name}": ` +
           `занято ${usedMinutes} из ${horse.maxDailyMinutes} мин.`,

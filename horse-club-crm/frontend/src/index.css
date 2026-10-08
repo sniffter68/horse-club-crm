@@ -127,6 +127,7 @@ textarea.ant-input { resize: none; }
 .crm-tag--accent { color: #3a2f2b; background: #efece8; }
 .crm-tag--success { color: #3e5f48; background: #edf4ef; }
 .crm-tag--warning { color: #8c6527; background: #fbf4e8; }
+.crm-tag--danger { color: #8c3838; background: #fbefef; }
 
 .mobile-menu-button {
   position: fixed;
@@ -172,8 +173,8 @@ textarea.ant-input { resize: none; }
 .responsive-record-value { min-width: 0; overflow-wrap: anywhere; }
 .responsive-record-value .ant-space { flex-wrap: wrap; }
 .responsive-record-field--actions { display: block; padding-top: 12px; }
-.responsive-record-field--actions .ant-space { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
-.responsive-record-field--actions .ant-btn { width: 100%; min-height: 40px; }
+.responsive-record-field--actions .ant-space { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+.responsive-record-field--actions .ant-btn { width: 100%; min-height: 40px; height: auto; white-space: normal; padding-block: 8px; }
 
 .fc {
   --fc-page-bg-color: var(--crm-paper);
@@ -246,3 +247,42 @@ html[data-theme='dark'] .fc {
 .loading-page { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; background: var(--crm-alabaster); }
 .login-card { width: 100%; max-width: 420px; border-radius: 28px; }
 .login-error { margin-bottom: 24px; }
+
+.client-membership { min-width: 0; padding: 14px 16px; border: 1px solid var(--crm-hairline); border-radius: 16px; background: #faf7f2; }
+.client-membership-balance { margin: 8px 0 4px; font-family: var(--crm-serif); font-size: 18px; }
+.client-membership-issue { display: block; margin-top: 8px; }
+.horse-workload-date { display: flex; align-items: center; gap: 8px; color: var(--crm-saddle); }
+.horse-workload-date .ant-input { width: 150px; }
+.horse-workload-panel { min-height: 180px; padding: 16px; border: 1px solid var(--crm-hairline); border-radius: 16px; background: #faf7f2; }
+.horse-workload-warning.ant-alert { background: #fbefef; color: #8c3838; border-color: #fecdd3; margin-block: 8px; }
+.horse-workload-warning .ant-alert-message { color: #8c3838; }
+.horse-workload-badge { margin: 0; font-size: 11px; line-height: 1.5; white-space: normal; }
+.horse-workload-badge:focus-visible { outline: 2px solid var(--crm-saddle); outline-offset: 2px; }
+.schedule-event-content { min-width: 0; padding: 2px 4px; overflow-wrap: anywhere; line-height: 1.35; }
+.schedule-event-horse { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+html[data-theme='dark'] .horse-workload-panel { background: var(--crm-paper); }
+@media (max-width: 767px) {
+  .schedule-toolbar { width: 100%; }
+  .horse-workload-date { justify-content: space-between; }
+  .horse-workload-date .ant-input { width: min(180px, 65%); }
+  .schedule-calendar .ant-card-body { padding: 12px; }
+  .schedule-calendar .fc-header-toolbar { flex-wrap: wrap; }
+  .schedule-calendar .fc-header-toolbar .fc-toolbar-chunk:nth-child(2) { order: -1; width: 100%; }
+  .schedule-calendar .fc-toolbar-chunk { min-width: 0; }
+  .schedule-page .ant-progress-text { min-width: 0; }
+}
+.client-ledger { min-height: 220px; padding: 16px; border: 1px solid var(--crm-hairline); border-radius: 16px; background: #faf7f2; overflow-wrap: anywhere; }
+html[data-theme='dark'] .client-membership,
+html[data-theme='dark'] .client-ledger { background: var(--crm-paper); }
+/* VK profile controls share the catalog's restrained palette. */
+.vk-profile { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.vk-chip--connected { background: #EDE3D5; color: #724C39; border-color: transparent; }
+.vk-chip--disconnected { background: #F1EDE7; color: #716B65; border-color: transparent; }
+.vk-invite { width: 100%; padding-block: 12px; color: #241E1C; }
+.vk-invite .ant-typography { margin-bottom: 0; }
+.vk-invite-code { font-size: 40px; letter-spacing: .2em; color: #724C39; }
+.vk-invite-code .ant-typography-copy { font-size: 18px; vertical-align: middle; }
+.vk-invite-command { padding: 12px; background: #FAF7F2; border: 1px solid rgb(0 0 0 / 5%); border-radius: 8px; overflow-wrap: anywhere; }
+html[data-theme='dark'] .vk-invite { color: var(--crm-ink); }
+html[data-theme='dark'] .vk-invite-code { color: var(--crm-beige); }
+html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); border-color: var(--crm-hairline); }

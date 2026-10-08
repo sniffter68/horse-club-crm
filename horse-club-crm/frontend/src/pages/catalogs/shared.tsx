@@ -5,8 +5,8 @@ import { Alert, Button, Checkbox, Form, Input, InputNumber, Result, Space, Spin,
 import { useCatalogPermissions } from './permissions'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 
-export function CatalogList<T extends BaseRecord>({ resource, title, columns }: {
-  resource: string; title: string; columns: TableColumnsType<T>
+export function CatalogList<T extends BaseRecord>({ resource, title, columns, extraActions }: {
+  resource: string; title: string; columns: TableColumnsType<T>; extraActions?: (record: T) => ReactNode
 }) {
   const { canManage } = useCatalogPermissions()
   const { tableProps, searchFormProps, tableQuery, sorters } = useTable<T, HttpError, { q?: string }>({
@@ -20,8 +20,9 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns }: 
   })
   const actions: TableColumnsType<T> = canManage ? [{
     key: 'actions', title: 'Действия', width: 250,
-    render: (_: unknown, record: T) => <Space>
+    render: (_: unknown, record: T) => <Space wrap>
       <EditButton resource={resource} recordItemId={record.id} size="small" aria-label="Редактировать">Редактировать</EditButton>
+      {extraActions?.(record)}
       <DeleteButton resource={resource} recordItemId={record.id} size="small" aria-label="Удалить"
         confirmTitle="Удалить запись?" confirmOkText="Удалить" confirmCancelText="Отмена">Удалить</DeleteButton>
     </Space>,

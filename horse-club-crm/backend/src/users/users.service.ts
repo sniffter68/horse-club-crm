@@ -7,12 +7,28 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BCRYPT_ROUNDS } from '../auth/auth.config';
 import type { CreateUserDto } from './dto/create-user.dto';
 
-export type PublicUser = { id: string; email: string; role: Role; createdAt: Date; updatedAt: Date };
-const publicUserSelect = { id: true, email: true, role: true, createdAt: true, updatedAt: true } satisfies Prisma.UserSelect;
+export type PublicUser = { id: string; email: string; role: Role; vkUserId: bigint | null; createdAt: Date; updatedAt: Date };
+const publicUserSelect = { id: true, email: true, role: true, vkUserId: true, createdAt: true, updatedAt: true } satisfies Prisma.UserSelect;
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async setVkRecipient(id: string, vkUserId: string | null): Promise<PublicUser> {
+    try {
+      return await this.prisma.$transaction(async tx => {
+        const user = await tx.user.findUnique({ where: { id } });
+        if (!user || user.role !== Role.ADMIN) throw new BadRequestException('Получателем заявок может быть только администратор');
+        if (user.vkUserId && user.vkUserId !== (vkUserId ? BigInt(vkUserId) : null)) {
+          await tx.vkNotification.deleteMany({ where: { peerId: user.vkUserId, sentAt: null, key: { startsWith: 'lead:' } } });
+        }
+        return tx.user.update({ where: { id }, data: { vkUserId: vkUserId ? BigInt(vkUserId) : null }, select: publicUserSelect });
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException('Этот VK уже назначен другому администратору');
+      throw error;
+    }
+  }
 
   async findAll(query: RefineQueryDto): Promise<PaginatedResult<PublicUser>> {
     const options = parseRefineQuery(query, ['id', 'email', 'role', 'createdAt', 'updatedAt'], 'createdAt');

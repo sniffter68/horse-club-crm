@@ -14,7 +14,9 @@ const original = Object.fromEntries(['VK_SECRET_KEY', 'VK_GROUP_ID', 'VK_CONFIRM
 before(async () => {
   process.env.VK_SECRET_KEY = 'test-secret'; process.env.VK_GROUP_ID = '123'; process.env.VK_CONFIRMATION_CODE = 'confirmation-code'; delete process.env.VK_BOT_TOKEN;
   const module = await Test.createTestingModule({ controllers: [VkBotController], providers: [VkBotService,
-    { provide: VkLinkService, useValue: {} }, { provide: MembershipLedgerService, useValue: {} }, { provide: LeadsService, useValue: {} },
+    { provide: VkLinkService, useValue: { bind: async (sender, phone, code) => {
+      assert.equal(sender, 42); assert.equal(phone, '+79991234567'); assert.equal(code, '1234'); return 'CLIENT';
+    } } }, { provide: MembershipLedgerService, useValue: {} }, { provide: LeadsService, useValue: {} },
     { provide: PrismaService, useValue: { trainer: { findUnique: async () => null }, client: { findUnique: async args => { lookup.push(args); return { id: 'client', firstName: 'Анна' }; } } } }] }).compile();
   bot = module.get(VkBotService);
   bot.vk = { api: { messages: { send: async params => { sent.push(params); return 1; } } } };
@@ -36,6 +38,13 @@ for (const patch of [{ secret: 'wrong' }, { secret: null }, { group_id: 456 }]) 
   assert.equal(lookup.length, 0);
 });
 const message = { ...event, type: 'message_new', event_id: 'event-1', object: { message: { from_id: 42, peer_id: 42, text: 'начать', out: 0 } } };
+
+test('/start binding command returns personalized role greeting through the callback', async () => {
+  await request(app.getHttpServer()).post('/api/vk/callback').send({ ...message,
+    object: { message: { ...message.object.message, text: '/start +79991234567 1234' } } }).expect(200);
+  assert.match(sent[0].message, /Анна.*роль: клиент/);
+  assert.match(String(sent[0].keyboard), /Мой баланс/);
+});
 test('message routes by BigInt vkUserId and repeats use stable random_id', async () => {
   for (let i = 0; i < 2; i++) assert.equal((await request(app.getHttpServer()).post('/api/vk/callback').send(message).expect(200)).text, 'ok');
   assert.equal(lookup[0].where.vkUserId, 42n);

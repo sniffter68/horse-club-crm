@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { UpdateUserVkDto } from './dto/update-user-vk.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import type { Response } from 'express';
@@ -17,6 +18,10 @@ import { UsersService, type PublicUser } from './users.service';
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+  @Patch(':id/vk')
+  setVk(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserVkDto): Promise<PublicUser> {
+    return this.usersService.setVkRecipient(id, dto.vkUserId);
+  }
   @Get()
   async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) res: Response): Promise<PublicUser[]> {
     const { data, total } = await this.usersService.findAll(query); setRefineTotalHeaders(res, total); return data;

@@ -1,10 +1,15 @@
 import { useState } from 'react'
+import { VkProfileLink } from '../../components/VkProfileLink'
 import { useOne, type HttpError } from '@refinedev/core'
 import { Alert, Button, Descriptions, Empty, List, Modal, Progress, Skeleton, Space, Tag, Typography } from 'antd'
 import { CatalogList } from '../catalogs/shared'
 import { money } from '../catalogs/format'
 import type { Client, RelationBooking, RelationPayment } from '../catalogs/types'
 import { dateOnly, dateTime } from '../cards/format'
+import { useCatalogPermissions } from '../catalogs/permissions'
+import { ClientLedger, MembershipBalance, type ActiveMembership } from './membership'
+
+type ClientRow = Client & { membership: ActiveMembership | null }
 
 type ClientMembership = {
   id: string
@@ -28,6 +33,9 @@ type ClientDetails = Client & {
 const dateFormatter = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeZone: 'Europe/Moscow' })
 
 export function ClientList() {
+  const [now] = useState(() => Date.now())
+  const { canManage } = useCatalogPermissions()
+  const [ledgerClient, setLedgerClient] = useState<Client>()
   const [selectedClientId, setSelectedClientId] = useState<string>()
   const { result: client, query } = useOne<ClientDetails, HttpError>({
     resource: 'clients',
@@ -36,7 +44,8 @@ export function ClientList() {
   })
 
   return <>
-    <CatalogList<Client> resource="clients" title="Клиенты" columns={[
+    <CatalogList<ClientRow> resource="clients" title="Клиенты"
+      extraActions={row => <Button size="small" onClick={() => setLedgerClient(row)}>История баланса</Button>} columns={[
       {
         key: 'name',
         title: 'Клиент',
@@ -46,6 +55,8 @@ export function ClientList() {
         </Button>,
       },
       { key: 'phone', dataIndex: 'phone', title: 'Телефон', sorter: true, render: (value: string | null) => <span className="data-mono">{value || '—'}</span> },
+      { key: 'vk', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name || row.firstName} kind="CLIENT" vkUserId={row.vkUserId} /> },
+      { key: 'membership', title: 'Абонемент', hidden: !canManage, width: 300, render: (_: unknown, row) => <MembershipBalance membership={row.membership} clientId={row.id} /> },
       { key: 'roles', title: 'Роли', render: (_: unknown, row) => <Space>{row.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{row.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
       { key: 'preferences', dataIndex: 'preferences', title: 'Заметки', width: 260, ellipsis: true, render: (value: string | null) => value || '—' },
       { key: 'createdAt', dataIndex: 'createdAt', title: 'Дата создания', sorter: true, render: (value: string) => dateFormatter.format(new Date(value)) },
@@ -56,6 +67,14 @@ export function ClientList() {
       {query.isLoading && <Skeleton active />}
       {query.error && <Alert type="error" showIcon message="Не удалось загрузить карточку клиента" description={query.error.message} />}
       {client && !query.isLoading && <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        {canManage && <MembershipBalance clientId={client.id} membership={(() => {
+          const active = client.memberships.filter(item => item.isActive)
+            .sort((a, b) => a.validUntil.localeCompare(b.validUntil) || a.id.localeCompare(b.id))[0]
+          return active ? { id: active.id, planName: active.pricingPlan?.name || 'Индивидуальный абонемент',
+            remainingUnits: active.remainedLessons, totalUnits: active.totalLessons, validUntil: active.validUntil,
+            status: new Date(active.validUntil).getTime() - now <= 7 * 86_400_000 ? 'EXPIRING' : 'ACTIVE' } : null
+        })()} />}
+        {canManage && <Button onClick={() => setLedgerClient(client)}>История баланса</Button>}
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'name', label: 'ФИО', span: 2, children: <span className="client-name">{[client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || '—'}</span> },
           { key: 'phone', label: 'Телефон', children: client.phone ? <a className="data-mono" href={`tel:${client.phone}`}>{client.phone}</a> : '—' },
@@ -112,6 +131,10 @@ export function ClientList() {
             </List.Item>} />}
         </div>
       </Space>}
+    </Modal>
+    <Modal title={`История баланса${ledgerClient ? ` · ${[ledgerClient.firstName, ledgerClient.lastName].filter(Boolean).join(' ') || ledgerClient.name}` : ''}`}
+      open={Boolean(ledgerClient) && canManage} onCancel={() => setLedgerClient(undefined)} footer={null} width={900} destroyOnHidden>
+      {ledgerClient && canManage && <ClientLedger key={ledgerClient.id} clientId={ledgerClient.id} />}
     </Modal>
   </>
 }

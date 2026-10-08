@@ -72,6 +72,17 @@ const clientDetailsInclude = Prisma.validator<Prisma.ClientDefaultArgs>()({
 type ClientDetails = Prisma.ClientGetPayload<typeof clientDetailsInclude>;
 export type ClientDetailsResponse = Omit<ClientDetails, 'memberships'> & { memberships: ClientMembership[] };
 
+export type ActiveMembership = {
+  id: string; planName: string; remainingUnits: number; totalUnits: number;
+  validUntil: Date; status: 'ACTIVE' | 'EXPIRING';
+};
+export type ClientListResponse = Client & { membership: ActiveMembership | null };
+const ledgerInclude = {
+  membership: { select: { pricingPlan: { select: { name: true } } } },
+  lesson: { select: { id: true, startTime: true, status: true, service: { select: { title: true, name: true } } } },
+} satisfies Prisma.MembershipOpInclude;
+export type ClientLedgerOperation = Prisma.MembershipOpGetPayload<{ include: typeof ledgerInclude }>;
+
 @Injectable()
 export class ClientsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -82,7 +93,8 @@ export class ClientsService {
     }
   }
 
-  async findAll(query: RefineQueryDto): Promise<PaginatedResult<Client>> {
+  async findAll(query: RefineQueryDto): Promise<PaginatedResult<ClientListResponse>> {
+    const now = new Date();
     const options = parseRefineQuery(query, ['id', 'name', 'phone', 'email', 'firstName', 'lastName', 'createdAt'], 'name');
     const where: Prisma.ClientWhereInput = options.search
       ? {
@@ -101,7 +113,33 @@ export class ClientsService {
         orderBy: [orderBy, { id: 'asc' }],
         skip: options.skip,
         take: options.take,
+        include: { memberships: {
+          where: { remainedLessons: { gt: 0 }, validUntil: { gte: now } },
+          orderBy: [{ validUntil: 'asc' }, { id: 'asc' }], take: 1,
+          select: { id: true, remainedLessons: true, totalLessons: true, validUntil: true, pricingPlan: { select: { name: true } } },
+        } },
       }),
+    ]);
+    return { data: data.map(({ memberships, ...client }) => {
+      const membership = memberships[0];
+      return { ...client, membership: membership ? {
+        id: membership.id, planName: membership.pricingPlan?.name || 'Индивидуальный абонемент',
+        remainingUnits: membership.remainedLessons, totalUnits: membership.totalLessons,
+        validUntil: membership.validUntil,
+        status: membership.validUntil.getTime() - now.getTime() <= 7 * 86_400_000 ? 'EXPIRING' as const : 'ACTIVE' as const,
+      } : null };
+    }), total };
+  }
+
+  async findLedger(clientId: string, query: RefineQueryDto): Promise<PaginatedResult<ClientLedgerOperation>> {
+    const client = await this.prisma.client.findUnique({ where: { id: clientId }, select: { id: true } });
+    if (!client) throw new NotFoundException('Клиент не найден');
+    const options = parseRefineQuery(query, ['createdAt'], 'createdAt');
+    const where: Prisma.MembershipOpWhereInput = { membership: { clientId } };
+    const [total, data] = await this.prisma.$transaction([
+      this.prisma.membershipOp.count({ where }),
+      this.prisma.membershipOp.findMany({ where, include: ledgerInclude,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: options.skip, take: options.take }),
     ]);
     return { data, total };
   }

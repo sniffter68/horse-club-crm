@@ -1,4 +1,5 @@
 import { money } from '../catalogs/format'
+import { VkProfileLink } from '../../components/VkProfileLink'
 import { useCatalogPermissions } from '../catalogs/permissions'
 import type { TableColumnsType } from 'antd'
 import { CatalogList } from '../catalogs/shared'
@@ -8,6 +9,7 @@ export function TrainerList() {
   const { canManage } = useCatalogPermissions()
   const columns: TableColumnsType<Trainer> = [
     { key: 'name', dataIndex: 'name', title: 'ФИО', sorter: true },
+    { key: 'vk', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name} kind="TRAINER" vkUserId={row.vkUserId} /> },
     { key: 'qualification', dataIndex: 'qualification', title: 'Квалификация', width: 260 },
     { key: 'maxDailyLoad', dataIndex: 'maxDailyLoad', title: 'Дневная нагрузка, мин', sorter: true },
   ]

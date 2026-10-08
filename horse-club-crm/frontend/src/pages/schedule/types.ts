@@ -12,6 +12,10 @@ export interface MembershipSummary {
 export interface ClientWithMemberships extends Client { memberships: MembershipSummary[] }
 export interface ClubSchedule { openTime: string; closeTime: string; daysOfWeekOff: number[] }
 export interface Workload { maxDailyMinutes: number; usedMinutes: number; remainingMinutes: number }
+export interface DailyHorseWorkload {
+  horseId: string; horseName: string; currentWorkloadMinutes: number; maxDailyWorkloadMinutes: number;
+  status: 'AVAILABLE' | 'AT_LIMIT' | 'OVERLOADED' | 'UNAVAILABLE';
+}
 export interface BookingParticipantValues {
   clientId?: string; membershipId?: string; horseId?: string;
 }

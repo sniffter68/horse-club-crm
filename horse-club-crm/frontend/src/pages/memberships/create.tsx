@@ -3,6 +3,7 @@ import type { BaseRecord, HttpError } from '@refinedev/core'
 import { Alert, DatePicker, Descriptions, Form, Input, InputNumber, Select } from 'antd'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
+import { useSearchParams } from 'react-router-dom'
 import { money } from '../catalogs/format'
 
 type Values = {
@@ -22,6 +23,7 @@ type Plan = BaseRecord & {
 }
 
 export function MembershipCreate() {
+  const [searchParams] = useSearchParams()
   const { formProps, saveButtonProps } = useForm<BaseRecord, HttpError, Values>({
     resource: 'memberships',
     action: 'create',
@@ -51,7 +53,7 @@ export function MembershipCreate() {
       {...formProps}
       layout="vertical"
       style={{ maxWidth: 720 }}
-      initialValues={{ validUntil: dayjs().add(30, 'day') }}
+      initialValues={{ clientId: searchParams.get('clientId') || undefined, validUntil: dayjs().add(30, 'day') }}
       onFinish={values => formProps.onFinish?.(values.pricingPlanId
         ? { clientId: values.clientId, pricingPlanId: values.pricingPlanId, reason: values.reason }
         : {

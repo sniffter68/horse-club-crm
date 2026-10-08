@@ -15,6 +15,7 @@ const leadId = '22222222-2222-4222-8222-222222222222';
 const clientId = '33333333-3333-4333-8333-333333333333';
 let clients, leads, app;
 const prisma = {
+  user: { findMany: async () => [] },
   $transaction: async callback => callback(prisma),
   client: {
     findUnique: async ({ where }) => clients.find(row => row.phone === where.phone) ?? null,

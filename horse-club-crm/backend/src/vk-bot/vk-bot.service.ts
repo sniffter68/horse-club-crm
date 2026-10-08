@@ -11,7 +11,7 @@ import { normalizePhone, VkLinkService } from './vk-link.service';
 function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
 const menu = (trainer: boolean) => Keyboard.keyboard(trainer
   ? [Keyboard.textButton({ label: 'Расписание на сегодня', payload: { command: 'today' } })]
-  : [Keyboard.textButton({ label: 'Баланс абонемента', payload: { command: 'balance' } }), Keyboard.textButton({ label: 'Мои тренировки', payload: { command: 'bookings' } })]);
+  : [Keyboard.textButton({ label: 'Мой баланс', payload: { command: 'balance' } }), Keyboard.textButton({ label: 'Мои тренировки', payload: { command: 'bookings' } })]);
 const welcome = Keyboard.keyboard([Keyboard.textButton({ label: 'Привязать профиль' }), Keyboard.textButton({ label: 'Первичная заявка' })]);
 const zone = () => process.env.CLUB_TIME_ZONE || 'Europe/Moscow';
 const consentVersion = () => process.env.LEAD_CONSENT_VERSION?.trim() || '2026-09-19';
@@ -62,10 +62,16 @@ export class VkBotService {
         });
         await this.send(peer, eventId, 'Согласие принято. Теперь отправьте: заявка Имя; +79991234567', welcome); return;
       }
-      const binding = /^привязать\s+(.+?)\s+([a-f0-9]{32})$/i.exec(text.trim());
+      const shortCode = /^(?:\/start\s+)?(\d{4})$/i.exec(text.trim());
+      if (shortCode) {
+        await this.send(peer, eventId, `Для подтверждения телефона отправьте: привязать ВАШ_ТЕЛЕФОН ${shortCode[1]}. Код действует 5 минут.`, welcome); return;
+      }
+      const binding = /^(?:привязать|\/start)\s+(.+?)\s+(\d{4}|[a-f0-9]{32})$/i.exec(text.trim());
       if (binding) {
         const kind = await this.links.bind(sender, binding[1], binding[2]);
-        await this.send(peer, eventId, 'Профиль успешно привязан', menu(kind === 'TRAINER')); return;
+        const profile = kind === 'TRAINER' ? await this.prisma.trainer.findUnique({ where: { vkUserId: BigInt(sender) } })
+          : await this.prisma.client.findUnique({ where: { vkUserId: BigInt(sender) } });
+        await this.send(peer, eventId, `Профиль успешно привязан. Здравствуйте, ${profile?.name || (profile && 'firstName' in profile ? profile.firstName : '') || 'всадник'}! Ваша роль: ${kind === 'TRAINER' ? 'тренер' : 'клиент'}.`, menu(kind === 'TRAINER')); return;
       }
       const [client, trainer] = await Promise.all([
         this.prisma.client.findUnique({ where: { vkUserId: BigInt(sender) } }), this.prisma.trainer.findUnique({ where: { vkUserId: BigInt(sender) } }),
@@ -86,7 +92,7 @@ export class VkBotService {
         return;
       }
       if (trainer && ['today', 'расписание на сегодня'].includes(command)) { await this.today(trainer.id, peer, eventId, offset); return; }
-      if (client && ['balance', 'баланс абонемента'].includes(command)) {
+      if (client && ['balance', 'мой баланс', 'баланс абонемента'].includes(command)) {
         const rows = await this.prisma.membership.findMany({ where: { clientId: client.id, validUntil: { gte: new Date() }, remainedLessons: { gt: 0 } }, orderBy: [{ validUntil: 'asc' }, { id: 'asc' }], skip: offset, take: 11 });
         await this.send(peer, eventId, rows.length ? rows.slice(0, 10).map(row => `Абонемент ${row.id}: ${row.remainedLessons} занятий, до ${date(row.validUntil)}`).join('\n') : 'Активных абонементов нет.', rows.length > 10 ? this.next('balance', offset) : menu(false)); return;
       }

@@ -25,7 +25,7 @@ import { CreateLessonDto } from './dto/create-lesson.dto';
 import { ListLessonsQueryDto } from './dto/list-lessons-query.dto';
 import { LessonHistoryQueryDto } from './dto/lesson-history-query.dto';
 import { setRefineTotalHeaders } from '../common/refine';
-import { UpdateLessonStatusDto } from './dto/update-lesson.dto';
+import { RescheduleLessonDto, UpdateLessonStatusDto } from './dto/update-lesson.dto';
 import type { LessonDetails } from './lessons.service';
 import { LessonsService } from './lessons.service';
 
@@ -67,6 +67,12 @@ export class LessonsController {
     @Body() dto: UpdateLessonStatusDto,
   ): Promise<LessonDetails> {
     return this.lessonsService.updateLessonStatus(lessonId, dto.status);
+  }
+
+  @Patch(':id/reschedule')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  reschedule(@Param('id', new ParseUUIDPipe()) lessonId: string, @Body() dto: RescheduleLessonDto): Promise<LessonDetails> {
+    return this.lessonsService.rescheduleLesson(lessonId, dto.startTime, dto.durationMinutes);
   }
 
   @Get(':id')

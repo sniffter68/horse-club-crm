@@ -3,6 +3,7 @@ export interface ClientValues {
   isRider: boolean; isPayer: boolean; preferences?: string; medicalNotes?: string;
 }
 export interface Client extends Omit<ClientValues, 'phone' | 'preferences' | 'medicalNotes'> {
+  vkUserId?: string | null;
   id: string; createdAt: string; phone: string | null; preferences: string | null; medicalNotes?: string | null;
 }
 export interface HorseValues {
@@ -31,6 +32,7 @@ export interface HorseDetails extends Horse {
 }
 export interface TrainerValues { name: string; phone?: string; qualification?: string; maxDailyLoad: number; baseRate?: number }
 export interface Trainer extends Omit<TrainerValues, 'baseRate' | 'phone' | 'qualification'> {
+  vkUserId?: string | null;
   id: string; baseRate?: string | number; phone: string | null; qualification: string | null;
 }
 export interface ServiceValues {

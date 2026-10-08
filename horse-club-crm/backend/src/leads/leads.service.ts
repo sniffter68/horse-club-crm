@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { LeadRequestStatus, Prisma } from '@prisma/client';
+import { queueVkNotification } from '../vk-bot/vk-delivery.module';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AcceptLeadDto } from './accept-lead.dto';
 import type { CreateLeadDto } from './create-lead.dto';
@@ -86,17 +87,16 @@ export class LeadsService {
   }
 
   private async notifyAdministrator(tx: Prisma.TransactionClient, leadId: string, dto: CreateLeadDto): Promise<void> {
+    const admins = await tx.user.findMany({ where: { role: 'ADMIN', vkUserId: { not: null } }, select: { vkUserId: true } });
+    const recipients = new Set(admins.flatMap(admin => admin.vkUserId ? [admin.vkUserId] : []));
     const peer = Number(process.env.VK_ADMIN_PEER_ID);
-    if (!Number.isSafeInteger(peer) || peer <= 0) return;
-    await tx.vkNotification.upsert({
-      where: { key: `lead:${leadId}:${dto.serviceId ?? 'general'}` },
-      update: {},
-      create: {
-        key: `lead:${leadId}:${dto.serviceId ?? 'general'}`,
-        peerId: BigInt(peer),
-        message: `Новая заявка: ${dto.firstName}\nТелефон: ${dto.phone}${dto.serviceId ? `\nУслуга: ${dto.serviceId}` : ''}`,
-      },
-    });
+    if (Number.isSafeInteger(peer) && peer > 0) recipients.add(BigInt(peer));
+    if (!recipients.size) return;
+    const service = dto.serviceId ? await tx.service.findUnique({ where: { id: dto.serviceId }, select: { title: true, name: true } }) : null;
+    for (const recipient of recipients) {
+      await queueVkNotification(tx, `lead:${leadId}:${recipient}`, recipient,
+        `🐎 Новая заявка: ${dto.firstName}, ${dto.phone}, ${service?.title || service?.name || 'Услуга не выбрана'}`);
+    }
   }
 
   private async retrySerializable<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {

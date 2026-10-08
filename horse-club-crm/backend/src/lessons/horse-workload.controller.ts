@@ -15,6 +15,12 @@ import { LessonsService } from './lessons.service';
 export class HorseWorkloadController {
   constructor(private readonly lessonsService: LessonsService) {}
 
+  @Get('workload')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  getDailyWorkload(@Query() query: HorseWorkloadQueryDto) {
+    return this.lessonsService.getDailyHorseWorkload(query.date, query.excludeLessonId);
+  }
+
   @Get(':id/workload')
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
   @ApiOkResponse({
@@ -32,6 +38,6 @@ export class HorseWorkloadController {
     @Param('id', new ParseUUIDPipe()) horseId: string,
     @Query() query: HorseWorkloadQueryDto,
   ): Promise<HorseWorkload> {
-    return this.lessonsService.getHorseWorkload(horseId, query.date);
+    return this.lessonsService.getHorseWorkload(horseId, query.date, query.excludeLessonId);
   }
 }
