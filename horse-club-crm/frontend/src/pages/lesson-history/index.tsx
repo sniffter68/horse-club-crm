@@ -160,12 +160,12 @@ export function LessonHistoryPage() {
         pagination={{ current: page, pageSize, total, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: count => `Всего: ${count}`,
           onChange: (nextPage, nextSize) => { setPage(nextSize !== pageSize ? 1 : nextPage); setPageSize(nextSize) } }}
         columns={[
-          { key: 'startTime', title: 'Дата и время', render: (_: unknown, row) => <Button type="link" style={{ padding: 0 }} onClick={() => setSelected(row)}>{dateTime(row.startTime)}</Button> },
+          { key: 'startTime', title: 'Дата и время', render: (_: unknown, row) => <Button className="data-mono" type="link" style={{ padding: 0 }} onClick={() => setSelected(row)}>{dateTime(row.startTime)}</Button> },
           { key: 'service', title: 'Услуга', render: (_: unknown, row) => row.service.title || row.service.name },
           { key: 'clients', title: 'Клиенты', render: (_: unknown, row) => row.bookings.length ? <Space wrap>{row.bookings.map(booking => <Tag key={booking.id}>{personName(booking.client)}</Tag>)}</Space> : 'Без участников' },
           { key: 'trainer', title: 'Тренер', render: (_: unknown, row) => row.trainer.name },
           { key: 'horses', title: 'Лошади', render: (_: unknown, row) => [...new Set(row.bookings.map(booking => booking.horse?.name).filter(Boolean))].join(', ') || '—' },
-          { key: 'status', title: 'Статус', render: (_: unknown, row) => <Tag color={statuses[row.status].color}>{statuses[row.status].label}</Tag> },
+          { key: 'status', title: 'Статус', render: (_: unknown, row) => <Tag className="status-badge" bordered={false} style={{ background: statuses[row.status].background, color: statuses[row.status].text }}>{statuses[row.status].label}</Tag> },
           { key: 'actions', title: 'Действия', render: (_: unknown, row) => <Button onClick={() => setSelected(row)}>Открыть</Button> },
         ]} />
     </RefineList>
@@ -173,8 +173,8 @@ export function LessonHistoryPage() {
     <Modal title="Карточка занятия" open={Boolean(selected)} footer={null} width={760} destroyOnHidden onCancel={() => setSelected(undefined)}>
       {selected && <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Descriptions bordered size="small" column={2} items={[
-          { key: 'time', label: 'Дата и время', children: `${dateTime(selected.startTime)} — ${dateTime(selected.endTime)}` },
-          { key: 'status', label: 'Статус', children: <Tag color={statuses[selected.status].color}>{statuses[selected.status].label}</Tag> },
+          { key: 'time', label: 'Дата и время', children: <span className="data-mono">{dateTime(selected.startTime)} — {dateTime(selected.endTime)}</span> },
+          { key: 'status', label: 'Статус', children: <Tag className="status-badge" bordered={false} style={{ background: statuses[selected.status].background, color: statuses[selected.status].text }}>{statuses[selected.status].label}</Tag> },
           { key: 'service', label: 'Услуга', children: selected.service.title || selected.service.name },
           { key: 'trainer', label: 'Тренер', children: selected.trainer.name },
           { key: 'arena', label: 'Манеж', span: 2, children: selected.arena?.name || '—' },
@@ -184,7 +184,7 @@ export function LessonHistoryPage() {
             <Space direction="vertical" size={3} style={{ width: '100%' }}>
               <Space wrap><Typography.Text strong>{personName(booking.client)}</Typography.Text>{booking.horse && <Tag>{booking.horse.name}</Tag>}
                 <Tag color={booking.attendanceStatus === 'ATTENDED' ? 'green' : booking.attendanceStatus === 'NO_SHOW' ? 'orange' : 'default'}>{attendanceLabels[booking.attendanceStatus]}</Tag></Space>
-              <Space wrap>{booking.membership ? <Tag color="blue">Абонемент · осталось {booking.membership.remainedLessons}</Tag> : <Tag>Без абонемента</Tag>}
+              <Space wrap>{booking.membership ? <Tag className="crm-tag crm-tag--accent">Абонемент · осталось {booking.membership.remainedLessons}</Tag> : <Tag>Без абонемента</Tag>}
                 {booking.payments.map(payment => <Tag key={payment.id} color={paymentColors[payment.status]}>{paymentLabels[payment.status]}: {Number(payment.amount).toLocaleString('ru-RU')} ₽</Tag>)}</Space>
             </Space>
           </List.Item>} />

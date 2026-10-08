@@ -92,7 +92,7 @@ export function PendingLeads({ leads, loading, onProcessed }: {
   }
 
   return <>
-    <Card id="pending-leads" title={<Space>Новые заявки <Tag color={leads.length ? 'blue' : 'default'}>{leads.length}</Tag></Space>}>
+    <Card id="pending-leads" title={<Space>Новые заявки <Tag className={leads.length ? 'crm-tag crm-tag--accent' : undefined}>{leads.length}</Tag></Space>}>
       <List<PendingLead> loading={loading} dataSource={leads} locale={{ emptyText: 'Необработанных заявок нет' }}
         renderItem={lead => <List.Item actions={[<Button type="primary" key="open" onClick={() => open(lead)}>Открыть</Button>]}>
           <List.Item.Meta title={lead.firstName} description={<Space direction="vertical" size={2}>

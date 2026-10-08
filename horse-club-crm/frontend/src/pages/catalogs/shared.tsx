@@ -31,7 +31,7 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns }: 
       <Form.Item name="q" style={{ width: 320, maxWidth: '100%' }}>
         <Input.Search aria-label="Поиск" placeholder="Поиск" allowClear onSearch={() => searchFormProps.form?.submit()} />
       </Form.Item>
-      <Button htmlType="submit">Найти</Button>
+      <Button type="primary" htmlType="submit">Найти</Button>
     </Form>
     {tableQuery.error && <Alert type="error" showIcon message="Не удалось загрузить каталог" description={tableQuery.error.message} />}
     <ResponsiveTable<T> {...tableProps} rowKey="id" columns={[...sortedColumns, ...actions]} scroll={{ x: 'max-content' }}

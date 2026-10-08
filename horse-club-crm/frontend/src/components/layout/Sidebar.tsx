@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useLogout, useMenu, usePermissions, type TreeMenuItem } from '@refinedev/core'
 import type { Role } from '../../authStorage'
-import { ThemedTitle } from '@refinedev/antd'
 import {
   BulbOutlined,
   CalendarOutlined,
@@ -16,6 +15,13 @@ import {
 } from '@ant-design/icons'
 import { Button, Drawer, Grid, Layout, Menu, type MenuProps } from 'antd'
 import { Link } from 'react-router-dom'
+
+function BrandMark({ collapsed = false }: { collapsed?: boolean }) {
+  return <Link className={`sidebar-brand${collapsed ? ' sidebar-brand--collapsed' : ''}`} to="/" aria-label="Horse Club OS — главная">
+    <span className="sidebar-brand__mark" aria-hidden="true">🐎</span>
+    {!collapsed && <span className="sidebar-brand__text">Horse Club OS</span>}
+  </Link>
+}
 
 function toMenuItems(resources: TreeMenuItem[]): NonNullable<MenuProps['items']> {
   return resources.map((item) => ({
@@ -97,7 +103,7 @@ export function Sidebar({ darkMode, onToggleTheme }: { darkMode: boolean; onTogg
         placement="left"
         width="min(86vw, 340px)"
         title={<div className="sidebar-title-row">
-          <ThemedTitle collapsed={false} text="Horse CRM" />
+          <BrandMark />
           <Button type="text" shape="circle" icon={darkMode ? <BulbOutlined /> : <MoonOutlined />}
             aria-label={darkMode ? 'Включить светлую тему' : 'Включить тёмную тему'} onClick={onToggleTheme} />
         </div>}
@@ -105,21 +111,21 @@ export function Sidebar({ darkMode, onToggleTheme }: { darkMode: boolean; onTogg
         onClose={() => setMobileOpen(false)}
         styles={{ body: { padding: 0 } }}
       >
-        <Menu theme={darkMode ? 'dark' : 'light'} mode="inline" items={items} selectedKeys={[selectedKey]} defaultOpenKeys={initialOpenKeys}
+        <Menu theme="dark" mode="inline" items={items} selectedKeys={[selectedKey]} defaultOpenKeys={initialOpenKeys}
           onClick={() => setMobileOpen(false)} />
       </Drawer>
     </>
   }
 
   return (
-    <Layout.Sider className="crm-sidebar" theme={darkMode ? 'dark' : 'light'} collapsible collapsed={collapsed} onCollapse={setCollapsed}
+    <Layout.Sider className="crm-sidebar" theme="dark" collapsible collapsed={collapsed} onCollapse={setCollapsed}
       breakpoint="lg" collapsedWidth={80} style={{ minHeight: '100vh' }}>
       <div className="sidebar-title-row sidebar-title-row--desktop">
-        <ThemedTitle collapsed={collapsed} text="Horse CRM" />
+        <BrandMark collapsed={collapsed} />
         <Button type="text" shape="circle" icon={darkMode ? <BulbOutlined /> : <MoonOutlined />}
           aria-label={darkMode ? 'Включить светлую тему' : 'Включить тёмную тему'} onClick={onToggleTheme} />
       </div>
-      <Menu theme={darkMode ? 'dark' : 'light'} mode="inline" items={items} selectedKeys={[selectedKey]} defaultOpenKeys={initialOpenKeys} style={{ flex: 1, overflowY: 'auto' }} />
+      <Menu theme="dark" mode="inline" items={items} selectedKeys={[selectedKey]} defaultOpenKeys={initialOpenKeys} style={{ flex: 1, overflowY: 'auto' }} />
     </Layout.Sider>
   )
 }

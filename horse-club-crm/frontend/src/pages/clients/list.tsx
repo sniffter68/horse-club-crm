@@ -41,12 +41,12 @@ export function ClientList() {
         key: 'name',
         title: 'Клиент',
         sorter: true,
-        render: (_: unknown, row) => <Button type="link" style={{ padding: 0 }} onClick={() => setSelectedClientId(row.id)}>
+        render: (_: unknown, row) => <Button className="client-name" type="link" style={{ padding: 0 }} onClick={() => setSelectedClientId(row.id)}>
           {[row.firstName, row.lastName].filter(Boolean).join(' ') || row.name || 'Без имени'}
         </Button>,
       },
-      { key: 'phone', dataIndex: 'phone', title: 'Телефон', sorter: true, render: (value: string | null) => value || '—' },
-      { key: 'roles', title: 'Роли', render: (_: unknown, row) => <Space>{row.isRider && <Tag color="blue">Всадник</Tag>}{row.isPayer && <Tag color="green">Плательщик</Tag>}</Space> },
+      { key: 'phone', dataIndex: 'phone', title: 'Телефон', sorter: true, render: (value: string | null) => <span className="data-mono">{value || '—'}</span> },
+      { key: 'roles', title: 'Роли', render: (_: unknown, row) => <Space>{row.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{row.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
       { key: 'preferences', dataIndex: 'preferences', title: 'Заметки', width: 260, ellipsis: true, render: (value: string | null) => value || '—' },
       { key: 'createdAt', dataIndex: 'createdAt', title: 'Дата создания', sorter: true, render: (value: string) => dateFormatter.format(new Date(value)) },
     ]} />
@@ -57,10 +57,10 @@ export function ClientList() {
       {query.error && <Alert type="error" showIcon message="Не удалось загрузить карточку клиента" description={query.error.message} />}
       {client && !query.isLoading && <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
-          { key: 'name', label: 'ФИО', span: 2, children: [client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || '—' },
-          { key: 'phone', label: 'Телефон', children: client.phone ? <a href={`tel:${client.phone}`}>{client.phone}</a> : '—' },
+          { key: 'name', label: 'ФИО', span: 2, children: <span className="client-name">{[client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || '—'}</span> },
+          { key: 'phone', label: 'Телефон', children: client.phone ? <a className="data-mono" href={`tel:${client.phone}`}>{client.phone}</a> : '—' },
           { key: 'email', label: 'Email', children: client.email ? <a href={`mailto:${client.email}`}>{client.email}</a> : '—' },
-          { key: 'roles', label: 'Роли', span: 2, children: <Space>{client.isRider && <Tag color="blue">Всадник</Tag>}{client.isPayer && <Tag color="green">Плательщик</Tag>}</Space> },
+          { key: 'roles', label: 'Роли', span: 2, children: <Space>{client.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{client.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
           { key: 'preferences', label: 'Заметки', span: 2, children: client.preferences || '—' },
           ...(client.medicalNotes !== undefined ? [{ key: 'medicalNotes', label: 'Медицинские заметки', span: 2, children: client.medicalNotes || '—' }] : []),
         ]} />
@@ -96,10 +96,10 @@ export function ClientList() {
           <Typography.Title level={5}>Последние занятия</Typography.Title>
           {client.bookings.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Занятий нет" /> :
             <List dataSource={client.bookings} renderItem={booking => <List.Item>
-              <Space wrap><span>{dateTime(booking.lesson.startTime)}</span>
+              <Space wrap><span className="data-mono">{dateTime(booking.lesson.startTime)}</span>
                 <strong>{booking.lesson.service.title || booking.lesson.service.name}</strong>
                 <span>{booking.horse?.name || 'Без лошади'}</span><Tag>{booking.attendanceStatus}</Tag>
-                {booking.membership && <Tag color="blue">По абонементу</Tag>}</Space>
+                {booking.membership && <Tag className="crm-tag crm-tag--accent">По абонементу</Tag>}</Space>
             </List.Item>} />}
         </div>
         <div>
@@ -108,7 +108,7 @@ export function ClientList() {
             <List dataSource={client.payments} renderItem={payment => <List.Item>
               <Space wrap><Tag color={payment.status === 'PAID' ? 'green' : payment.status === 'PENDING' ? 'gold' : 'default'}>{payment.status}</Tag>
                 <strong>{money(payment.amount)}</strong><span>{payment.description || 'Начисление'}</span>
-                <span>{dateTime(payment.paidAt || payment.createdAt)}</span></Space>
+                <span className="data-mono">{dateTime(payment.paidAt || payment.createdAt)}</span></Space>
             </List.Item>} />}
         </div>
       </Space>}

@@ -73,9 +73,9 @@ const clientName = (booking: DashboardAlertBooking): string =>
   booking.client.id
 
 function workloadColor(percent: number): string {
-  if (percent >= 100) return '#cf1322'
-  if (percent >= 75) return '#1677ff'
-  return '#389e0d'
+  if (percent >= 100) return '#8C3838'
+  if (percent >= 75) return '#8C6527'
+  return '#3E5F48'
 }
 
 export function DashboardPage() {
@@ -234,7 +234,7 @@ export function DashboardPage() {
       key: 'time',
       width: 130,
       render: (_, row) => <Link to="/schedule" title="Открыть расписание">
-        {formatTime(row.startTime)}–{formatTime(row.endTime)}
+        <span className="data-mono">{formatTime(row.startTime)}–{formatTime(row.endTime)}</span>
       </Link>,
     },
     {
@@ -281,17 +281,17 @@ export function DashboardPage() {
     <Row gutter={[16, 16]}>
       <Col xs={24} sm={12} lg={8}>
         <Link className="dashboard-kpi-link" to="/schedule" aria-label="Открыть расписание">
-          <Card hoverable><Statistic title="Тренировки сегодня" value={summary?.kpi.lessonsCompleted ?? 0} suffix={`/ ${summary?.kpi.lessonsTotal ?? 0}`} loading={loading && !summary} /></Card>
+          <Card hoverable className="kpi-card"><Statistic title="Тренировки сегодня" value={summary?.kpi.lessonsCompleted ?? 0} suffix={`/ ${summary?.kpi.lessonsTotal ?? 0}`} loading={loading && !summary} /></Card>
         </Link>
       </Col>
       <Col xs={24} sm={12} lg={8}>
         <a className="dashboard-kpi-link" href="#pending-leads" aria-label="Открыть новые заявки">
-          <Card hoverable><Statistic title="Необработанные заявки" value={summary?.kpi.newLeads ?? 0} loading={loading && !summary} /></Card>
+          <Card hoverable className="kpi-card"><Statistic title="Необработанные заявки" value={summary?.kpi.newLeads ?? 0} loading={loading && !summary} /></Card>
         </a>
       </Col>
       <Col xs={24} sm={12} lg={8}>
         <Link className="dashboard-kpi-link" to="/memberships" aria-label="Открыть абонементы">
-          <Card hoverable><Statistic title="Активные абонементы" value={summary?.kpi.activeMemberships ?? 0} loading={loading && !summary} /></Card>
+          <Card hoverable className="kpi-card"><Statistic title="Активные абонементы" value={summary?.kpi.activeMemberships ?? 0} loading={loading && !summary} /></Card>
         </Link>
       </Col>
     </Row>

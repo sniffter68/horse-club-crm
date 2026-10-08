@@ -18,9 +18,9 @@ export interface BookingParticipantValues {
 export interface BookingValues {
   participants: BookingParticipantValues[]; serviceId: string; trainerId: string; arenaId?: string; startTime: string; durationMinutes: number;
 }
-export const statuses: Record<Status, { color: string; label: string }> = {
-  SCHEDULED: { color: '#1677ff', label: 'Запланировано' },
-  COMPLETED: { color: '#389e0d', label: 'Проведено' },
-  NO_SHOW: { color: '#d46b08', label: 'Неявка' },
-  CANCELLED: { color: '#737373', label: 'Отменено' },
+export const statuses: Record<Status, { background: string; text: string; event: string; label: string }> = {
+  SCHEDULED: { background: '#EFECE8', text: '#3A2F2B', event: '#724C39', label: 'Запланировано' },
+  COMPLETED: { background: '#EDF4EF', text: '#3E5F48', event: '#3E5F48', label: 'Проведено' },
+  NO_SHOW: { background: '#FBF4E8', text: '#8C6527', event: '#8C6527', label: 'Неявка' },
+  CANCELLED: { background: '#FBEFEF', text: '#8C3838', event: '#8C3838', label: 'Отменено' },
 }

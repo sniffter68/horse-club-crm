@@ -57,7 +57,7 @@ export function MembershipList() {
         </section>
         <section><Typography.Title level={5}>Занятия и списания</Typography.Title>
           {membership.operations.length ? <List dataSource={membership.operations} renderItem={operation => <List.Item>
-            <Space wrap><Tag color={operation.type === 'DEBIT' ? 'orange' : 'blue'}>{operation.type}</Tag>
+            <Space wrap><Tag className={operation.type === 'DEBIT' ? 'crm-tag crm-tag--warning' : 'crm-tag crm-tag--accent'}>{operation.type}</Tag>
               <strong>{operation.amount > 0 ? '+' : ''}{operation.amount}</strong>
               <span>{operation.lesson ? `${dateTime(operation.lesson.startTime)} · ${operation.lesson.service.title || operation.lesson.service.name}` : operation.reason}</span></Space>
           </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Операций нет" />}

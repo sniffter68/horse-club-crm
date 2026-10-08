@@ -245,7 +245,7 @@ export function SchedulePage() {
       <Button onClick={() => { setError(undefined); setRevision(value => value + 1) }}>Обновить</Button>
       {canManage && <Button type="primary" disabled={!ready} onClick={() => openBooking(new Date())}>Новое занятие</Button>}
     </Space>
-    <Space wrap>{Object.entries(statuses).map(([status, item]) => <Tag key={status} color={item.color}>{item.label}</Tag>)}</Space>
+    <Space wrap>{Object.entries(statuses).map(([status, item]) => <Tag className="status-badge" bordered={false} key={status} style={{ background: item.background, color: item.text }}>{item.label}</Tag>)}</Space>
     <Card><Spin spinning={loading || (!ready && !error)}>
       {schedule && <FullCalendar plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin, luxonPlugin]} locale={ruLocale}
         timeZone={CLUB_TIME_ZONE} initialView={compactLayout ? 'timeGridDay' : 'timeGridWeek'}
@@ -255,7 +255,7 @@ export function SchedulePage() {
         selectable={canManage && ready} selectMirror selectOverlap={false} eventDisplay="block"
         datesSet={({ start, end }) => setRange(previous => previous?.from === start.toISOString() && previous.to === end.toISOString() ? previous : { from: start.toISOString(), to: end.toISOString() })}
         select={({ start, end, view }) => { openBooking(start, Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000))); view.calendar.unselect() }}
-        events={lessons.map(lesson => ({ id: lesson.id, title: `${lesson.service.title || lesson.service.name} · ${lesson.trainer.name}${lessonHorses(lesson).length ? ` · ${lessonHorses(lesson).join(', ')}` : ''}`, start: lesson.startTime, end: lesson.endTime, backgroundColor: statuses[lesson.status].color, borderColor: statuses[lesson.status].color }))}
+        events={lessons.map(lesson => ({ id: lesson.id, title: `${lesson.service.title || lesson.service.name} · ${lesson.trainer.name}${lessonHorses(lesson).length ? ` · ${lessonHorses(lesson).join(', ')}` : ''}`, start: lesson.startTime, end: lesson.endTime, backgroundColor: statuses[lesson.status].event, borderColor: statuses[lesson.status].event, textColor: '#FFFFFF' }))}
         eventClick={({ event }) => { setError(undefined); setDetail(lessons.find(lesson => lesson.id === event.id)) }} />}
     </Spin></Card>
     <Modal title="Быстрое бронирование" open={bookingOpen} onCancel={() => { if (!saving) setBookingOpen(false) }} footer={null} forceRender width={720}>
@@ -299,7 +299,7 @@ export function SchedulePage() {
     <Modal title="Карточка занятия" open={Boolean(detail)} onCancel={() => { if (!saving) setDetail(undefined) }} footer={null}>
       {failure}
       {detail && <Space direction="vertical" style={{ width: '100%' }}>
-        <Tag color={statuses[detail.status].color}>{statuses[detail.status].label}</Tag>
+        <Tag className="status-badge" bordered={false} style={{ background: statuses[detail.status].background, color: statuses[detail.status].text }}>{statuses[detail.status].label}</Tag>
         <Descriptions column={1} items={[
           { key: 'service', label: 'Услуга', children: detail.service.title || detail.service.name },
           { key: 'start', label: 'Начало', children: formatTime(detail.startTime) },

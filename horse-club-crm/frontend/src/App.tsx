@@ -91,9 +91,70 @@ export default function App() {
     return next
   })
 
+  const quietLuxuryTheme = {
+    algorithm: darkMode ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+    token: {
+      colorPrimary: '#241E1C',
+      colorPrimaryHover: '#724C39',
+      colorPrimaryActive: '#3A2F2B',
+      colorLink: '#724C39',
+      colorLinkHover: '#3A2F2B',
+      colorInfo: '#724C39',
+      colorSuccess: '#3E5F48',
+      colorWarning: '#8C6527',
+      colorError: '#8C3838',
+      colorText: darkMode ? '#FAF7F2' : '#3A2F2B',
+      colorTextSecondary: darkMode ? '#CBBFB6' : '#71645E',
+      colorBgLayout: darkMode ? '#181311' : '#F7F4F0',
+      colorBgContainer: darkMode ? '#241E1C' : '#FFFFFF',
+      colorBgElevated: darkMode ? '#2D2522' : '#FFFFFF',
+      colorBorder: darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)',
+      colorBorderSecondary: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+      borderRadius: 12,
+      borderRadiusLG: 24,
+      borderRadiusSM: 10,
+      fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontFamilyCode: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
+      controlHeight: 40,
+      controlOutline: 'rgba(114, 76, 57, 0.22)',
+      boxShadowSecondary: '0 18px 48px rgba(58, 47, 43, 0.10)',
+    },
+    components: {
+      Button: {
+        primaryShadow: '0 8px 20px rgba(36, 30, 28, 0.16)',
+        defaultBg: darkMode ? '#2D2522' : '#FFFFFF',
+        defaultBorderColor: darkMode ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.10)',
+        defaultColor: darkMode ? '#FAF7F2' : '#3A2F2B',
+        borderRadius: 12,
+      },
+      Card: { borderRadiusLG: 24 },
+      Layout: {
+        bodyBg: darkMode ? '#181311' : '#F7F4F0',
+        headerBg: darkMode ? '#181311' : '#F7F4F0',
+        siderBg: '#241E1C',
+      },
+      Table: {
+        headerBg: darkMode ? '#2D2522' : '#F3EFEA',
+        headerColor: darkMode ? '#FAF7F2' : '#3A2F2B',
+        rowHoverBg: darkMode ? '#302724' : '#FAF8F5',
+        borderColor: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+      },
+      Drawer: { colorBgElevated: '#241E1C' },
+      Menu: {
+        darkItemBg: '#241E1C',
+        darkSubMenuItemBg: '#1D1817',
+        darkItemColor: '#FAF7F2',
+        darkItemSelectedBg: 'rgba(255,255,255,0.15)',
+        darkItemSelectedColor: '#E4DAD0',
+        darkItemHoverBg: 'rgba(255,255,255,0.09)',
+        darkItemHoverColor: '#FFFFFF',
+      },
+    },
+  }
+
   return (
     <BrowserRouter>
-      <ConfigProvider locale={ruRU} theme={{ algorithm: darkMode ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}>
+      <ConfigProvider locale={ruRU} theme={quietLuxuryTheme}>
         <AntdApp>
           <Refine dataProvider={dataProvider} authProvider={authProvider} routerProvider={routerProvider}
             notificationProvider={useNotificationProvider} resources={resources}
