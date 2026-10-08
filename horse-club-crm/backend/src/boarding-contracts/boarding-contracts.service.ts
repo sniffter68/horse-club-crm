@@ -40,6 +40,36 @@ const SERIALIZATION_RETRIES = 3;
 export class BoardingContractsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async availability(startsAt: string) {
+    const start = this.date(startsAt, 'Некорректная дата начала');
+    // Quick placement has no end date, so future reservations also conflict.
+    const reserved: Prisma.BoardingContractWhereInput = {
+      status: { in: RESERVING_STATUSES },
+      OR: [{ endsAt: null }, { endsAt: { gt: start } }],
+    };
+    return this.prisma.$transaction(async tx => {
+      const [horses, stalls] = await Promise.all([
+        tx.horse.findMany({ where: { boardingContracts: { none: reserved } }, select: { id: true, name: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
+        tx.stall.findMany({ where: { isUnavailable: false, contracts: { none: reserved } }, select: { id: true, name: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
+      ]);
+      return { horses, stalls };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+  }
+
+  async terminate(id: string): Promise<BoardingContractWithRelations> {
+    return this.runSerializable(async tx => {
+      const current = await tx.boardingContract.findUnique({ where: { id }, include: contractInclude.include });
+      if (!current) throw new NotFoundException('Договор постоя не найден');
+      if (current.status === BoardingContractStatus.TERMINATED) return current;
+      const now = new Date();
+      if (!RESERVING_STATUSES.includes(current.status) || current.startsAt >= now || (current.endsAt && current.endsAt <= now)) {
+        throw new ConflictException('Освободить денник можно только по текущему активному или приостановленному договору');
+      }
+      // Keep the original parties, rate, payments and history, even for an unavailable stall.
+      return tx.boardingContract.update({ where: { id }, data: { status: BoardingContractStatus.TERMINATED, endsAt: now }, include: contractInclude.include });
+    });
+  }
+
   async findAll(query: RefineQueryDto): Promise<PaginatedResult<BoardingContractWithRelations>> {
     const options = parseRefineQuery(
       query,

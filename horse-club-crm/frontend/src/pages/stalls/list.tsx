@@ -5,6 +5,7 @@ import { CatalogList } from '../catalogs/shared'
 import type { Stall } from '../catalogs/types'
 import { dateOnly, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
+import { QuickBoardingActions } from '../boarding-contracts/quick'
 
 export function StallList() {
   const [selectedId, setSelectedId] = useState<string>()
@@ -30,6 +31,7 @@ export function StallList() {
           { key: 'status', label: 'Статус', children: <Tag color={stall.isUnavailable ? 'red' : 'green'}>{stall.isUnavailable ? 'Недоступен' : 'Доступен'}</Tag> },
           { key: 'description', label: 'Описание', span: 2, children: stall.description || '—' },
         ]} />
+        <QuickBoardingActions key={stall.id} context={{ kind: 'STALL', id: stall.id, name: stall.name, isUnavailable: stall.isUnavailable }} contracts={stall.contracts ?? []} />
         {(stall.contracts ?? []).length ? <List dataSource={stall.contracts} renderItem={contract => {
           const pending = (contract.payments ?? []).filter(payment => payment.status === 'PENDING').reduce((sum, payment) => sum + Number(payment.amount), 0)
           return <List.Item><Space wrap><Tag color={contract.status === 'ACTIVE' ? 'green' : 'default'}>{contract.status}</Tag>

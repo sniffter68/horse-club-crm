@@ -5,6 +5,7 @@ import { CatalogList } from '../catalogs/shared'
 import type { Horse, HorseDetails } from '../catalogs/types'
 import { dateOnly, dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
+import { QuickBoardingActions } from '../boarding-contracts/quick'
 
 const healthLabels = { VACCINATION: 'Вакцинация', FARRIER: 'Коваль', DEWORMING: 'Дегельминтизация', INSPECTION: 'Осмотр' }
 
@@ -31,6 +32,8 @@ export function HorseList() {
           { key: 'rest', label: 'Минимальный отдых', children: `${horse.minRestMinutes} мин` },
         ]} />
         <section><Typography.Title level={5}>Постой</Typography.Title>
+          <QuickBoardingActions key={horse.id} context={{ kind: 'HORSE', id: horse.id, name: horse.name }}
+            contracts={horse.boardingContracts} currentContract={horse.currentBoardingContract} />
           {horse.boardingContracts.length ? <List dataSource={horse.boardingContracts} renderItem={contract => <List.Item>
             <Space wrap><Tag color={contract.status === 'ACTIVE' ? 'green' : 'default'}>{contract.status}</Tag>
               <span>{personName(contract.client)}</span><span>Денник: {contract.stall?.name || 'не назначен'}</span>

@@ -10,6 +10,7 @@ import { setRefineTotalHeaders } from '../common/refine';
 import { BoardingContractsService, type BoardingContractWithRelations } from './boarding-contracts.service';
 import { CreateBoardingContractDto } from './dto/create-boarding-contract.dto';
 import { UpdateBoardingContractDto } from './dto/update-boarding-contract.dto';
+import { BoardingAvailabilityQueryDto } from './dto/boarding-availability-query.dto';
 
 @ApiTags('Boarding contracts')
 @ApiBearerAuth()
@@ -24,6 +25,18 @@ export class BoardingContractsController {
     const { data, total } = await this.service.findAll(query);
     setRefineTotalHeaders(response, total);
     return data;
+  }
+
+  @Get('availability')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  availability(@Query() query: BoardingAvailabilityQueryDto) {
+    return this.service.availability(query.startsAt);
+  }
+
+  @Post(':id/terminate')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  terminate(@Param('id', new ParseUUIDPipe()) id: string): Promise<BoardingContractWithRelations> {
+    return this.service.terminate(id);
   }
 
   @Get(':id')

@@ -25,6 +25,7 @@ export interface RelationBooking {
   lesson: RelationLesson; payments: RelationPayment[]; membership: { id: string } | null;
 }
 export interface HorseDetails extends Horse {
+  currentBoardingContract?: HorseDetails['boardingContracts'][number] | null;
   healthLogs: Array<{ id: string; type: 'VACCINATION' | 'FARRIER' | 'DEWORMING' | 'INSPECTION'; occurredAt: string; nextDueAt: string | null; notes: string | null }>;
   boardingContracts: Array<{ id: string; status: string; startsAt: string; endsAt: string | null; monthlyRate: string | number;
     client: { id: string; name: string; firstName: string; lastName: string }; stall: { id: string; name: string } | null; payments: RelationPayment[] }>;

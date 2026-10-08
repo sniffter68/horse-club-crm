@@ -45,7 +45,8 @@ const horseDetailsInclude = Prisma.validator<Prisma.HorseDefaultArgs>()({
     },
   },
 });
-export type HorseDetailsResponse = Prisma.HorseGetPayload<typeof horseDetailsInclude>;
+type HorseDetails = Prisma.HorseGetPayload<typeof horseDetailsInclude>;
+export type HorseDetailsResponse = HorseDetails & { currentBoardingContract: HorseDetails['boardingContracts'][number] | null };
 
 @Injectable()
 export class HorsesService {
@@ -76,7 +77,14 @@ export class HorsesService {
   async findOne(id: string): Promise<HorseDetailsResponse> {
     const horse = await this.prisma.horse.findUnique({ where: { id }, include: horseDetailsInclude.include });
     if (!horse) throw new NotFoundException('Лошадь не найдена');
-    return horse;
+    const now = new Date();
+    const currentBoardingContract = await this.prisma.boardingContract.findFirst({
+      where: { horseId: id, status: { in: ['ACTIVE', 'SUSPENDED'] }, startsAt: { lte: now }, OR: [{ endsAt: null }, { endsAt: { gt: now } }] },
+      include: horseDetailsInclude.include.boardingContracts.include,
+      orderBy: [{ startsAt: 'desc' }, { id: 'asc' }],
+    });
+    return { ...horse, currentBoardingContract, boardingContracts: currentBoardingContract && !horse.boardingContracts.some(contract => contract.id === currentBoardingContract.id)
+      ? [currentBoardingContract, ...horse.boardingContracts] : horse.boardingContracts };
   }
 
   create(dto: CreateHorseDto): Promise<Horse> {
