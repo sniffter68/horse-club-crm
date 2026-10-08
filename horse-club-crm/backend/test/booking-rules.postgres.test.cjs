@@ -121,10 +121,11 @@ test('PostgreSQL booking rules, rollback, HTTP contract and concurrent triad wri
       const { Test } = require('@nestjs/testing');
       const { ValidationPipe } = require('@nestjs/common');
       const { BookingsController } = require('../dist/bookings/bookings.controller');
+      const { BookingLifecycleService } = require('../dist/bookings/booking-lifecycle.service');
       const { JwtAuthGuard } = require('../dist/auth/guards/jwt-auth.guard');
       const { RolesGuard } = require('../dist/auth/guards/roles.guard');
       const request = require('supertest');
-      const module = await Test.createTestingModule({ controllers: [BookingsController], providers: [RolesGuard, { provide: BookingsService, useValue: service }] })
+      const module = await Test.createTestingModule({ controllers: [BookingsController], providers: [RolesGuard, { provide: BookingsService, useValue: service }, { provide: BookingLifecycleService, useValue: new BookingLifecycleService(p) }] })
         .overrideGuard(JwtAuthGuard).useValue({ canActivate(ctx) { const req = ctx.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return true; } }).compile();
       app = module.createNestApplication();
       app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true })); await app.init();

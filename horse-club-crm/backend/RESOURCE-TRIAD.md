@@ -1,4 +1,4 @@
-# Horse Club OS: Blocks 1.1–1.2
+# Horse Club OS: resource triad and billing lifecycle
 
 The additive migration `20261008200000_init_resource_triad_and_boarding` introduces
 the requested enums, physiological fields, decimal memberships, standalone resource
@@ -21,12 +21,11 @@ overlapping reservations or enforce daily workload/rest rules (scheduling layer)
   limits and arena capacities are preserved; new horses default to 120/45 minutes.
   Horse owners/stall numbers are initially inferred from current boarding contracts;
   review these inferred owners and the default indoor arena classification.
-- Legacy counters (`remainedLessons`, `totalLessons`, `validUntil`) and MembershipOp
-  remain authoritative for existing financial services. LedgerTransaction receives
-  a historical projection for operations with known clients, with a unique source
-  operation FK. No ongoing financial dual writes, triggers or new billing policy
-  are introduced. Decimal balances remain foundation fields; financial services
-  still use legacy counters. Resource configuration aliases are synchronized by
+- In Phases 1.1–1.3 legacy counters and MembershipOp remained authoritative and
+  LedgerTransaction was a historical projection. Phase 2 below introduces a live
+  transactional bridge: fixed lesson counters and validity aliases stay synchronized,
+  while LedgerTransaction becomes the combined journal for known clients. Deposits
+  use decimal units only. Resource configuration aliases are synchronized by
   catalog APIs as of Block 1.2; copied legacy Booking dates/statuses remain snapshots.
 - Membership status is a stored snapshot; expiration still requires checking dates.
   Journal foreign keys protect linked history; this is not an append-only audit policy.
@@ -108,3 +107,68 @@ locks and rules; this service is not a database exclusion constraint.
 - `PATCH /api/bookings/:id` allows ADMIN/MANAGER and accepts the complete create DTO. Only scheduled standalone bookings can be edited (`BOOKING_NOT_EDITABLE` otherwise). The Serializable rules transaction excludes the current booking, retains resource locking/retries and rolls back the entire update on conflict. Membership ownership is still checked; no automatic debit is introduced.
 - The frontend combines both read sources, uses club-local dates, refreshes all views on save and maps typed conflicts to the relevant form field. Availability is advisory; POST/PATCH always rerun authoritative rules.
 - PostgreSQL integration tests cover the new read/availability contracts, exclusion, update rollback and HTTP permissions alongside concurrent creation and legacy interoperability.
+
+## Phase 2: lifecycle and canonical ledger
+
+`PATCH /api/bookings/:id/complete`, `PATCH /api/bookings/:id/no-show`, and
+`PATCH /api/bookings/:id/cancel` require ADMIN/MANAGER. Cancellation accepts
+`{cancelledBy: "client" | "club", reason: string}` (trimmed, 1–1000 characters).
+The lifecycle applies to standalone triad bookings. Legacy group Lesson records
+retain their existing attendance/cancellation API and policy; they are not silently
+converted to independent bookings. Their ongoing MembershipOp operations are
+projected once into the canonical journal by database trigger.
+
+Only scheduled standalone records transition. Repeating the same terminal action
+returns the stored record without another charge or extension; a different terminal
+action returns BOOKING_STATE_CONFLICT. There is no implicit terminal-state refund or
+reopening. These endpoints are explicit administrator actions, not an automatic timer.
+
+- Completion records `completed` + `usage`; no-show records `no_show` +
+  `penalty_cancellation` with a no-show description.
+- Client cancellation at least exactly twelve hours before start is free
+  (`cancelled_client`). Less than twelve hours, including past start, produces
+  `penalty_cancellation` and the description «Штрафная отмена менее чем за 12 часов».
+- Club cancellation is free (`cancelled_club`), extending only the already attached
+  membership by seven club-calendar days, once. It does not select an unrelated
+  membership for compensation.
+- Fixed lesson plans debit **one unit**, recording signed amount **−1**. Deposits
+  debit `Booking.costAmount`, recording its exact negative decimal monetary amount.
+  Boarding memberships cannot pay for training. Frozen, expired, not-yet-valid or
+  discipline-incompatible memberships are rejected. Empty disciplines mean unrestricted.
+- An attached membership must be usable and sufficiently funded; it is never
+  silently replaced. Without one, choose a usable funded membership by earliest
+  `validTo`, then `createdAt`, then UUID, and attach it upon successful billing.
+  No suitable membership returns MEMBERSHIP_REQUIRED; unusable/insufficient ones
+  return MEMBERSHIP_UNAVAILABLE / MEMBERSHIP_INSUFFICIENT. No status or balance is
+  changed on these failures. Existing PAID cash payments block membership billing;
+  pending booking invoices are cancelled in the same successful billing transaction.
+
+Every transition uses an interactive Serializable transaction with five full retries.
+Locks follow Arena → Horse → Trainer → Client → membership advisory/row → Booking.
+Membership advisory keys match the legacy ledger. PostgreSQL `clock_timestamp()`
+after lock acquisition determines the cancellation window and current validity.
+Status, optional membership assignment, balance and signed journal commit together.
+The partial unique `LedgerTransaction_booking_charge_key` permits only one native
+usage/penalty outcome per booking, including across different outcome types.
+
+Migration `20261009010000_booking_lifecycle_ledger` reconciles fixed balances from
+the still-authoritative legacy counters at the cutover, fills missing known-client
+operation projections, and installs database triggers. Subsequent fixed-unit/date
+updates from either API synchronize both representations; conflicting aliases and
+fractional fixed lesson units are rejected. Deposits retain decimal precision.
+Original MembershipOp history is unchanged, with unique source IDs preventing a
+second projection. Back up PostgreSQL before applying this migration. Preserve these
+SQL triggers and partial indexes in future migrations; Prisma's schema alone does
+not describe them.
+
+`GET /api/clients/:id/membership-ledger` now reads LedgerTransaction (same roles,
+paging and legacy type/positive-magnitude fields). Additive `transactionType`,
+`signedAmount`, and `unit` distinguish monetary deposits from lesson units. The
+client history shows both legacy projections and new standalone training operations.
+The schedule confirms paid outcomes, explains the twelve-hour rule and seven-day
+compensation, preserves drafts on errors and refreshes bookings, workload and balances.
+
+Verification: `booking-lifecycle.test.cjs`, `booking-lifecycle.postgres.test.cjs`,
+the isolated triad runner and frontend triad/client-ledger browser suites cover the
+boundary, decimals, idempotency, rollback, concurrent last-unit contenders, legacy
+interoperability, access control and narrow screens.

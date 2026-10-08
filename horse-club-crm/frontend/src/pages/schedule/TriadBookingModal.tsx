@@ -142,7 +142,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
         <Form.Item name="serviceType" label="Дисциплина" rules={[required]}><Select onInputKeyDown={stopPopupEscape} id="triad_serviceType" aria-label="Дисциплина" options={Object.entries(disciplines).map(([value, label]) => ({ value, label }))} /></Form.Item>
         <Form.Item name="costAmount" label="Стоимость, ₽" rules={[required, { type: 'number', min: 0, max: 999999999999.99 }]}><InputNumber min={0} precision={2} style={{ width: '100%' }} /></Form.Item>
       </div>
-      <Form.Item name="membershipId" label="Абонемент / депозит" extra="Бронирование фиксирует запись. Оплата и списание баланса выполняются отдельно.">
+      <Form.Item name="membershipId" label="Абонемент / депозит" extra="Списание произойдёт при завершении тренировки, неявке или штрафной отмене.">
         <Select onInputKeyDown={stopPopupEscape} id="triad_membershipId" aria-label="Абонемент / депозит" allowClear showSearch optionFilterProp="label" disabled={!clientId || busy} loading={membershipState.loading} placeholder="Без абонемента"
           options={suitableMemberships.map(m => ({ value: m.id, label: `${m.title || m.pricingPlan?.name || 'Абонемент'} · ${membershipBalance(m).label}` }))} />
       </Form.Item>

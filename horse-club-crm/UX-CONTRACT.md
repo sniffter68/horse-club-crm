@@ -131,6 +131,15 @@
 - Horse columns show daily minutes and hatched required-rest intervals; arena columns show peak simultaneous rider count. Event buttons expose full details to keyboard users and open the appropriate detail card.
 - Verification: `frontend/e2e/triad-booking.spec.ts`, schedule regression suites, frontend unit/build checks and PostgreSQL booking integration tests. Booking creation does not itself charge a membership or deposit.
 
+### Booking billing and cancellation
+
+- Canonical owner: `BookingLifecycleActions.tsx` inside the standalone booking detail card, using Ant Design Modal/Form/Select/Popconfirm and the existing theme. ADMIN/MANAGER can record outcomes; TRAINER remains read-only. Legacy group lesson actions keep their established API.
+- Completion/no-show require confirmation of the debit. Cancellation requires an initiator and trimmed reason, with a prominent late-cancellation warning and an explanation of club compensation. The backend clock decides the final twelve-hour boundary; the warning updates while the form is open.
+- Fixed lesson plans debit one lesson; deposits debit the booking price. Without an attached plan, the backend chooses the usable funded plan expiring first. Missing/ineligible/insufficient balances keep the original status and show an actionable inline error.
+- Pessimistic requests prevent duplicate submission, closing and editing during a write. Failure retains the card and cancellation draft for retry. Success closes the details and invalidates calendar, workloads, client/membership queries and the client's ledger history. Terminal records have no further lifecycle controls.
+- The client ledger reads the canonical journal while supporting legacy response fields. Signed deposit amounts include ₽ and retain decimal precision in storage; standalone training dates and descriptions appear alongside projected historical operations.
+- Evidence: backend lifecycle PostgreSQL tests, `frontend/e2e/triad-booking.spec.ts` and `frontend/e2e/clients-memberships.spec.ts`.
+
 - Static: premium strict audit, forbidden-blue grep, lint, typecheck, unit tests, production build.
 - Browser: dashboard, clients, schedule; desktop and narrow viewport; light/dark/reduced motion when available.
 - Canonical sibling flow: shared catalog list/create/edit.

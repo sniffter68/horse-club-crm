@@ -84,3 +84,4 @@ const reasons: Record<string, { field?: keyof TriadValues; message: string }> = 
   BOOKING_CONTENTION: { message: 'Ресурсы изменились одновременно. Проверьте доступность и повторите сохранение.' },
 }
 export function bookingFailure(error: ApiError) { return reasons[error.code ?? ''] ?? { message: error.message } }
+export const isPenaltyCancellation = (start: string, now: number) => +new Date(start) - now < 12 * 3600000

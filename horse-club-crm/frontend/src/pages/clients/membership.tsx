@@ -32,8 +32,16 @@ export function MembershipBalance({ membership, clientId }: { membership: Active
 
 type LedgerOperation = {
   id: string; type: 'DEBIT' | 'CREDIT' | 'REFUND'; amount: number; reason: string; createdAt: string;
-  membership: { pricingPlan: { name: string } | null };
+  transactionType?: 'purchase' | 'usage' | 'penalty_cancellation' | 'refund' | 'boarding_charge' | 'manual_adjustment'; signedAmount?: string; unit?: 'RUB' | 'lessons';
+  membership: { title?: string; pricingPlan: { name: string } | null } | null;
   lesson: { id: string; startTime: string; status: string; service: { title: string; name: string } } | null;
+}
+function operationLabel(row: LedgerOperation) {
+  if (row.transactionType === 'manual_adjustment') return 'Ручная корректировка'
+  if (row.transactionType === 'boarding_charge') return 'Начисление постоя'
+  if (row.transactionType === 'penalty_cancellation') return /неявка/i.test(row.reason) ? 'Неявка' : 'Штрафная отмена'
+  return row.type === 'CREDIT' ? 'Пополнение' : row.type === 'REFUND' ? (row.unit === 'RUB' ? 'Возврат средств' : 'Возврат занятия')
+    : /штраф/i.test(row.reason) ? 'Штрафная отмена' : 'Списание за тренировку'
 }
 
 export function ClientLedger({ clientId }: { clientId: string }) {
@@ -55,14 +63,13 @@ export function ClientLedger({ clientId }: { clientId: string }) {
         locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Операций по абонементам пока нет" /> }}
         columns={[
           { key: 'date', title: 'Дата и время', render: (_: unknown, row) => <span className="data-mono">{dateTime(row.createdAt)}</span> },
-          { key: 'type', title: 'Тип операции', render: (_: unknown, row) => row.type === 'CREDIT' ? 'Пополнение'
-            : row.type === 'REFUND' ? 'Возврат занятия' : /штраф/i.test(row.reason) ? 'Штрафная отмена' : 'Списание за тренировку' },
-          // Ledger stores positive magnitudes for DEBIT as well as CREDIT/REFUND.
-          { key: 'amount', title: 'Изменение', render: (_: unknown, row) => <span className="data-mono">{row.type === 'DEBIT' ? '−' : '+'}{Math.abs(row.amount)}</span> },
+          { key: 'type', title: 'Тип операции', render: (_: unknown, row) => operationLabel(row) },
+          // Prefer signed canonical amounts; retain compatibility with old magnitudes.
+          { key: 'amount', title: 'Изменение', render: (_: unknown, row) => <span className="data-mono">{Number(row.signedAmount ?? (row.type === 'DEBIT' ? -row.amount : row.amount)) < 0 ? '−' : '+'}{Math.abs(Number(row.signedAmount ?? row.amount)).toLocaleString('ru-RU')}{row.unit === 'RUB' ? ' ₽' : ''}</span> },
           { key: 'reason', title: 'Комментарий / тренировка', render: (_: unknown, row) => <>
             <div>{row.reason || 'Без комментария'}</div>
             {row.lesson && <div>{dateTime(row.lesson.startTime)} · {row.lesson.service.title || row.lesson.service.name}</div>}
-            <Typography.Text type="secondary">{row.membership.pricingPlan?.name || 'Индивидуальный абонемент'}</Typography.Text>
+            <Typography.Text type="secondary">{row.membership?.title || row.membership?.pricingPlan?.name || 'Индивидуальный абонемент'}</Typography.Text>
           </> },
         ]} />}
   </div>

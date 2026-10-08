@@ -298,6 +298,9 @@ html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); borde
 .triad-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .triad-form-grid .ant-picker { width: 100%; }
 .triad-feedback { margin-block: 12px; }
+.booking-lifecycle { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+.booking-cancellation-modal .ant-modal-body { max-height: calc(100dvh - 160px); overflow-y: auto; }
+.booking-billing-note { display: block; max-width: min(320px, calc(100vw - 64px)); white-space: normal; }
 .triad-client-summary { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; margin-block: -8px 20px; border: 1px solid var(--crm-hairline); border-radius: 12px; background: var(--crm-paper); overflow-wrap: anywhere; }
 .triad-client-summary strong { font-family: var(--crm-serif); font-size: 18px; }
 .triad-client-summary span, .triad-load { font-size: 13px; font-variant-numeric: tabular-nums; }

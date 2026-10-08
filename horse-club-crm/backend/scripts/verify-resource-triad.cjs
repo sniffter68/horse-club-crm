@@ -45,7 +45,7 @@ async function main() {
     } else if (process.argv[2] === 'deploy') {
       prisma(['migrate', 'deploy']);
     } else if (process.argv[2] === 'test') {
-      const run = spawnSync(process.execPath, ['--test', 'test/resource-triad.postgres.test.cjs', 'test/booking-rules.postgres.test.cjs'], {
+      const run = spawnSync(process.execPath, ['--test', '--test-concurrency=1', 'test/resource-triad.postgres.test.cjs', 'test/booking-rules.postgres.test.cjs', 'test/booking-lifecycle.postgres.test.cjs'], {
         cwd: path.join(__dirname, '..'), env: { ...process.env, DATABASE_URL: target.toString(), RUN_TRIAD_TESTS: '1' }, stdio: 'inherit',
       });
       if (run.status !== 0) throw new Error('Resource triad database tests failed');

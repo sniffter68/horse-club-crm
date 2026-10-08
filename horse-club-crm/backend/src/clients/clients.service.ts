@@ -80,10 +80,12 @@ export type ActiveMembership = {
 };
 export type ClientListResponse = Client & { membership: ActiveMembership | null };
 const ledgerInclude = {
-  membership: { select: { pricingPlan: { select: { name: true } } } },
-  lesson: { select: { id: true, startTime: true, status: true, service: { select: { title: true, name: true } } } },
-} satisfies Prisma.MembershipOpInclude;
-export type ClientLedgerOperation = Prisma.MembershipOpGetPayload<{ include: typeof ledgerInclude }>;
+  membership: { select: { title: true, type: true, pricingPlan: { select: { name: true } } } },
+  booking: { select: { id: true, startTime: true, status: true, serviceType: true,
+    lesson: { select: { id: true, startTime: true, status: true, service: { select: { title: true, name: true } } } } } },
+} satisfies Prisma.LedgerTransactionInclude;
+type LedgerRow = Prisma.LedgerTransactionGetPayload<{ include: typeof ledgerInclude }>;
+export type ClientLedgerOperation = Omit<LedgerRow, 'amount'> & { amount: number; type: 'DEBIT' | 'CREDIT' | 'REFUND'; reason: string; signedAmount: string; unit: 'RUB' | 'lessons'; lesson: { id: string; startTime: Date; status: string; service: { title: string; name: string } } | null };
 
 @Injectable()
 export class ClientsService {
@@ -116,7 +118,7 @@ export class ClientsService {
         skip: options.skip,
         take: options.take,
         include: { memberships: {
-          where: { remainedLessons: { gt: 0 }, validUntil: { gte: now } },
+          where: { type: 'fixed_lessons', status: 'active', validFrom: { lte: now }, remainedLessons: { gt: 0 }, validUntil: { gte: now } },
           orderBy: [{ validUntil: 'asc' }, { id: 'asc' }], take: 1,
           select: { id: true, remainedLessons: true, totalLessons: true, validUntil: true, pricingPlan: { select: { name: true } } },
         } },
@@ -137,13 +139,19 @@ export class ClientsService {
     const client = await this.prisma.client.findUnique({ where: { id: clientId }, select: { id: true } });
     if (!client) throw new NotFoundException('Клиент не найден');
     const options = parseRefineQuery(query, ['createdAt'], 'createdAt');
-    const where: Prisma.MembershipOpWhereInput = { membership: { clientId } };
+    const where: Prisma.LedgerTransactionWhereInput = { clientId };
     const [total, data] = await this.prisma.$transaction([
-      this.prisma.membershipOp.count({ where }),
-      this.prisma.membershipOp.findMany({ where, include: ledgerInclude,
+      this.prisma.ledgerTransaction.count({ where }),
+      this.prisma.ledgerTransaction.findMany({ where, include: ledgerInclude,
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: options.skip, take: options.take }),
     ]);
-    return { data, total };
+    const services: Record<string, string> = { dressage: 'Выездка', jumping: 'Конкур', walks: 'Прогулка шагом', beginners: 'Начинающие', photoshoot: 'Фотосессия', corde: 'Корда' };
+    return { data: data.map(row => ({ ...row, amount: row.amount.abs().toNumber(),
+      type: row.transactionType === 'refund' ? 'REFUND' as const : row.amount.isNegative() ? 'DEBIT' as const : 'CREDIT' as const,
+      reason: row.description || '', signedAmount: row.amount.toString(), unit: row.membership?.type === 'deposit' ? 'RUB' as const : 'lessons' as const,
+      lesson: row.booking?.lesson ?? (row.booking ? { id: row.booking.id, startTime: row.booking.startTime, status: row.booking.status,
+        service: { name: services[row.booking.serviceType ?? ''] || 'Тренировка', title: services[row.booking.serviceType ?? ''] || 'Тренировка' } } : null),
+    })), total };
   }
 
   async findOne(id: string): Promise<ClientDetailsResponse> {

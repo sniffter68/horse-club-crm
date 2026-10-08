@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { BookingRulesService } from './booking-rules.service';
 import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
+import { BookingLifecycleService } from './booking-lifecycle.service';
 
-@Module({ imports: [AuthModule], providers: [BookingRulesService, BookingsService], controllers: [BookingsController], exports: [BookingRulesService, BookingsService] })
+@Module({ imports: [AuthModule], providers: [BookingRulesService, BookingsService, BookingLifecycleService], controllers: [BookingsController], exports: [BookingRulesService, BookingsService] })
 export class BookingsModule {}

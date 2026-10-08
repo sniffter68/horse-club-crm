@@ -19,6 +19,7 @@ import { TriadBookingModal } from './TriadBookingModal'
 import { ResourceSchedule, type ResourceGrouping } from './ResourceSchedule'
 import { bookingStatusLabels, clientName as personName, dayBounds, disciplines, scheduleEntries, type ScheduleEntry, type TriadBooking, type TriadValues } from './triad'
 import { useTriadAvailability } from './useTriadAvailability'
+import { BookingLifecycleActions } from './BookingLifecycleActions'
 
 async function catalog<T>(resource: string, signal: AbortSignal, params: Record<string, string | undefined> = {}): Promise<T[]> {
   const records: T[] = []
@@ -155,6 +156,7 @@ export function SchedulePage() {
   const [triadSeed, setTriadSeed] = useState<Partial<TriadValues>>()
   const [editingTriad, setEditingTriad] = useState<TriadBooking>()
   const [triadDetail, setTriadDetail] = useState<TriadBooking>()
+  const [triadLifecycleBusy, setTriadLifecycleBusy] = useState(false)
   const [loading, setLoading] = useState(false)
   const [bookingOpen, setBookingOpen] = useState(false)
   const [editingLesson, setEditingLesson] = useState<Lesson>()
@@ -374,12 +376,12 @@ export function SchedulePage() {
     </Spin></Card>
     {triadSeed && <TriadBookingModal initial={triadSeed} booking={editingTriad} clients={clients} horses={horses} trainers={trainers} arenas={arenas} report={report}
       onClose={() => setTriadSeed(undefined)} onSaved={start => { setTriadSeed(undefined); setEditingTriad(undefined); setWorkloadDate(start.slice(0, 10)); calendarRef.current?.getApi().gotoDate(start.slice(0, 10)); setRevision(r => r + 1) }} />}
-    <Modal open={Boolean(triadDetail)} title="Карточка бронирования" footer={null} onCancel={() => setTriadDetail(undefined)} destroyOnHidden>
+    <Modal open={Boolean(triadDetail)} title="Карточка бронирования" footer={null} keyboard={!triadLifecycleBusy} maskClosable={!triadLifecycleBusy} closable={!triadLifecycleBusy} onCancel={() => { if (!triadLifecycleBusy) setTriadDetail(undefined) }} destroyOnHidden>
       {triadDetail && <Space direction="vertical" style={{ width: '100%' }}><Tag>{bookingStatusLabels[triadDetail.status]}</Tag><Descriptions column={1} items={[
         { key: 'horse', label: 'Лошадь', children: triadDetail.horse.name }, { key: 'trainer', label: 'Тренер', children: triadDetail.trainer.fullName || triadDetail.trainer.name },
         { key: 'client', label: 'Всадник', children: personName(triadDetail.client) }, { key: 'arena', label: 'Локация', children: triadDetail.arena.name },
         { key: 'time', label: 'Интервал', children: `${formatTime(triadDetail.startTime)} — ${formatTime(triadDetail.endTime)}` }, { key: 'discipline', label: 'Дисциплина', children: disciplines[triadDetail.serviceType] },
-      ]} />{canManage && <Button disabled={triadDetail.status !== 'scheduled' || !ready} onClick={() => openTriad({ clientId: triadDetail.clientId, horseId: triadDetail.horseId, trainerId: triadDetail.trainerId,
+      ]} />{canManage && <BookingLifecycleActions key={triadDetail.id} booking={triadDetail} report={report} onBusyChange={setTriadLifecycleBusy} onSaved={() => { setTriadDetail(undefined); setTriadLifecycleBusy(false); setRevision(r => r + 1) }} />}{canManage && <Button disabled={triadLifecycleBusy || triadDetail.status !== 'scheduled' || !ready} onClick={() => openTriad({ clientId: triadDetail.clientId, horseId: triadDetail.horseId, trainerId: triadDetail.trainerId,
         arenaId: triadDetail.arenaId, membershipId: triadDetail.membershipId ?? undefined, startTime: toLocalInput(new Date(triadDetail.startTime)), endTime: toLocalInput(new Date(triadDetail.endTime)), serviceType: triadDetail.serviceType, costAmount: Number(triadDetail.costAmount) }, triadDetail)}>Редактировать бронирование</Button>}</Space>}
     </Modal>
     <Modal title={editingLesson ? 'Перенос занятия' : 'Быстрое бронирование'} open={bookingOpen} onCancel={() => { if (!saving) setBookingOpen(false) }} footer={null} forceRender width={720}>

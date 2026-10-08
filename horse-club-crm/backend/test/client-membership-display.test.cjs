@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
+const { Prisma } = require('@prisma/client');
 require('reflect-metadata');
 const { ClientsService } = require('../dist/clients/clients.service');
 const { ClientsController } = require('../dist/clients/clients.controller');
@@ -28,17 +29,17 @@ test('client list includes nearest active membership and returns an explicit emp
 });
 
 test('client ledger scopes all operations to client and paginates without excluding expired memberships', async () => {
-  const checkWhere = (where) => assert.deepEqual(where, { membership: { clientId: 'client-a' } });
+  const checkWhere = (where) => assert.deepEqual(where, { clientId: 'client-a' });
   const service = new ClientsService({
     client: { findUnique: async () => ({ id: 'client-a' }) },
     $transaction: async (queries) => Promise.all(queries),
-    membershipOp: {
+    ledgerTransaction: {
       count: async ({ where }) => { checkWhere(where); return 21; },
       findMany: async (args) => {
         checkWhere(args.where);
         assert.equal(args.skip, 10); assert.equal(args.take, 10);
         assert.deepEqual(args.orderBy, [{ createdAt: 'desc' }, { id: 'asc' }]);
-        return [{ id: 'operation-a', amount: 1, type: 'DEBIT' }];
+        return [{ id: 'operation-a', amount: new Prisma.Decimal(-1), transactionType: 'usage', membership: null, booking: null }];
       },
     },
   });

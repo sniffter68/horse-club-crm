@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { AxiosError } from 'axios'
 import { toHttpError } from '../../httpClient'
-import { bookingFailure, dayBounds, membershipBalance, peakOccupancy, type ScheduleEntry } from './triad'
+import { bookingFailure, dayBounds, membershipBalance, peakOccupancy, isPenaltyCancellation, type ScheduleEntry } from './triad'
 
 describe('triad schedule data', () => {
+  it('previews the exact twelve-hour cancellation boundary', () => {
+    const now = +new Date('2026-10-09T00:00Z')
+    expect(isPenaltyCancellation('2026-10-09T12:00Z', now)).toBe(false)
+    expect(isPenaltyCancellation('2026-10-09T11:59:59.999Z', now)).toBe(true)
+  })
   it('preserves Rules Engine codes and details through repeated error normalization', () => {
     const failure = toHttpError(new AxiosError('Conflict', '409', undefined, undefined, {
       status: 409, statusText: 'Conflict', headers: {}, config: { headers: undefined! }, data: { code: 'HORSE_REST_VIOLATION', message: 'Отдых 45 мин', details: { requiredRestMinutes: 45 } },

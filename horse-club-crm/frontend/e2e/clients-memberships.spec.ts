@@ -25,6 +25,19 @@ test('issue membership opens the existing form with the correct client selected'
   await expect(page.locator('.ant-select-selection-item').first()).toHaveText('Борис Иванов')
 })
 
+test('canonical ledger renders a signed decimal deposit charge with a standalone training', async ({ page }) => {
+  await page.route('**/api/clients/client-a/membership-ledger?*', route => route.fulfill({ headers: { 'x-total-count': '1' }, json: [{
+    id: 'canonical-charge', type: 'DEBIT', amount: 1250.75, signedAmount: '-1250.75', transactionType: 'penalty_cancellation', unit: 'RUB',
+    reason: 'Штрафная отмена менее чем за 12 часов', createdAt: '2026-10-09T07:00Z',
+    membership: { title: 'Депозит', pricingPlan: null }, lesson: { id: 'standalone', startTime: '2026-10-09T10:00Z', status: 'penalty_cancellation', service: { title: 'Выездка', name: 'Выездка' } },
+  }] }))
+  await page.goto('/clients'); await page.getByRole('button', { name: 'История баланса', exact: true }).first().click()
+  const modal = page.getByRole('dialog')
+  await expect(modal.getByText('−1 250,75 ₽', { exact: true })).toBeVisible()
+  await expect(modal.getByText('Штрафная отмена', { exact: true })).toBeVisible()
+  await expect(modal.getByText('Депозит', { exact: true })).toBeVisible()
+})
+
 for (const width of [1280, 390]) {
   test(`balance, lazy ledger, signed changes and keyboard close at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 850 })

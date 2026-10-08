@@ -9,13 +9,24 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingsService } from './bookings.service';
+import { BookingLifecycleService } from './booking-lifecycle.service';
+import { CancelBookingDto } from './dto/cancel-booking.dto';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
 @Controller('bookings')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BookingsController {
-  constructor(private readonly bookings: BookingsService) {}
+  constructor(private readonly bookings: BookingsService, private readonly lifecycle: BookingLifecycleService) {}
+  @Patch(':id/complete')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  complete(@Param('id', new ParseUUIDPipe()) id: string) { return this.lifecycle.transition(id, 'complete'); }
+  @Patch(':id/no-show')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  noShow(@Param('id', new ParseUUIDPipe()) id: string) { return this.lifecycle.transition(id, 'no-show'); }
+  @Patch(':id/cancel')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  cancel(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CancelBookingDto) { return this.lifecycle.transition(id, 'cancel', dto); }
   @Post()
   @Roles(Role.ADMIN, Role.MANAGER)
   create(@Body() dto: CreateBookingDto) { return this.bookings.createBooking(dto); }
