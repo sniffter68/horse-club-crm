@@ -13,6 +13,65 @@ enum Role {
   TRAINER
 }
 
+enum HorseOwnerType {
+  club
+  private
+}
+
+enum HorseStatus {
+  active
+  rest
+  sick
+  quarantine
+}
+
+enum ArenaType {
+  indoor_arena
+  outdoor_arena
+  round_pen
+  trail
+}
+
+enum MembershipType {
+  fixed_lessons
+  deposit
+  boarding
+}
+
+enum MembershipStatus {
+  active
+  frozen
+  expired
+  exhausted
+}
+
+enum BookingServiceType {
+  dressage
+  jumping
+  walks
+  beginners
+  photoshoot
+  corde
+}
+
+enum BookingStatus {
+  scheduled
+  completed
+  no_show
+  cancelled_client
+  cancelled_club
+  penalty_cancellation
+}
+
+enum TransactionType {
+  purchase
+  usage
+  penalty_cancellation
+  refund
+  boarding_charge
+  manual_adjustment
+}
+
 enum LessonStatus {
   SCHEDULED
   COMPLETED
@@ -87,9 +146,15 @@ model Service {
 }
 
 model Trainer {
+  fullName        String   @default("")
+  telegramId      String?  @unique
+  specializations String[] @default([])
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  bookings        Booking[]
   id            String   @id @default(uuid()) @db.Uuid
   name          String   @default("")
-  phone         String?
+  phone         String?  @unique
   vkUserId      BigInt?  @unique
   qualification String?
   maxDailyLoad  Int      @default(480)
@@ -98,6 +163,19 @@ model Trainer {
 }
 
 model Horse {
+  ownerType               HorseOwnerType @default(club)
+  ownerId                 String?        @db.Uuid
+  owner                   Client?        @relation("HorseOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  stallNumber             String?
+  maxRiderWeight          Int            @default(85)
+  maxDailyWorkloadMinutes Int            @default(120)
+  requiredRestMinutes     Int            @default(45)
+  suitability             String[]       @default([])
+  status                  HorseStatus    @default(active)
+  lastVetCheckAt          DateTime?      @db.Timestamptz(6)
+  nextShoeingDate         DateTime?      @db.Timestamptz(6)
+  createdAt               DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime       @updatedAt @db.Timestamptz(6)
   id                String             @id @default(uuid()) @db.Uuid
   name              String
   breed             String?
@@ -107,14 +185,19 @@ model Horse {
   unavailableReason String?
   unavailableFrom   DateTime?          @db.Timestamptz(6)
   unavailableUntil  DateTime?          @db.Timestamptz(6)
-  maxDailyMinutes   Int                @default(240)
-  minRestMinutes    Int                @default(15)
+  maxDailyMinutes   Int                @default(120)
+  minRestMinutes    Int                @default(45)
   bookings          Booking[]
   healthLogs        HorseHealthLog[]
   boardingContracts BoardingContract[]
+
+  @@index([ownerId])
+  @@index([status])
 }
 
 model Client {
+  ownedHorses       Horse[]            @relation("HorseOwner")
+  transactions      LedgerTransaction[]
   id                String             @id @default(uuid()) @db.Uuid
   name              String             @default("")
   firstName         String             @default("")
@@ -186,10 +269,20 @@ model Lesson {
 }
 
 model Membership {
+  type               MembershipType   @default(fixed_lessons)
+  title              String           @default("")
+  initialUnits       Decimal          @default(0) @db.Decimal(14, 2)
+  remainingUnits     Decimal          @default(0) @db.Decimal(14, 2)
+  validFrom          DateTime         @default(now()) @db.Timestamptz(6)
+  validTo            DateTime         @default(now()) @db.Timestamptz(6)
+  allowedDisciplines String[]         @default([])
+  status             MembershipStatus @default(active)
+  transactions       LedgerTransaction[]
+  legacyUnassigned   Boolean          @default(false)
   id              String         @id @default(uuid()) @db.Uuid
   totalLessons    Int            @default(0)
-  remainedLessons Int
-  validUntil      DateTime       @db.Timestamptz(6)
+  remainedLessons Int            @default(0)
+  validUntil      DateTime       @default(now()) @db.Timestamptz(6)
   clientId        String?        @db.Uuid
   client          Client?        @relation(fields: [clientId], references: [id])
   pricingPlanId   String?        @db.Uuid
@@ -201,6 +294,7 @@ model Membership {
   updatedAt       DateTime       @updatedAt @db.Timestamptz(6)
 
   @@index([pricingPlanId])
+  @@index([clientId, status, validTo])
 }
 
 model PricingPlan {
@@ -215,16 +309,28 @@ model PricingPlan {
 }
 
 model Booking {
+  trainerId           String              @db.Uuid
+  arenaId             String?             @db.Uuid
+  startTime           DateTime            @db.Timestamptz(6)
+  endTime             DateTime            @db.Timestamptz(6)
+  serviceType         BookingServiceType?
+  status              BookingStatus       @default(scheduled)
+  costAmount          Decimal             @default(0) @db.Decimal(14, 2)
+  cancellationReason  String?
+  trainer             Trainer             @relation(fields: [trainerId], references: [id], onDelete: Restrict)
+  arena               Arena?              @relation(fields: [arenaId], references: [id], onDelete: Restrict)
+  transactions        LedgerTransaction[]
+  legacyLessonBinding Boolean             @default(false)
   id               String            @id @default(uuid()) @db.Uuid
-  lessonId         String            @db.Uuid
+  lessonId         String?           @db.Uuid
   clientId         String            @db.Uuid
   horseId          String?           @db.Uuid
   membershipId     String?           @db.Uuid
   attended         Boolean           @default(false)
   attendanceStatus BookingAttendance @default(PENDING)
-  lesson           Lesson            @relation(fields: [lessonId], references: [id])
+  lesson           Lesson?           @relation(fields: [lessonId], references: [id], onDelete: Restrict)
   client           Client            @relation(fields: [clientId], references: [id])
-  horse            Horse?            @relation(fields: [horseId], references: [id], onDelete: SetNull)
+  horse            Horse?            @relation(fields: [horseId], references: [id], onDelete: Restrict)
   membership       Membership?       @relation(fields: [membershipId], references: [id])
   payments         Payment[]
   createdAt        DateTime          @default(now()) @db.Timestamptz(6)
@@ -234,17 +340,45 @@ model Booking {
   @@index([clientId])
   @@index([horseId])
   @@index([membershipId])
+  @@index([startTime, endTime])
+  @@index([trainerId, status, startTime, endTime])
+  @@index([horseId, status, startTime, endTime])
+  @@index([arenaId, status, startTime, endTime])
 }
 
 model Arena {
+  type              ArenaType @default(indoor_arena)
+  maxRidersCapacity Int       @default(6)
+  isActive          Boolean   @default(true)
+  bookings          Booking[]
   id            String   @id @default(uuid()) @db.Uuid
   name          String   @unique
   description   String?
-  capacity      Int      @default(1)
+  capacity      Int      @default(6)
   isUnavailable Boolean  @default(false)
   lessons       Lesson[]
   createdAt     DateTime @default(now()) @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+}
+
+model LedgerTransaction {
+  id                   String          @id @default(uuid()) @db.Uuid
+  clientId             String          @db.Uuid
+  bookingId            String?         @db.Uuid
+  membershipId         String?         @db.Uuid
+  transactionType      TransactionType
+  amount               Decimal         @db.Decimal(14, 2)
+  description          String?
+  createdAt            DateTime        @default(now()) @db.Timestamptz(6)
+  sourceMembershipOpId String?         @unique @db.Uuid
+  client               Client          @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  booking              Booking?        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  membership           Membership?     @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  sourceMembershipOp   MembershipOp?   @relation(fields: [sourceMembershipOpId], references: [id], onDelete: Restrict)
+
+  @@index([clientId, createdAt])
+  @@index([membershipId, createdAt])
+  @@index([bookingId, transactionType])
 }
 
 model HorseHealthLog {
@@ -282,7 +416,7 @@ model BoardingContract {
   endsAt      DateTime?              @db.Timestamptz(6)
   monthlyRate Decimal                @default(0) @db.Decimal(12, 2)
   notes       String?
-  client      Client?                @relation(fields: [clientId], references: [id])
+  client      Client?                @relation(fields: [clientId], references: [id], onDelete: Restrict)
   horse       Horse                  @relation(fields: [horseId], references: [id])
   stall       Stall?                 @relation(fields: [stallId], references: [id], onDelete: SetNull)
   payments    Payment[]
@@ -347,6 +481,7 @@ model VkNotification {
 }
 
 model MembershipOp {
+  transaction  LedgerTransaction?
   id           String           @id @default(uuid()) @db.Uuid
   membershipId String           @db.Uuid
   lessonId     String?          @db.Uuid

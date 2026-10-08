@@ -201,7 +201,7 @@ export class DashboardService {
 
     const horseWorkloads: DashboardHorseWorkload[] = horses.map((horse) => {
       const uniqueLessons = new Map(
-        horse.bookings.map(({ lesson }) => [lesson.id, lesson]),
+        horse.bookings.flatMap(({ lesson }) => lesson ? [[lesson.id, lesson] as const] : []),
       );
       const usedMinutes = [...uniqueLessons.values()].reduce(
         (total, lesson) =>

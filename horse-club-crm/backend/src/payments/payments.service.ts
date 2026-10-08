@@ -68,6 +68,7 @@ export class PaymentsService {
 
   async findBookingOptions(): Promise<BookingPaymentOption[]> {
     return this.prisma.booking.findMany({
+      where: { lessonId: { not: null } },
       select: bookingOptionSelect,
       orderBy: [{ lesson: { startTime: 'desc' } }, { id: 'asc' }],
       take: 100,
@@ -132,12 +133,12 @@ export class PaymentsService {
     if (dto.bookingId) {
       const booking = await this.prisma.booking.findUnique({
         where: { id: dto.bookingId },
-        select: { clientId: true, lesson: { select: { service: { select: { price: true } } } } },
+        select: { clientId: true, costAmount: true, lesson: { select: { service: { select: { price: true } } } } },
       });
       if (!booking) throw new NotFoundException('Запись на занятие не найдена');
       if (clientId && clientId !== booking.clientId) throw new ConflictException('Клиент не соответствует записи на занятие');
       clientId = booking.clientId;
-      amount ??= booking.lesson.service.price.toNumber();
+      amount ??= booking.lesson?.service.price.toNumber() ?? booking.costAmount.toNumber();
     }
     if (dto.membershipId) {
       const membership = await this.prisma.membership.findUnique({

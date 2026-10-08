@@ -99,7 +99,7 @@ export class VkBotService {
       if (client && ['bookings', 'мои тренировки'].includes(command)) {
         const rows = await this.prisma.booking.findMany({ where: { clientId: client.id, lesson: { status: 'SCHEDULED', startTime: { gte: new Date() } } },
           include: { horse: true, lesson: { include: { trainer: true } } }, orderBy: [{ lesson: { startTime: 'asc' } }, { id: 'asc' }], skip: offset, take: 11 });
-        await this.send(peer, eventId, rows.length ? rows.slice(0, 10).map(row => `${date(row.lesson.startTime)} — ${row.lesson.trainer.name}${row.horse ? `, лошадь ${row.horse.name}` : ''}`).join('\n') : 'Предстоящих тренировок нет.', rows.length > 10 ? this.next('bookings', offset) : menu(false)); return;
+        await this.send(peer, eventId, rows.length ? rows.slice(0, 10).filter(row => row.lesson !== null).map(row => `${date(row.lesson!.startTime)} — ${row.lesson!.trainer.name}${row.horse ? `, лошадь ${row.horse.name}` : ''}`).join('\n') : 'Предстоящих тренировок нет.', rows.length > 10 ? this.next('bookings', offset) : menu(false)); return;
       }
       await this.send(peer, eventId, `Здравствуйте, ${trainer?.name || client?.firstName || 'всадник'}! Выберите действие. Время: ${zone()}.`, menu(Boolean(trainer)));
     } catch (error) {

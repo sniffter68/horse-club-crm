@@ -1,0 +1,24 @@
+-- Only used by verify-resource-triad.cjs in a newly created dedicated local DB.
+BEGIN;
+INSERT INTO "Client" ("id", "name", "firstName", "lastName", "phone") VALUES ('00000000-0000-4000-8000-000000000001', 'Migration Client', 'Migration', 'Client', '+79990000001');
+INSERT INTO "Trainer" ("id", "name", "phone") VALUES ('00000000-0000-4000-8000-000000000002', 'Migration Trainer', NULL);
+INSERT INTO "Horse" ("id", "name", "maxDailyMinutes", "minRestMinutes", "isUnavailable", "feedingNotes")
+  VALUES ('00000000-0000-4000-8000-000000000003', 'Migration Horse', 240, 15, true, 'Existing feeding notes');
+INSERT INTO "Arena" ("id", "name", "capacity", "isUnavailable", "updatedAt") VALUES ('00000000-0000-4000-8000-000000000004', 'Migration Arena', 1, true, CURRENT_TIMESTAMP);
+INSERT INTO "Service" ("id", "name", "durationMinutes", "price", "updatedAt") VALUES ('00000000-0000-4000-8000-000000000005', 'Legacy service', 30, 1500, CURRENT_TIMESTAMP);
+INSERT INTO "Lesson" ("id", "trainerId", "arenaId", "serviceId", "startTime", "endTime", "status", "updatedAt")
+  VALUES ('00000000-0000-4000-8000-000000000006', '00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000004', '00000000-0000-4000-8000-000000000005', '2026-10-08T09:00:00Z', '2026-10-08T09:30:00Z', 'COMPLETED', CURRENT_TIMESTAMP);
+INSERT INTO "Membership" ("id", "clientId", "totalLessons", "remainedLessons", "validUntil", "updatedAt")
+  VALUES ('00000000-0000-4000-8000-000000000007', '00000000-0000-4000-8000-000000000001', 8, 7, '2030-01-01Z', CURRENT_TIMESTAMP),
+    ('00000000-0000-4000-8000-000000000008', NULL, 2, 2, '2030-01-01Z', CURRENT_TIMESTAMP);
+INSERT INTO "Booking" ("id", "clientId", "lessonId", "horseId", "membershipId", "attendanceStatus", "attended", "updatedAt")
+  VALUES ('00000000-0000-4000-8000-000000000009', '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000006', '00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000007', 'ATTENDED', true, CURRENT_TIMESTAMP),
+    ('00000000-0000-4000-8000-000000000010', '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000006', NULL, NULL, 'PENDING', false, CURRENT_TIMESTAMP);
+INSERT INTO "MembershipOp" ("id", "membershipId", "lessonId", "type", "amount", "reason") VALUES
+  ('00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000007', NULL, 'CREDIT', 8, 'Legacy purchase'),
+  ('00000000-0000-4000-8000-000000000012', '00000000-0000-4000-8000-000000000007', '00000000-0000-4000-8000-000000000006', 'DEBIT', 1, 'Legacy attendance'),
+  ('00000000-0000-4000-8000-000000000013', '00000000-0000-4000-8000-000000000008', NULL, 'CREDIT', 2, 'Orphan purchase retained');
+INSERT INTO "Stall" ("id", "name", "updatedAt") VALUES ('00000000-0000-4000-8000-000000000014', '12', CURRENT_TIMESTAMP);
+INSERT INTO "BoardingContract" ("id", "clientId", "horseId", "stallId", "status", "startsAt", "monthlyRate", "updatedAt") VALUES
+  ('00000000-0000-4000-8000-000000000015', '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000014', 'ACTIVE', '2020-01-01Z', 25000, CURRENT_TIMESTAMP);
+COMMIT;

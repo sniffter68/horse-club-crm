@@ -324,6 +324,12 @@ export class LessonsService {
       }
 
       const bookingCreateData = participants.map(participant => ({
+        trainerId: dto.trainerId,
+        arenaId: dto.arenaId ?? null,
+        startTime: start,
+        endTime: end,
+        costAmount: service.price,
+        legacyLessonBinding: true,
         clientId: participant.clientId,
         ...(participant.horseId ? { horseId: participant.horseId } : {}),
         ...(participant.membershipId ? { membershipId: participant.membershipId } : {}),

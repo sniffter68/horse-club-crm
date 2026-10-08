@@ -193,6 +193,8 @@ test('create uses service duration and adds a pending payment for a booking with
   assert.equal(createArgs.data.endTime.toISOString(), '2026-09-08T10:45:00.000Z');
   assert.equal(createArgs.data.status, LessonStatus.SCHEDULED);
   assert.deepEqual(createArgs.data.bookings.create, [{
+    trainerId: 'trainer-1', arenaId: null, legacyLessonBinding: true, costAmount: 1500,
+    startTime: new Date('2026-09-08T10:00:00.000Z'), endTime: new Date('2026-09-08T10:45:00.000Z'),
     clientId: 'client-1', horseId: 'horse-1', payments: { create: {
       clientId: 'client-1', amount: 1500, method: 'UNSPECIFIED', status: 'PENDING',
       description: 'Начисление за занятие: Тренировка',
@@ -231,8 +233,12 @@ test('creates one group lesson with separate riders, horses, memberships and pay
 
   assert.equal(result.id, 'group-lesson');
   assert.deepEqual(createArgs.data.bookings.create, [
-    { clientId: 'client-1', horseId: 'horse-1', membershipId: 'membership-1' },
-    { clientId: 'client-2', horseId: 'horse-2', payments: { create: {
+    { trainerId: 'trainer-1', arenaId: 'arena-1', legacyLessonBinding: true, costAmount: 2000,
+      startTime: new Date('2026-09-08T10:00:00.000Z'), endTime: new Date('2026-09-08T11:00:00.000Z'),
+      clientId: 'client-1', horseId: 'horse-1', membershipId: 'membership-1' },
+    { trainerId: 'trainer-1', arenaId: 'arena-1', legacyLessonBinding: true, costAmount: 2000,
+      startTime: new Date('2026-09-08T10:00:00.000Z'), endTime: new Date('2026-09-08T11:00:00.000Z'),
+      clientId: 'client-2', horseId: 'horse-2', payments: { create: {
       clientId: 'client-2', amount: 2000, method: 'UNSPECIFIED', status: 'PENDING',
       description: 'Начисление за занятие: Групповая тренировка',
     } } },
@@ -264,6 +270,8 @@ test('adds a later rider to the matching scheduled lesson instead of reporting a
   assert.equal(result.id, 'existing-lesson');
   assert.equal(updateArgs.where.id, 'existing-lesson');
   assert.deepEqual(updateArgs.data.bookings.create, [{
+    trainerId: 'trainer-1', arenaId: null, legacyLessonBinding: true, costAmount: 1500,
+    startTime: new Date('2026-09-08T10:00:00.000Z'), endTime: new Date('2026-09-08T11:00:00.000Z'),
     clientId: 'client-2', horseId: 'horse-2', payments: { create: {
       clientId: 'client-2', amount: 1500, method: 'UNSPECIFIED', status: 'PENDING',
       description: 'Начисление за занятие: Конкур',

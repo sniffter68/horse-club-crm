@@ -115,11 +115,13 @@ export class MembershipLedgerService {
       if (!booking) {
         throw new NotFoundException('Бронирование не найдено');
       }
+      if (!booking.lesson) throw new ConflictException('Для самостоятельной записи используйте журнал LedgerTransaction');
       if (actor) {
         if (booking.lesson.trainerId !== actor.trainerId) throw new ForbiddenException('Занятие другого тренера');
         if (booking.lesson.status === 'CANCELLED') throw new ConflictException('Занятие отменено');
         if (booking.lesson.startTime > new Date()) throw new ConflictException('Занятие ещё не началось');
       }
+      if (!booking.lessonId) throw new ConflictException('Для самостоятельной записи используйте журнал LedgerTransaction');
 
       // Во всех путях сначала берём lock абонемента, затем изменяем booking.
       // Единый порядок блокировок снижает риск взаимных блокировок с другими

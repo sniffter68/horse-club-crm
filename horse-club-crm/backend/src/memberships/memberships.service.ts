@@ -13,6 +13,7 @@ const membershipDetailsInclude = {
     include: { lesson: { include: { service: true, trainer: true, arena: true } } },
   },
   bookings: {
+    where: { lessonId: { not: null } },
     orderBy: [{ lesson: { startTime: 'desc' as const } }, { id: 'asc' as const }],
     include: {
       horse: { select: { id: true, name: true } },

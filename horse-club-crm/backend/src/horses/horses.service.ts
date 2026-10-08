@@ -25,6 +25,7 @@ const horseDetailsInclude = Prisma.validator<Prisma.HorseDefaultArgs>()({
       take: 20,
     },
     bookings: {
+      where: { lessonId: { not: null } },
       include: {
         client: { select: { id: true, name: true, firstName: true, lastName: true } },
         membership: { select: { id: true } },
