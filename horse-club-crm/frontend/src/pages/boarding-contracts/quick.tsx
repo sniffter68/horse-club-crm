@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useInvalidate, useOnError } from '@refinedev/core'
 import { useSelect } from '@refinedev/antd'
-import { Alert, App, Button, DatePicker, Empty, Form, InputNumber, Modal, Select, Skeleton, Space, Typography } from 'antd'
+import { Alert, App, Button, DatePicker, Empty, Form, InputNumber, Modal, Select as EntitySelect, Skeleton, Space, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { useCatalogPermissions } from '../catalogs/permissions'
@@ -14,8 +14,10 @@ type ContractSummary = { id: string; status: string; startsAt: string; endsAt: s
 type Choice = { id: string; name: string }
 type Availability = { horses: Choice[]; stalls: Choice[] }
 type PlacementValues = { horseId: string; stallId: string; clientId: string; startsAt: Dayjs; monthlyRate: number }
+const FormField = Form.Item
+const popupContainer = (trigger: HTMLElement) => trigger.closest<HTMLElement>('.ant-modal-content') ?? document.body
 
-export function isCurrentBoarding(contract: ContractSummary, now = Date.now()): boolean {
+function isCurrentBoarding(contract: ContractSummary, now = Date.now()): boolean {
   return ['ACTIVE', 'SUSPENDED'].includes(contract.status) && new Date(contract.startsAt).getTime() <= now
     && (!contract.endsAt || new Date(contract.endsAt).getTime() > now)
 }
@@ -26,8 +28,8 @@ function useBoardingRefresh() {
     invalidate({ resource, invalidates: ['all'] })))
 }
 
-export function QuickBoardingActions({ context, contracts, currentContract }: {
-  context: PlacementContext; contracts: ContractSummary[]; currentContract?: ContractSummary | null
+export function QuickBoardingActions({ context, contracts, currentContract, disabled = false }: {
+  context: PlacementContext; contracts: ContractSummary[]; currentContract?: ContractSummary | null; disabled?: boolean
 }) {
   const { canManage } = useCatalogPermissions()
   const refresh = useBoardingRefresh()
@@ -57,9 +59,9 @@ export function QuickBoardingActions({ context, contracts, currentContract }: {
   }
   if (!canManage) return null
   return <div className="quick-boarding-actions">
-    {current ? <Button size="small" onClick={() => { setError(undefined); setRelease(current) }}>Освободить денник</Button>
+    {current ? <Button size="small" disabled={disabled} onClick={() => { setError(undefined); setRelease(current) }}>Освободить денник</Button>
       : context.kind === 'STALL' && context.isUnavailable ? <Typography.Text type="secondary">Заселение недоступно: денник закрыт.</Typography.Text>
-        : <Button className="quick-boarding-primary" type="primary" size="small" onClick={() => setPlace(true)}>
+        : <Button className="quick-boarding-primary" type="primary" size="small" disabled={disabled} onClick={() => setPlace(true)}>
           {context.kind === 'HORSE' ? '+ Разместить в денник' : '+ Заселить лошадь'}
         </Button>}
     {place && <QuickPlacement context={context} onClose={() => setPlace(false)} />}
@@ -73,6 +75,8 @@ export function QuickBoardingActions({ context, contracts, currentContract }: {
 }
 
 function QuickPlacement({ context, onClose }: { context: PlacementContext; onClose: () => void }) {
+  const [open, setOpen] = useState(true)
+  const [ready, setReady] = useState(false)
   const [form] = Form.useForm<PlacementValues>()
   const [initialStart] = useState(() => dayjs(toLocalInput(new Date())))
   const [selectedStart, setSelectedStart] = useState<Dayjs | null>(initialStart)
@@ -114,7 +118,7 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
   const horseId = Form.useWatch<string>('horseId', form) ?? (context.kind === 'HORSE' ? context.id : undefined)
   const stallId = Form.useWatch<string>('stallId', form) ?? (context.kind === 'STALL' ? context.id : undefined)
   const eligible = Boolean(data && (!horseId || data.horses.some(item => item.id === horseId)) && (!stallId || data.stalls.some(item => item.id === stallId)))
-  const blocked = !instant || !data || !data.horses.length || !data.stalls.length || !eligible || busy || clientsQuery.isFetching || Boolean(clientsQuery.error)
+  const blocked = !ready || !instant || !data || !data.horses.length || !data.stalls.length || !eligible || busy || clientsQuery.isFetching || Boolean(clientsQuery.error)
   const reload = () => { setRevision(value => value + 1); void clientsQuery.refetch() }
   const submit = async (values: PlacementValues) => {
     if (blocked || lock.current) return
@@ -129,7 +133,7 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
         status: 'ACTIVE', monthlyRate: values.monthlyRate,
       })
       void message.success('Лошадь заселена в денник')
-      onClose()
+      setOpen(false)
       await refresh()
     } catch (cause) {
       const failure = toHttpError(cause)
@@ -139,20 +143,21 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
     } finally { lock.current = false; setBusy(false) }
   }
   const choices = (items: Choice[] = []) => items.map(item => ({ value: item.id, label: item.name }))
-  return <Modal open title={`Быстрое заселение · ${context.name}`} onCancel={onClose} width={520}
+  return <Modal open={open} afterOpenChange={setReady} afterClose={onClose} className="quick-boarding-dialog" title={`Быстрое заселение · ${context.name}`} onCancel={() => setOpen(false)} width={520}
     onOk={() => form.submit()} okText={context.kind === 'HORSE' ? 'Заселить' : 'Подтвердить'} cancelText="Отмена"
     okButtonProps={{ disabled: blocked, className: 'quick-boarding-primary' }} confirmLoading={busy}
     cancelButtonProps={{ disabled: busy }} closable={!busy} maskClosable={!busy} keyboard={!busy}>
     <div className="quick-boarding-form">
       <Typography.Paragraph type="secondary">Постой без даты окончания. Часовой пояс: {CLUB_TIME_ZONE}.</Typography.Paragraph>
-      <Form<PlacementValues> form={form} layout="vertical" noValidate disabled={busy} onFinish={submit}
+      <Form form={form} layout="vertical" noValidate disabled={busy || !ready} onFinish={submit}
         initialValues={{ startsAt: initialStart, monthlyRate: 0, ...(context.kind === 'HORSE' ? { horseId: context.id } : { stallId: context.id }) }}>
-        <Form.Item name="startsAt" label="Дата начала" rules={[{ required: true, message: 'Укажите дату начала' }, { validator: async (_rule, value: Dayjs | undefined) => {
+        <FormField name="startsAt" label="Дата начала" rules={[{ required: true, message: 'Укажите дату начала' }, { validator: async (_rule, value: Dayjs | undefined) => {
           if (value) toInstant(value.format('YYYY-MM-DDTHH:mm'))
         } }]}>
           <DatePicker aria-label="Дата начала" showTime={{ format: 'HH:mm' }} format="DD.MM.YYYY HH:mm" showNow={false}
-            onChange={value => setSelectedStart(value)} style={{ width: '100%' }} />
-        </Form.Item>
+            classNames={{ popup: { root: 'quick-boarding-date-popup' } }}
+            getPopupContainer={popupContainer} onChange={value => setSelectedStart(value)} style={{ width: '100%' }} />
+        </FormField>
         {!data && !loadError && instant && <Skeleton active paragraph={{ rows: 1 }} title={false} />}
         {(loadError || clientsQuery.error) && <Space direction="vertical" className="quick-boarding-feedback">
           <Alert type="error" showIcon message="Не удалось загрузить варианты заселения" description={loadError || clientsQuery.error?.message} />
@@ -161,24 +166,24 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
         {data && !eligible && <Alert type="warning" showIcon message="Выбранная лошадь или денник уже заняты на этот период. Выберите другой вариант или дату." />}
         {data && (!data.horses.length || !data.stalls.length) && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={!data.stalls.length ? 'Свободных денников на этот период нет' : 'Нет лошадей без постоя на этот период'} />}
-        <Form.Item name="horseId" label="Лошадь" rules={[{ required: true, message: 'Выберите лошадь' }]}>
-          <Select aria-label="Лошадь" showSearch optionFilterProp="label" disabled={busy || context.kind === 'HORSE' || !data}
+        <FormField name="horseId" label="Лошадь" rules={[{ required: true, message: 'Выберите лошадь' }]}>
+          <EntitySelect aria-label="Лошадь" getPopupContainer={popupContainer} showSearch optionFilterProp="label" disabled={!ready || busy || context.kind === 'HORSE' || !data}
             options={context.kind === 'HORSE' ? [{ value: context.id, label: context.name }] : choices(data?.horses)} placeholder="Выберите лошадь"
             notFoundContent="Нет свободных лошадей" />
-        </Form.Item>
-        <Form.Item name="stallId" label="Денник" rules={[{ required: true, message: 'Выберите денник' }]}>
-          <Select aria-label="Денник" showSearch optionFilterProp="label" disabled={busy || context.kind === 'STALL' || !data}
+        </FormField>
+        <FormField name="stallId" label="Денник" rules={[{ required: true, message: 'Выберите денник' }]}>
+          <EntitySelect aria-label="Денник" getPopupContainer={popupContainer} showSearch optionFilterProp="label" disabled={!ready || busy || context.kind === 'STALL' || !data}
             options={context.kind === 'STALL' ? [{ value: context.id, label: context.name }] : choices(data?.stalls)} placeholder="Выберите денник"
             notFoundContent="Нет свободных денников" />
-        </Form.Item>
-        <Form.Item name="clientId" label="Владелец / клиент" rules={[{ required: true, message: 'Выберите владельца или клиента' }]}>
-          <Select {...clients} aria-label="Владелец / клиент" showSearch filterOption={false} placeholder="Найдите клиента по имени или телефону"
+        </FormField>
+        <FormField name="clientId" label="Владелец / клиент" rules={[{ required: true, message: 'Выберите владельца или клиента' }]}>
+          <EntitySelect {...clients} aria-label="Владелец / клиент" getPopupContainer={popupContainer} showSearch filterOption={false} placeholder="Найдите клиента по имени или телефону"
             notFoundContent={clientsQuery.isFetching ? 'Поиск…' : 'Клиенты не найдены'} />
-        </Form.Item>
-        <Form.Item name="monthlyRate" label="Стоимость в месяц, ₽" extra="0 ₽ — постой без начисления оплаты."
+        </FormField>
+        <FormField name="monthlyRate" label="Стоимость в месяц, ₽" extra="0 ₽ — постой без начисления оплаты."
           rules={[{ required: true, message: 'Укажите стоимость' }, { type: 'number', min: 0, max: 9999999999.99, message: 'Укажите неотрицательную стоимость' }]}>
           <InputNumber aria-label="Стоимость в месяц, ₽" min={0} max={9999999999.99} precision={2} style={{ width: '100%' }} />
-        </Form.Item>
+        </FormField>
       </Form>
       {error && <Alert type="error" showIcon message="Не удалось заселить лошадь" description={error} />}
     </div>

@@ -25,13 +25,13 @@ export function StallList() {
         render: (value: boolean) => <Tag color={value ? 'red' : 'green'}>{value ? 'Недоступен' : 'Доступен'}</Tag> },
     ]} />
     <DetailsModal<Stall> resource="stalls" id={selectedId} title="Карточка денника" onClose={() => setSelectedId(undefined)}>
-      {stall => <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      {(stall, ready) => <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'name', label: 'Денник', children: stall.name },
           { key: 'status', label: 'Статус', children: <Tag color={stall.isUnavailable ? 'red' : 'green'}>{stall.isUnavailable ? 'Недоступен' : 'Доступен'}</Tag> },
           { key: 'description', label: 'Описание', span: 2, children: stall.description || '—' },
         ]} />
-        <QuickBoardingActions key={stall.id} context={{ kind: 'STALL', id: stall.id, name: stall.name, isUnavailable: stall.isUnavailable }} contracts={stall.contracts ?? []} />
+        <QuickBoardingActions key={stall.id} context={{ kind: 'STALL', id: stall.id, name: stall.name, isUnavailable: stall.isUnavailable }} contracts={stall.contracts ?? []} disabled={!ready} />
         {(stall.contracts ?? []).length ? <List dataSource={stall.contracts} renderItem={contract => {
           const pending = (contract.payments ?? []).filter(payment => payment.status === 'PENDING').reduce((sum, payment) => sum + Number(payment.amount), 0)
           return <List.Item><Space wrap><Tag color={contract.status === 'ACTIVE' ? 'green' : 'default'}>{contract.status}</Tag>

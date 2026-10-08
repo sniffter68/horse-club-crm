@@ -22,7 +22,7 @@ export function HorseList() {
         render: (value: boolean) => <Tag color={value ? 'red' : 'green'}>{value ? 'Недоступна' : 'Доступна'}</Tag> },
     ]} />
     <DetailsModal<HorseDetails> resource="horses" id={selectedId} title="Карточка лошади" onClose={() => setSelectedId(undefined)}>
-      {horse => <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      {(horse, ready) => <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'name', label: 'Кличка', children: horse.name },
           { key: 'status', label: 'Статус', children: <Tag color={horse.isUnavailable ? 'red' : 'green'}>{horse.isUnavailable ? 'Недоступна' : 'Доступна'}</Tag> },
@@ -33,7 +33,7 @@ export function HorseList() {
         ]} />
         <section><Typography.Title level={5}>Постой</Typography.Title>
           <QuickBoardingActions key={horse.id} context={{ kind: 'HORSE', id: horse.id, name: horse.name }}
-            contracts={horse.boardingContracts} currentContract={horse.currentBoardingContract} />
+            contracts={horse.boardingContracts} currentContract={horse.currentBoardingContract} disabled={!ready} />
           {horse.boardingContracts.length ? <List dataSource={horse.boardingContracts} renderItem={contract => <List.Item>
             <Space wrap><Tag color={contract.status === 'ACTIVE' ? 'green' : 'default'}>{contract.status}</Tag>
               <span>{personName(contract.client)}</span><span>Денник: {contract.stall?.name || 'не назначен'}</span>

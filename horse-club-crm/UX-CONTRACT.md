@@ -96,6 +96,13 @@
 
 ## Validation
 
+### Quick boarding
+
+- Canonical owner: `frontend/src/pages/boarding-contracts/quick.tsx`, shared by horse and stall detail cards; Ant Design Form/Modal/Select/DatePicker primitives.
+- ADMIN/MANAGER can place a horse through date-sensitive availability or explicitly confirm termination. The originating horse/stall is fixed; client and monthly cost are explicit.
+- Mutations preserve values on failure, prevent duplicate requests, and invalidate the related cards and lists. Calendar conversion uses the club timezone. Nested modal readiness and close animation preserve focus; mobile body scrolling keeps actions reachable.
+- Domain/API contract: `frontend/BOARDING.md`. Browser evidence: `frontend/e2e/quick-boarding.spec.ts`.
+
 - Ant Design Form rules and server mapping remain canonical.
 - Existing error timing, value preservation and disabled/busy states are retained.
 

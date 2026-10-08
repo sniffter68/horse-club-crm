@@ -291,3 +291,14 @@ html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); borde
 .quick-boarding-form { padding-top: 12px; }
 .quick-boarding-feedback { width: 100%; margin-bottom: 16px; }
 .quick-boarding-form .ant-alert { margin-block: 12px; }
+.quick-boarding-dialog .ant-modal-body { max-height: calc(100dvh - 260px); overflow-y: auto; }
+@media (max-width: 767px) {
+  .quick-boarding-dialog .ant-modal-body { max-height: calc(100dvh - 180px); }
+  .quick-boarding-date-popup .ant-picker-datetime-panel { flex-direction: column; }
+  .quick-boarding-date-popup .ant-picker-date-panel,
+  .quick-boarding-date-popup .ant-picker-time-panel { width: min(280px, calc(100vw - 48px)); }
+  .quick-boarding-date-popup .ant-picker-time-panel { border-inline-start: 0; border-top: 1px solid var(--crm-hairline); }
+  .quick-boarding-date-popup .ant-picker-time-panel .ant-picker-content,
+  .quick-boarding-date-popup .ant-picker-time-panel-column { height: 100px; }
+  .quick-boarding-date-popup .ant-picker-panel-container { max-height: calc(100dvh - 32px); overflow-y: auto; }
+}

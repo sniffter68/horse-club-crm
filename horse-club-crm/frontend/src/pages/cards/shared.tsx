@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useState } from 'react'
 import { useOne, type BaseRecord, type HttpError } from '@refinedev/core'
 import { Alert, Button, Modal, Skeleton } from 'antd'
 
@@ -12,8 +13,9 @@ export function DetailsModal<T extends BaseRecord>({ resource, id, title, childr
   title: string
   width?: number
   onClose: () => void
-  children: (record: T) => ReactNode
+  children: (record: T, ready: boolean) => ReactNode
 }) {
+  const [ready, setReady] = useState(false)
   const { result, query } = useOne<T, HttpError>({
     resource,
     id,
@@ -21,9 +23,9 @@ export function DetailsModal<T extends BaseRecord>({ resource, id, title, childr
   })
 
   return <Modal title={title} open={Boolean(id)} footer={null} width={width} destroyOnHidden
-    onCancel={onClose}>
+    onCancel={onClose} afterOpenChange={setReady}>
     {query.isLoading && <Skeleton active />}
     {query.error && <Alert type="error" showIcon message="Не удалось загрузить карточку" description={query.error.message} />}
-    {result && !query.isLoading && children(result)}
+    {result && !query.isLoading && children(result, ready)}
   </Modal>
 }
