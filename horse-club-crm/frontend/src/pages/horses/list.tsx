@@ -6,6 +6,7 @@ import type { Horse, HorseDetails } from '../catalogs/types'
 import { dateOnly, dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
 import { QuickBoardingActions } from '../boarding-contracts/quick'
+import { HorseFeeding } from './feeding'
 
 const healthLabels = { VACCINATION: 'Вакцинация', FARRIER: 'Коваль', DEWORMING: 'Дегельминтизация', INSPECTION: 'Осмотр' }
 
@@ -32,14 +33,15 @@ export function HorseList() {
           { key: 'rest', label: 'Минимальный отдых', children: `${horse.minRestMinutes} мин` },
         ]} />
         <section><Typography.Title level={5}>Постой</Typography.Title>
-          <QuickBoardingActions key={horse.id} context={{ kind: 'HORSE', id: horse.id, name: horse.name }}
+          <QuickBoardingActions key={horse.id} context={{ kind: 'HORSE', id: horse.id, name: horse.name, ownerClientId: horse.boardingContracts[0]?.client?.id }}
             contracts={horse.boardingContracts} currentContract={horse.currentBoardingContract} disabled={!ready} />
           {horse.boardingContracts.length ? <List dataSource={horse.boardingContracts} renderItem={contract => <List.Item>
             <Space wrap><Tag color={contract.status === 'ACTIVE' ? 'green' : 'default'}>{contract.status}</Tag>
-              <span>{personName(contract.client)}</span><span>Денник: {contract.stall?.name || 'не назначен'}</span>
-              <span>{money(contract.monthlyRate)} / мес.</span></Space>
+              <span>{contract.client ? personName(contract.client) : 'Лошадь клуба'}</span><span>Денник: {contract.stall?.name || 'не назначен'}</span>
+              {contract.client && <span>{money(contract.monthlyRate)} / мес.</span>}</Space>
           </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Постоя нет" />}
         </section>
+        <HorseFeeding key={horse.id} horse={horse} disabled={!ready} />
         <section><Typography.Title level={5}>Журнал здоровья</Typography.Title>
           {horse.healthLogs.length ? <List dataSource={horse.healthLogs} renderItem={log => <List.Item>
             <Space wrap><Tag>{healthLabels[log.type]}</Tag><span>{dateOnly(log.occurredAt)}</span>

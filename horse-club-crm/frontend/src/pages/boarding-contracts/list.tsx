@@ -10,14 +10,14 @@ const statusLabels: Record<BoardingContractStatus, string> = {
   DRAFT: 'Черновик', ACTIVE: 'Активен', SUSPENDED: 'Приостановлен', TERMINATED: 'Завершён', EXPIRED: 'Истёк',
 }
 const statusColors: Record<BoardingContractStatus, string> = {
-  DRAFT: 'default', ACTIVE: 'green', SUSPENDED: 'gold', TERMINATED: 'blue', EXPIRED: 'red',
+  DRAFT: 'default', ACTIVE: 'green', SUSPENDED: 'gold', TERMINATED: 'default', EXPIRED: 'red',
 }
 
 export function BoardingContractList() {
   const [selectedId, setSelectedId] = useState<string>()
   return <>
     <CatalogList<BoardingContract> resource="boarding-contracts" title="Договоры постоя" columns={[
-      { key: 'client', title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{personName(record.client)}</CardLink> },
+      { key: 'client', title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : 'Лошадь клуба'}</CardLink> },
       { key: 'horse', dataIndex: ['horse', 'name'], title: 'Лошадь' },
       { key: 'stall', title: 'Денник', render: (_: unknown, record) => record.stall?.name || '—' },
       { key: 'status', dataIndex: 'status', title: 'Статус', sorter: true, render: (value: BoardingContractStatus) => <Tag color={statusColors[value]}>{statusLabels[value]}</Tag> },
@@ -33,7 +33,7 @@ export function BoardingContractList() {
     <DetailsModal<BoardingContract> resource="boarding-contracts" id={selectedId} title="Карточка договора постоя" onClose={() => setSelectedId(undefined)}>
       {contract => <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
-          { key: 'client', label: 'Клиент', children: personName(contract.client) },
+          { key: 'client', label: 'Клиент', children: contract.client ? personName(contract.client) : 'Лошадь клуба' },
           { key: 'horse', label: 'Лошадь', children: contract.horse.name },
           { key: 'stall', label: 'Денник', children: contract.stall?.name || 'Не назначен' },
           { key: 'status', label: 'Статус', children: <Tag color={statusColors[contract.status]}>{statusLabels[contract.status]}</Tag> },

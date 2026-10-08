@@ -287,6 +287,9 @@ html[data-theme='dark'] .vk-invite { color: var(--crm-ink); }
 html[data-theme='dark'] .vk-invite-code { color: var(--crm-beige); }
 html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); border-color: var(--crm-hairline); }
 .quick-boarding-actions { margin-block: 12px; }
+.horse-feeding { padding: 16px; border: 1px solid var(--crm-hairline); border-radius: 16px; background: var(--crm-paper); }
+.horse-feeding-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.horse-feeding-actions { margin-top: 16px; }
 .quick-boarding-primary.ant-btn-primary { background: var(--crm-saddle); border-color: var(--crm-saddle); color: #fff; }
 .quick-boarding-form { padding-top: 12px; }
 .quick-boarding-feedback { width: 100%; margin-bottom: 16px; }

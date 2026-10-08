@@ -102,6 +102,7 @@ model Horse {
   name              String
   breed             String?
   riderLevel        String?
+  feedingNotes      String?
   isUnavailable     Boolean            @default(false)
   unavailableReason String?
   unavailableFrom   DateTime?          @db.Timestamptz(6)
@@ -273,7 +274,7 @@ model Stall {
 
 model BoardingContract {
   id          String                 @id @default(uuid()) @db.Uuid
-  clientId    String                 @db.Uuid
+  clientId    String?                @db.Uuid
   horseId     String                 @db.Uuid
   stallId     String?                @db.Uuid
   status      BoardingContractStatus @default(DRAFT)
@@ -281,7 +282,7 @@ model BoardingContract {
   endsAt      DateTime?              @db.Timestamptz(6)
   monthlyRate Decimal                @default(0) @db.Decimal(12, 2)
   notes       String?
-  client      Client                 @relation(fields: [clientId], references: [id])
+  client      Client?                @relation(fields: [clientId], references: [id])
   horse       Horse                  @relation(fields: [horseId], references: [id])
   stall       Stall?                 @relation(fields: [stallId], references: [id], onDelete: SetNull)
   payments    Payment[]

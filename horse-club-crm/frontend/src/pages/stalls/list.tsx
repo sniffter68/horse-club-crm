@@ -35,7 +35,7 @@ export function StallList() {
         {(stall.contracts ?? []).length ? <List dataSource={stall.contracts} renderItem={contract => {
           const pending = (contract.payments ?? []).filter(payment => payment.status === 'PENDING').reduce((sum, payment) => sum + Number(payment.amount), 0)
           return <List.Item><Space wrap><Tag color={contract.status === 'ACTIVE' ? 'green' : 'default'}>{contract.status}</Tag>
-            <strong>{contract.horse.name}</strong><span>{personName(contract.client)}</span><span>с {dateOnly(contract.startsAt)}</span>
+            <strong>{contract.horse.name}</strong><span>{contract.client ? personName(contract.client) : 'Лошадь клуба'}</span><span>с {dateOnly(contract.startsAt)}</span>
             {pending > 0 && <Tag color="gold">К оплате {money(pending)}</Tag>}</Space></List.Item>
         }} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Денник свободен" />}
       </Space>}

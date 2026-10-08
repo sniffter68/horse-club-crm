@@ -3,7 +3,8 @@ import type { Dayjs } from 'dayjs'
 export type BoardingContractStatus = 'DRAFT' | 'ACTIVE' | 'SUSPENDED' | 'TERMINATED' | 'EXPIRED'
 
 export interface BoardingContractValues {
-  clientId: string
+  clubHorse?: boolean
+  clientId?: string | null
   horseId: string
   stallId?: string | null
   status: BoardingContractStatus
@@ -18,7 +19,7 @@ export interface BoardingContract extends Omit<BoardingContractValues, 'startsAt
   startsAt: string
   endsAt: string | null
   monthlyRate: string | number
-  client: { id: string; name: string; firstName: string; lastName: string }
+  client: { id: string; name: string; firstName: string; lastName: string } | null
   horse: { id: string; name: string }
   stall: { id: string; name: string; isUnavailable: boolean } | null
   payments: Array<{

@@ -59,7 +59,7 @@ function WritableCatalogForm<T extends BaseRecord, V extends object>({ resource,
   return <Wrapper title={title} isLoading={formLoading} canDelete={false}
     saveButtonProps={{ ...saveButtonProps, children: 'Сохранить', 'aria-label': 'Сохранить', disabled: saveButtonProps.disabled || !!query?.error }}>
     {query?.error ? <Alert type="error" showIcon message="Не удалось загрузить запись" description={query.error.message} /> :
-      <Form<V> {...formProps} onFinish={values => formProps.onFinish?.(toPayload ? toPayload(values) : values)} layout="vertical" style={{ maxWidth: 720 }}
+      <Form<V> {...formProps} noValidate onFinish={values => formProps.onFinish?.(toPayload ? toPayload(values) : values)} layout="vertical" style={{ maxWidth: 720 }}
         initialValues={action === 'create' ? defaults : formProps.initialValues}>
         {children}
       </Form>}

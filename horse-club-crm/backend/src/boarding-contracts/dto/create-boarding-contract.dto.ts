@@ -3,9 +3,10 @@ import { BoardingContractStatus } from '@prisma/client';
 import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export class CreateBoardingContractDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiPropertyOptional({ format: 'uuid', nullable: true, description: 'null — клубное размещение без начислений' })
+  @IsOptional()
   @IsUUID()
-  clientId!: string;
+  clientId?: string | null;
 
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
@@ -30,11 +31,12 @@ export class CreateBoardingContractDto {
   @IsDateString()
   endsAt?: string | null;
 
-  @ApiProperty({ minimum: 0, maximum: 9999999999.99 })
+  @ApiPropertyOptional({ minimum: 0, maximum: 9999999999.99 })
+  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(9999999999.99)
-  monthlyRate!: number;
+  monthlyRate?: number;
 
   @ApiPropertyOptional({ maxLength: 2000, nullable: true })
   @IsOptional()

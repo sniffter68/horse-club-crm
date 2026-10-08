@@ -124,6 +124,7 @@ export class PaymentsService {
         where: { id: dto.boardingContractId }, select: { clientId: true, monthlyRate: true },
       });
       if (!contract) throw new NotFoundException('Договор постоя не найден');
+      if (!contract.clientId) throw new ConflictException('Клубное размещение не предусматривает начислений');
       if (clientId && clientId !== contract.clientId) throw new ConflictException('Клиент не соответствует договору постоя');
       clientId = contract.clientId;
       amount ??= contract.monthlyRate.toNumber();

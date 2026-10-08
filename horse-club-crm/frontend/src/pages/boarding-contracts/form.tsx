@@ -1,9 +1,11 @@
 import { useSelect } from '@refinedev/antd'
-import { DatePicker, Form, Input, InputNumber, Select } from 'antd'
+import { Checkbox, DatePicker, Form, Input, InputNumber, Select as EntitySelect } from 'antd'
 import dayjs from 'dayjs'
 import type { Client, Horse, Stall } from '../catalogs/types'
 import { CatalogForm } from '../catalogs/shared'
 import type { BoardingContract, BoardingContractStatus, BoardingContractValues } from './types'
+
+const ContractField = Form.Item
 
 const statusOptions: Array<{ value: BoardingContractStatus; label: string }> = [
   { value: 'DRAFT', label: 'Черновик' },
@@ -22,12 +24,15 @@ function clientName(client: Client): string {
 }
 
 function toPayload(values: BoardingContractValues): BoardingContractValues {
+  const { clubHorse, ...fields } = values
+  const club = clubHorse ?? !values.clientId
   return {
-    ...values,
+    ...fields,
+    clientId: club ? null : values.clientId,
     stallId: values.stallId || null,
     startsAt: dayjs(values.startsAt).toISOString(),
     endsAt: values.endsAt ? dayjs(values.endsAt).toISOString() : null,
-    monthlyRate: Number(values.monthlyRate),
+    monthlyRate: club ? 0 : Number(values.monthlyRate),
     notes: values.notes?.trim() || null,
   }
 }
@@ -58,34 +63,43 @@ export function BoardingContractForm({ action }: { action: 'create' | 'edit' }) 
     defaults={{ status: 'ACTIVE', startsAt: dayjs(), monthlyRate: 0 }}
     toPayload={toPayload}
   >
-    <Form.Item name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}>
-      <Select {...clientSelectProps} showSearch optionFilterProp="label" placeholder="Выберите клиента" />
-    </Form.Item>
-    <Form.Item name="horseId" label="Лошадь" rules={[{ required: true, message: 'Выберите лошадь' }]}>
-      <Select {...horseSelectProps} showSearch optionFilterProp="label" placeholder="Выберите лошадь" />
-    </Form.Item>
-    <Form.Item name="stallId" label="Денник">
-      <Select allowClear showSearch optionFilterProp="label" options={stallOptions}
+    <ContractField name="clubHorse" hidden valuePropName="checked"><Checkbox /></ContractField>
+    <ContractField shouldUpdate>
+      {({ getFieldValue, setFieldValue }) => <Checkbox checked={getFieldValue('clubHorse') ?? !getFieldValue('clientId')}
+        onChange={event => setFieldValue('clubHorse', event.target.checked)}>Лошадь клуба</Checkbox>}
+    </ContractField>
+    <ContractField shouldUpdate>
+      {({ getFieldValue }) => (getFieldValue('clubHorse') ?? !getFieldValue('clientId')) ? null : <ContractField name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}>
+        <EntitySelect {...clientSelectProps} showSearch optionFilterProp="label" placeholder="Выберите клиента" />
+      </ContractField>}
+    </ContractField>
+    <ContractField name="horseId" label="Лошадь" rules={[{ required: true, message: 'Выберите лошадь' }]}>
+      <EntitySelect {...horseSelectProps} showSearch optionFilterProp="label" placeholder="Выберите лошадь" />
+    </ContractField>
+    <ContractField name="stallId" label="Денник">
+      <EntitySelect allowClear showSearch optionFilterProp="label" options={stallOptions}
         loading={stallsQuery.isLoading} placeholder="Выберите денник" />
-    </Form.Item>
-    <Form.Item name="status" label="Статус" rules={[{ required: true, message: 'Выберите статус' }]}>
-      <Select options={statusOptions} />
-    </Form.Item>
-    <Form.Item name="startsAt" label="Дата начала" getValueProps={dateValue}
+    </ContractField>
+    <ContractField name="status" label="Статус" rules={[{ required: true, message: 'Выберите статус' }]}>
+      <EntitySelect options={statusOptions} />
+    </ContractField>
+    <ContractField name="startsAt" label="Дата начала" getValueProps={dateValue}
       rules={[{ required: true, message: 'Укажите дату начала' }]}>
       <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
-    </Form.Item>
-    <Form.Item name="endsAt" label="Дата окончания" getValueProps={dateValue}>
+    </ContractField>
+    <ContractField name="endsAt" label="Дата окончания" getValueProps={dateValue}>
       <DatePicker showTime format="DD.MM.YYYY HH:mm" allowClear style={{ width: '100%' }} />
-    </Form.Item>
-    <Form.Item name="monthlyRate" label="Стоимость в месяц, ₽" rules={[
+    </ContractField>
+    <ContractField shouldUpdate>
+      {({ getFieldValue }) => (getFieldValue('clubHorse') ?? !getFieldValue('clientId')) ? null : <ContractField name="monthlyRate" label="Стоимость в месяц, ₽" rules={[
       { required: true, message: 'Укажите стоимость' },
-      { type: 'number', min: 0, max: 9999999999.99, message: 'Укажите корректную стоимость' },
+      { type: 'number', min: 0, max: 9999999999.99, transform: (value: unknown) => value == null ? value : Number(value), message: 'Укажите корректную стоимость' },
     ]} getValueProps={(value: unknown) => ({ value: value == null ? undefined : Number(value) })}>
       <InputNumber min={0} max={9999999999.99} precision={2} style={{ width: '100%' }} />
-    </Form.Item>
-    <Form.Item name="notes" label="Заметки" rules={[{ max: 2000, message: 'Не более 2000 символов' }]}>
+    </ContractField>}
+    </ContractField>
+    <ContractField name="notes" label="Заметки" rules={[{ max: 2000, message: 'Не более 2000 символов' }]}>
       <Input.TextArea rows={5} maxLength={2000} showCount />
-    </Form.Item>
+    </ContractField>
   </CatalogForm>
 }

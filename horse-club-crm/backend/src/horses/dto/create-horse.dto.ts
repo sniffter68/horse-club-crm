@@ -2,6 +2,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class CreateHorseDto {
+  @ApiPropertyOptional({ maxLength: 5000, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  feedingNotes?: string | null;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

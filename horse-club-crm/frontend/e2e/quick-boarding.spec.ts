@@ -9,25 +9,32 @@ const contract = { id: 'bc1', status: 'ACTIVE', startsAt: '2026-01-01T09:00:00Z'
 const available = { horses: [{ id: 'h1', name: 'Кролик' }, { id: 'h2', name: 'Валдай' }],
   stalls: [{ id: 's1', name: 'Денник №1' }, { id: 's2', name: 'Денник №2' }] }
 
-async function setup(page: Page, { occupied = false, unavailable = false, role = 'ADMIN' } = {}) {
+async function setup(page: Page, { occupied = false, unavailable = false, role = 'ADMIN', privateHorse = false } = {}) {
   await page.clock.setFixedTime(new Date('2026-10-08T09:00:00Z'))
   await page.addInitScript(role => {
     localStorage.setItem('horsecrm.access_token', 'cookie-session')
     localStorage.setItem('horsecrm.email', 'qa@example.com')
     localStorage.setItem('horsecrm.role', role)
   }, role)
-  const state = { occupied, posts: [] as Record<string, unknown>[], released: 0, horseReads: 0, stallReads: 0 }
-  const horseDetails = () => ({ ...horse, healthLogs: [], bookings: [], boardingContracts: state.occupied ? [contract] : [], currentBoardingContract: state.occupied ? contract : null })
-  const stallDetails = () => ({ ...stall, isUnavailable: unavailable, contracts: state.occupied ? [contract] : [] })
+  const state = { occupied, posts: [] as Record<string, unknown>[], released: 0, horseReads: 0, stallReads: 0, feedingNotes: null as string | null }
+  let boarding = contract as Omit<typeof contract, 'client'> & { client: typeof client | null }
+  const horseDetails = () => ({ ...horse, feedingNotes: state.feedingNotes, healthLogs: [], bookings: [], boardingContracts: state.occupied ? [boarding] : privateHorse ? [{ ...contract, status: 'TERMINATED' }] : [], currentBoardingContract: state.occupied ? boarding : null })
+  const stallDetails = () => ({ ...stall, isUnavailable: unavailable, contracts: state.occupied ? [boarding] : [] })
   await page.route('**/api/horses?*', route => route.fulfill({ json: [horse], headers: { 'x-total-count': '1' } }))
   await page.route('**/api/stalls?*', route => route.fulfill({ json: [stallDetails()], headers: { 'x-total-count': '1' } }))
-  await page.route('**/api/horses/h1', route => { state.horseReads++; return route.fulfill({ json: horseDetails() }) })
+  await page.route('**/api/horses/h1', route => {
+    if (route.request().method() === 'PATCH') state.feedingNotes = route.request().postDataJSON().feedingNotes
+    else state.horseReads++
+    return route.fulfill({ json: horseDetails() })
+  })
   await page.route('**/api/stalls/s1', route => { state.stallReads++; return route.fulfill({ json: stallDetails() }) })
   await page.route('**/api/clients?*', route => route.fulfill({ json: [client], headers: { 'x-total-count': '1' } }))
   await page.route('**/api/boarding-contracts/availability?*', route => route.fulfill({ json: available }))
   await page.route('**/api/boarding-contracts', async route => {
     state.posts.push(route.request().postDataJSON()); state.occupied = true
-    await route.fulfill({ json: contract })
+    const payload = route.request().postDataJSON()
+    boarding = { ...contract, client: payload.clientId ? client : null, monthlyRate: payload.monthlyRate }
+    await route.fulfill({ json: boarding })
   })
   await page.route('**/api/boarding-contracts/bc1/terminate', async route => {
     state.released++; state.occupied = false
@@ -42,6 +49,9 @@ async function openCard(page: Page, kind: 'horse' | 'stall') {
   return page.getByRole('dialog', { name: kind === 'horse' ? 'Карточка лошади' : 'Карточка денника', exact: true })
 }
 async function select(page: Page, modal: Locator, name: string, label: string) {
+  if (name === 'Владелец / клиент' && await modal.getByRole('checkbox', { name: 'Лошадь клуба' }).isChecked()) {
+    await modal.getByRole('checkbox', { name: 'Лошадь клуба' }).uncheck()
+  }
   const combobox = page.getByRole('combobox', { name, exact: true })
   await expect(modal.getByRole('combobox', { name, exact: true })).toBeEnabled()
   await modal.locator('.ant-select-selector').filter({ has: combobox }).click()
@@ -180,6 +190,131 @@ test('unavailable free stall cannot be populated', async ({ page }) => {
   const card = await openCard(page, 'stall')
   await expect(card.getByText('Заселение недоступно: денник закрыт.')).toBeVisible()
   await expect(card.getByRole('button', { name: '+ Заселить лошадь', exact: true })).toHaveCount(0)
+})
+
+for (const kind of ['horse', 'stall'] as const) test(`club ${kind} placement needs neither client nor rate, even if clients API is unavailable`, async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 })
+  const state = await setup(page)
+  let clientRequests = 0
+  await page.route('**/api/clients?*', route => { clientRequests++; return route.fulfill({ status: 503, json: { message: 'Недоступно' } }) })
+  const card = await openCard(page, kind)
+  await card.getByRole('button', { name: kind === 'horse' ? '+ Разместить в денник' : '+ Заселить лошадь', exact: true }).click()
+  const modal = page.getByRole('dialog', { name: /^Быстрое заселение/ })
+  await expect(modal.getByRole('checkbox', { name: 'Лошадь клуба' })).toBeChecked()
+  await expect(modal.getByRole('combobox', { name: 'Владелец / клиент' })).toHaveCount(0)
+  await expect(modal.getByRole('spinbutton')).toHaveCount(0)
+  await select(page, modal, kind === 'horse' ? 'Денник' : 'Лошадь', kind === 'horse' ? 'Денник №1' : 'Кролик')
+  await modal.getByRole('button', { name: kind === 'horse' ? 'Заселить' : 'Подтвердить', exact: true }).click()
+  await expect(modal).not.toBeVisible()
+  expect(state.posts[0]).toMatchObject({ clientId: null, monthlyRate: 0, horseId: 'h1', stallId: 's1' })
+  expect(clientRequests).toBe(0)
+  await expect(card.getByText('Лошадь клуба', { exact: true })).toBeVisible()
+})
+
+test('private placement requires a client; switching to club drops hidden owner and rate', async ({ page }) => {
+  const state = await setup(page)
+  const card = await openCard(page, 'horse')
+  await card.getByRole('button', { name: '+ Разместить в денник', exact: true }).click()
+  const modal = page.getByRole('dialog', { name: /^Быстрое заселение/ })
+  await select(page, modal, 'Денник', 'Денник №1')
+  await modal.getByRole('checkbox', { name: 'Лошадь клуба' }).uncheck()
+  await modal.getByRole('button', { name: 'Заселить', exact: true }).click()
+  await expect(modal.getByText('Выберите владельца или клиента', { exact: true })).toBeVisible()
+  expect(state.posts).toHaveLength(0)
+  await select(page, modal, 'Владелец / клиент', 'Анна Орлова')
+  await modal.getByRole('spinbutton').fill('20000')
+  await modal.getByRole('checkbox', { name: 'Лошадь клуба' }).check()
+  await modal.getByRole('button', { name: 'Заселить', exact: true }).click()
+  await expect(modal).not.toBeVisible()
+  expect(state.posts[0]).toMatchObject({ clientId: null, monthlyRate: 0 })
+})
+
+test('last private contract suggests the owner and defaults to private placement', async ({ page }) => {
+  await setup(page, { privateHorse: true })
+  const card = await openCard(page, 'horse')
+  await card.getByRole('button', { name: '+ Разместить в денник', exact: true }).click()
+  const modal = page.getByRole('dialog', { name: /^Быстрое заселение/ })
+  await expect(modal.getByRole('checkbox', { name: 'Лошадь клуба' })).not.toBeChecked()
+  await expect(modal.getByText('Анна Орлова', { exact: true })).toBeVisible()
+})
+
+for (const width of [1280, 320]) test(`feeding edit preserves drafts on failure, cancels, saves and clears at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  const state = await setup(page)
+  const card = await openCard(page, 'horse')
+  const feeding = card.getByRole('region', { name: 'Режим кормления', exact: true })
+  await expect(feeding.getByText('Режим кормления пока не указан.')).toBeVisible()
+  await feeding.getByRole('button', { name: 'Редактировать кормление' }).click()
+  const notes = feeding.getByRole('textbox', { name: 'Рацион, подкормки и особенности' })
+  await notes.fill('Черновик')
+  await notes.press('Escape')
+  await expect(feeding.getByText('Режим кормления пока не указан.')).toBeVisible()
+  await expect(card).toBeVisible()
+  await feeding.getByRole('button', { name: 'Редактировать кормление' }).click()
+  await expect(notes).toHaveValue('')
+  await notes.fill('Утро: 2 кг овса\nВечер: сено\nПодкормка по назначению')
+  let attempts = 0
+  await page.route('**/api/horses/h1', async route => {
+    if (route.request().method() !== 'PATCH') return route.fallback()
+    attempts++
+    if (attempts === 1) return route.fulfill({ status: 503, json: { message: 'Попробуйте ещё раз' } })
+    expect(Object.keys(route.request().postDataJSON())).toEqual(['feedingNotes'])
+    return route.fallback()
+  })
+  await feeding.getByRole('button', { name: 'Сохранить кормление' }).click()
+  await expect(feeding.getByText('Не удалось сохранить режим кормления')).toBeVisible()
+  await expect(notes).toHaveValue('Утро: 2 кг овса\nВечер: сено\nПодкормка по назначению')
+  await feeding.getByRole('button', { name: 'Сохранить кормление' }).click()
+  await expect(notes).toHaveCount(0)
+  await expect(feeding.getByText('Утро: 2 кг овса', { exact: false })).toBeVisible()
+  expect(state.feedingNotes).toBe('Утро: 2 кг овса\nВечер: сено\nПодкормка по назначению')
+  await page.screenshot({ path: `test-results/horse-feeding-${width}.png`, fullPage: true, animations: 'disabled' })
+  await feeding.getByRole('button', { name: 'Редактировать кормление' }).click()
+  await notes.fill('  ')
+  await feeding.getByRole('button', { name: 'Сохранить кормление' }).click()
+  await expect(feeding.getByText('Режим кормления пока не указан.')).toBeVisible()
+  expect(state.feedingNotes).toBeNull()
+})
+
+test('trainer can read feeding notes but cannot edit them', async ({ page }) => {
+  const state = await setup(page, { role: 'TRAINER' })
+  state.feedingNotes = 'Утро: сено'
+  const card = await openCard(page, 'horse')
+  await expect(card.getByText('Утро: сено', { exact: true })).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Редактировать кормление' })).toHaveCount(0)
+})
+
+test('full boarding form also creates club placement without leaking UI fields', async ({ page }) => {
+  const state = await setup(page)
+  await page.goto('/boarding-contracts/new')
+  await expect(page.getByRole('checkbox', { name: 'Лошадь клуба' }).last()).toBeChecked()
+  const horseSelect = page.getByLabel('Лошадь', { exact: true })
+  await horseSelect.click()
+  await page.locator('.ant-select-dropdown:visible').getByText('Кролик', { exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Лошадь клуба' }).last().uncheck()
+  await expect(page.getByLabel('Клиент', { exact: true })).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Лошадь клуба' }).last().check()
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect.poll(() => state.posts.length).toBe(1)
+  expect(state.posts[0]).toMatchObject({ clientId: null, monthlyRate: 0 })
+  expect(state.posts[0]).not.toHaveProperty('clubHorse')
+})
+
+test('full boarding edit preserves an existing private owner and decimal rate', async ({ page }) => {
+  await setup(page)
+  const saved: Record<string, unknown>[] = []
+  const privateContract = { ...contract, clientId: 'c1', horseId: 'h1', stallId: 's1', monthlyRate: '25000.00' }
+  await page.route('**/api/boarding-contracts/bc1', route => {
+    if (route.request().method() === 'PATCH') saved.push(route.request().postDataJSON())
+    return route.fulfill({ json: privateContract })
+  })
+  await page.goto('/boarding-contracts/edit/bc1')
+  await expect(page.getByRole('checkbox', { name: 'Лошадь клуба' }).last()).not.toBeChecked()
+  await expect(page.getByLabel('Клиент', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect.poll(() => saved.length).toBe(1)
+  expect(saved[0]).toMatchObject({ clientId: 'c1', monthlyRate: 25000 })
+  expect(saved[0]).not.toHaveProperty('clubHorse')
 })
 
 test('date changes refresh availability in club timezone and the mobile calendar remains within the viewport', async ({ page }) => {

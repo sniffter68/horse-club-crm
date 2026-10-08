@@ -88,12 +88,12 @@ export class HorsesService {
   }
 
   create(dto: CreateHorseDto): Promise<Horse> {
-    return this.prisma.horse.create({ data: dto });
+    return this.prisma.horse.create({ data: { ...dto, ...(dto.feedingNotes !== undefined ? { feedingNotes: dto.feedingNotes?.trim() || null } : {}) } });
   }
 
   async update(id: string, dto: UpdateHorseDto): Promise<Horse> {
     try {
-      return await this.prisma.horse.update({ where: { id }, data: dto });
+      return await this.prisma.horse.update({ where: { id }, data: { ...dto, ...(dto.feedingNotes !== undefined ? { feedingNotes: dto.feedingNotes?.trim() || null } : {}) } });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Лошадь');
     }

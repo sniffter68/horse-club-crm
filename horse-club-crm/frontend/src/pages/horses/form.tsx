@@ -8,6 +8,7 @@ export function HorseForm({ action }: { action: 'create' | 'edit' }) {
     <TextField name="name" label="Кличка" required />
     <TextField name="breed" label="Порода" />
     <TextField name="riderLevel" label="Уровень всадника" max={100} />
+    <TextField name="feedingNotes" label="Режим кормления" max={5000} multiline />
     <NumberField name="maxDailyMinutes" label="Суточный лимит нагрузки, мин" min={1} />
     <NumberField name="minRestMinutes" label="Минимальный отдых, мин" />
     <BooleanField name="isUnavailable" label="Недоступна для занятий" />

@@ -7,6 +7,7 @@ export interface Client extends Omit<ClientValues, 'phone' | 'preferences' | 'me
   id: string; createdAt: string; phone: string | null; preferences: string | null; medicalNotes?: string | null;
 }
 export interface HorseValues {
+  feedingNotes?: string | null;
   name: string; breed?: string; riderLevel?: string; maxDailyMinutes: number; minRestMinutes: number; isUnavailable: boolean;
 }
 export interface Horse extends Omit<HorseValues, 'breed' | 'riderLevel'> { id: string; breed: string | null; riderLevel: string | null }
@@ -28,7 +29,7 @@ export interface HorseDetails extends Horse {
   currentBoardingContract?: HorseDetails['boardingContracts'][number] | null;
   healthLogs: Array<{ id: string; type: 'VACCINATION' | 'FARRIER' | 'DEWORMING' | 'INSPECTION'; occurredAt: string; nextDueAt: string | null; notes: string | null }>;
   boardingContracts: Array<{ id: string; status: string; startsAt: string; endsAt: string | null; monthlyRate: string | number;
-    client: { id: string; name: string; firstName: string; lastName: string }; stall: { id: string; name: string } | null; payments: RelationPayment[] }>;
+    client: { id: string; name: string; firstName: string; lastName: string } | null; stall: { id: string; name: string } | null; payments: RelationPayment[] }>;
   bookings: Array<RelationBooking & { client: { id: string; name: string; firstName: string; lastName: string } }>;
 }
 export interface TrainerValues { name: string; phone?: string; qualification?: string; maxDailyLoad: number; baseRate?: number }
@@ -47,7 +48,7 @@ export interface StallValues { name: string; description?: string; isUnavailable
 export interface StallContractSummary {
   id: string; status: 'DRAFT' | 'ACTIVE' | 'SUSPENDED'; startsAt: string; endsAt: string | null;
   horse: { id: string; name: string };
-  client: { id: string; name: string; firstName: string; lastName: string };
+  client: { id: string; name: string; firstName: string; lastName: string } | null;
   payments?: RelationPayment[];
 }
 export interface Stall extends Omit<StallValues, 'description'> {

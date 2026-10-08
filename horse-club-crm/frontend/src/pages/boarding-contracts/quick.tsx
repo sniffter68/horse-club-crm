@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useInvalidate, useOnError } from '@refinedev/core'
 import { useSelect } from '@refinedev/antd'
-import { Alert, App, Button, DatePicker, Empty, Form, InputNumber, Modal, Select as EntitySelect, Skeleton, Space, Typography } from 'antd'
+import { Alert, App, Button, Checkbox, DatePicker, Empty, Form, InputNumber, Modal, Select as EntitySelect, Skeleton, Space, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { useCatalogPermissions } from '../catalogs/permissions'
@@ -9,11 +9,11 @@ import type { Client } from '../catalogs/types'
 import { personName } from '../cards/format'
 import { CLUB_TIME_ZONE, toInstant, toLocalInput } from '../schedule/time'
 
-type PlacementContext = { kind: 'HORSE' | 'STALL'; id: string; name: string; isUnavailable?: boolean }
+type PlacementContext = { kind: 'HORSE' | 'STALL'; id: string; name: string; isUnavailable?: boolean; ownerClientId?: string | null }
 type ContractSummary = { id: string; status: string; startsAt: string; endsAt: string | null; stall?: { name: string } | null; horse?: { name: string } }
-type Choice = { id: string; name: string }
+type Choice = { id: string; name: string; ownerClientId?: string | null }
 type Availability = { horses: Choice[]; stalls: Choice[] }
-type PlacementValues = { horseId: string; stallId: string; clientId: string; startsAt: Dayjs; monthlyRate: number }
+type PlacementValues = { horseId: string; stallId: string; clientId?: string; startsAt: Dayjs; monthlyRate?: number }
 const FormField = Form.Item
 const popupContainer = (trigger: HTMLElement) => trigger.closest<HTMLElement>('.ant-modal-content') ?? document.body
 
@@ -75,6 +75,7 @@ export function QuickBoardingActions({ context, contracts, currentContract, disa
 }
 
 function QuickPlacement({ context, onClose }: { context: PlacementContext; onClose: () => void }) {
+  const [clubHorse, setClubHorse] = useState(!context.ownerClientId)
   const [open, setOpen] = useState(true)
   const [ready, setReady] = useState(false)
   const [form] = Form.useForm<PlacementValues>()
@@ -91,7 +92,7 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
   const { selectProps: clients, query: clientsQuery } = useSelect<Client>({ resource: 'clients', optionLabel: personName, optionValue: 'id',
     pagination: { mode: 'server', pageSize: 100 }, debounce: 300,
     onSearch: value => [{ field: 'q', operator: 'contains', value: value.trim() }],
-    queryOptions: { retry: false }, errorNotification: false,
+    queryOptions: { retry: false, enabled: !clubHorse }, errorNotification: false,
   })
   let instant = ''
   try { if (selectedStart?.isValid()) instant = toInstant(selectedStart.format('YYYY-MM-DDTHH:mm')) } catch { /* Form validation explains invalid local times. */ }
@@ -118,7 +119,8 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
   const horseId = Form.useWatch<string>('horseId', form) ?? (context.kind === 'HORSE' ? context.id : undefined)
   const stallId = Form.useWatch<string>('stallId', form) ?? (context.kind === 'STALL' ? context.id : undefined)
   const eligible = Boolean(data && (!horseId || data.horses.some(item => item.id === horseId)) && (!stallId || data.stalls.some(item => item.id === stallId)))
-  const blocked = !ready || !instant || !data || !data.horses.length || !data.stalls.length || !eligible || busy || clientsQuery.isFetching || Boolean(clientsQuery.error)
+  const blocked = !ready || !instant || !data || !data.horses.length || !data.stalls.length || !eligible || busy
+    || (!clubHorse && (clientsQuery.isFetching || Boolean(clientsQuery.error)))
   const reload = () => { setRevision(value => value + 1); void clientsQuery.refetch() }
   const submit = async (values: PlacementValues) => {
     if (blocked || lock.current) return
@@ -129,8 +131,8 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
       await httpClient.post(`${API_URL}/boarding-contracts`, {
         horseId: context.kind === 'HORSE' ? context.id : values.horseId,
         stallId: context.kind === 'STALL' ? context.id : values.stallId,
-        clientId: values.clientId, startsAt: toInstant(values.startsAt.format('YYYY-MM-DDTHH:mm')),
-        status: 'ACTIVE', monthlyRate: values.monthlyRate,
+        clientId: clubHorse ? null : values.clientId, startsAt: toInstant(values.startsAt.format('YYYY-MM-DDTHH:mm')),
+        status: 'ACTIVE', monthlyRate: clubHorse ? 0 : values.monthlyRate,
       })
       void message.success('Лошадь заселена в денник')
       setOpen(false)
@@ -150,7 +152,7 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
     <div className="quick-boarding-form">
       <Typography.Paragraph type="secondary">Постой без даты окончания. Часовой пояс: {CLUB_TIME_ZONE}.</Typography.Paragraph>
       <Form form={form} layout="vertical" noValidate disabled={busy || !ready} onFinish={submit}
-        initialValues={{ startsAt: initialStart, monthlyRate: 0, ...(context.kind === 'HORSE' ? { horseId: context.id } : { stallId: context.id }) }}>
+        initialValues={{ startsAt: initialStart, monthlyRate: 0, clientId: context.ownerClientId ?? undefined, ...(context.kind === 'HORSE' ? { horseId: context.id } : { stallId: context.id }) }}>
         <FormField name="startsAt" label="Дата начала" rules={[{ required: true, message: 'Укажите дату начала' }, { validator: async (_rule, value: Dayjs | undefined) => {
           if (value) toInstant(value.format('YYYY-MM-DDTHH:mm'))
         } }]}>
@@ -159,7 +161,7 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
             getPopupContainer={popupContainer} onChange={value => setSelectedStart(value)} style={{ width: '100%' }} />
         </FormField>
         {!data && !loadError && instant && <Skeleton active paragraph={{ rows: 1 }} title={false} />}
-        {(loadError || clientsQuery.error) && <Space direction="vertical" className="quick-boarding-feedback">
+        {(loadError || (!clubHorse && clientsQuery.error)) && <Space direction="vertical" className="quick-boarding-feedback">
           <Alert type="error" showIcon message="Не удалось загрузить варианты заселения" description={loadError || clientsQuery.error?.message} />
           <Button onClick={reload}>Повторить загрузку</Button>
         </Space>}
@@ -168,6 +170,11 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
           description={!data.stalls.length ? 'Свободных денников на этот период нет' : 'Нет лошадей без постоя на этот период'} />}
         <FormField name="horseId" label="Лошадь" rules={[{ required: true, message: 'Выберите лошадь' }]}>
           <EntitySelect aria-label="Лошадь" getPopupContainer={popupContainer} showSearch optionFilterProp="label" disabled={!ready || busy || context.kind === 'HORSE' || !data}
+            onChange={(id: string) => {
+              const ownerClientId = data?.horses.find(item => item.id === id)?.ownerClientId
+              setClubHorse(!ownerClientId)
+              form.setFieldValue('clientId', ownerClientId ?? undefined)
+            }}
             options={context.kind === 'HORSE' ? [{ value: context.id, label: context.name }] : choices(data?.horses)} placeholder="Выберите лошадь"
             notFoundContent="Нет свободных лошадей" />
         </FormField>
@@ -176,6 +183,8 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
             options={context.kind === 'STALL' ? [{ value: context.id, label: context.name }] : choices(data?.stalls)} placeholder="Выберите денник"
             notFoundContent="Нет свободных денников" />
         </FormField>
+        <FormField><Checkbox checked={clubHorse} onChange={event => setClubHorse(event.target.checked)}>Лошадь клуба</Checkbox></FormField>
+        {clubHorse ? <Typography.Paragraph type="secondary">Клубное размещение без начисления оплаты.</Typography.Paragraph> : <>
         <FormField name="clientId" label="Владелец / клиент" rules={[{ required: true, message: 'Выберите владельца или клиента' }]}>
           <EntitySelect {...clients} aria-label="Владелец / клиент" getPopupContainer={popupContainer} showSearch filterOption={false} placeholder="Найдите клиента по имени или телефону"
             notFoundContent={clientsQuery.isFetching ? 'Поиск…' : 'Клиенты не найдены'} />
@@ -184,6 +193,7 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
           rules={[{ required: true, message: 'Укажите стоимость' }, { type: 'number', min: 0, max: 9999999999.99, message: 'Укажите неотрицательную стоимость' }]}>
           <InputNumber aria-label="Стоимость в месяц, ₽" min={0} max={9999999999.99} precision={2} style={{ width: '100%' }} />
         </FormField>
+        </>}
       </Form>
       {error && <Alert type="error" showIcon message="Не удалось заселить лошадь" description={error} />}
     </div>

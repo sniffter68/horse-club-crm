@@ -1,0 +1,21 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["frontend/src"],
+  "locale": "ru-RU",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": ["Select/Listbox", "Date", "Form", "Scrollbar", "Toast", "CRUD"],
+  "ownership": {
+    "Select/Listbox": "authored",
+    "Date": "native"
+  },
+  "requiredCommands": ["unit", "typecheck", "build"],
+  "commands": {
+    "unit": "npm --prefix frontend run test",
+    "typecheck": "npm --prefix frontend run typecheck",
+    "build": "npm --prefix frontend run build"
+  },
+  "evidence": {
+    "crudFullFlow": "frontend/e2e/catalogs.live.spec.ts",
+    "failurePaths": "frontend/e2e/s3-01.spec.ts"
+  }
+}

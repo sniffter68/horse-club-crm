@@ -11,6 +11,64 @@ test('boarding contracts module imports authentication providers for its guards'
   assert.ok(imports.includes(AuthModule));
 });
 
+test('club placement accepts omitted/null client, forces zero rate and creates no payments', async () => {
+  for (const clientId of [undefined, null]) {
+    const { prisma, state } = createPrisma();
+    await new BoardingContractsService(prisma).create({ ...activeContract, clientId, monthlyRate: 25000 });
+    assert.equal(state.createArgs.data.clientId, null);
+    assert.equal(state.createArgs.data.monthlyRate, 0);
+    assert.equal(state.createArgs.data.payments, undefined);
+  }
+  const { prisma, state } = createPrisma();
+  await new BoardingContractsService(prisma).create({ horseId: activeContract.horseId, startsAt: activeContract.startsAt });
+  assert.equal(state.createArgs.data.monthlyRate, 0);
+  await assert.rejects(new BoardingContractsService(prisma).create({ ...activeContract, monthlyRate: undefined }), error => error.status === 400);
+});
+
+test('club update preserves omitted client, supports explicit null, and cannot introduce a club rate', async () => {
+  for (const [currentClient, patch, expectedClient] of [
+    [activeContract.clientId, { clientId: null }, null],
+    [activeContract.clientId, { notes: 'note' }, activeContract.clientId],
+    [null, { monthlyRate: 999 }, null],
+  ]) {
+    let saved;
+    const tx = {
+      client: { findUnique: async () => ({ id: activeContract.clientId }) },
+      horse: { findUnique: async () => ({ id: activeContract.horseId }) },
+      stall: { findUnique: async () => ({ id: activeContract.stallId, isUnavailable: false }) },
+      boardingContract: {
+        findUnique: async () => ({ ...activeContract, clientId: currentClient, startsAt: new Date(activeContract.startsAt), endsAt: null }),
+        findFirst: async () => null,
+        update: async args => { saved = args.data; return args.data; },
+      },
+    };
+    await new BoardingContractsService({ $transaction: async fn => fn(tx) }).update('contract', patch);
+    assert.equal(saved.clientId, expectedClient);
+    assert.equal(saved.monthlyRate, expectedClient ? 25000 : 0);
+    assert.equal(saved.payments, undefined);
+  }
+});
+
+test('manual payments cannot be linked to club placement', async () => {
+  const { PaymentsService } = require('../dist/payments/payments.service');
+  const service = new PaymentsService({ boardingContract: { findUnique: async () => ({ clientId: null, monthlyRate: { toNumber: () => 0 } }) },
+    payment: { create: async () => assert.fail('club payment must not be created') } });
+  await assert.rejects(service.create({ boardingContractId: 'contract', clientId: activeContract.clientId, amount: 100, method: 'CASH' }), error => error.status === 409);
+});
+
+test('boarding DTO accepts club placement and still validates private UUIDs and rates', async () => {
+  const { ValidationPipe } = require('@nestjs/common');
+  const { CreateBoardingContractDto } = require('../dist/boarding-contracts/dto/create-boarding-contract.dto');
+  const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+  const metadata = { type: 'body', metatype: CreateBoardingContractDto };
+  const club = { horseId: activeContract.horseId, startsAt: activeContract.startsAt, clientId: null };
+  await pipe.transform(club, metadata);
+  await pipe.transform({ horseId: club.horseId, startsAt: club.startsAt }, metadata);
+  for (const patch of [{ clientId: 'invalid' }, { monthlyRate: -1 }, { monthlyRate: 1.234 }, { monthlyRate: '25000' }]) {
+    await assert.rejects(pipe.transform({ ...club, ...patch }, metadata), error => error.status === 400);
+  }
+});
+
 function createPrisma({ stallUnavailable = false, conflicts = [] } = {}) {
   const state = { createArgs: undefined, transactionOptions: undefined, findFirstArgs: [] };
   const tx = {
@@ -100,7 +158,7 @@ test('quick placement excludes active/suspended and future reservations but allo
   const match = (contract, filter) => filter.status.in.includes(contract.status)
     && filter.OR.some(clause => clause.endsAt === null ? contract.endsAt === null : contract.endsAt > clause.endsAt.gt);
   const tx = {
-    horse: { findMany: async ({ where }) => fixtures.filter(row => !match(row, where.boardingContracts.none)).map(row => ({ id: row.id, name: row.id })) },
+    horse: { findMany: async ({ where }) => fixtures.filter(row => !match(row, where.boardingContracts.none)).map(row => ({ id: row.id, name: row.id, boardingContracts: row.id === 'ended' ? [{ clientId: activeContract.clientId }] : [] })) },
     stall: { findMany: async ({ where }) => {
       assert.equal(where.isUnavailable, false);
       return fixtures.filter(row => !match(row, where.contracts.none)).map(row => ({ id: row.id, name: row.id }));
@@ -111,6 +169,8 @@ test('quick placement excludes active/suspended and future reservations but allo
   } });
   const result = await service.availability(start.toISOString());
   assert.deepEqual(result.horses.map(row => row.id), ['draft', 'ended', 'terminated']);
+  assert.equal(result.horses[1].ownerClientId, activeContract.clientId);
+  assert.equal(result.horses[0].ownerClientId, null);
   assert.deepEqual(result.stalls.map(row => row.id), ['draft', 'ended', 'terminated']);
   await assert.rejects(service.availability('invalid'), error => error.status === 400);
 });

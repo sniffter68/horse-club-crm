@@ -22,7 +22,7 @@ const contractInclude = Prisma.validator<Prisma.BoardingContractDefaultArgs>()({
 export type BoardingContractWithRelations = Prisma.BoardingContractGetPayload<typeof contractInclude>;
 
 type ContractData = {
-  clientId: string;
+  clientId: string | null;
   horseId: string;
   stallId: string | null;
   status: BoardingContractStatus;
@@ -49,10 +49,12 @@ export class BoardingContractsService {
     };
     return this.prisma.$transaction(async tx => {
       const [horses, stalls] = await Promise.all([
-        tx.horse.findMany({ where: { boardingContracts: { none: reserved } }, select: { id: true, name: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
+        tx.horse.findMany({ where: { boardingContracts: { none: reserved } }, select: { id: true, name: true,
+          boardingContracts: { select: { clientId: true }, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], take: 1 },
+        }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
         tx.stall.findMany({ where: { isUnavailable: false, contracts: { none: reserved } }, select: { id: true, name: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
       ]);
-      return { horses, stalls };
+      return { horses: horses.map(({ boardingContracts, ...horse }) => ({ ...horse, ownerClientId: boardingContracts[0]?.clientId ?? null })), stalls };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
@@ -118,7 +120,7 @@ export class BoardingContractsService {
         return tx.boardingContract.create({
           data: {
             ...data,
-            ...(Number(data.monthlyRate) > 0 ? {
+            ...(data.clientId && Number(data.monthlyRate) > 0 ? {
               payments: { create: {
                 clientId: data.clientId,
                 amount: data.monthlyRate,
@@ -142,7 +144,7 @@ export class BoardingContractsService {
         const current = await tx.boardingContract.findUnique({ where: { id } });
         if (!current) throw new NotFoundException('Договор постоя не найден');
         const data: ContractData = {
-          clientId: dto.clientId ?? current.clientId,
+          clientId: dto.clientId === undefined ? current.clientId : dto.clientId,
           horseId: dto.horseId ?? current.horseId,
           stallId: dto.stallId === undefined ? current.stallId : dto.stallId,
           status: dto.status ?? current.status,
@@ -151,6 +153,7 @@ export class BoardingContractsService {
           monthlyRate: dto.monthlyRate ?? current.monthlyRate,
           notes: dto.notes === undefined ? current.notes : dto.notes?.trim() || null,
         };
+        if (!data.clientId) data.monthlyRate = 0;
         await this.validate(tx, data, id);
         return tx.boardingContract.update({ where: { id }, data, include: contractInclude.include });
       });
@@ -168,14 +171,15 @@ export class BoardingContractsService {
   }
 
   private createData(dto: CreateBoardingContractDto): ContractData {
+    if (dto.clientId && dto.monthlyRate == null) throw new BadRequestException('Укажите стоимость частного постоя');
     return {
-      clientId: dto.clientId,
+      clientId: dto.clientId ?? null,
       horseId: dto.horseId,
       stallId: dto.stallId ?? null,
       status: dto.status ?? BoardingContractStatus.DRAFT,
       startsAt: this.date(dto.startsAt, 'Некорректная дата начала'),
       endsAt: dto.endsAt ? this.date(dto.endsAt, 'Некорректная дата окончания') : null,
-      monthlyRate: dto.monthlyRate,
+      monthlyRate: dto.clientId ? dto.monthlyRate! : 0,
       notes: dto.notes?.trim() || null,
     };
   }
@@ -185,13 +189,13 @@ export class BoardingContractsService {
       throw new BadRequestException('Дата окончания должна быть позже даты начала');
     }
     const [client, horse, stall] = await Promise.all([
-      tx.client.findUnique({ where: { id: data.clientId }, select: { id: true } }),
+      data.clientId ? tx.client.findUnique({ where: { id: data.clientId }, select: { id: true } }) : Promise.resolve(null),
       tx.horse.findUnique({ where: { id: data.horseId }, select: { id: true } }),
       data.stallId
         ? tx.stall.findUnique({ where: { id: data.stallId }, select: { id: true, isUnavailable: true } })
         : Promise.resolve(null),
     ]);
-    if (!client) throw new NotFoundException('Клиент не найден');
+    if (data.clientId && !client) throw new NotFoundException('Клиент не найден');
     if (!horse) throw new NotFoundException('Лошадь не найдена');
     if (data.stallId && !stall) throw new NotFoundException('Денник не найден');
     if (stall?.isUnavailable) throw new ConflictException('Выбранный денник недоступен');
