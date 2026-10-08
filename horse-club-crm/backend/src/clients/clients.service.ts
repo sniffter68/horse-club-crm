@@ -19,6 +19,7 @@ const paymentSummarySelect = {
 } satisfies Prisma.PaymentSelect;
 
 const clientMembershipSelect = {
+  type: true, title: true, initialUnits: true, remainingUnits: true, validFrom: true, validTo: true, status: true,
   id: true,
   totalLessons: true,
   remainedLessons: true,

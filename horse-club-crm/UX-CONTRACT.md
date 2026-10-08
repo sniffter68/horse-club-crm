@@ -120,6 +120,17 @@
 
 ## Verification
 
+### Triad booking and resource schedule
+
+- Canonical owners: `TriadBookingModal.tsx`, `ResourceSchedule.tsx` and `useTriadAvailability.ts` in `frontend/src/pages/schedule`. Reuse Ant Design Form/Modal/Select and the existing club timezone, palette and typography.
+- ADMIN/MANAGER create or edit scheduled standalone bookings; TRAINER reads the schedule. Legacy lesson actions retain their existing flow. Calendar and trainer/horse/arena day groupings show both sources without duplicating legacy booking projections.
+- Named date-control variant: the triad form uses an authored Ant Design DatePicker with time selection; existing native date filters remain unchanged. Labels, search, keyboard operation and visible focus are retained. Narrow screens stack the form and scroll the resource board internally.
+- Selecting a client displays phone, weight and active lesson/deposit balances. Overweight horses are disabled; changing to an overweight client preserves the horse choice and explains why saving is blocked.
+- Availability requests debounce and cancel on interval/client/record changes; stale responses cannot replace current data. Loading or failed availability blocks submission and offers retry. Server rules remain authoritative. HTTP 409 maps codes to inline field errors and Russian notices while preserving all input.
+- Writes are pessimistic and guarded against duplicate submission. Busy forms cannot close; abandoning a dirty draft requires explicit confirmation. Success closes the modal and refreshes the selected calendar date, bookings and workload. Scheduled bookings can be edited with their own reservation excluded from validation.
+- Horse columns show daily minutes and hatched required-rest intervals; arena columns show peak simultaneous rider count. Event buttons expose full details to keyboard users and open the appropriate detail card.
+- Verification: `frontend/e2e/triad-booking.spec.ts`, schedule regression suites, frontend unit/build checks and PostgreSQL booking integration tests. Booking creation does not itself charge a membership or deposit.
+
 - Static: premium strict audit, forbidden-blue grep, lint, typecheck, unit tests, production build.
 - Browser: dashboard, clients, schedule; desktop and narrow viewport; light/dark/reduced motion when available.
 - Canonical sibling flow: shared catalog list/create/edit.

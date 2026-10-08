@@ -6,6 +6,8 @@ export interface Lesson {
   bookings: { id: string; client: Client; horse: Horse | null; membership: MembershipSummary | null }[];
 }
 export interface MembershipSummary {
+  type?: 'fixed_lessons' | 'deposit' | 'boarding'; title?: string; initialUnits?: number | string; remainingUnits?: number | string;
+  validFrom?: string; validTo?: string; status?: 'active' | 'frozen' | 'expired' | 'exhausted';
   id: string; totalLessons: number; remainedLessons: number; validUntil: string; isActive?: boolean;
   pricingPlan?: { id: string; name: string } | null;
 }

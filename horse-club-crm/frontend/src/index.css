@@ -294,6 +294,58 @@ html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); borde
 .quick-boarding-form { padding-top: 12px; }
 .quick-boarding-feedback { width: 100%; margin-bottom: 16px; }
 .quick-boarding-form .ant-alert { margin-block: 12px; }
+.triad-booking-modal .ant-modal-body { max-height: calc(100dvh - 190px); overflow-y: auto; }
+.triad-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.triad-form-grid .ant-picker { width: 100%; }
+.triad-feedback { margin-block: 12px; }
+.triad-client-summary { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; margin-block: -8px 20px; border: 1px solid var(--crm-hairline); border-radius: 12px; background: var(--crm-paper); overflow-wrap: anywhere; }
+.triad-client-summary strong { font-family: var(--crm-serif); font-size: 18px; }
+.triad-client-summary span, .triad-load { font-size: 13px; font-variant-numeric: tabular-nums; }
+.triad-actions { margin-top: 8px; }
+.resource-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; font-size: 13px; color: var(--crm-saddle); }
+.resource-rest-key { padding-inline-start: 12px; border-inline-start: 8px solid var(--crm-beige); }
+.resource-board { width: 100%; max-height: 720px; overflow: auto; border: 1px solid var(--crm-hairline); border-radius: 12px; background: var(--crm-paper); }
+.resource-board-inner { display: flex; min-width: 100%; width: max-content; align-items: stretch; }
+.resource-ruler { position: sticky; left: 0; z-index: 6; flex: 0 0 64px; width: 64px; background: var(--crm-paper); border-inline-end: 1px solid var(--crm-hairline); }
+.resource-ruler > div:last-child { position: relative; }
+.resource-ruler .resource-header { padding: 8px; font-size: 12px; white-space: nowrap; }
+.resource-tick { position: absolute; left: 8px; font-family: var(--crm-mono); font-size: 12px; color: var(--crm-saddle); }
+.resource-column { flex: 1 0 260px; min-width: 260px; width: 260px; border-inline-end: 1px solid var(--crm-hairline); }
+.resource-column--arenas { flex-basis: 360px; min-width: 360px; width: 360px; }
+.resource-header { display: flex; position: sticky; top: 0; z-index: 5; flex-direction: column; justify-content: center; gap: 6px; height: 108px; box-sizing: border-box; padding: 12px; background: var(--crm-paper); border-bottom: 1px solid var(--crm-hairline); overflow-wrap: anywhere; }
+.resource-header strong { font-family: var(--crm-serif); font-size: 19px; }
+.resource-header .ant-progress { margin: 0; }
+.resource-data { font-family: var(--crm-mono); font-size: 12px; }
+.resource-lane { position: relative; overflow: hidden; }
+.resource-slot { position: absolute; left: 0; width: 100%; padding: 0; background: transparent; border: 0; border-bottom: 1px solid var(--crm-hairline); cursor: pointer; }
+.resource-slot:hover:not(:disabled) { background: rgb(114 76 57 / 8%); }
+.resource-slot:disabled { cursor: default; }
+.resource-slot:focus-visible, .resource-booking:focus-visible, .resource-board:focus-visible { outline: 2px solid var(--crm-saddle); outline-offset: -2px; }
+.resource-rest { position: absolute; left: 0; width: 100%; box-sizing: border-box; background: repeating-linear-gradient(-45deg, rgb(114 76 57 / 6%), rgb(114 76 57 / 6%) 5px, rgb(114 76 57 / 14%) 5px, rgb(114 76 57 / 14%) 6px); border: 1px dashed var(--crm-saddle); pointer-events: none; }
+.resource-rest span { display: block; padding: 5px 8px; font-size: 12px; color: var(--crm-saddle); }
+.resource-booking { position: absolute; display: flex; flex-direction: column; gap: 3px; box-sizing: border-box; padding: 6px 9px; margin-left: 2px; text-align: start; background: var(--crm-saddle); color: #fff; border: 0; border-radius: 8px; overflow: hidden; cursor: pointer; font: inherit; font-size: 12px; line-height: 1.3; }
+.resource-booking > * { flex-shrink: 0; }
+.resource-booking b { font-family: var(--crm-mono); font-weight: 500; }
+.resource-booking strong { font-family: var(--crm-serif); font-size: 15px; }
+.resource-booking--completed { background: #3e5f48; }
+.resource-booking--cancelled { background: #8c6527; }
+.resource-book-action { margin-top: 16px; }
+@media (max-width: 767px) {
+  .triad-form-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .triad-booking-modal .ant-modal-body { max-height: calc(100dvh - 120px); }
+  .triad-date-popup { position: fixed !important; inset: 16px auto auto 16px !important; transform: none !important; }
+  .triad-date-popup .ant-picker-datetime-panel { flex-direction: column; }
+  .triad-date-popup .ant-picker-date-panel, .triad-date-popup .ant-picker-time-panel { width: min(280px, calc(100vw - 48px)); }
+  .triad-date-popup .ant-picker-time-panel { border-inline-start: 0; border-top: 1px solid var(--crm-hairline); }
+  .triad-date-popup .ant-picker-content, .triad-date-popup .ant-picker-time-panel-column { max-height: 180px; }
+  .triad-date-popup .ant-picker-panel-container { max-height: calc(100dvh - 32px); overflow-y: auto; }
+  .resource-board { max-height: 65dvh; }
+  .resource-header { height: 112px; }
+  .resource-ruler { flex-basis: 54px; width: 54px; }
+  .triad-actions { display: flex; }
+  .triad-actions > .ant-space-item { flex: 1; }
+  .triad-actions .ant-btn { width: 100%; }
+}
 .quick-boarding-dialog .ant-modal-body { max-height: calc(100dvh - 260px); overflow-y: auto; }
 @media (max-width: 767px) {
   .quick-boarding-dialog .ant-modal-body { max-height: calc(100dvh - 180px); }

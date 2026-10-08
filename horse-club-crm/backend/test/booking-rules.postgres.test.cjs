@@ -97,6 +97,26 @@ test('PostgreSQL booking rules, rollback, HTTP contract and concurrent triad wri
       await p.lesson.update({ where: { id: lesson.id }, data: { status: 'CANCELLED' } });
       await service.createBooking({ ...dto, startTime: '2030-01-08T08:00Z', endTime: '2030-01-08T08:30Z' });
     });
+    await t.test('read models, exclusion and transactional reschedule', async () => {
+      const dto = await resources();
+      const first = await service.createBooking(dto);
+      const query = { from: dto.startTime, to: dto.endTime };
+      const list = await service.findAll({ ...query, horseId: dto.horseId });
+      assert.equal(list.total, 1); assert.equal(list.data[0].client.id, dto.clientId);
+      const availability = await service.availability(query);
+      assert.equal(availability.horseWorkloads.find(h => h.horseId === dto.horseId).currentWorkloadMinutes, 30);
+      assert.equal(availability.arenaOccupancy.find(a => a.arenaId === dto.arenaId).occupied, 1);
+      const excluded = await service.availability({ ...query, excludeBookingId: first.id });
+      assert.equal(excluded.horseWorkloads.find(h => h.horseId === dto.horseId).currentWorkloadMinutes, 0);
+      await service.updateBooking(first.id, { ...dto, costAmount: 1234.56 });
+      assert.equal((await p.booking.findUniqueOrThrow({ where: { id: first.id } })).costAmount.toString(), '1234.56');
+      await service.createBooking({ ...dto, startTime: '2030-01-08T12:00Z', endTime: '2030-01-08T12:30Z' });
+      await assert.rejects(service.updateBooking(first.id, { ...dto, startTime: '2030-01-08T11:30Z', endTime: '2030-01-08T12:00Z' }), hasCode('HORSE_REST_VIOLATION'));
+      assert.equal((await p.booking.findUniqueOrThrow({ where: { id: first.id } })).startTime.toISOString(), '2030-01-08T10:00:00.000Z');
+      await p.booking.update({ where: { id: first.id }, data: { status: 'completed' } });
+      await assert.rejects(service.updateBooking(first.id, dto), hasCode('BOOKING_NOT_EDITABLE'));
+      await assert.rejects(service.findAll({ from: '2030-01-01', to: '2030-01-02' }), e => e.getStatus() === 400);
+    });
     await t.test('HTTP RBAC, DTO validation and structured conflict response', async () => {
       const { Test } = require('@nestjs/testing');
       const { ValidationPipe } = require('@nestjs/common');
@@ -117,7 +137,14 @@ test('PostgreSQL booking rules, rollback, HTTP contract and concurrent triad wri
       const response = await request(app.getHttpServer()).post('/bookings').set('x-role', 'MANAGER').send(dto).expect(409);
       assert.equal(response.body.code, 'RIDER_WEIGHT_EXCEEDED'); assert.equal(response.body.error, 'BookingValidationError');
       await p.client.update({ where: { id: dto.clientId }, data: { weightKg: null } });
-      await request(app.getHttpServer()).post('/bookings').set('x-role', 'ADMIN').send(dto).expect(201);
+      const created = await request(app.getHttpServer()).post('/bookings').set('x-role', 'ADMIN').send(dto).expect(201);
+      const query = { from: dto.startTime, to: dto.endTime, horseId: dto.horseId };
+      const listing = await request(app.getHttpServer()).get('/bookings').set('x-role', 'TRAINER').query(query).expect(200);
+      assert.equal(listing.headers['x-total-count'], '1'); assert.equal(listing.body[0].id, created.body.id);
+      await request(app.getHttpServer()).get('/bookings/availability').set('x-role', 'TRAINER').query({ from: dto.startTime, to: dto.endTime }).expect(200);
+      await request(app.getHttpServer()).patch(`/bookings/${created.body.id}`).set('x-role', 'TRAINER').send(dto).expect(403);
+      await request(app.getHttpServer()).patch(`/bookings/${created.body.id}`).set('x-role', 'MANAGER').send(dto).expect(200);
+      await request(app.getHttpServer()).get('/bookings').set('x-role', 'ADMIN').query({ from: 'bad', to: dto.endTime }).expect(400);
     });
   } finally {
     if (app) await app.close();

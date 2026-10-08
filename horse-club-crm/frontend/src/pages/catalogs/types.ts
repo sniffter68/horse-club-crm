@@ -3,6 +3,8 @@ export interface ClientValues {
   isRider: boolean; isPayer: boolean; preferences?: string; medicalNotes?: string;
 }
 export interface Client extends Omit<ClientValues, 'phone' | 'preferences' | 'medicalNotes'> {
+  weightKg?: string | number | null;
+  membership?: { planName: string; remainingUnits: number; totalUnits: number; status: string } | null;
   vkUserId?: string | null;
   id: string; createdAt: string; phone: string | null; preferences: string | null; medicalNotes?: string | null;
 }
@@ -10,7 +12,8 @@ export interface HorseValues {
   feedingNotes?: string | null;
   name: string; breed?: string; riderLevel?: string; maxDailyMinutes: number; minRestMinutes: number; isUnavailable: boolean;
 }
-export interface Horse extends Omit<HorseValues, 'breed' | 'riderLevel'> { id: string; breed: string | null; riderLevel: string | null }
+export interface Horse extends Omit<HorseValues, 'breed' | 'riderLevel'> { id: string; breed: string | null; riderLevel: string | null;
+  status?: 'active' | 'rest' | 'sick' | 'quarantine'; maxRiderWeight?: number; maxDailyWorkloadMinutes?: number; requiredRestMinutes?: number }
 export interface RelationPayment {
   id: string; amount: string | number; status: 'PENDING' | 'PAID' | 'REFUNDED' | 'CANCELLED';
   paidAt: string | null; createdAt: string; description?: string | null;
@@ -34,6 +37,7 @@ export interface HorseDetails extends Horse {
 }
 export interface TrainerValues { name: string; phone?: string; qualification?: string; maxDailyLoad: number; baseRate?: number }
 export interface Trainer extends Omit<TrainerValues, 'baseRate' | 'phone' | 'qualification'> {
+  fullName?: string; specializations?: string[]; isActive?: boolean;
   vkUserId?: string | null;
   id: string; baseRate?: string | number; phone: string | null; qualification: string | null;
 }
@@ -43,7 +47,7 @@ export interface ServiceValues {
 }
 export interface Service extends Omit<ServiceValues, 'price'> { id: string; price?: string | number }
 export interface ArenaValues { name: string; description?: string; capacity: number; isUnavailable: boolean }
-export interface Arena extends Omit<ArenaValues, 'description'> { id: string; description: string | null; createdAt: string; updatedAt: string }
+export interface Arena extends Omit<ArenaValues, 'description'> { id: string; description: string | null; createdAt: string; updatedAt: string; maxRidersCapacity?: number; isActive?: boolean }
 export interface StallValues { name: string; description?: string; isUnavailable: boolean }
 export interface StallContractSummary {
   id: string; status: 'DRAFT' | 'ACTIVE' | 'SUSPENDED'; startsAt: string; endsAt: string | null;

@@ -99,3 +99,12 @@ cancelled history, HTTP permissions and structured errors. Run the same isolated
 database verification commands above; the runner executes both integration files.
 Direct SQL writes and future booking status/update endpoints must also honor these
 locks and rules; this service is not a database exclusion constraint.
+
+## Block 1.3: schedule read models and editing
+
+- `GET /api/bookings?from=...&to=...` returns paginated standalone bookings with minimal client, horse, trainer and arena relations and Refine total headers. Optional `trainerId`, `horseId`, `arenaId` filters apply. Legacy lessons remain on their existing endpoint, preventing duplicate display.
+- `GET /api/bookings/availability?from=...&to=...` returns `date`, `horseWorkloads` and `arenaOccupancy`. The former counts clipped minutes on the club day containing `from`; the latter counts peak simultaneous riders within the requested interval. Both include current scheduled/completed legacy lessons and standalone bookings, under a RepeatableRead snapshot. Optional `excludeBookingId` / `excludeLessonId` support edit previews.
+- Both read endpoints allow ADMIN/MANAGER/TRAINER and require zoned ISO timestamps, a positive interval and a maximum range of 62 days.
+- `PATCH /api/bookings/:id` allows ADMIN/MANAGER and accepts the complete create DTO. Only scheduled standalone bookings can be edited (`BOOKING_NOT_EDITABLE` otherwise). The Serializable rules transaction excludes the current booking, retains resource locking/retries and rolls back the entire update on conflict. Membership ownership is still checked; no automatic debit is introduced.
+- The frontend combines both read sources, uses club-local dates, refreshes all views on save and maps typed conflicts to the relevant form field. Availability is advisory; POST/PATCH always rerun authoritative rules.
+- PostgreSQL integration tests cover the new read/availability contracts, exclusion, update rollback and HTTP permissions alongside concurrent creation and legacy interoperability.

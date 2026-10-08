@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DateTime } from 'luxon'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -14,16 +15,19 @@ import { CLUB_TIME_ZONE, formatTime, toInstant, toLocalInput } from './time'
 import { statuses, type BookingParticipantValues, type BookingValues, type ClientWithMemberships, type ClubSchedule, type DailyHorseWorkload, type Lesson, type MembershipSummary, type Status } from './types'
 import { HorseWorkloadBadge, HorseWorkloadList } from './workload'
 import { useHorseWorkloads } from './useHorseWorkloads'
+import { TriadBookingModal } from './TriadBookingModal'
+import { ResourceSchedule, type ResourceGrouping } from './ResourceSchedule'
+import { bookingStatusLabels, clientName as personName, dayBounds, disciplines, scheduleEntries, type ScheduleEntry, type TriadBooking, type TriadValues } from './triad'
+import { useTriadAvailability } from './useTriadAvailability'
 
-async function catalog<T>(resource: string, signal: AbortSignal): Promise<T[]> {
+async function catalog<T>(resource: string, signal: AbortSignal, params: Record<string, string | undefined> = {}): Promise<T[]> {
   const records: T[] = []
   for (let start = 0; ; start += 100) {
-    const response = await httpClient.get<T[]>(`${API_URL}/${resource}`, { signal, params: { _start: start, _end: start + 100 } })
+    const response = await httpClient.get<T[]>(`${API_URL}/${resource}`, { signal, params: { ...params, _start: start, _end: start + 100 } })
     records.push(...response.data)
     if (response.data.length < 100 || records.length >= Number(response.headers['x-total-count'])) return records
   }
 }
-const personName = (client: Client) => [client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || client.id
 const membershipDate = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeZone: CLUB_TIME_ZONE })
 const lessonHorses = (lesson: Lesson) => [...new Set(lesson.bookings.map(booking => booking.horse?.name).filter((name): name is string => Boolean(name)))]
 
@@ -144,13 +148,23 @@ export function SchedulePage() {
   const [horseId, setHorseId] = useState<string>()
   const [arenaId, setArenaId] = useState<string>()
   const [lessons, setLessons] = useState<Lesson[]>([])
+  const [triadBookings, setTriadBookings] = useState<TriadBooking[]>([])
+  const [triadLoading, setTriadLoading] = useState(false)
+  const [triadError, setTriadError] = useState<string>()
+  const [grouping, setGrouping] = useState<ResourceGrouping>('calendar')
+  const [triadSeed, setTriadSeed] = useState<Partial<TriadValues>>()
+  const [editingTriad, setEditingTriad] = useState<TriadBooking>()
+  const [triadDetail, setTriadDetail] = useState<TriadBooking>()
   const [loading, setLoading] = useState(false)
   const [bookingOpen, setBookingOpen] = useState(false)
   const [editingLesson, setEditingLesson] = useState<Lesson>()
   const calendarRef = useRef<FullCalendar>(null)
   const [workloadDate, setWorkloadDate] = useState(() => toLocalInput(new Date()).slice(0, 10))
-  const [workloadOpen, setWorkloadOpen] = useState(false)
   const [workloadRevision, setWorkloadRevision] = useState(0)
+  const dayRange = dayBounds(workloadDate)
+  const triadAvailability = useTriadAvailability(dayRange.from, dayRange.to, revision + workloadRevision, report)
+  const entries = useMemo(() => scheduleEntries(lessons, triadBookings), [lessons, triadBookings])
+  const [workloadOpen, setWorkloadOpen] = useState(false)
   const [detail, setDetail] = useState<Lesson>()
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
@@ -199,6 +213,38 @@ export function SchedulePage() {
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [range, trainerId, horseId, arenaId, revision, report])
+
+  useEffect(() => {
+    if (!range) return
+    const controller = new AbortController()
+    void Promise.resolve().then(async () => {
+      if (controller.signal.aborted) return
+      setTriadLoading(true); setTriadError(undefined)
+      try {
+        const rows = await catalog<TriadBooking>('bookings', controller.signal, { ...range, trainerId, horseId, arenaId })
+        if (!controller.signal.aborted) setTriadBookings(rows)
+      } catch (cause) {
+        if (controller.signal.aborted) return
+        const error = toHttpError(cause)
+        setTriadBookings([]); setTriadError(error.message)
+        if (error.statusCode === 401) report(cause)
+      } finally { if (!controller.signal.aborted) setTriadLoading(false) }
+    })
+    return () => controller.abort()
+  }, [range, trainerId, horseId, arenaId, revision, report])
+
+  useEffect(() => { if (grouping === 'calendar') calendarRef.current?.getApi().updateSize() }, [grouping])
+
+  function openTriad(values: Partial<TriadValues> = {}, booking?: TriadBooking) {
+    if (!canManage || !ready) return
+    const startTime = values.startTime ?? `${workloadDate}T${schedule?.openTime ?? '09:00'}`
+    setEditingTriad(booking); setTriadDetail(undefined)
+    setTriadSeed({ trainerId, horseId, arenaId, startTime, endTime: DateTime.fromISO(startTime, { zone: CLUB_TIME_ZONE }).plus({ minutes: 60 }).toFormat("yyyy-MM-dd'T'HH:mm"), ...values })
+  }
+  function openEntry(entry: ScheduleEntry) {
+    if (entry.source === 'lesson') { setError(undefined); setDetail(lessons.find(l => l.id === entry.id)) }
+    else setTriadDetail(triadBookings.find(b => b.id === entry.id))
+  }
 
   function openBooking(start: Date, minutes = 60) {
     if (!canManage || !ready || savingRef.current) return
@@ -276,12 +322,23 @@ export function SchedulePage() {
         setWorkloadDate(date); calendarRef.current?.getApi().gotoDate(date)
       }} /></label>
       <Button onClick={() => setWorkloadOpen(true)}>Нагрузка лошадей</Button>
-      {canManage && <Button type="primary" disabled={!ready} onClick={() => openBooking(new Date(toInstant(`${workloadDate}T${schedule?.openTime ?? '09:00'}`)))}>Новое занятие</Button>}
+      <Select aria-label="Группировка расписания" value={grouping} style={{ width: compactLayout ? '100%' : 210 }} onChange={setGrouping}
+        options={[{ value: 'calendar', label: 'Календарь' }, { value: 'trainers', label: 'По тренерам' }, { value: 'horses', label: 'По лошадям' }, { value: 'arenas', label: 'По локациям' }]} />
+      {canManage && <Button type="primary" disabled={!ready} onClick={() => openTriad()}>Новое бронирование</Button>}
+      {canManage && <Button disabled={!ready} onClick={() => openBooking(new Date(toInstant(`${workloadDate}T${schedule?.openTime ?? '09:00'}`)))}>Новое занятие</Button>}
     </Space>
+    {(triadError || triadAvailability.error) && <Alert type="error" showIcon message="Не удалось загрузить бронирования или доступность ресурсов" description={triadError || triadAvailability.error}
+      action={<Button onClick={() => setRevision(r => r + 1)}>Повторить загрузку</Button>} />}
+    {grouping !== 'calendar' && <Space wrap><Button onClick={() => { const next = DateTime.fromISO(workloadDate).minus({ days: 1 }).toISODate()!; setWorkloadDate(next); calendarRef.current?.getApi().gotoDate(next) }}>Предыдущий день</Button>
+      <Button onClick={() => { const next = DateTime.fromISO(workloadDate).plus({ days: 1 }).toISODate()!; setWorkloadDate(next); calendarRef.current?.getApi().gotoDate(next) }}>Следующий день</Button></Space>}
     {dayWorkloads.error && <Alert type="error" showIcon message="Не удалось загрузить нагрузку лошадей" description={dayWorkloads.error}
       action={<Button onClick={() => setWorkloadRevision(value => value + 1)}>Повторить</Button>} />}
     <Space wrap>{Object.entries(statuses).map(([status, item]) => <Tag className="status-badge" bordered={false} key={status} style={{ background: item.background, color: item.text }}>{item.label}</Tag>)}</Space>
-    <Card className="schedule-calendar"><Spin spinning={loading || (!ready && !error)}>
+    <Card className="schedule-calendar"><Spin spinning={loading || triadLoading || (!ready && !error)}>
+      {grouping !== 'calendar' && schedule && <ResourceSchedule grouping={grouping} date={workloadDate} schedule={schedule} entries={entries}
+        trainers={trainers.filter(t => !trainerId || t.id === trainerId)} horses={horses.filter(h => !horseId || h.id === horseId)} arenas={arenas.filter(a => !arenaId || a.id === arenaId)}
+        workloads={triadAvailability.data?.horseWorkloads ?? []} occupancy={triadAvailability.data?.arenaOccupancy} canManage={canManage && ready} onBook={openTriad} onOpen={openEntry} />}
+      <div hidden={grouping !== 'calendar'}>
       {schedule && <FullCalendar ref={calendarRef} plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin, luxonPlugin]} locale={ruLocale}
         timeZone={CLUB_TIME_ZONE} initialView={compactLayout ? 'timeGridDay' : 'timeGridWeek'}
         headerToolbar={compactLayout ? { left: 'prev,next', center: 'title', right: 'today' } : { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' }}
@@ -293,19 +350,38 @@ export function SchedulePage() {
           setWorkloadDate(toLocalInput(view.calendar.getDate()).slice(0, 10))
         }}
         select={({ start, end, view }) => { openBooking(start, Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000))); view.calendar.unselect() }}
-        events={lessons.map(lesson => ({ id: lesson.id, title: `${lesson.service.title || lesson.service.name} · ${lesson.trainer.name}${lessonHorses(lesson).length ? ` · ${lessonHorses(lesson).join(', ')}` : ''}`, start: lesson.startTime, end: lesson.endTime, backgroundColor: statuses[lesson.status].event, borderColor: statuses[lesson.status].event, textColor: '#FFFFFF' }))}
+        events={[
+          ...lessons.map(lesson => ({ id: lesson.id, title: `${lesson.service.title || lesson.service.name} · ${lesson.trainer.name}${lessonHorses(lesson).length ? ` · ${lessonHorses(lesson).join(', ')}` : ''}`, start: lesson.startTime, end: lesson.endTime, backgroundColor: statuses[lesson.status].event, borderColor: statuses[lesson.status].event, textColor: '#FFFFFF' })),
+          ...triadBookings.map(booking => ({ id: `triad:${booking.id}`, title: `${booking.horse.name} · ${personName(booking.client)} · ${disciplines[booking.serviceType]}`, start: booking.startTime, end: booking.endTime,
+            backgroundColor: booking.status === 'completed' ? '#3E5F48' : booking.status === 'scheduled' ? '#724C39' : '#8C6527', borderColor: 'transparent', textColor: '#FFFFFF' })),
+        ]}
         eventContent={({ event, timeText }) => {
+          if (event.id.startsWith('triad:')) {
+            const booking = triadBookings.find(b => `triad:${b.id}` === event.id)
+            return booking ? <div className="schedule-event-content"><strong>{timeText} · {booking.horse.name}</strong><div>{booking.trainer.fullName || booking.trainer.name} · {personName(booking.client)}</div><div>{disciplines[booking.serviceType]} · {bookingStatusLabels[booking.status]}</div></div> : null
+          }
           const lesson = lessons.find(item => item.id === event.id)
           if (!lesson) return null
           const date = toLocalInput(new Date(lesson.startTime)).slice(0, 10)
-          return <div className="schedule-event-content"><strong>{timeText}</strong><div>{lesson.service.title || lesson.service.name} · {lesson.trainer.name}</div>
+          return <div className="schedule-event-content"><strong>{timeText}</strong><div>{lesson.service.title || lesson.service.name} · {lesson.trainer.name}</div><div>{lesson.bookings.map(b => personName(b.client)).join(', ')} · {statuses[lesson.status].label}</div>
             {lesson.bookings.filter(booking => booking.horse).map(booking => <div key={booking.id} className="schedule-event-horse">
               <span>{booking.horse?.name}</span><HorseWorkloadBadge date={date} workload={dayWorkloads.byDate[date]?.find(row => row.horseId === booking.horse?.id)} />
             </div>)}
           </div>
         }}
-        eventClick={({ event }) => { setError(undefined); const lesson = lessons.find(lesson => lesson.id === event.id); setDetail(lesson); if (lesson) setWorkloadDate(toLocalInput(new Date(lesson.startTime)).slice(0, 10)) }} />}
+        eventClick={({ event }) => { if (event.id.startsWith('triad:')) { setTriadDetail(triadBookings.find(b => `triad:${b.id}` === event.id)); return } setError(undefined); const lesson = lessons.find(lesson => lesson.id === event.id); setDetail(lesson); if (lesson) setWorkloadDate(toLocalInput(new Date(lesson.startTime)).slice(0, 10)) }} />}
+      </div>
     </Spin></Card>
+    {triadSeed && <TriadBookingModal initial={triadSeed} booking={editingTriad} clients={clients} horses={horses} trainers={trainers} arenas={arenas} report={report}
+      onClose={() => setTriadSeed(undefined)} onSaved={start => { setTriadSeed(undefined); setEditingTriad(undefined); setWorkloadDate(start.slice(0, 10)); calendarRef.current?.getApi().gotoDate(start.slice(0, 10)); setRevision(r => r + 1) }} />}
+    <Modal open={Boolean(triadDetail)} title="Карточка бронирования" footer={null} onCancel={() => setTriadDetail(undefined)} destroyOnHidden>
+      {triadDetail && <Space direction="vertical" style={{ width: '100%' }}><Tag>{bookingStatusLabels[triadDetail.status]}</Tag><Descriptions column={1} items={[
+        { key: 'horse', label: 'Лошадь', children: triadDetail.horse.name }, { key: 'trainer', label: 'Тренер', children: triadDetail.trainer.fullName || triadDetail.trainer.name },
+        { key: 'client', label: 'Всадник', children: personName(triadDetail.client) }, { key: 'arena', label: 'Локация', children: triadDetail.arena.name },
+        { key: 'time', label: 'Интервал', children: `${formatTime(triadDetail.startTime)} — ${formatTime(triadDetail.endTime)}` }, { key: 'discipline', label: 'Дисциплина', children: disciplines[triadDetail.serviceType] },
+      ]} />{canManage && <Button disabled={triadDetail.status !== 'scheduled' || !ready} onClick={() => openTriad({ clientId: triadDetail.clientId, horseId: triadDetail.horseId, trainerId: triadDetail.trainerId,
+        arenaId: triadDetail.arenaId, membershipId: triadDetail.membershipId ?? undefined, startTime: toLocalInput(new Date(triadDetail.startTime)), endTime: toLocalInput(new Date(triadDetail.endTime)), serviceType: triadDetail.serviceType, costAmount: Number(triadDetail.costAmount) }, triadDetail)}>Редактировать бронирование</Button>}</Space>}
+    </Modal>
     <Modal title={editingLesson ? 'Перенос занятия' : 'Быстрое бронирование'} open={bookingOpen} onCancel={() => { if (!saving) setBookingOpen(false) }} footer={null} forceRender width={720}>
       {failure}
       <Form form={form} noValidate layout="vertical" onFinish={createBooking} disabled={saving}>
@@ -377,8 +453,8 @@ export function SchedulePage() {
       </Space>}
     </Modal>
     <Modal title={`Нагрузка лошадей · ${workloadDate.split('-').reverse().join('.')}`} open={workloadOpen} onCancel={() => setWorkloadOpen(false)} footer={null} width={600} destroyOnHidden>
-      <HorseWorkloadList key={workloadDate} rows={dayWorkloads.byDate[workloadDate] ?? []} loading={dayWorkloads.loading}
-        error={dayWorkloads.error} onRefresh={() => setWorkloadRevision(value => value + 1)} />
+      <HorseWorkloadList key={workloadDate} rows={triadAvailability.data?.horseWorkloads ?? dayWorkloads.byDate[workloadDate] ?? []} loading={dayWorkloads.loading || triadAvailability.loading}
+        error={triadAvailability.error || dayWorkloads.error} onRefresh={() => setWorkloadRevision(value => value + 1)} />
     </Modal>
   </Space>
 }

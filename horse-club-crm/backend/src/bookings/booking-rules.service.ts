@@ -10,6 +10,7 @@ export interface BookingRuleInput {
   start: Date;
   end: Date;
   excludeLessonId?: string;
+  excludeBookingId?: string;
   /** Existing participants when adding riders to one legacy group lesson. */
   existingRiders?: number;
 }
@@ -102,6 +103,7 @@ export class BookingRulesService {
   private async reservations(tx: Prisma.TransactionClient, input: BookingRuleInput, horseIds: string[], start: Date, end: Date): Promise<Reservation[]> {
     const direct = await tx.booking.findMany({ where: {
       lessonId: null, status: { in: ['scheduled', 'completed'] }, startTime: { lt: end }, endTime: { gt: start },
+      ...(input.excludeBookingId ? { id: { not: input.excludeBookingId } } : {}),
       OR: [{ trainerId: input.trainerId }, ...(input.arenaId ? [{ arenaId: input.arenaId }] : []), { horseId: { in: horseIds } }],
     } });
     const lessons = await tx.lesson.findMany({ where: {

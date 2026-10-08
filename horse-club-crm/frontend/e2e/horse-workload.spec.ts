@@ -13,6 +13,11 @@ const workloads = (date: string | null, exclude?: string | null) => [
 ]
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/bookings?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
+  await page.route('**/api/bookings/availability?*', route => {
+    const date = new URL(route.request().url()).searchParams.get('from')?.slice(0, 10) || '2026-10-08'
+    return route.fulfill({ json: { date, horseWorkloads: workloads('2026-10-08'), arenaOccupancy: [] } })
+  })
   await page.clock.setFixedTime(new Date('2026-10-08T09:00:00Z'))
   await page.addInitScript(() => {
     localStorage.setItem('horsecrm.access_token', 'cookie-session')
@@ -111,6 +116,7 @@ test('API failure blocks selected horses, supports retry and empty daily state',
   await expect(modal.getByText('Доступно: 20 из 120 мин')).toBeVisible()
   await modal.getByRole('button', { name: 'Close', exact: true }).click()
   await page.route('**/api/horses/workload?*', route => route.fulfill({ json: [] }))
+  await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { date: '2026-10-08', horseWorkloads: [], arenaOccupancy: [] } }))
   await page.getByRole('button', { name: 'Нагрузка лошадей', exact: true }).click()
   const panel = page.getByRole('dialog', { name: /Нагрузка лошадей/ })
   await panel.getByRole('button', { name: 'Обновить нагрузку', exact: true }).click()
