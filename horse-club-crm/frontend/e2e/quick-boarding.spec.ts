@@ -246,12 +246,13 @@ for (const width of [1280, 320]) test(`feeding edit preserves drafts on failure,
   await expect(feeding.getByText('Режим кормления пока не указан.')).toBeVisible()
   await feeding.getByRole('button', { name: 'Редактировать кормление' }).click()
   const notes = feeding.getByRole('textbox', { name: 'Рацион, подкормки и особенности' })
+  await expect(notes).toHaveValue('Утро: \nДень: \nВечер: \nСено, подкормки и особенности: ')
   await notes.fill('Черновик')
   await notes.press('Escape')
   await expect(feeding.getByText('Режим кормления пока не указан.')).toBeVisible()
   await expect(card).toBeVisible()
   await feeding.getByRole('button', { name: 'Редактировать кормление' }).click()
-  await expect(notes).toHaveValue('')
+  await expect(notes).toHaveValue('Утро: \nДень: \nВечер: \nСено, подкормки и особенности: ')
   await notes.fill('Утро: 2 кг овса\nВечер: сено\nПодкормка по назначению')
   let attempts = 0
   await page.route('**/api/horses/h1', async route => {
@@ -270,6 +271,7 @@ for (const width of [1280, 320]) test(`feeding edit preserves drafts on failure,
   expect(state.feedingNotes).toBe('Утро: 2 кг овса\nВечер: сено\nПодкормка по назначению')
   await page.screenshot({ path: `test-results/horse-feeding-${width}.png`, fullPage: true, animations: 'disabled' })
   await feeding.getByRole('button', { name: 'Редактировать кормление' }).click()
+  await expect(notes).toHaveValue(state.feedingNotes!)
   await notes.fill('  ')
   await feeding.getByRole('button', { name: 'Сохранить кормление' }).click()
   await expect(feeding.getByText('Режим кормления пока не указан.')).toBeVisible()

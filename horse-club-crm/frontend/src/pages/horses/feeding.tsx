@@ -6,6 +6,7 @@ import { useCatalogPermissions } from '../catalogs/permissions'
 import type { Horse } from '../catalogs/types'
 
 const FeedingField = Form.Item
+export const DEFAULT_FEEDING_TEMPLATE = 'Утро: \nДень: \nВечер: \nСено, подкормки и особенности: '
 
 export function HorseFeeding({ horse, disabled }: { horse: Horse; disabled: boolean }) {
   const { canManage } = useCatalogPermissions()
@@ -53,7 +54,7 @@ export function HorseFeeding({ horse, disabled }: { horse: Horse; disabled: bool
         {horse.feedingNotes || 'Режим кормления пока не указан.'}
       </Typography.Paragraph>
       {canManage && <Button size="small" disabled={disabled} onClick={() => {
-        form.setFieldsValue({ feedingNotes: horse.feedingNotes || '' }); setError(undefined); setEditing(true)
+        form.setFieldsValue({ feedingNotes: horse.feedingNotes?.trim() ? horse.feedingNotes : DEFAULT_FEEDING_TEMPLATE }); setError(undefined); setEditing(true)
       }}>Редактировать кормление</Button>}
     </>}
   </section>
