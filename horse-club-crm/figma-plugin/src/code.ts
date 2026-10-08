@@ -13,93 +13,161 @@ type HorizontalTextAlignment = 'LEFT' | 'CENTER' | 'RIGHT' | 'JUSTIFIED';
 interface TextOptions {
   content: string;
   name: string;
-  color: string;
+  color?: string;
   fontName?: FontName;
   fontSize: number;
   width: number;
   lineHeight?: number;
   letterSpacing?: number;
   textAlign?: HorizontalTextAlignment;
-  opacity?: number;
 }
 
-interface InfrastructureCardContent {
-  badge: string;
-  title: string;
-  description: string;
-  specs: ReadonlyArray<readonly [string, string]>;
-  gradient: readonly [string, string];
-}
-
-interface ServiceCardContent {
-  category: string;
-  title: string;
+interface PackageContent {
+  name: string;
+  eyebrow: string;
   price: string;
+  description: string;
+  features: readonly string[];
+  featured: boolean;
+}
+
+interface CoachContent {
+  role: string;
+  rank: 'МСМК' | 'МС' | 'КМС';
+  specialization: string;
+  experience: string;
+  description: string;
+}
+
+interface LogisticsContent {
+  label: string;
+  value: string;
   description: string;
 }
 
 const PLUGIN_OWNER = 'slks-tambov-landing-builder';
-const FRAME_NAME = 'СЛКС Тамбов — Лендинг';
+const FRAME_NAME = 'СЛКС Тамбов — Конный клуб';
 const UI_WIDTH = 360;
-const PAGE = { width: 1440, height: 4510 } as const;
+const CONTENT_WIDTH = 1280;
 
 const COLORS = {
-  background: '#0B0C0E',
-  surface: '#121614',
-  surfaceElevated: '#171C19',
-  text: '#F5F7F6',
-  textMuted: '#A8AFAB',
-  textDim: '#737B77',
-  accent: '#AEC7B8',
-  accentDark: '#173A2D',
-  warm: '#C8B98A',
-  white: '#FFFFFF',
+  page: '#0D1210',
+  card: '#141C18',
+  border: '#233129',
+  accent: '#C5A059',
+  text: '#F4F3EF',
+  secondary: '#8D9A92',
+  darkText: '#17140E',
+  transparent: '#000000',
 } as const;
 
-const INTER_REGULAR: FontName = { family: 'Inter', style: 'Regular' };
-const INTER_BOLD: FontName = { family: 'Inter', style: 'Bold' };
+const FONTS = {
+  regular: { family: 'Inter', style: 'Regular' },
+  medium: { family: 'Inter', style: 'Medium' },
+  semiBold: { family: 'Inter', style: 'Semi Bold' },
+  bold: { family: 'Inter', style: 'Bold' },
+} as const satisfies Record<string, FontName>;
 
-const INFRASTRUCTURE_CARDS: ReadonlyArray<InfrastructureCardContent> = [
+const PACKAGES: readonly PackageContent[] = [
   {
-    badge: 'ТРЕНИРОВКИ В ЛЮБОЙ СЕЗОН',
-    title: 'Манеж со специализированным грунтом',
-    description: 'Подготовленное покрытие бережёт суставы лошади и даёт всаднику уверенную опору.',
-    specs: [['Формат', 'Крытый'], ['Грунт', 'Профессиональный'], ['Сезон', 'Круглый год']],
-    gradient: ['#25362F', '#0E1713'],
+    name: 'Базовый',
+    eyebrow: 'КОМФОРТНЫЙ ПОСТОЙ',
+    price: '35 000 ₽ / мес.',
+    description: 'Надёжная ежедневная забота и всё необходимое для спокойной жизни лошади.',
+    features: [
+      'Просторный денник и ежедневная уборка',
+      'Сено, овёс и базовый рацион',
+      'Ежедневный выгул в леваде',
+      'Контроль состояния дежурным персоналом',
+    ],
+    featured: false,
   },
   {
-    badge: 'ЗАБОТА 24 / 7',
-    title: 'Комфортная конюшня и индивидуальный рацион',
-    description: 'Просторные денники, ежедневный выгул и программа кормления под потребности каждой лошади.',
-    specs: [['Денники', 'Просторные'], ['Рацион', 'Индивидуальный'], ['Выгул', 'Ежедневный']],
-    gradient: ['#3A3025', '#18130F'],
+    name: 'Спортивный',
+    eyebrow: 'ДЛЯ АКТИВНОЙ РАБОТЫ',
+    price: '48 000 ₽ / мес.',
+    description: 'Постой для лошадей в тренинге с расширенным уходом и спортивным режимом.',
+    features: [
+      'Всё из пакета «Базовый»',
+      'Индивидуальный рацион и добавки',
+      'Работа в манеже по графику',
+      'Подготовка к тренировкам и шаговка',
+      'Координация ветврача и коваля',
+    ],
+    featured: true,
   },
   {
-    badge: 'ДЕТЯМ С 3 ЛЕТ',
-    title: 'Пони-клуб для первых уверенных шагов',
-    description: 'Мягкое знакомство с лошадьми, занятия в игровой форме и безопасность рядом с тренером.',
-    specs: [['Возраст', 'От 3 лет'], ['Формат', 'Индивидуально'], ['Темп', 'Бережный']],
-    gradient: ['#30334A', '#141522'],
+    name: 'VIP / Берейторский',
+    eyebrow: 'ПОЛНОЕ СОПРОВОЖДЕНИЕ',
+    price: '75 000 ₽ / мес.',
+    description: 'Персональная программа содержания, тренинга и подготовки лошади к стартам.',
+    features: [
+      'Всё из пакета «Спортивный»',
+      'Индивидуальная работа берейтора',
+      'Персональный план нагрузок',
+      'Груминг и амуниция под контролем',
+      'Подготовка и сопровождение на стартах',
+    ],
+    featured: false,
   },
 ];
 
-const SERVICES: ReadonlyArray<ServiceCardContent> = [
-  { category: 'ОБУЧЕНИЕ', title: 'Разовое занятие с тренером', price: '2 000 ₽ / 45 мин', description: 'Персональное знакомство с верховой ездой и базовой техникой.' },
-  { category: 'РЕГУЛЯРНО', title: 'Регулярные тренировки', price: '1 800 ₽ / 45 мин', description: 'Системная программа развития навыков для детей и взрослых.' },
-  { category: 'ДЕТЯМ', title: 'Катание в поводу', price: '1 500 ₽ / 20 мин', description: 'Безопасная первая встреча ребёнка с лошадью рядом с инструктором.' },
-  { category: 'БАЛАНС', title: 'Гимнастика на лошади', price: 'По запросу', description: 'Упражнения для осанки, координации, доверия и чувства равновесия.' },
-  { category: 'ВПЕЧАТЛЕНИЯ', title: 'Фотосессии с лошадьми', price: 'По запросу', description: 'Атмосферная съёмка на территории клуба с подготовленной лошадью.' },
-  { category: 'ВЛАДЕЛЬЦАМ', title: 'Постой частных лошадей', price: 'По согласованию', description: 'Денник, выгул, кормление и внимательный ежедневный уход.' },
+const COACHES: readonly CoachContent[] = [
+  {
+    role: 'Главный тренер клуба',
+    rank: 'МСМК',
+    specialization: 'Конкур · подготовка к стартам',
+    experience: '18 лет опыта',
+    description: 'Спортивная стратегия пары, маршруты, техника прыжка и системная подготовка к турнирам.',
+  },
+  {
+    role: 'Тренер по выездке',
+    rank: 'МС',
+    specialization: 'Выездка · работа с лошадью',
+    experience: '14 лет опыта',
+    description: 'Посадка, баланс, качество аллюров и последовательное развитие лошади любого уровня.',
+  },
+  {
+    role: 'Тренер начинающих всадников',
+    rank: 'КМС',
+    specialization: 'Базовая подготовка · дети и взрослые',
+    experience: '9 лет опыта',
+    description: 'Безопасное знакомство с лошадью, уверенная посадка и бережный путь к самостоятельной езде.',
+  },
+];
+
+const LOGISTICS: readonly LogisticsContent[] = [
+  {
+    label: 'ЗАЕЗД КОНЕВОЗОВ',
+    value: 'По предварительному согласованию',
+    description: 'Администратор согласует время прибытия и подготовит безопасный маршрут по территории.',
+  },
+  {
+    label: 'ПАРКОВКА',
+    value: 'Охраняемая территория',
+    description: 'Отдельные места для автомобилей гостей и зона временной стоянки коневозов.',
+  },
+  {
+    label: 'ВРЕМЯ РАБОТЫ',
+    value: 'Ежедневно · 09:00–19:00',
+    description: 'Посещение, тренировки и заезд осуществляются по предварительной записи.',
+  },
 ];
 
 function hexToRgb(hex: string): RGB {
-  const normalized = hex.trim().replace(/^#/, '');
-  const expanded = normalized.length === 3
-    ? normalized.split('').map((character: string): string => `${character}${character}`).join('')
-    : normalized;
+  const value = hex.trim().replace(/^#/, '');
+  const expanded =
+    value.length === 3
+      ? value
+          .split('')
+          .map((character: string): string => `${character}${character}`)
+          .join('')
+      : value;
+
   if (!/^[0-9a-fA-F]{6}$/.test(expanded)) {
     throw new Error(`Некорректный HEX-цвет: ${hex}`);
   }
+
   return {
     r: Number.parseInt(expanded.slice(0, 2), 16) / 255,
     g: Number.parseInt(expanded.slice(2, 4), 16) / 255,
@@ -107,226 +175,893 @@ function hexToRgb(hex: string): RGB {
   };
 }
 
-function hexToRgba(hex: string, alpha = 1): RGBA {
-  return { ...hexToRgb(hex), a: Math.max(0, Math.min(1, alpha)) };
-}
-
 function solidPaint(hex: string, opacity = 1): SolidPaint {
-  return { type: 'SOLID', color: hexToRgb(hex), opacity };
+  return {
+    type: 'SOLID',
+    color: hexToRgb(hex),
+    opacity,
+  };
 }
 
-function gradientPaint(from: string, to: string): GradientPaint {
+function linearGradient(from: string, to: string): GradientPaint {
   return {
     type: 'GRADIENT_LINEAR',
-    gradientTransform: [[1, 0, 0], [0, 1, 0]],
+    gradientTransform: [
+      [1, 0, 0],
+      [0, 1, 0],
+    ],
     gradientStops: [
-      { position: 0, color: hexToRgba(from) },
-      { position: 1, color: hexToRgba(to) },
+      { position: 0, color: { ...hexToRgb(from), a: 1 } },
+      { position: 1, color: { ...hexToRgb(to), a: 1 } },
     ],
   };
 }
 
-function createFrameNode(name: string, width: number, height: number, fill: Paint, cornerRadius = 0): FrameNode {
-  const frame = figma.createFrame();
-  frame.name = name;
-  frame.resize(width, height);
-  frame.fills = [fill];
-  frame.cornerRadius = cornerRadius;
-  frame.clipsContent = true;
-  return frame;
-}
-
-function createTextNode(options: TextOptions): TextNode {
+function createText(options: TextOptions): TextNode {
   const node = figma.createText();
   node.name = options.name;
-  node.fontName = options.fontName ?? INTER_REGULAR;
+  node.fontName = options.fontName ?? FONTS.regular;
   node.fontSize = options.fontSize;
   node.characters = options.content;
-  node.fills = [solidPaint(options.color)];
-  node.lineHeight = { unit: 'PIXELS', value: options.lineHeight ?? Math.round(options.fontSize * 1.2) };
-  node.letterSpacing = { unit: 'PIXELS', value: options.letterSpacing ?? 0 };
+  node.fills = [solidPaint(options.color ?? COLORS.text)];
+  node.lineHeight = {
+    unit: 'PIXELS',
+    value: options.lineHeight ?? Math.round(options.fontSize * 1.35),
+  };
+  node.letterSpacing = {
+    unit: 'PIXELS',
+    value: options.letterSpacing ?? 0,
+  };
   node.textAlignHorizontal = options.textAlign ?? 'LEFT';
-  node.opacity = options.opacity ?? 1;
   node.textAutoResize = 'HEIGHT';
   node.resize(options.width, Math.max(1, node.height));
   return node;
 }
 
-function appendAt(parent: FrameNode, node: SceneNode, x: number, y: number): void {
-  parent.appendChild(node);
-  node.x = x;
-  node.y = y;
+function createVerticalFrame(
+  name: string,
+  width: number,
+  gap: number,
+  padding: number,
+  fill: Paint = solidPaint(COLORS.transparent, 0),
+  radius = 0,
+): FrameNode {
+  const frame = figma.createFrame();
+  frame.name = name;
+  frame.resize(width, 100);
+  frame.layoutMode = 'VERTICAL';
+  frame.primaryAxisSizingMode = 'AUTO';
+  frame.counterAxisSizingMode = 'FIXED';
+  frame.primaryAxisAlignItems = 'MIN';
+  frame.counterAxisAlignItems = 'MIN';
+  frame.paddingTop = padding;
+  frame.paddingRight = padding;
+  frame.paddingBottom = padding;
+  frame.paddingLeft = padding;
+  frame.itemSpacing = gap;
+  frame.fills = [fill];
+  frame.cornerRadius = radius;
+  frame.clipsContent = false;
+  return frame;
 }
 
-function applyGlassStyle(frame: FrameNode): void {
-  frame.fills = [solidPaint(COLORS.surfaceElevated, 0.82)];
-  frame.strokes = [solidPaint(COLORS.white, 0.1)];
-  frame.strokeWeight = 1;
+function createHorizontalFrame(
+  name: string,
+  width: number,
+  gap: number,
+  padding: number,
+  fill: Paint = solidPaint(COLORS.transparent, 0),
+  radius = 0,
+): FrameNode {
+  const frame = figma.createFrame();
+  frame.name = name;
+  frame.resize(width, 100);
+  frame.layoutMode = 'HORIZONTAL';
+  frame.primaryAxisSizingMode = 'FIXED';
+  frame.counterAxisSizingMode = 'AUTO';
+  frame.primaryAxisAlignItems = 'MIN';
+  frame.counterAxisAlignItems = 'MIN';
+  frame.paddingTop = padding;
+  frame.paddingRight = padding;
+  frame.paddingBottom = padding;
+  frame.paddingLeft = padding;
+  frame.itemSpacing = gap;
+  frame.fills = [fill];
+  frame.cornerRadius = radius;
+  frame.clipsContent = false;
+  return frame;
+}
+
+function createFixedFrame(
+  name: string,
+  width: number,
+  height: number,
+  direction: 'VERTICAL' | 'HORIZONTAL',
+  gap: number,
+  padding: number,
+  fill: Paint,
+  radius: number,
+): FrameNode {
+  const frame = figma.createFrame();
+  frame.name = name;
+  frame.resize(width, height);
+  frame.layoutMode = direction;
+  frame.primaryAxisSizingMode = 'FIXED';
+  frame.counterAxisSizingMode = 'FIXED';
+  frame.primaryAxisAlignItems = 'MIN';
+  frame.counterAxisAlignItems = 'MIN';
+  frame.paddingTop = padding;
+  frame.paddingRight = padding;
+  frame.paddingBottom = padding;
+  frame.paddingLeft = padding;
+  frame.itemSpacing = gap;
+  frame.fills = [fill];
+  frame.cornerRadius = radius;
+  frame.clipsContent = true;
+  return frame;
+}
+
+function createSpacer(width: number, height = 1): FrameNode {
+  const spacer = figma.createFrame();
+  spacer.name = 'Spacer';
+  spacer.resize(width, height);
+  spacer.fills = [];
+  return spacer;
+}
+
+function createDivider(width: number): RectangleNode {
+  const divider = figma.createRectangle();
+  divider.name = 'Divider';
+  divider.resize(width, 1);
+  divider.fills = [solidPaint(COLORS.border)];
+  return divider;
+}
+
+function createVerticalDivider(height: number): RectangleNode {
+  const divider = figma.createRectangle();
+  divider.name = 'Vertical divider';
+  divider.resize(1, height);
+  divider.fills = [solidPaint(COLORS.border)];
+  return divider;
+}
+
+function applyCardStyle(frame: FrameNode, featured = false): void {
+  frame.strokes = [solidPaint(featured ? COLORS.accent : COLORS.border)];
+  frame.strokeWeight = featured ? 2 : 1;
   frame.effects = [
-    { type: 'DROP_SHADOW', color: hexToRgba('#000000', 0.28), offset: { x: 0, y: 18 }, radius: 42, spread: 0, visible: true, blendMode: 'NORMAL' },
-    { type: 'BACKGROUND_BLUR', blurType: 'NORMAL', radius: 24, visible: true },
+    {
+      type: 'DROP_SHADOW',
+      color: { ...hexToRgb('#000000'), a: featured ? 0.28 : 0.18 },
+      offset: { x: 0, y: 18 },
+      radius: 36,
+      spread: 0,
+      visible: true,
+      blendMode: 'NORMAL',
+    },
   ];
 }
 
-function createPill(label: string, width: number, background: string, foreground: string): FrameNode {
-  const pill = createFrameNode(`Кнопка — ${label}`, width, 52, solidPaint(background), 999);
-  pill.layoutMode = 'HORIZONTAL';
-  pill.primaryAxisAlignItems = 'CENTER';
-  pill.counterAxisAlignItems = 'CENTER';
-  pill.primaryAxisSizingMode = 'FIXED';
-  pill.counterAxisSizingMode = 'FIXED';
-  pill.appendChild(createTextNode({ content: label, name: 'Текст кнопки', color: foreground, fontName: INTER_BOLD, fontSize: 15, width: width - 32, lineHeight: 20, textAlign: 'CENTER' }));
-  return pill;
+function createBadge(label: string): FrameNode {
+  const badge = createHorizontalFrame(
+    `Бейдж — ${label}`,
+    120,
+    0,
+    0,
+    solidPaint(COLORS.accent),
+    999,
+  );
+  badge.primaryAxisSizingMode = 'AUTO';
+  badge.counterAxisSizingMode = 'AUTO';
+  badge.paddingTop = 8;
+  badge.paddingRight = 12;
+  badge.paddingBottom = 8;
+  badge.paddingLeft = 12;
+  badge.counterAxisAlignItems = 'CENTER';
+  badge.appendChild(
+    createText({
+      content: label,
+      name: 'Текст бейджа',
+      color: COLORS.darkText,
+      fontName: FONTS.bold,
+      fontSize: 11,
+      width: Math.max(42, label.length * 8),
+      lineHeight: 14,
+      letterSpacing: 0.8,
+      textAlign: 'CENTER',
+    }),
+  );
+  return badge;
 }
 
-function createSectionHeading(parent: FrameNode, eyebrow: string, title: string, description: string, y: number): void {
-  appendAt(parent, createTextNode({ content: eyebrow, name: 'Надзаголовок секции', color: COLORS.accent, fontName: INTER_BOLD, fontSize: 13, width: 360, lineHeight: 18, letterSpacing: 2.2 }), 80, y);
-  appendAt(parent, createTextNode({ content: title, name: 'Заголовок секции', color: COLORS.text, fontName: INTER_BOLD, fontSize: 52, width: 760, lineHeight: 58, letterSpacing: -1.8 }), 80, y + 42);
-  appendAt(parent, createTextNode({ content: description, name: 'Описание секции', color: COLORS.textMuted, fontSize: 18, width: 440, lineHeight: 28 }), 920, y + 48);
+function createButton(label: string, width: number, secondary = false): FrameNode {
+  const button = createFixedFrame(
+    `Кнопка — ${label}`,
+    width,
+    52,
+    'HORIZONTAL',
+    0,
+    0,
+    solidPaint(secondary ? COLORS.card : COLORS.accent),
+    999,
+  );
+  button.primaryAxisAlignItems = 'CENTER';
+  button.counterAxisAlignItems = 'CENTER';
+  button.strokes = secondary ? [solidPaint(COLORS.border)] : [];
+  button.strokeWeight = secondary ? 1 : 0;
+  button.appendChild(
+    createText({
+      content: label,
+      name: 'Текст кнопки',
+      color: secondary ? COLORS.text : COLORS.darkText,
+      fontName: FONTS.semiBold,
+      fontSize: 14,
+      width: width - 32,
+      lineHeight: 18,
+      textAlign: 'CENTER',
+    }),
+  );
+  return button;
+}
+
+function createSectionHeader(
+  eyebrow: string,
+  title: string,
+  description: string,
+): FrameNode {
+  const header = createHorizontalFrame('Заголовок секции', CONTENT_WIDTH, 80, 0);
+  const titleGroup = createVerticalFrame('Название секции', 760, 18, 0);
+  titleGroup.appendChild(
+    createText({
+      content: eyebrow,
+      name: 'Надзаголовок',
+      color: COLORS.accent,
+      fontName: FONTS.semiBold,
+      fontSize: 12,
+      width: 500,
+      lineHeight: 16,
+      letterSpacing: 2,
+    }),
+  );
+  titleGroup.appendChild(
+    createText({
+      content: title,
+      name: 'Заголовок',
+      fontName: FONTS.bold,
+      fontSize: 52,
+      width: 760,
+      lineHeight: 58,
+      letterSpacing: -1.8,
+    }),
+  );
+  header.appendChild(titleGroup);
+  header.appendChild(
+    createText({
+      content: description,
+      name: 'Описание секции',
+      color: COLORS.secondary,
+      fontSize: 18,
+      width: 440,
+      lineHeight: 28,
+    }),
+  );
+  return header;
 }
 
 function createNavbar(): FrameNode {
-  const navbar = createFrameNode('Навигация', 1000, 72, solidPaint(COLORS.surfaceElevated, 0.84), 999);
-  applyGlassStyle(navbar);
-  const logo = createFrameNode('Логотип', 44, 44, gradientPaint('#315B49', '#183226'), 14);
-  appendAt(navbar, logo, 14, 14);
-  appendAt(logo, createTextNode({ content: 'СЛ', name: 'Монограмма', color: COLORS.white, fontName: INTER_BOLD, fontSize: 13, width: 32, lineHeight: 16, textAlign: 'CENTER' }), 6, 14);
-  appendAt(navbar, createTextNode({ content: 'СЛКС Тамбов', name: 'Название бренда', color: COLORS.text, fontName: INTER_BOLD, fontSize: 16, width: 150, lineHeight: 20 }), 72, 26);
-  ['Клуб', 'Услуги', 'Контакты'].forEach((item: string, index: number): void => {
-    appendAt(navbar, createTextNode({ content: item, name: `Ссылка — ${item}`, color: COLORS.textMuted, fontSize: 15, width: 100, lineHeight: 20, textAlign: 'CENTER' }), 330 + index * 120, 26);
-  });
-  appendAt(navbar, createPill('Записаться', 150, COLORS.white, COLORS.background), 834, 10);
+  const navbar = createFixedFrame(
+    'Навигация',
+    CONTENT_WIDTH,
+    72,
+    'HORIZONTAL',
+    28,
+    14,
+    solidPaint(COLORS.card, 0.92),
+    999,
+  );
+  navbar.counterAxisAlignItems = 'CENTER';
+  navbar.strokes = [solidPaint(COLORS.border)];
+  navbar.strokeWeight = 1;
+
+  const brand = createHorizontalFrame('Бренд', 230, 12, 0);
+  brand.counterAxisAlignItems = 'CENTER';
+  const mark = createFixedFrame(
+    'Знак клуба',
+    42,
+    42,
+    'HORIZONTAL',
+    0,
+    0,
+    solidPaint(COLORS.accent),
+    13,
+  );
+  mark.primaryAxisAlignItems = 'CENTER';
+  mark.counterAxisAlignItems = 'CENTER';
+  mark.appendChild(
+    createText({
+      content: 'СЛ',
+      name: 'Монограмма',
+      color: COLORS.darkText,
+      fontName: FONTS.bold,
+      fontSize: 12,
+      width: 30,
+      lineHeight: 16,
+      textAlign: 'CENTER',
+    }),
+  );
+  brand.appendChild(mark);
+  brand.appendChild(
+    createText({
+      content: 'СЛКС Тамбов',
+      name: 'Название клуба',
+      fontName: FONTS.semiBold,
+      fontSize: 16,
+      width: 160,
+      lineHeight: 20,
+    }),
+  );
+
+  const links = createHorizontalFrame('Ссылки', 360, 32, 0);
+  links.counterAxisAlignItems = 'CENTER';
+  for (const label of ['Клуб', 'Постой', 'Тренеры', 'Контакты']) {
+    links.appendChild(
+      createText({
+        content: label,
+        name: `Ссылка — ${label}`,
+        color: COLORS.secondary,
+        fontName: FONTS.medium,
+        fontSize: 14,
+        width: 66,
+        lineHeight: 18,
+        textAlign: 'CENTER',
+      }),
+    );
+  }
+
+  navbar.appendChild(brand);
+  navbar.appendChild(createSpacer(286));
+  navbar.appendChild(links);
+  navbar.appendChild(createButton('Записаться', 160));
   return navbar;
 }
 
+function createHeroSpec(label: string, value: string): FrameNode {
+  const card = createVerticalFrame(
+    `Характеристика — ${label}`,
+    296,
+    9,
+    24,
+    solidPaint(COLORS.card),
+    20,
+  );
+  card.strokes = [solidPaint(COLORS.border)];
+  card.strokeWeight = 1;
+  card.appendChild(
+    createText({
+      content: label,
+      name: 'Подпись',
+      color: COLORS.secondary,
+      fontName: FONTS.medium,
+      fontSize: 11,
+      width: 248,
+      lineHeight: 15,
+      letterSpacing: 1.2,
+    }),
+  );
+  card.appendChild(
+    createText({
+      content: value,
+      name: 'Значение',
+      fontName: FONTS.semiBold,
+      fontSize: 18,
+      width: 248,
+      lineHeight: 24,
+    }),
+  );
+  return card;
+}
+
 function createHeroSection(): FrameNode {
-  const section = createFrameNode('01 — Hero', PAGE.width, 980, gradientPaint('#101512', COLORS.background));
-  const glow = figma.createEllipse();
-  glow.name = 'Мягкое свечение';
-  glow.resize(720, 720);
-  glow.fills = [solidPaint('#204B38', 0.18)];
-  glow.effects = [{ type: 'LAYER_BLUR', blurType: 'NORMAL', radius: 120, visible: true }];
-  appendAt(section, glow, 820, 70);
-  appendAt(section, createNavbar(), 220, 28);
-  appendAt(section, createTextNode({ content: 'ТАМБОВ · УЛ. БАСТИОННАЯ, 22А СТР. 2', name: 'География', color: COLORS.warm, fontName: INTER_BOLD, fontSize: 13, width: 520, lineHeight: 20, letterSpacing: 2.4 }), 80, 210);
-  appendAt(section, createTextNode({ content: 'Искусство\nбыть в седле', name: 'Главный заголовок', color: COLORS.text, fontName: INTER_BOLD, fontSize: 102, width: 760, lineHeight: 100, letterSpacing: -4.2 }), 72, 288);
-  const media = createFrameNode('Фотография — всадник и лошадь', 500, 580, gradientPaint('#3E4C45', '#121715'), 40);
-  media.strokes = [solidPaint(COLORS.white, 0.1)];
-  media.strokeWeight = 1;
-  appendAt(section, media, 860, 180);
-  const mediaCircle = figma.createEllipse();
-  mediaCircle.name = 'Световой акцент';
-  mediaCircle.resize(360, 360);
-  mediaCircle.fills = [gradientPaint('#A9BBAF', '#35483E')];
-  appendAt(media, mediaCircle, 70, 70);
-  appendAt(media, createTextNode({ content: 'ФОТО\nЛОШАДИ И ВСАДНИКА', name: 'Подпись изображения', color: COLORS.white, fontName: INTER_BOLD, fontSize: 20, width: 280, lineHeight: 28, letterSpacing: 1.4, textAlign: 'CENTER', opacity: 0.86 }), 110, 220);
-  appendAt(section, createTextNode({ content: 'Семейный конный клуб для детей и взрослых. Обучение верховой езде, конкур и забота о каждой лошади.', name: 'Подзаголовок', color: COLORS.textMuted, fontSize: 20, width: 570, lineHeight: 31 }), 80, 660);
-  appendAt(section, createPill('Записаться на занятие', 240, COLORS.white, COLORS.background), 80, 784);
-  appendAt(section, createPill('Узнать о клубе', 190, COLORS.surfaceElevated, COLORS.text), 336, 784);
+  const section = createVerticalFrame(
+    '01 — Hero + Specs',
+    1440,
+    72,
+    80,
+    solidPaint(COLORS.page),
+  );
+  section.paddingTop = 28;
+  section.paddingBottom = 100;
+  section.appendChild(createNavbar());
+
+  const content = createHorizontalFrame('Hero content', CONTENT_WIDTH, 80, 0);
+  content.counterAxisAlignItems = 'CENTER';
+
+  const copy = createVerticalFrame('Hero copy', 730, 26, 0);
+  copy.appendChild(
+    createText({
+      content: 'ТАМБОВ · УЛ. БАСТИОННАЯ, 22А СТР. 2',
+      name: 'Адрес',
+      color: COLORS.accent,
+      fontName: FONTS.semiBold,
+      fontSize: 12,
+      width: 600,
+      lineHeight: 16,
+      letterSpacing: 2.2,
+    }),
+  );
+  copy.appendChild(
+    createText({
+      content: 'Искусство\nбыть в седле',
+      name: 'Главный заголовок',
+      fontName: FONTS.bold,
+      fontSize: 96,
+      width: 730,
+      lineHeight: 94,
+      letterSpacing: -4,
+    }),
+  );
+  copy.appendChild(
+    createText({
+      content: 'Семейный конный клуб «Союз любителей конного спорта». Обучение детей и взрослых, профессиональный тренинг, конкур и выездка.',
+      name: 'Описание',
+      color: COLORS.secondary,
+      fontSize: 19,
+      width: 620,
+      lineHeight: 30,
+    }),
+  );
+  const actions = createHorizontalFrame('Hero actions', 500, 16, 0);
+  actions.counterAxisAlignItems = 'CENTER';
+  actions.appendChild(createButton('Записаться на занятие', 238));
+  actions.appendChild(createButton('Узнать о клубе', 190, true));
+  copy.appendChild(actions);
+
+  const visual = createFixedFrame(
+    'Фото — лошадь и всадник',
+    470,
+    520,
+    'VERTICAL',
+    24,
+    32,
+    linearGradient('#314039', '#111713'),
+    34,
+  );
+  visual.primaryAxisAlignItems = 'SPACE_BETWEEN';
+  visual.strokes = [solidPaint(COLORS.border)];
+  visual.strokeWeight = 1;
+  visual.appendChild(createBadge('КОННЫЙ СПОРТ'));
+  visual.appendChild(
+    createText({
+      content: 'Сила. Баланс.\nДоверие.',
+      name: 'Подпись изображения',
+      fontName: FONTS.bold,
+      fontSize: 38,
+      width: 360,
+      lineHeight: 44,
+      letterSpacing: -1,
+    }),
+  );
+
+  content.appendChild(copy);
+  content.appendChild(visual);
+  section.appendChild(content);
+
+  const specs = createHorizontalFrame('Specs', CONTENT_WIDTH, 32, 0);
+  specs.appendChild(createHeroSpec('МАНЕЖ', 'Крытый · еврогрунт'));
+  specs.appendChild(createHeroSpec('НАПРАВЛЕНИЯ', 'Конкур · выездка'));
+  specs.appendChild(createHeroSpec('ФОРМАТ', 'Дети и взрослые'));
+  specs.appendChild(createHeroSpec('ГРАФИК', 'Ежедневно · 09–19'));
+  section.appendChild(specs);
   return section;
 }
 
-function createInfrastructureCard(content: InfrastructureCardContent, index: number): FrameNode {
-  const card = createFrameNode(`Инфраструктура ${index + 1} — ${content.title}`, 400, 650, solidPaint(COLORS.surface, 0.96), 28);
-  card.strokes = [solidPaint(COLORS.white, 0.1)];
-  card.strokeWeight = 1;
-  const visual = createFrameNode('Изображение', 368, 230, gradientPaint(content.gradient[0], content.gradient[1]), 20);
-  appendAt(card, visual, 16, 16);
-  appendAt(visual, createTextNode({ content: content.badge, name: 'Бейдж', color: COLORS.white, fontName: INTER_BOLD, fontSize: 11, width: 300, lineHeight: 16, letterSpacing: 1.4, opacity: 0.8 }), 20, 190);
-  appendAt(card, createTextNode({ content: content.title, name: 'Название', color: COLORS.text, fontName: INTER_BOLD, fontSize: 25, width: 344, lineHeight: 31, letterSpacing: -0.5 }), 28, 276);
-  appendAt(card, createTextNode({ content: content.description, name: 'Описание', color: COLORS.textMuted, fontSize: 15, width: 344, lineHeight: 23 }), 28, 370);
-  content.specs.forEach((spec: readonly [string, string], specIndex: number): void => {
-    const x = 28 + specIndex * 116;
-    appendAt(card, createTextNode({ content: spec[0], name: `Характеристика — ${spec[0]}`, color: COLORS.textDim, fontSize: 11, width: 100, lineHeight: 16 }), x, 510);
-    appendAt(card, createTextNode({ content: spec[1], name: `Значение — ${spec[1]}`, color: COLORS.text, fontName: INTER_BOLD, fontSize: 12, width: 104, lineHeight: 17 }), x, 534);
-  });
+function createFeatureItem(text: string, width: number): FrameNode {
+  const row = createHorizontalFrame(`Пункт — ${text}`, width, 12, 0);
+  row.counterAxisAlignItems = 'CENTER';
+  const dot = figma.createEllipse();
+  dot.name = 'Маркер';
+  dot.resize(8, 8);
+  dot.fills = [solidPaint(COLORS.accent)];
+  row.appendChild(dot);
+  row.appendChild(
+    createText({
+      content: text,
+      name: 'Текст пункта',
+      color: COLORS.secondary,
+      fontSize: 13,
+      width: width - 20,
+      lineHeight: 20,
+    }),
+  );
+  return row;
+}
+
+function createPackageCard(item: PackageContent): FrameNode {
+  const card = createVerticalFrame(
+    `Пакет — ${item.name}`,
+    410,
+    22,
+    30,
+    solidPaint(COLORS.card),
+    26,
+  );
+  applyCardStyle(card, item.featured);
+  const top = createHorizontalFrame('Название и бейдж', 350, 12, 0);
+  top.counterAxisAlignItems = 'CENTER';
+  top.appendChild(
+    createText({
+      content: item.eyebrow,
+      name: 'Категория',
+      color: COLORS.accent,
+      fontName: FONTS.semiBold,
+      fontSize: 10,
+      width: item.featured ? 205 : 350,
+      lineHeight: 14,
+      letterSpacing: 1.4,
+    }),
+  );
+  if (item.featured) top.appendChild(createBadge('ПОПУЛЯРНЫЙ'));
+  card.appendChild(top);
+  card.appendChild(
+    createText({
+      content: item.name,
+      name: 'Название пакета',
+      fontName: FONTS.bold,
+      fontSize: 28,
+      width: 350,
+      lineHeight: 34,
+      letterSpacing: -0.6,
+    }),
+  );
+  card.appendChild(
+    createText({
+      content: item.price,
+      name: 'Стоимость',
+      color: COLORS.accent,
+      fontName: FONTS.semiBold,
+      fontSize: 21,
+      width: 350,
+      lineHeight: 28,
+    }),
+  );
+  card.appendChild(
+    createText({
+      content: item.description,
+      name: 'Описание пакета',
+      color: COLORS.secondary,
+      fontSize: 14,
+      width: 350,
+      lineHeight: 22,
+    }),
+  );
+  card.appendChild(createDivider(350));
+  const features = createVerticalFrame('Включено', 350, 13, 0);
+  for (const feature of item.features) {
+    features.appendChild(createFeatureItem(feature, 350));
+  }
+  card.appendChild(features);
+  card.appendChild(createSpacer(350, item.features.length === 4 ? 20 : 1));
+  card.appendChild(createButton('Выбрать пакет', 350, !item.featured));
   return card;
 }
 
-function createInfrastructureSection(): FrameNode {
-  const section = createFrameNode('02 — Инфраструктура', PAGE.width, 1200, solidPaint(COLORS.background));
-  createSectionHeading(section, 'ИНФРАСТРУКТУРА', 'Пространство, где растут всадники.', 'Всё необходимое для безопасных занятий, спортивного роста и внимательного ухода за лошадьми.', 110);
-  INFRASTRUCTURE_CARDS.forEach((card: InfrastructureCardContent, index: number): void => {
-    appendAt(section, createInfrastructureCard(card, index), 80 + index * 432, 360);
-  });
+function createPackagesSection(): FrameNode {
+  const section = createVerticalFrame(
+    '02 — Пакеты постоя',
+    1440,
+    64,
+    80,
+    solidPaint('#101612'),
+  );
+  section.paddingTop = 112;
+  section.paddingBottom = 112;
+  section.appendChild(
+    createSectionHeader(
+      'ПАКЕТЫ ПОСТОЯ',
+      'Условия для здоровья и результата.',
+      'Три уровня сопровождения — от ежедневного ухода до полной спортивной подготовки лошади.',
+    ),
+  );
+  const row = createHorizontalFrame('Карточки пакетов', CONTENT_WIDTH, 25, 0);
+  for (const item of PACKAGES) row.appendChild(createPackageCard(item));
+  section.appendChild(row);
   return section;
 }
 
-function createServiceCard(content: ServiceCardContent, index: number): FrameNode {
-  const card = createFrameNode(`Услуга ${index + 1} — ${content.title}`, 400, 270, solidPaint(COLORS.surface, 0.94), 24);
-  card.strokes = [solidPaint(COLORS.white, 0.09)];
-  card.strokeWeight = 1;
-  appendAt(card, createTextNode({ content: content.category, name: 'Категория', color: COLORS.accent, fontName: INTER_BOLD, fontSize: 10, width: 160, lineHeight: 14, letterSpacing: 1.5 }), 26, 25);
-  appendAt(card, createTextNode({ content: content.title, name: 'Название услуги', color: COLORS.text, fontName: INTER_BOLD, fontSize: 22, width: 348, lineHeight: 28, letterSpacing: -0.4 }), 26, 58);
-  appendAt(card, createTextNode({ content: content.description, name: 'Описание услуги', color: COLORS.textMuted, fontSize: 14, width: 348, lineHeight: 21 }), 26, 124);
-  appendAt(card, createTextNode({ content: content.price, name: 'Стоимость', color: COLORS.warm, fontName: INTER_BOLD, fontSize: 17, width: 230, lineHeight: 22 }), 26, 220);
-  appendAt(card, createTextNode({ content: 'Выбрать  →', name: 'Действие', color: COLORS.text, fontName: INTER_BOLD, fontSize: 13, width: 100, lineHeight: 18, textAlign: 'RIGHT' }), 274, 222);
+function createCoachCard(coach: CoachContent, index: number): FrameNode {
+  const card = createVerticalFrame(
+    `Тренер ${index + 1} — ${coach.role}`,
+    410,
+    22,
+    24,
+    solidPaint(COLORS.card),
+    26,
+  );
+  applyCardStyle(card);
+  const portrait = createFixedFrame(
+    'Портрет тренера',
+    362,
+    250,
+    'VERTICAL',
+    0,
+    20,
+    linearGradient(index === 1 ? '#3B3527' : '#293A32', '#111713'),
+    18,
+  );
+  portrait.primaryAxisAlignItems = 'SPACE_BETWEEN';
+  portrait.appendChild(createBadge(coach.rank));
+  portrait.appendChild(
+    createText({
+      content: `0${index + 1}`,
+      name: 'Номер профиля',
+      color: COLORS.text,
+      fontName: FONTS.bold,
+      fontSize: 46,
+      width: 100,
+      lineHeight: 52,
+    }),
+  );
+  card.appendChild(portrait);
+  card.appendChild(
+    createText({
+      content: coach.role,
+      name: 'Роль',
+      fontName: FONTS.bold,
+      fontSize: 24,
+      width: 362,
+      lineHeight: 30,
+      letterSpacing: -0.4,
+    }),
+  );
+  card.appendChild(
+    createText({
+      content: coach.specialization,
+      name: 'Специализация',
+      color: COLORS.accent,
+      fontName: FONTS.semiBold,
+      fontSize: 13,
+      width: 362,
+      lineHeight: 18,
+    }),
+  );
+  card.appendChild(
+    createText({
+      content: coach.description,
+      name: 'Описание тренера',
+      color: COLORS.secondary,
+      fontSize: 14,
+      width: 362,
+      lineHeight: 22,
+    }),
+  );
+  card.appendChild(createDivider(362));
+  card.appendChild(
+    createText({
+      content: coach.experience,
+      name: 'Опыт',
+      fontName: FONTS.medium,
+      fontSize: 14,
+      width: 362,
+      lineHeight: 20,
+    }),
+  );
   return card;
 }
 
-function createServicesSection(): FrameNode {
-  const section = createFrameNode('03 — Услуги', PAGE.width, 1150, gradientPaint('#0E1210', '#111713'));
-  createSectionHeading(section, 'УСЛУГИ', 'Ваш путь в конном спорте.', 'Выберите формат знакомства с лошадьми или регулярную программу тренировок.', 105);
-  SERVICES.forEach((service: ServiceCardContent, index: number): void => {
-    appendAt(section, createServiceCard(service, index), 80 + (index % 3) * 432, 340 + Math.floor(index / 3) * 300);
+function createCoachesSection(): FrameNode {
+  const section = createVerticalFrame(
+    '03 — Тренерский состав',
+    1440,
+    64,
+    80,
+    solidPaint(COLORS.page),
+  );
+  section.paddingTop = 112;
+  section.paddingBottom = 112;
+  section.appendChild(
+    createSectionHeader(
+      'ТРЕНЕРСКИЙ СОСТАВ',
+      'Опыт, который превращается в уверенность.',
+      'Специалисты по конкуру, выездке и базовой подготовке выстраивают программу под цели каждой пары.',
+    ),
+  );
+  const row = createHorizontalFrame('Карточки тренеров', CONTENT_WIDTH, 25, 0);
+  COACHES.forEach((coach: CoachContent, index: number): void => {
+    row.appendChild(createCoachCard(coach, index));
   });
+  section.appendChild(row);
   return section;
 }
 
-function createContactItem(label: string, value: string): FrameNode {
-  const item = createFrameNode(`Контакт — ${label}`, 500, 92, solidPaint(COLORS.surface, 0.6), 18);
-  item.strokes = [solidPaint(COLORS.white, 0.08)];
-  item.strokeWeight = 1;
-  appendAt(item, createTextNode({ content: label, name: 'Подпись', color: COLORS.textDim, fontSize: 11, width: 440, lineHeight: 16, letterSpacing: 1.2 }), 22, 17);
-  appendAt(item, createTextNode({ content: value, name: 'Значение', color: COLORS.text, fontName: INTER_BOLD, fontSize: 16, width: 450, lineHeight: 22 }), 22, 46);
-  return item;
-}
-
-function createInputField(label: string, placeholder: string): FrameNode {
-  const field = createFrameNode(`Поле — ${label}`, 520, 78, solidPaint(COLORS.background, 0.72), 16);
-  field.strokes = [solidPaint(COLORS.white, 0.1)];
-  field.strokeWeight = 1;
-  appendAt(field, createTextNode({ content: label, name: 'Label', color: COLORS.textDim, fontSize: 10, width: 470, lineHeight: 14, letterSpacing: 1.1 }), 20, 14);
-  appendAt(field, createTextNode({ content: placeholder, name: 'Placeholder', color: COLORS.textMuted, fontSize: 15, width: 470, lineHeight: 20 }), 20, 42);
-  return field;
+function createLogisticsItem(item: LogisticsContent): FrameNode {
+  const card = createVerticalFrame(
+    `Логистика — ${item.label}`,
+    719,
+    12,
+    22,
+    solidPaint('#101612'),
+    18,
+  );
+  card.strokes = [solidPaint(COLORS.border)];
+  card.strokeWeight = 1;
+  card.appendChild(
+    createText({
+      content: item.label,
+      name: 'Параметр',
+      color: COLORS.accent,
+      fontName: FONTS.semiBold,
+      fontSize: 10,
+      width: 675,
+      lineHeight: 14,
+      letterSpacing: 1.4,
+    }),
+  );
+  card.appendChild(
+    createText({
+      content: item.value,
+      name: 'Значение',
+      fontName: FONTS.semiBold,
+      fontSize: 17,
+      width: 675,
+      lineHeight: 23,
+    }),
+  );
+  card.appendChild(
+    createText({
+      content: item.description,
+      name: 'Описание',
+      color: COLORS.secondary,
+      fontSize: 13,
+      width: 675,
+      lineHeight: 20,
+    }),
+  );
+  return card;
 }
 
 function createContactsSection(): FrameNode {
-  const section = createFrameNode('04 — Контакты и запись', PAGE.width, 1000, solidPaint(COLORS.background));
-  createSectionHeading(section, 'КОНТАКТЫ', 'Приезжайте знакомиться.', 'Расскажем о клубе, подберём тренера и удобное время для первого занятия.', 100);
-  const contacts = createFrameNode('Контактная информация', 500, 420, solidPaint(COLORS.background, 0));
-  appendAt(section, contacts, 80, 350);
-  appendAt(contacts, createContactItem('АДРЕС', 'г. Тамбов, ул. Бастионная, д. 22А, стр. 2'), 0, 0);
-  appendAt(contacts, createContactItem('ТЕЛЕФОН', '+7 (915) 672-00-30'), 0, 108);
-  appendAt(contacts, createContactItem('РЕЖИМ РАБОТЫ', 'Ежедневно с 09:00 до 19:00'), 0, 216);
-  appendAt(contacts, createPill('Открыть сообщество VK', 250, COLORS.accentDark, COLORS.text), 0, 340);
-  const form = createFrameNode('Форма быстрой записи', 600, 560, solidPaint(COLORS.surfaceElevated, 0.84), 32);
-  applyGlassStyle(form);
-  appendAt(section, form, 760, 300);
-  appendAt(form, createTextNode({ content: 'Быстрая запись', name: 'Заголовок формы', color: COLORS.text, fontName: INTER_BOLD, fontSize: 30, width: 520, lineHeight: 38, letterSpacing: -0.8 }), 40, 38);
-  appendAt(form, createTextNode({ content: 'Оставьте контакты — администратор поможет выбрать формат.', name: 'Описание формы', color: COLORS.textMuted, fontSize: 14, width: 500, lineHeight: 21 }), 40, 86);
-  appendAt(form, createInputField('ИМЯ', 'Как к вам обращаться'), 40, 145);
-  appendAt(form, createInputField('ТЕЛЕФОН', '+7 (___) ___-__-__'), 40, 239);
-  appendAt(form, createInputField('УСЛУГА', 'Разовое занятие с тренером  ·  ↓'), 40, 333);
-  appendAt(form, createPill('Отправить заявку', 520, COLORS.white, COLORS.background), 40, 449);
+  const section = createVerticalFrame(
+    '04 — Контакты и логистика',
+    1440,
+    64,
+    80,
+    solidPaint('#101612'),
+  );
+  section.paddingTop = 112;
+  section.paddingBottom = 112;
+  section.appendChild(
+    createSectionHeader(
+      'КОНТАКТЫ И ЛОГИСТИКА',
+      'Удобный заезд. Спокойное размещение.',
+      'Согласуем визит, подготовим территорию к прибытию коневоза и ответим на вопросы по постою.',
+    ),
+  );
+
+  const contactCard = createHorizontalFrame(
+    'Контактная карточка',
+    CONTENT_WIDTH,
+    40,
+    40,
+    solidPaint(COLORS.card),
+    30,
+  );
+  applyCardStyle(contactCard);
+
+  const contacts = createVerticalFrame('Основные контакты', 400, 20, 0);
+  contacts.appendChild(
+    createText({
+      content: 'СЛКС Тамбов',
+      name: 'Название клуба',
+      fontName: FONTS.bold,
+      fontSize: 30,
+      width: 400,
+      lineHeight: 38,
+      letterSpacing: -0.8,
+    }),
+  );
+  contacts.appendChild(
+    createText({
+      content: 'г. Тамбов, ул. Бастионная,\nд. 22А, стр. 2',
+      name: 'Адрес',
+      color: COLORS.secondary,
+      fontSize: 16,
+      width: 400,
+      lineHeight: 25,
+    }),
+  );
+  contacts.appendChild(
+    createText({
+      content: '+7 (915) 672-00-30\n+7 (902) 936-47-27',
+      name: 'Телефоны',
+      fontName: FONTS.semiBold,
+      fontSize: 18,
+      width: 400,
+      lineHeight: 28,
+    }),
+  );
+  contacts.appendChild(createButton('Связаться с клубом', 260));
+
+  const logistics = createVerticalFrame('Параметры логистики', 719, 16, 0);
+  for (const item of LOGISTICS) logistics.appendChild(createLogisticsItem(item));
+
+  contactCard.appendChild(contacts);
+  contactCard.appendChild(createVerticalDivider(430));
+  contactCard.appendChild(logistics);
+  section.appendChild(contactCard);
   return section;
 }
 
 function createFooter(): FrameNode {
-  const footer = createFrameNode('05 — Footer', PAGE.width, 180, solidPaint('#090B0A'));
-  footer.strokes = [solidPaint(COLORS.white, 0.08)];
+  const footer = createHorizontalFrame(
+    '05 — Footer',
+    1440,
+    24,
+    80,
+    solidPaint(COLORS.page),
+  );
+  footer.paddingTop = 54;
+  footer.paddingBottom = 54;
+  footer.counterAxisAlignItems = 'CENTER';
+  footer.strokes = [solidPaint(COLORS.border)];
   footer.strokeTopWeight = 1;
-  appendAt(footer, createTextNode({ content: 'СЛКС Тамбов', name: 'Бренд', color: COLORS.text, fontName: INTER_BOLD, fontSize: 18, width: 220, lineHeight: 24 }), 80, 74);
-  appendAt(footer, createTextNode({ content: 'Союз любителей конного спорта  ·  Тамбов  ·  2026', name: 'Копирайт', color: COLORS.textDim, fontSize: 13, width: 500, lineHeight: 20, textAlign: 'RIGHT' }), 860, 76);
+  footer.appendChild(
+    createText({
+      content: 'СЛКС Тамбов',
+      name: 'Бренд',
+      fontName: FONTS.semiBold,
+      fontSize: 17,
+      width: 240,
+      lineHeight: 22,
+    }),
+  );
+  footer.appendChild(createSpacer(596));
+  footer.appendChild(
+    createText({
+      content: 'Союз любителей конного спорта · 2026',
+      name: 'Копирайт',
+      color: COLORS.secondary,
+      fontSize: 13,
+      width: 420,
+      lineHeight: 18,
+      textAlign: 'RIGHT',
+    }),
+  );
   return footer;
 }
 
 async function preloadFonts(): Promise<void> {
-  await Promise.all([figma.loadFontAsync(INTER_REGULAR), figma.loadFontAsync(INTER_BOLD)]);
+  await Promise.all([
+    figma.loadFontAsync(FONTS.regular),
+    figma.loadFontAsync(FONTS.medium),
+    figma.loadFontAsync(FONTS.semiBold),
+    figma.loadFontAsync(FONTS.bold),
+  ]);
 }
 
 function findPreviousOutputs(): FrameNode[] {
-  return figma.currentPage.children.filter((node: SceneNode): node is FrameNode => node.type === 'FRAME' && node.getPluginData('owner') === PLUGIN_OWNER);
+  return figma.currentPage.children.filter(
+    (node: SceneNode): node is FrameNode =>
+      node.type === 'FRAME' && node.getPluginData('owner') === PLUGIN_OWNER,
+  );
+}
+
+function createRootFrame(): FrameNode {
+  const root = createVerticalFrame(
+    FRAME_NAME,
+    1440,
+    0,
+    0,
+    solidPaint(COLORS.page),
+  );
+  root.clipsContent = true;
+  root.setPluginData('owner', PLUGIN_OWNER);
+  root.setPluginData('schemaVersion', '3');
+  root.setRelaunchData({ open: 'Открыть генератор лендинга' });
+  root.appendChild(createHeroSection());
+  root.appendChild(createPackagesSection());
+  root.appendChild(createCoachesSection());
+  root.appendChild(createContactsSection());
+  root.appendChild(createFooter());
+  return root;
 }
 
 async function generateLanding(): Promise<FrameNode> {
@@ -334,34 +1069,37 @@ async function generateLanding(): Promise<FrameNode> {
   const previous = findPreviousOutputs();
   const position = previous[0]
     ? { x: previous[0].x, y: previous[0].y }
-    : { x: Math.round(figma.viewport.center.x - PAGE.width / 2), y: Math.round(figma.viewport.center.y - 360) };
-  let pageFrame: FrameNode | null = null;
+    : {
+        x: Math.round(figma.viewport.center.x - 720),
+        y: Math.round(figma.viewport.center.y - 360),
+      };
+
+  let root: FrameNode | null = null;
   try {
-    pageFrame = createFrameNode(FRAME_NAME, PAGE.width, PAGE.height, solidPaint(COLORS.background));
-    pageFrame.x = position.x;
-    pageFrame.y = position.y;
-    pageFrame.setPluginData('owner', PLUGIN_OWNER);
-    pageFrame.setPluginData('schemaVersion', '2');
-    pageFrame.setRelaunchData({ open: 'Открыть генератор лендинга' });
-    appendAt(pageFrame, createHeroSection(), 0, 0);
-    appendAt(pageFrame, createInfrastructureSection(), 0, 980);
-    appendAt(pageFrame, createServicesSection(), 0, 2180);
-    appendAt(pageFrame, createContactsSection(), 0, 3330);
-    appendAt(pageFrame, createFooter(), 0, 4330);
+    root = createRootFrame();
+    root.x = position.x;
+    root.y = position.y;
     previous.forEach((node: FrameNode): void => node.remove());
-    figma.currentPage.selection = [pageFrame];
-    figma.viewport.scrollAndZoomIntoView([pageFrame]);
-    return pageFrame;
+    figma.currentPage.selection = [root];
+    figma.viewport.scrollAndZoomIntoView([root]);
+    return root;
   } catch (error: unknown) {
-    pageFrame?.remove();
+    root?.remove();
     throw error;
   }
 }
 
 function isUiMessage(message: unknown): message is UiMessage {
-  if (typeof message !== 'object' || message === null || !('type' in message)) return false;
+  if (typeof message !== 'object' || message === null || !('type' in message)) {
+    return false;
+  }
   if (message.type === 'generate-landing') return true;
-  return message.type === 'resize-ui' && 'height' in message && typeof message.height === 'number' && Number.isFinite(message.height);
+  return (
+    message.type === 'resize-ui' &&
+    'height' in message &&
+    typeof message.height === 'number' &&
+    Number.isFinite(message.height)
+  );
 }
 
 function postToUi(message: SandboxMessage): void {
@@ -374,26 +1112,38 @@ function getErrorMessage(error: unknown): string {
 
 figma.root.setRelaunchData({ open: 'Открыть генератор лендинга' });
 figma.showUI(__html__, { width: UI_WIDTH, height: 420, themeColors: true });
+
 const fontsReady: Promise<void> = preloadFonts();
-void fontsReady.then((): void => postToUi({ type: 'fonts-ready' })).catch((error: unknown): void => postToUi({ type: 'error', message: getErrorMessage(error) }));
+void fontsReady
+  .then((): void => postToUi({ type: 'fonts-ready' }))
+  .catch((error: unknown): void => {
+    postToUi({ type: 'error', message: getErrorMessage(error) });
+  });
 
 figma.ui.onmessage = async (message: unknown): Promise<void> => {
   if (!isUiMessage(message)) {
     figma.notify('Плагин получил неизвестное сообщение.', { error: true });
     return;
   }
+
   if (message.type === 'resize-ui') {
-    figma.ui.resize(UI_WIDTH, Math.max(260, Math.min(560, Math.round(message.height))));
+    figma.ui.resize(
+      UI_WIDTH,
+      Math.max(260, Math.min(560, Math.round(message.height))),
+    );
     return;
   }
+
   postToUi({ type: 'generation-started' });
   try {
     const frame = await generateLanding();
     postToUi({ type: 'generation-complete', frameName: frame.name });
-    figma.notify('Лендинг СЛКС Тамбов создан.');
+    figma.notify('Структура конного клуба создана.');
   } catch (error: unknown) {
     const messageText = getErrorMessage(error);
     postToUi({ type: 'error', message: messageText });
-    figma.notify(`Не удалось создать лендинг: ${messageText}`, { error: true });
+    figma.notify(`Не удалось создать структуру: ${messageText}`, {
+      error: true,
+    });
   }
 };

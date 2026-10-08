@@ -1,397 +1,296 @@
-import {
-  ArrowUpRight,
-  Check,
-  ChevronDown,
-  Clock3,
-  LoaderCircle,
-  MapPin,
-  Phone,
-  Send,
-} from 'lucide-react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactElement } from 'react';
-import { legal } from '../legal';
-import { phoneDigits, phoneMask, sendLead, type LeadPayload } from '../lead';
-import type { ContactInfo, ServiceItem } from '../types/content';
+import { useState, type ReactElement, type FormEvent } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-interface Props {
-  contacts: ContactInfo;
-  services: ServiceItem[];
-}
+const serviceOptions = [
+  'Выездка',
+  'Конкур',
+  'Конная прогулка',
+  'Фотосессия',
+  'Экскурсия по клубу',
+];
 
-interface FormErrors {
-  name?: string;
-  phone?: string;
-  service?: string;
-  consent?: string;
-}
+export function ContactsSection(): ReactElement {
+  const [selectedService, setSelectedService] = useState<string>('Выездка');
+  const [name, setName] = useState<string>('');
+  const [phone, setPhone] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
+  const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
-type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !phone.trim()) return;
 
-function telephoneHref(phone: string): string {
-  return `tel:+${phoneDigits(phone)}`;
-}
-
-export function ContactsSection({ contacts, services }: Props): ReactElement {
-  const prefersReducedMotion = useReducedMotion();
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [serviceId, setServiceId] = useState('');
-  const [consentAccepted, setConsentAccepted] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [status, setStatus] = useState<SubmitStatus>('idle');
-  const [submitError, setSubmitError] = useState('');
-  const isSubmittingRef = useRef(false);
-  const consentRef = useRef<HTMLInputElement>(null);
-
-  const selectedService = services.find((service) => service.id === serviceId);
-  const mapUrl = `https://yandex.ru/maps/?pt=${contacts.coordinates[1]},${contacts.coordinates[0]}&z=16&l=map`;
-
-  const clearFeedback = (): void => {
-    if (status !== 'idle') {
-      setStatus('idle');
-    }
-    if (submitError) {
-      setSubmitError('');
-    }
+    // Имитация отправки формы (сюда можно подключить Telegram Webhook или API)
+    setIsSubmitted(true);
   };
-
-  const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>): void => {
-    setPhone(phoneMask(event.target.value));
-    setErrors((current) => ({ ...current, phone: undefined }));
-    clearFeedback();
-  };
-
-  const handlePhoneKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
-    if (
-      event.key === 'Backspace'
-      && event.currentTarget.selectionStart === phone.length
-      && event.currentTarget.selectionEnd === phone.length
-      && /\D$/.test(phone)
-    ) {
-      event.preventDefault();
-      const digits = phoneDigits(phone);
-      setPhone(phoneMask(digits.slice(0, -1)));
-      setErrors((current) => ({ ...current, phone: undefined }));
-      clearFeedback();
-    }
-  };
-
-  const validate = (): FormErrors => {
-    const nextErrors: FormErrors = {};
-    if (!name.trim()) {
-      nextErrors.name = 'Укажите имя';
-    }
-    if (phoneDigits(phone).length !== 11) {
-      nextErrors.phone = 'Укажите телефон полностью';
-    }
-    if (!serviceId) {
-      nextErrors.service = 'Выберите услугу';
-    }
-    if (!consentAccepted) {
-      nextErrors.consent = 'Подтвердите согласие, чтобы отправить заявку';
-    }
-    return nextErrors;
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault();
-    if (isSubmittingRef.current) {
-      return;
-    }
-
-    const website = new FormData(event.currentTarget).get('website');
-    if (typeof website === 'string' && website.length > 0) {
-      setStatus('success');
-      return;
-    }
-
-    const nextErrors = validate();
-    setErrors(nextErrors);
-    setSubmitError('');
-    if (Object.keys(nextErrors).length > 0) {
-      if (nextErrors.consent) {
-        consentRef.current?.focus();
-      }
-      return;
-    }
-
-    if (!selectedService) {
-      setErrors({ service: 'Выберите услугу' });
-      return;
-    }
-
-    const payload: LeadPayload = {
-      consentAccepted: true,
-      consentVersion: legal.consentVersion,
-      firstName: name.trim(),
-      phone: `+${phoneDigits(phone)}`,
-      preferences: `Выбранная услуга: ${selectedService.title}`,
-    };
-
-    isSubmittingRef.current = true;
-    setStatus('submitting');
-    try {
-      await sendLead(payload);
-      setStatus('success');
-      setName('');
-      setPhone('');
-      setServiceId('');
-      setConsentAccepted(false);
-      setErrors({});
-    } catch (error: unknown) {
-      setStatus('error');
-      setSubmitError(error instanceof Error ? error.message : 'Не удалось отправить заявку. Попробуйте ещё раз.');
-    } finally {
-      isSubmittingRef.current = false;
-    }
-  };
-
-  const inputClassName =
-    'mt-2 min-h-12 w-full rounded-2xl border border-white/10 bg-white/[0.045] px-4 text-base text-white outline-none transition placeholder:text-zinc-600 hover:border-white/20 focus:border-amber-100/50 focus:ring-4 focus:ring-amber-100/5';
 
   return (
-    <section id="contacts" className="relative overflow-hidden bg-[#0B0C0E] px-6 py-24 sm:px-10 sm:py-32 lg:px-12">
-      <div aria-hidden="true" className="absolute -left-40 top-24 h-96 w-96 rounded-full bg-amber-100/[0.055] blur-3xl" />
-      <div aria-hidden="true" className="absolute bottom-0 right-0 h-[30rem] w-[30rem] rounded-full bg-white/[0.035] blur-3xl" />
+    <section
+      id="contacts"
+      className="relative overflow-hidden bg-[#241E1C] px-6 py-28 text-white sm:px-10 lg:px-16"
+    >
+      {/* Декоративное теплое свечение сзади */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-32 top-1/4 h-[550px] w-[550px] rounded-full bg-[#724C39]/15 blur-3xl"
+      />
 
-      <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(30rem,1fr)] lg:gap-20">
-        <motion.div
-          initial={prefersReducedMotion ? false : { opacity: 0, y: 28 }}
-          whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.25 }}
-          transition={{ type: 'spring', stiffness: 90, damping: 20 }}
-        >
-          <p className="text-xs font-medium uppercase tracking-[0.24em] text-amber-100/75">Контакты</p>
-          <h2 className="mt-5 max-w-2xl text-balance text-4xl font-light leading-tight tracking-[-0.04em] text-white sm:text-6xl">
-            Начнём с первого знакомства.
-          </h2>
-          <p className="mt-6 max-w-xl text-base leading-7 text-zinc-400">
-            Оставьте заявку или позвоните нам. Подберём подходящий формат и ответим на вопросы.
+      <div className="relative mx-auto max-w-7xl">
+        {/* Верхний заголовок секции */}
+        <div className="mb-16 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-[0.25em] text-[#A6988E]">
+              Связь и бронирование
+            </span>
+            <h2 className="mt-3 font-serif text-4xl font-normal tracking-tight text-[#E4DAD0] sm:text-6xl">
+              Визит в клуб
+            </h2>
+          </div>
+          <p className="max-w-md text-xs sm:text-sm leading-relaxed text-[#A6988E]">
+            Мы ценим приватность и индивидуальный подход: все тренировки и посещения клуба проходят по предварительной записи.
           </p>
+        </div>
 
-          <div className="mt-10 space-y-3">
-            <a
-              href={telephoneHref(contacts.phone)}
-              className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/80"
-            >
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10 text-amber-100">
-                <Phone aria-hidden="true" className="h-5 w-5" strokeWidth={1.6} />
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 items-start">
+          {/* Левая колонка: Контакты, адрес, навигация */}
+          <div className="flex flex-col gap-10 lg:col-span-5">
+            {/* Карточка адреса и режима */}
+            <div className="rounded-[2.4rem] border border-white/10 bg-white/5 p-8 backdrop-blur-md">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A6988E]">
+                Локация клуба
               </span>
-              <span>
-                <span className="block text-[0.62rem] uppercase tracking-[0.16em] text-zinc-500">Основной телефон</span>
-                <span className="mt-1 block text-lg tracking-tight text-white">{contacts.phone}</span>
-              </span>
-            </a>
+              <h3 className="mt-2 font-serif text-2xl font-light text-white">
+                Тамбов, ул. Бастионная, 22АС2
+              </h3>
+              <p className="mt-2 text-xs leading-relaxed text-[#A6988E]">
+                Удобный подъезд с закрытой охраняемой парковкой для гостей клуба.
+              </p>
 
-            <a
-              href={telephoneHref(contacts.altPhone)}
-              className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/80"
-            >
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10 text-amber-100">
-                <Phone aria-hidden="true" className="h-5 w-5" strokeWidth={1.6} />
-              </span>
-              <span>
-                <span className="block text-[0.62rem] uppercase tracking-[0.16em] text-zinc-500">Дополнительный телефон</span>
-                <span className="mt-1 block text-lg tracking-tight text-white">{contacts.altPhone}</span>
-              </span>
-            </a>
+              <div className="mt-6 flex flex-wrap gap-2.5">
+                <a
+                  href="https://yandex.ru/maps/?text=Тамбов+ул+Бастионная+22АС2"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-medium text-[#E4DAD0] transition-all hover:bg-white/20 active:scale-95"
+                >
+                  <span>Яндекс Карты</span>
+                  <span className="text-xs">↗</span>
+                </a>
+                <a
+                  href="https://2gis.ru/tambov"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-medium text-[#E4DAD0] transition-all hover:bg-white/20 active:scale-95"
+                >
+                  <span>2ГИС</span>
+                  <span className="text-xs">↗</span>
+                </a>
+              </div>
+            </div>
 
-            <a
-              href={mapUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="group flex items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/80"
-            >
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10 text-amber-100">
-                <MapPin aria-hidden="true" className="h-5 w-5" strokeWidth={1.6} />
-              </span>
-              <span>
-                <span className="block text-[0.62rem] uppercase tracking-[0.16em] text-zinc-500">Адрес</span>
-                <span className="mt-1 block max-w-sm text-base leading-6 text-white">{contacts.address}</span>
-              </span>
-              <ArrowUpRight aria-hidden="true" className="ml-auto mt-1 h-4 w-4 shrink-0 text-zinc-500 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-white" />
-            </a>
+            {/* Карточка контактов и часов работы */}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+                <span className="block text-[10px] font-semibold uppercase tracking-widest text-[#A6988E]">
+                  Прямой телефон
+                </span>
+                <a
+                  href="tel:+79000000000"
+                  className="mt-2 block font-serif text-xl text-white transition-colors hover:text-[#E4DAD0]"
+                >
+                  +7 (900) 000-00-00
+                </a>
+                <span className="mt-1 block text-[11px] text-[#A6988E]">
+                  Ежедневно 09:00 — 20:00
+                </span>
+              </div>
 
-            <div className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10 text-amber-100">
-                <Clock3 aria-hidden="true" className="h-5 w-5" strokeWidth={1.6} />
-              </span>
-              <span>
-                <span className="block text-[0.62rem] uppercase tracking-[0.16em] text-zinc-500">Часы работы</span>
-                <span className="mt-1 block max-w-sm text-base leading-6 text-white">{contacts.workingHours}</span>
-              </span>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+                <span className="block text-[10px] font-semibold uppercase tracking-widest text-[#A6988E]">
+                  Мессенджеры
+                </span>
+                <div className="mt-2 flex gap-3">
+                  <a
+                    href="https://t.me/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-serif text-base text-[#E4DAD0] underline underline-offset-4 hover:text-white transition-colors"
+                  >
+                    Telegram
+                  </a>
+                  <span className="text-white/20">·</span>
+                  <a
+                    href="https://wa.me/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-serif text-base text-[#E4DAD0] underline underline-offset-4 hover:text-white transition-colors"
+                  >
+                    WhatsApp
+                  </a>
+                </div>
+                <span className="mt-1 block text-[11px] text-[#A6988E]">
+                  Быстрый ответ дежурного
+                </span>
+              </div>
+            </div>
+
+            {/* Памятка первого визита */}
+            <div className="rounded-3xl border border-white/10 bg-[#724C39]/15 p-6 text-xs text-[#E4DAD0]/90">
+              <div className="flex items-center gap-2 font-semibold uppercase tracking-wider text-white mb-2">
+                <span>✦</span>
+                <span>Рекомендации к первому визиту</span>
+              </div>
+              <p className="leading-relaxed">
+                Шлем и защитный жилет предоставляются клубом бесплатно. Для первой тренировки подойдут эластичные брюки без грубых внутренних швов и закрытая обувь на небольшом плоском каблуке (1-2 см).
+              </p>
             </div>
           </div>
 
-          <motion.a
-            href={contacts.vkGroup}
-            target="_blank"
-            rel="noreferrer"
-            whileHover={prefersReducedMotion ? undefined : { scale: 1.025 }}
-            whileTap={prefersReducedMotion ? undefined : { scale: 0.975 }}
-            className="mt-5 inline-flex min-h-12 items-center gap-3 rounded-full border border-white/15 bg-white/5 px-5 text-sm font-medium text-white backdrop-blur-xl transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/80"
-          >
-            <span aria-hidden="true" className="grid h-6 w-6 place-items-center rounded-md bg-[#0077FF] text-[0.65rem] font-bold text-white">VK</span>
-            Группа клуба
-            <ArrowUpRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
-          </motion.a>
-        </motion.div>
-
-        <motion.div
-          initial={prefersReducedMotion ? false : { opacity: 0, y: 32 }}
-          whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ type: 'spring', stiffness: 90, damping: 20, delay: 0.08 }}
-          className="self-start rounded-[2rem] border border-white/10 bg-zinc-900/50 p-2 shadow-2xl shadow-black/30 backdrop-blur-xl"
-        >
-          <form id="lead-form" onSubmit={handleSubmit} noValidate className="rounded-[1.55rem] border border-white/[0.07] bg-black/20 p-6 sm:p-8">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-amber-100/75">Быстрая запись</p>
-            <h3 className="mt-3 text-3xl font-light tracking-tight text-white sm:text-4xl">Мы вам перезвоним</h3>
-            <p className="mt-3 text-sm leading-6 text-zinc-400">Обычно связываемся в рабочее время клуба.</p>
-
-            <div className="mt-8 space-y-5">
-              <label className="block text-sm text-zinc-300" htmlFor="firstName">
-                Имя
-                <input
-                  id="firstName"
-                  name="firstName"
-                  type="text"
-                  autoComplete="name"
-                  value={name}
-                  onChange={(event) => {
-                    setName(event.target.value);
-                    setErrors((current) => ({ ...current, name: undefined }));
-                    clearFeedback();
-                  }}
-                  aria-invalid={Boolean(errors.name)}
-                  aria-describedby={errors.name ? 'name-error' : undefined}
-                  placeholder="Как к вам обратиться"
-                  className={inputClassName}
-                />
-                {errors.name ? <span id="name-error" className="mt-2 block text-xs text-red-300" role="alert">{errors.name}</span> : null}
-              </label>
-
-              <label className="block text-sm text-zinc-300" htmlFor="phone">
-                Телефон
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  value={phone}
-                  onChange={handlePhoneChange}
-                  onKeyDown={handlePhoneKeyDown}
-                  aria-invalid={Boolean(errors.phone)}
-                  aria-describedby={errors.phone ? 'phone-error' : undefined}
-                  placeholder="+7 (___) ___-__-__"
-                  className={inputClassName}
-                />
-                {errors.phone ? <span id="phone-error" className="mt-2 block text-xs text-red-300" role="alert">{errors.phone}</span> : null}
-              </label>
-
-              <label className="block text-sm text-zinc-300" htmlFor="service">
-                Услуга
-                <span className="relative mt-2 block">
-                  <select
-                    id="service"
-                    name="service"
-                    value={serviceId}
-                    onChange={(event) => {
-                      setServiceId(event.target.value);
-                      setErrors((current) => ({ ...current, service: undefined }));
-                      clearFeedback();
-                    }}
-                    aria-invalid={Boolean(errors.service)}
-                    aria-describedby={errors.service ? 'service-error' : undefined}
-                    className="min-h-12 w-full appearance-none rounded-2xl border border-white/10 bg-zinc-900 px-4 pr-12 text-base text-white outline-none transition hover:border-white/20 focus:border-amber-100/50 focus:ring-4 focus:ring-amber-100/5"
+          {/* Правая колонка: Форма записи */}
+          <div className="lg:col-span-7">
+            <div className="relative rounded-[2.8rem] bg-white p-8 text-[#241E1C] shadow-2xl sm:p-12">
+              <AnimatePresence mode="wait">
+                {isSubmitted ? (
+                  <motion.div
+                    key="success"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="flex flex-col items-center justify-center py-12 text-center"
                   >
-                    <option value="">Выберите услугу</option>
-                    {services.map((service) => (
-                      <option key={service.id} value={service.id}>
-                        {service.title} — {service.price}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                </span>
-                {errors.service ? <span id="service-error" className="mt-2 block text-xs text-red-300" role="alert">{errors.service}</span> : null}
-              </label>
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#E4DAD0] text-2xl text-[#3A2F2B] mb-5">
+                      ✓
+                    </div>
+                    <h3 className="font-serif text-3xl font-normal text-[#241E1C]">
+                      Заявка принята
+                    </h3>
+                    <p className="mt-3 max-w-md text-sm leading-relaxed text-[#6E645F]">
+                      Благодарим вас, <span className="font-semibold text-[#241E1C]">{name}</span>! Администратор клуба свяжется с вами по номеру <span className="font-semibold text-[#241E1C]">{phone}</span> в течение 15 минут для подтверждения времени и подбора лошади.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSubmitted(false);
+                        setName('');
+                        setPhone('');
+                        setNotes('');
+                      }}
+                      className="mt-8 rounded-full border border-black/15 bg-transparent px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-[#3A2F2B] transition-all hover:bg-black/5"
+                    >
+                      Отправить ещё одну заявку
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.form
+                    key="form"
+                    onSubmit={handleSubmit}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex flex-col gap-6"
+                  >
+                    <div>
+                      <div className="inline-block rounded-full bg-[#E4DAD0]/60 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5A483E] mb-3">
+                        Онлайн-запись
+                      </div>
+                      <h3 className="font-serif text-3xl sm:text-4xl font-normal text-[#241E1C]">
+                        Забронировать занятие
+                      </h3>
+                      <p className="mt-1 text-xs text-[#6E645F]">
+                        Выберите направление и оставьте контактные данные.
+                      </p>
+                    </div>
 
-              <div className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
-                <label htmlFor="website">Ваш сайт</label>
-                <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off" />
-              </div>
+                    {/* Выбор направления */}
+                    <div>
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-2.5">
+                        Направление
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {serviceOptions.map((srv) => {
+                          const isSel = selectedService === srv;
+                          return (
+                            <button
+                              key={srv}
+                              type="button"
+                              onClick={() => setSelectedService(srv)}
+                              className={`rounded-full px-4 py-2 text-xs font-medium transition-all ${
+                                isSel
+                                  ? 'bg-[#3A2F2B] text-white shadow-sm'
+                                  : 'border border-black/10 bg-[#FAF7F2] text-[#6E645F] hover:text-[#241E1C] hover:border-black/20'
+                              }`}
+                            >
+                              {srv}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
 
-              <div>
-                <label className="flex cursor-pointer items-start gap-3 text-xs leading-5 text-zinc-400" htmlFor="personal-data-consent">
-                  <input
-                    ref={consentRef}
-                    id="personal-data-consent"
-                    name="personalDataConsent"
-                    type="checkbox"
-                    checked={consentAccepted}
-                    onChange={(event) => {
-                      setConsentAccepted(event.target.checked);
-                      setErrors((current) => ({ ...current, consent: undefined }));
-                      clearFeedback();
-                    }}
-                    aria-invalid={Boolean(errors.consent)}
-                    aria-describedby={errors.consent ? 'consent-error' : undefined}
-                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-white/5 accent-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/80"
-                  />
-                  <span>Я даю согласие на обработку персональных данных для рассмотрения заявки.</span>
-                </label>
-                {errors.consent ? <span id="consent-error" className="mt-2 block text-xs text-red-300" role="alert">{errors.consent}</span> : null}
-              </div>
+                    {/* Поля ввода: Имя и Телефон */}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
+                          Ваше имя *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          placeholder="Анастасия"
+                          className="w-full rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
+                          Телефон *
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="+7 (900) 000-00-00"
+                          className="w-full rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Пожелания / комментарий */}
+                    <div>
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
+                        Удобная дата или опыт верховой езды (необязательно)
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Например: суббота, первая половина дня. Опыта нет, хотелось бы спокойную лошадь."
+                        className="w-full resize-none rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
+                      />
+                    </div>
+
+                    {/* Кнопка отправки и согласие */}
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        className="w-full rounded-2xl bg-[#614535] py-4 text-xs font-semibold uppercase tracking-[0.16em] text-white shadow-lg transition-all hover:bg-[#432F24] hover:scale-[1.01] active:scale-[0.99]"
+                      >
+                        Отправить заявку на тренировку ↗
+                      </button>
+
+                      <p className="mt-3 text-center text-[11px] text-[#9C8F87]">
+                        Нажимая кнопку, вы соглашаетесь на обработку персональных данных в соответствии с политикой конфиденциальности клуба.
+                      </p>
+                    </div>
+                  </motion.form>
+                )}
+              </AnimatePresence>
             </div>
-
-            <AnimatePresence mode="wait">
-              {status === 'success' ? (
-                <motion.div
-                  key="success"
-                  initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={prefersReducedMotion ? undefined : { opacity: 0, y: -8 }}
-                  className="mt-6 flex min-h-14 items-center gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 text-sm text-emerald-100"
-                  role="status"
-                >
-                  <Check aria-hidden="true" className="h-5 w-5 shrink-0" />
-                  Заявка принята. Мы свяжемся с вами.
-                </motion.div>
-              ) : (
-                <motion.button
-                  key="submit"
-                  type="submit"
-                  disabled={status === 'submitting'}
-                  whileHover={prefersReducedMotion || status === 'submitting' ? undefined : { scale: 1.015 }}
-                  whileTap={prefersReducedMotion || status === 'submitting' ? undefined : { scale: 0.98 }}
-                  transition={{ type: 'spring', stiffness: 380, damping: 22 }}
-                  className="mt-6 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-medium text-zinc-950 shadow-xl shadow-black/20 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/80 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
-                >
-                  {status === 'submitting' ? (
-                    <>
-                      <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
-                      Отправляем…
-                    </>
-                  ) : (
-                    <>
-                      Отправить заявку
-                      <Send aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
-                    </>
-                  )}
-                </motion.button>
-              )}
-            </AnimatePresence>
-
-            {submitError ? (
-              <p className="mt-3 rounded-xl border border-red-300/15 bg-red-300/[0.07] px-4 py-3 text-sm leading-5 text-red-200" role="alert">
-                {submitError}
-              </p>
-            ) : null}
-          </form>
-        </motion.div>
+          </div>
+        </div>
       </div>
     </section>
   );

@@ -286,3 +286,8 @@ html[data-theme='dark'] .client-ledger { background: var(--crm-paper); }
 html[data-theme='dark'] .vk-invite { color: var(--crm-ink); }
 html[data-theme='dark'] .vk-invite-code { color: var(--crm-beige); }
 html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); border-color: var(--crm-hairline); }
+.quick-boarding-actions { margin-block: 12px; }
+.quick-boarding-primary.ant-btn-primary { background: var(--crm-saddle); border-color: var(--crm-saddle); color: #fff; }
+.quick-boarding-form { padding-top: 12px; }
+.quick-boarding-feedback { width: 100%; margin-bottom: 16px; }
+.quick-boarding-form .ant-alert { margin-block: 12px; }

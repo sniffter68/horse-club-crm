@@ -1,33 +1,38 @@
-import { useEffect, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
 import Lenis from '@studio-freight/lenis';
 
-interface Props {
+interface SmoothScrollProps {
   children: ReactNode;
 }
 
-export function SmoothScroll({ children }: Props): ReactElement {
+export function SmoothScroll({ children }: SmoothScrollProps) {
+  const lenisRef = useRef<Lenis | null>(null);
+
   useEffect(() => {
     const lenis = new Lenis({
-      duration: 1.2,
+      duration: 1.1,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       smoothWheel: true,
       wheelMultiplier: 0.9,
-      touchMultiplier: 1.2,
     });
 
-    let animationFrameId = 0;
+    lenisRef.current = lenis;
 
-    const frame = (time: number): void => {
+    let rfId: number;
+    function raf(time: number) {
       lenis.raf(time);
-      animationFrameId = window.requestAnimationFrame(frame);
-    };
+      rfId = requestAnimationFrame(raf);
+    }
 
-    animationFrameId = window.requestAnimationFrame(frame);
+    rfId = requestAnimationFrame(raf);
 
     return () => {
-      window.cancelAnimationFrame(animationFrameId);
+      cancelAnimationFrame(rfId);
       lenis.destroy();
+      lenisRef.current = null;
     };
   }, []);
 
-  return <div className="min-h-screen bg-[#0B0C0E] text-white">{children}</div>;
+  return <>{children}</>;
 }
