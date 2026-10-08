@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type Arena } from '@prisma/client';
 import type { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { rethrowCatalogMutation } from '../common/prisma-errors';
@@ -58,8 +58,16 @@ export class ArenasService {
   }
 
   private normalize<T extends CreateArenaDto | UpdateArenaDto>(dto: T): T {
+    if ((dto.capacity !== undefined && dto.maxRidersCapacity !== undefined && dto.capacity !== dto.maxRidersCapacity)
+      || (dto.isActive !== undefined && dto.isUnavailable !== undefined && dto.isActive === dto.isUnavailable)) {
+      throw new BadRequestException('Параметры доступности или вместимости противоречат друг другу');
+    }
+    const capacity = dto.maxRidersCapacity ?? dto.capacity;
+    const active = dto.isActive ?? (dto.isUnavailable === undefined ? undefined : !dto.isUnavailable);
     return {
       ...dto,
+      ...(capacity !== undefined ? { capacity, maxRidersCapacity: capacity } : {}),
+      ...(active !== undefined ? { isActive: active, isUnavailable: !active } : {}),
       ...(dto.name !== undefined ? { name: dto.name.trim().replace(/\s+/g, ' ') } : {}),
       ...(dto.description !== undefined ? { description: dto.description.trim() || undefined } : {}),
     };

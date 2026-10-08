@@ -196,6 +196,7 @@ model Horse {
 }
 
 model Client {
+  weightKg          Decimal?           @db.Decimal(5, 2)
   ownedHorses       Horse[]            @relation("HorseOwner")
   transactions      LedgerTransaction[]
   id                String             @id @default(uuid()) @db.Uuid

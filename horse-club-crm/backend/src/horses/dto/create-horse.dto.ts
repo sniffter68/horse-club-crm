@@ -1,7 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { HorseStatus } from '@prisma/client';
 
 export class CreateHorseDto {
+  @ApiPropertyOptional({ enum: HorseStatus }) @IsOptional() @IsEnum(HorseStatus) status?: HorseStatus;
+  @ApiPropertyOptional({ default: 85 }) @IsOptional() @IsInt() @Min(1) @Max(1000) maxRiderWeight?: number;
+  @ApiPropertyOptional({ default: 120 }) @IsOptional() @IsInt() @Min(1) @Max(1440) maxDailyWorkloadMinutes?: number;
+  @ApiPropertyOptional({ default: 45 }) @IsOptional() @IsInt() @Min(0) @Max(1440) requiredRestMinutes?: number;
   @ApiPropertyOptional({ maxLength: 5000, nullable: true })
   @IsOptional()
   @IsString()
@@ -30,14 +35,14 @@ export class CreateHorseDto {
   @MaxLength(150)
   name!: string;
 
-  @ApiPropertyOptional({ default: 240 })
+  @ApiPropertyOptional({ default: 120 })
   @IsOptional()
   @IsInt()
   @Min(1)
   @Max(1440)
   maxDailyMinutes?: number;
 
-  @ApiPropertyOptional({ default: 15 })
+  @ApiPropertyOptional({ default: 45 })
   @IsOptional()
   @IsInt()
   @Min(0)

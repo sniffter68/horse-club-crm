@@ -1,6 +1,7 @@
-const { test } = require('node:test');
+const { test, mock } = require('node:test');
 const assert = require('node:assert/strict');
 require('reflect-metadata');
+mock.method(require('../dist/bookings/booking-rules.service').BookingRulesService.prototype, 'validate', async () => {});
 const { Test } = require('@nestjs/testing');
 const { Reflector } = require('@nestjs/core');
 const { firstValueFrom, of } = require('rxjs');

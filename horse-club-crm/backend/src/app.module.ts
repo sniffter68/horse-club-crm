@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BookingsModule } from './bookings/bookings.module';
 import { LeadsModule } from './leads/leads.module';
 import { VkBotModule } from './vk-bot/vk-bot.module';
 import { AuthModule } from './auth/auth.module';
@@ -23,6 +24,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
+    BookingsModule,
     LeadsModule,
     VkBotModule,
     PrismaModule,

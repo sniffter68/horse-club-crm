@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
-const { test } = require('node:test');
+const { test, mock } = require('node:test');
 require('reflect-metadata');
+// Isolate legacy lesson behavior; the shared engine has its own unit/PostgreSQL tests.
+mock.method(require('../dist/bookings/booking-rules.service').BookingRulesService.prototype, 'validate', async () => {});
 
 const { LessonStatus, MembershipOpType, Prisma } = require('@prisma/client');
 const { LessonsService } = require('../dist/lessons/lessons.service');

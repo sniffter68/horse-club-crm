@@ -26,7 +26,7 @@ async function main() {
         fs.writeFileSync(path.join(directory, 'schema.prisma'), fs.readFileSync(path.join(__dirname, '../prisma/schema.prisma')));
         fs.mkdirSync(path.join(directory, 'migrations'));
         for (const entry of fs.readdirSync(path.join(__dirname, '../prisma/migrations'))) {
-          if (entry === '20261008200000_init_resource_triad_and_boarding') continue;
+          if (/^\d/.test(entry) && entry >= '20261008200000') continue;
           fs.cpSync(path.join(__dirname, '../prisma/migrations', entry), path.join(directory, 'migrations', entry), { recursive: true });
         }
         prisma(['migrate', 'deploy', '--schema', path.join(directory, 'schema.prisma')]);
@@ -45,11 +45,11 @@ async function main() {
     } else if (process.argv[2] === 'deploy') {
       prisma(['migrate', 'deploy']);
     } else if (process.argv[2] === 'test') {
-      const run = spawnSync(process.execPath, ['--test', 'test/resource-triad.postgres.test.cjs'], {
+      const run = spawnSync(process.execPath, ['--test', 'test/resource-triad.postgres.test.cjs', 'test/booking-rules.postgres.test.cjs'], {
         cwd: path.join(__dirname, '..'), env: { ...process.env, DATABASE_URL: target.toString(), RUN_TRIAD_TESTS: '1' }, stdio: 'inherit',
       });
       if (run.status !== 0) throw new Error('Resource triad database tests failed');
-    } else throw new Error('Use prepare, generate, deploy or test');
+    } else throw new Error('Use prepare, prepare-legacy, generate, generate-diff, deploy or test');
   } finally { await admin.$disconnect(); }
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; });

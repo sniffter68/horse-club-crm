@@ -1,7 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsNumber, IsOptional, IsString, Max, Min, MaxLength, MinLength } from 'class-validator';
 
 export class CreateClientDto {
+  @ApiPropertyOptional({ minimum: 0.01, maximum: 999.99, nullable: true })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  @Max(999.99)
+  weightKg?: number | null;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

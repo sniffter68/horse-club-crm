@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BookingsModule } from '../bookings/bookings.module';
 import { VkDeliveryModule } from '../vk-bot/vk-delivery.module';
 import { AuthModule } from '../auth/auth.module';
 import { MembershipsModule } from '../memberships/memberships.module';
@@ -7,7 +8,7 @@ import { LessonsController } from './lessons.controller';
 import { LessonsService } from './lessons.service';
 
 @Module({
-  imports: [AuthModule, MembershipsModule, VkDeliveryModule],
+  imports: [AuthModule, MembershipsModule, VkDeliveryModule, BookingsModule],
   controllers: [LessonsController, HorseWorkloadController],
   providers: [LessonsService],
   exports: [LessonsService],

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Horse } from '@prisma/client';
 import type { RefineQueryDto } from '../common/dto/refine-query.dto';
@@ -89,15 +89,32 @@ export class HorsesService {
   }
 
   create(dto: CreateHorseDto): Promise<Horse> {
-    return this.prisma.horse.create({ data: { ...dto, ...(dto.feedingNotes !== undefined ? { feedingNotes: dto.feedingNotes?.trim() || null } : {}) } });
+    return this.prisma.horse.create({ data: this.normalize(dto) });
   }
 
   async update(id: string, dto: UpdateHorseDto): Promise<Horse> {
     try {
-      return await this.prisma.horse.update({ where: { id }, data: { ...dto, ...(dto.feedingNotes !== undefined ? { feedingNotes: dto.feedingNotes?.trim() || null } : {}) } });
+      return await this.prisma.horse.update({ where: { id }, data: this.normalize(dto) });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Лошадь');
     }
+  }
+
+  private normalize<T extends CreateHorseDto | UpdateHorseDto>(dto: T): T {
+    if ((dto.maxDailyMinutes !== undefined && dto.maxDailyWorkloadMinutes !== undefined && dto.maxDailyMinutes !== dto.maxDailyWorkloadMinutes)
+      || (dto.minRestMinutes !== undefined && dto.requiredRestMinutes !== undefined && dto.minRestMinutes !== dto.requiredRestMinutes)
+      || (dto.status !== undefined && dto.isUnavailable !== undefined && (dto.status !== 'active') !== dto.isUnavailable)) {
+      throw new BadRequestException('Параметры доступности или нагрузки противоречат друг другу');
+    }
+    const daily = dto.maxDailyWorkloadMinutes ?? dto.maxDailyMinutes;
+    const rest = dto.requiredRestMinutes ?? dto.minRestMinutes;
+    const status = dto.status ?? (dto.isUnavailable === undefined ? undefined : dto.isUnavailable ? 'rest' as const : 'active' as const);
+    return { ...dto,
+      ...(daily !== undefined ? { maxDailyMinutes: daily, maxDailyWorkloadMinutes: daily } : {}),
+      ...(rest !== undefined ? { minRestMinutes: rest, requiredRestMinutes: rest } : {}),
+      ...(status !== undefined ? { status, isUnavailable: status !== 'active' } : {}),
+      ...(dto.feedingNotes !== undefined ? { feedingNotes: dto.feedingNotes?.trim() || null } : {}),
+    };
   }
 
   async remove(id: string): Promise<Horse> {

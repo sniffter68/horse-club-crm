@@ -1,4 +1,5 @@
 import { isSerializationFailure } from '../common/serialization-failure';
+import { BookingRulesService } from '../bookings/booking-rules.service';
 import { randomUUID } from 'node:crypto';
 import { queueVkNotification } from '../vk-bot/vk-delivery.module';
 import {
@@ -81,6 +82,7 @@ export class LessonsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly membershipLedgerService: MembershipLedgerService,
+    private readonly bookingRules: BookingRulesService = new BookingRulesService(),
   ) {}
 
   async validateNoConflicts(
@@ -182,6 +184,7 @@ export class LessonsService {
         }
       }
       const horseIds = [...new Set(lesson.bookings.map(booking => booking.horseId).filter((id): id is string => Boolean(id)))];
+      await this.bookingRules.validate(tx, { trainerId: lesson.trainerId, arenaId: lesson.arenaId, participants: lesson.bookings, start, end, excludeLessonId: lessonId });
       await this.validateNoConflictsWithClient(tx, lesson.trainerId, horseIds, start, end, lessonId, lesson.arenaId ?? undefined);
       for (const horseId of horseIds) {
         await this.getHorseWorkloadWithClient(tx, horseId, this.getLocalDateParts(start), durationMinutes, lessonId);
@@ -305,6 +308,8 @@ export class LessonsService {
           throw new ConflictException('Лошадь уже назначена участнику этого занятия');
         }
       }
+      await this.bookingRules.validate(tx, { trainerId: dto.trainerId, arenaId: dto.arenaId, participants, start, end,
+        excludeLessonId: matchingLesson?.id, existingRiders: matchingLesson?.bookings.length });
       await this.validateNoConflictsWithClient(
         tx,
         dto.trainerId,

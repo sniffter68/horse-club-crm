@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
-const { test } = require('node:test');
+const { test, mock } = require('node:test');
 require('reflect-metadata');
+mock.method(require('../dist/bookings/booking-rules.service').BookingRulesService.prototype, 'validate', async () => {});
 const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
 const { VkLinkService, normalizePhone } = require('../dist/vk-bot/vk-link.service');
 const { MembershipLedgerService } = require('../dist/memberships/membership-ledger.service');
