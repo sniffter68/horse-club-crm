@@ -13,7 +13,7 @@ const colors: Record<PaymentStatus, string> = { PENDING: 'gold', PAID: 'green', 
 
 function source(payment: Payment): string {
   if (payment.boardingContract) return `Постой: ${payment.boardingContract.horse.name}`
-  if (payment.booking) return `Занятие: ${payment.booking.lesson.service.title || payment.booking.lesson.service.name}`
+  if (payment.booking) return `Занятие: ${payment.booking.lesson?.service.title || payment.booking.lesson?.service.name || 'Тренировка'}`
   if (payment.membership) return `Абонемент: ${payment.membership.pricingPlan?.name || 'индивидуальный'}`
   return 'Ручная запись'
 }
@@ -53,7 +53,7 @@ export function PaymentList() {
         { key: 'amount', dataIndex: 'amount', title: 'Сумма', sorter: true, render: money },
         { key: 'status', dataIndex: 'status', title: 'Оплата', sorter: true, render: (_: PaymentStatus, record) => <Space>
           <Tag color={colors[record.status]}>{statuses[record.status]}</Tag>
-          {record.status === 'PAID'
+          {record.cashierId ? <Tag>Проведено в кассе</Tag> : record.status === 'PAID'
             ? <Button size="small" loading={updatingId === record.id} onClick={() => setPaid(record, false)}>Снять отметку</Button>
             : <Button type="primary" size="small" loading={updatingId === record.id} onClick={() => setPaid(record, true)}>Оплачено</Button>}
         </Space> },

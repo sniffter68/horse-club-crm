@@ -34,7 +34,7 @@ function toMenuItems(resources: TreeMenuItem[]): NonNullable<MenuProps['items']>
 
 const menuCategories = [
   { key: 'category-lessons', label: 'Занятия', icon: <CalendarOutlined />, resources: ['lessons', 'lesson-history'] },
-  { key: 'category-clients', label: 'Клиенты и финансы', icon: <CreditCardOutlined />, resources: ['clients', 'memberships', 'pricing-plans', 'payments'] },
+  { key: 'category-clients', label: 'Клиенты и финансы', icon: <CreditCardOutlined />, resources: ['clients', 'memberships', 'pricing-plans', 'payments', 'cash-desk'] },
   { key: 'category-horses', label: 'Лошади и постой', icon: <HomeOutlined />, resources: ['horses', 'horse-health-logs', 'stalls', 'boarding-contracts'] },
   { key: 'category-club', label: 'Клуб и команда', icon: <TeamOutlined />, resources: ['trainers', 'services', 'arenas'] },
   { key: 'category-admin', label: 'Администрирование', icon: <SettingOutlined />, resources: ['users', 'settings'] },
@@ -67,6 +67,7 @@ export function Sidebar({ darkMode, onToggleTheme }: { darkMode: boolean; onTogg
     (item.name !== 'users' || role === 'ADMIN') &&
     (item.name !== 'memberships' || role !== 'TRAINER') &&
     (item.name !== 'pricing-plans' || role !== 'TRAINER') &&
+    (item.name !== 'cash-desk' || role === 'ADMIN' || role === 'MANAGER') &&
     (item.name !== 'payments' || role !== 'TRAINER') &&
     (item.name !== 'dashboard' || role !== 'TRAINER'),
   )

@@ -145,6 +145,11 @@ export function SchedulePage() {
   const [arenas, setArenas] = useState<Arena[]>([])
   const [ready, setReady] = useState(false)
   const [revision, setRevision] = useState(0)
+  useEffect(() => {
+    const refresh = () => setRevision(value => value + 1)
+    window.addEventListener('cash-desk-paid', refresh)
+    return () => window.removeEventListener('cash-desk-paid', refresh)
+  }, [])
   const [range, setRange] = useState<{ from: string; to: string }>()
   const [trainerId, setTrainerId] = useState<string>()
   const [horseId, setHorseId] = useState<string>()

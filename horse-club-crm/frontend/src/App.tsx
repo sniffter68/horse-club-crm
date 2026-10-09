@@ -1,3 +1,5 @@
+import { CashDeskPage } from './pages/cash-desk'
+import { CashDeskProvider, CashDeskButton } from './pages/cash-desk/CashDeskPaymentModal'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { SettingsPage } from './pages/settings'
 import { ClientList } from './pages/clients/list'
@@ -68,6 +70,7 @@ const resources: ResourceProps[] = [
   { name: 'memberships', list: '/memberships', create: '/memberships/new', meta: { label: 'Абонементы' } },
   { name: 'pricing-plans', list: '/pricing-plans', create: '/pricing-plans/new', edit: '/pricing-plans/edit/:id', meta: { label: 'Тарифы' } },
   { name: 'users', list: '/users', create: '/users/new', meta: { label: 'Пользователи' } },
+  { name: 'cash-desk', list: '/cash-desk', meta: { label: 'Касса' } },
   { name: 'payments', list: '/payments', meta: { label: 'Оплаты' } },
 ]
 function LoadingPage() {
@@ -161,7 +164,7 @@ export default function App() {
             options={{ syncWithLocation: true, disableTelemetry: true }}>
             <Routes>
               <Route element={<Authenticated key="private" fallback={<CatchAllNavigate to="/login" />} loading={<LoadingPage />}>
-                <ThemedLayoutV2 Sider={() => <Sidebar darkMode={darkMode} onToggleTheme={toggleTheme} />} Title={(props) => <ThemedTitleV2 {...props} text="Horse CRM" />}><Outlet /></ThemedLayoutV2>
+                <CashDeskProvider><ThemedLayoutV2 Header={() => <div className="cash-desk-header"><CashDeskButton /></div>} Sider={() => <Sidebar darkMode={darkMode} onToggleTheme={toggleTheme} />} Title={(props) => <ThemedTitleV2 {...props} text="Horse CRM" />}><Outlet /></ThemedLayoutV2></CashDeskProvider>
               </Authenticated>}>
                 <Route index element={<DashboardRoute />} />
                 {catalogs.map(({ name, ListPage, CreatePage, EditPage }) => (
@@ -177,6 +180,7 @@ export default function App() {
                 <Route path="memberships"><Route index element={<MembershipList />} /><Route path="new" element={<MembershipCreate />} /></Route>
                 <Route path="pricing-plans"><Route index element={<PricingPlanList />} /><Route path="new" element={<PricingPlanCreate />} /><Route path="edit/:id" element={<PricingPlanEdit />} /></Route>
                 <Route path="users"><Route index element={<UserList />} /><Route path="new" element={<UserCreate />} /></Route>
+                <Route path="cash-desk" element={<CashDeskPage />} />
                 <Route path="payments" element={<PaymentList />} />
                 <Route path="*" element={<Result status="404" title="404" subTitle="Страница не найдена" />} />
               </Route>

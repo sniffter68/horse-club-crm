@@ -148,3 +148,17 @@
 - Ant Design Modal/Form/Select and App message are reused for future scheduled bookings and legacy lesson participants.
 - ADMIN/MANAGER can change only the horse and optional reason. BookingRulesService validates resources in the same serializable transaction; payments, memberships and ledger entries stay attached to the original booking.
 - Conflicts preserve selection and reason and show both persistent text and a toast. Missing rider weight requires completing the client card before replacement.
+
+## Cash desk
+
+- Owner: `frontend/src/pages/cash-desk`; reusable payment modal via `CashDeskProvider` in the private layout.
+- Sources: user cash-desk brief; `backend/src/payments/cash-desk.service.ts`, DTOs and migration `20261009120000_cash_desk`.
+- ADMIN/MANAGER receive payments and view the book; backend guards are authoritative. Cashier identity comes from the session.
+- Existing Ant Select, Form, Modal, DatePicker and App message own accessibility, focus and feedback. Native popup ownership is not used in the cash desk.
+- Modal client search is transient and intentionally absent from the URL (personal data); server search is bounded and stale responses are ignored.
+- Book filters and pagination live in URL parameters. Dates are Moscow calendar dates; API end is exclusive.
+- A request UUID survives uncertain HTTP outcomes; retry preserves the original payload. Posted cash receipts cannot be edited/deleted through legacy payment CRUD.
+- Fixed lesson issuance already credits lessons; receiving payment settles a pending charge without crediting lessons again. Deposit payments increment monetary units. No automatic unfreeze or extension of validity.
+- Starting cash is shown separately and excluded from revenue. Payments may be accepted without an open shift; an active cashier shift attaches automatically.
+- Success closes the modal, announces change and invalidates balances; schedule and cash book reload on the shared event.
+- Browser verification: `frontend/e2e/cash-desk.spec.ts` (desktop/mobile, insufficient tender, SBP, uncertain retry, role denial).

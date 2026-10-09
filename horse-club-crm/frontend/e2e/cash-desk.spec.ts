@@ -1,0 +1,90 @@
+import { test, expect, type Page } from '@playwright/test'
+
+async function setup(page: Page, role = 'ADMIN') {
+  await page.clock.setFixedTime(new Date('2026-10-09T09:00:00Z'))
+  await page.addInitScript(role => {
+    localStorage.setItem('horsecrm.access_token', 'cookie-session')
+    localStorage.setItem('horsecrm.email', 'qa@example.com')
+    localStorage.setItem('horsecrm.role', sessionStorage.getItem('qa.role') || role)
+  }, role)
+  const state = { posts: [] as Record<string, unknown>[], summaries: [] as string[], fail: false, paid: false }
+  await page.route('**/api/clients?*', route => route.fulfill({ json: [{ id: 'c1', name: 'Анна Орлова', phone: '+79991234567' }], headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/services?*', route => route.fulfill({ json: [{ id: 's1', title: 'Индивидуальная тренировка', price: '1200.10' }], headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/payments/cash-desk/options/*', route => route.fulfill({ json: { bookings: [], memberships: [] } }))
+  await page.route('**/api/payments/shifts/current', route => route.fulfill({ json: { id: 'shift1', openedAt: '2026-10-09T07:00:00Z', startingCash: '1000' } }))
+  await page.route('**/api/payments/summary?*', route => {
+    state.summaries.push(route.request().url())
+    return route.fulfill({ json: { totalCash: state.paid ? '1200.10' : '0', totalCard: '0', totalRevenue: state.paid ? '1200.10' : '0', operationsCount: state.paid ? 1 : 0, operations: state.paid ? [{ id: 'p1', amount: '1200.10', cashChange: '799.90', method: 'CASH', client: { name: 'Анна Орлова' }, service: { title: 'Индивидуальная тренировка' }, cashier: { email: 'qa@example.com' }, paidAt: '2026-10-09T09:00:00Z' }] : [] } })
+  })
+  await page.route('**/api/payments/cash-desk', route => {
+    state.posts.push(route.request().postDataJSON())
+    if (state.fail) return route.fulfill({ status: 500, json: { message: 'Ответ сервера потерян' } })
+    state.paid = true
+    return route.fulfill({ json: { id: 'p1', cashChange: '799.90', method: state.posts.at(-1)?.method } })
+  })
+  return state
+}
+async function fillPayment(page: Page) {
+  await page.getByRole('button', { name: 'Принять платёж', exact: true }).first().click()
+  const modal = page.getByRole('dialog', { name: 'Принять оплату / Касса', exact: true })
+  await modal.getByRole('combobox', { name: 'Клиент', exact: true }).fill('Анна')
+  await expect(page.locator('.ant-select-dropdown:visible').getByText('Анна Орлова · +79991234567', { exact: true })).toBeVisible()
+  await modal.getByRole('combobox', { name: 'Клиент', exact: true }).press('Enter')
+  await modal.getByRole('combobox', { name: 'Услуга / занятие / абонемент', exact: true }).click()
+  await expect(page.locator('.ant-select-dropdown:visible').getByText('Индивидуальная тренировка', { exact: true })).toBeVisible()
+  await modal.getByRole('combobox', { name: 'Услуга / занятие / абонемент', exact: true }).press('Enter')
+  return modal
+}
+for (const width of [1440, 390]) test(`cash payment and book refresh at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  const state = await setup(page)
+  await page.goto('/cash-desk')
+  const modal = await fillPayment(page)
+  await expect(modal.getByRole('spinbutton', { name: 'Сумма чека, ₽', exact: true })).toHaveValue('1200.10')
+  await modal.getByRole('button', { name: '+1000', exact: true }).click()
+  await expect(modal.getByRole('button', { name: 'Провести платёж', exact: true })).toBeDisabled()
+  await modal.getByRole('button', { name: '+1000', exact: true }).click()
+  await expect(modal).toContainText('Сдача')
+  await expect(modal).toContainText('799')
+  await page.screenshot({ path: `test-results/cash-desk-${width}.png`, fullPage: true })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await modal.getByRole('button', { name: 'Провести платёж', exact: true }).click()
+  await expect(modal).not.toBeVisible()
+  await expect(page.getByText('Анна Орлова', { exact: true })).toBeVisible()
+  expect(state.posts).toHaveLength(1)
+  expect(state.posts[0]).toMatchObject({ clientId: 'c1', amount: 1200.1, cashGiven: 2000, method: 'CASH', serviceId: 's1' })
+  await page.getByText('Текущая неделя', { exact: true }).click()
+  await expect.poll(() => new URL(state.summaries.at(-1)!).searchParams.get('from')).toBe('2026-10-05T00:00:00.000+03:00')
+})
+test('uncertain response preserves payload and operation key on retry', async ({ page }) => {
+  const state = await setup(page)
+  await page.goto('/cash-desk')
+  const modal = await fillPayment(page)
+  await modal.getByRole('button', { name: 'Без сдачи', exact: true }).click()
+  state.fail = true
+  await modal.getByRole('button', { name: 'Провести платёж', exact: true }).click()
+  await expect(modal.getByRole('alert')).toContainText('Ответ сервера потерян')
+  await expect(modal.getByRole('spinbutton', { name: 'Сумма чека, ₽', exact: true })).toBeDisabled()
+  state.fail = false
+  await modal.getByRole('button', { name: 'Провести платёж', exact: true }).click()
+  await expect(modal).not.toBeVisible()
+  expect(state.posts).toHaveLength(2)
+  expect(state.posts[0]).toEqual(state.posts[1])
+})
+test('noncash SBP skips cash input and trainer cannot access cash desk', async ({ page }) => {
+  const state = await setup(page)
+  await page.goto('/cash-desk')
+  const modal = await fillPayment(page)
+  await modal.getByText('Безнал', { exact: true }).click()
+  await expect(modal.getByRole('spinbutton', { name: 'Внесено клиентом, ₽', exact: true })).not.toBeVisible()
+  await modal.locator('.ant-select-selector').filter({ has: page.getByRole('combobox', { name: 'Вид безналичной оплаты', exact: true }) }).click()
+  await page.locator('.ant-select-dropdown:visible').getByText('СБП', { exact: true }).click()
+  await modal.getByRole('button', { name: 'Провести платёж', exact: true }).click()
+  await expect(modal).not.toBeVisible()
+  expect(state.posts[0].method).toBe('SBP')
+  expect(state.posts[0].cashGiven).toBeUndefined()
+  await page.evaluate(() => sessionStorage.setItem('qa.role', 'TRAINER'))
+  await page.reload()
+  await expect(page.getByText('Касса доступна администратору и менеджеру', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Принять платёж', exact: true })).not.toBeVisible()
+})

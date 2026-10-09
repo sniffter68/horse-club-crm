@@ -1,3 +1,4 @@
+import { CashDeskButton } from '../cash-desk/CashDeskPaymentModal'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOnError } from '@refinedev/core'
 import type { ColumnsType } from 'antd/es/table'
@@ -273,7 +274,7 @@ export function DashboardPage() {
           <Typography.Text type="secondary">Автообновление каждые 15 секунд · обновлено {new Date(summary.generatedAt).toLocaleTimeString('ru-RU')}</Typography.Text>
         </Space>}
       </div>
-      <Button className="dashboard-refresh" onClick={() => void loadSummary()} loading={loading}>Обновить</Button>
+      <Space wrap><CashDeskButton /><Button className="dashboard-refresh" onClick={() => void loadSummary()} loading={loading}>Обновить</Button></Space>
     </Space>
 
     {error && <Alert type="error" showIcon message="Не удалось загрузить сводку" description={error} />}

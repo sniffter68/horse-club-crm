@@ -360,3 +360,14 @@ html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); borde
   .quick-boarding-date-popup .ant-picker-time-panel-column { height: 100px; }
   .quick-boarding-date-popup .ant-picker-panel-container { max-height: calc(100dvh - 32px); overflow-y: auto; }
 }
+
+.cash-desk-header { display: flex; justify-content: flex-end; padding: 12px 24px; }
+.cash-desk-change { padding: 20px; margin-bottom: 20px; border: 1px solid var(--color-border, #E4DAD0); border-radius: 16px; font-variant-numeric: tabular-nums; }
+.cash-desk-change .ant-statistic-content { font-size: 36px; font-family: Georgia, serif; }
+.cash-desk-page, .cash-desk-page > .ant-space-item { min-width: 0; max-width: 100%; }
+.cash-desk-filters { display: flex; min-width: 0; max-width: 100%; }
+.cash-desk-filters > .ant-space-item { min-width: 0; max-width: 100%; overflow-x: auto; padding-bottom: 4px; }
+.cash-desk-modal { top: 16px; padding-bottom: 16px; }
+.cash-desk-modal .ant-modal-body { max-height: calc(100dvh - 180px); overflow-y: auto; padding-right: 4px; }
+.cash-desk-modal .ant-modal-footer { margin-top: 16px; }
+@media (max-width: 767px) { .cash-desk-header { padding-top: 76px; padding-right: 24px; } }

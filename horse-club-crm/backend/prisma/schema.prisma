@@ -95,6 +95,8 @@ enum HealthLogType {
 enum PaymentMethod {
   UNSPECIFIED
   CASH
+  CARD_TERMINAL
+  SBP
   CARD
   TRANSFER
 }
@@ -121,6 +123,8 @@ enum LeadRequestStatus {
 }
 
 model User {
+  cashPayments Payment[]
+  cashShifts CashShift[]
   vkUserId     BigInt?  @unique
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -132,6 +136,7 @@ model User {
 }
 
 model Service {
+  payments Payment[]
   id                      String        @id @default(uuid()) @db.Uuid
   name                    String
   title                   String        @default("")
@@ -311,6 +316,7 @@ model PricingPlan {
 }
 
 model Booking {
+  isPaid Boolean @default(false)
   trainerId           String              @db.Uuid
   arenaId             String?             @db.Uuid
   startTime           DateTime            @db.Timestamptz(6)
@@ -365,6 +371,8 @@ model Arena {
 }
 
 model LedgerTransaction {
+  cashDeskPaymentId String? @unique @db.Uuid
+  cashDeskPayment Payment? @relation("CashDeskLedger", fields: [cashDeskPaymentId], references: [id], onDelete: Restrict)
   id                   String          @id @default(uuid()) @db.Uuid
   clientId             String          @db.Uuid
   bookingId            String?         @db.Uuid
@@ -431,12 +439,36 @@ model BoardingContract {
   @@index([stallId, status])
 }
 
+model CashShift {
+  id String @id @default(uuid()) @db.Uuid
+  cashierId String @db.Uuid
+  cashier User @relation(fields: [cashierId], references: [id], onDelete: Restrict)
+  openedAt DateTime @default(now()) @db.Timestamptz(6)
+  closedAt DateTime? @db.Timestamptz(6)
+  startingCash Decimal @default(0) @db.Decimal(12, 2)
+  notes String?
+  payments Payment[]
+  @@index([cashierId, openedAt])
+}
+
 model Payment {
+  cashDeskTransaction LedgerTransaction? @relation("CashDeskLedger")
+  cashGiven Decimal? @db.Decimal(12, 2)
+  cashChange Decimal? @db.Decimal(12, 2)
+  cashierId String? @db.Uuid
+  cashier User? @relation(fields: [cashierId], references: [id], onDelete: Restrict)
+  shiftId String? @db.Uuid
+  shift CashShift? @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  serviceId String? @db.Uuid
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  serviceType String?
+  notes String?
+  requestId String? @unique @db.Uuid
   id                 String            @id @default(uuid()) @db.Uuid
   clientId           String            @db.Uuid
   bookingId          String?           @db.Uuid
   boardingContractId String?           @db.Uuid
-  membershipId       String?           @unique @db.Uuid
+  membershipId       String?           @db.Uuid
   amount             Decimal           @db.Decimal(12, 2)
   method             PaymentMethod
   status             PaymentStatus     @default(PENDING)
@@ -453,6 +485,9 @@ model Payment {
   @@index([bookingId])
   @@index([boardingContractId])
   @@index([status, createdAt])
+  @@index([cashierId, paidAt])
+  @@index([shiftId])
+  @@index([membershipId])
 }
 
 enum BookingAttendance {

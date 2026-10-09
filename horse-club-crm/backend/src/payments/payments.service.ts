@@ -88,6 +88,7 @@ export class PaymentsService {
     try {
       const current = await this.prisma.payment.findUnique({ where: { id } });
       if (!current) throw new NotFoundException('Платёж не найден');
+      if (current.cashierId) throw new ConflictException('Проведённый кассовый платёж нельзя редактировать');
       const data = await this.resolveData({
         clientId: dto.clientId ?? current.clientId,
         bookingId: dto.bookingId === undefined ? current.bookingId : dto.bookingId,
@@ -107,6 +108,8 @@ export class PaymentsService {
 
   async remove(id: string): Promise<PaymentWithRelations> {
     try {
+      const current = await this.prisma.payment.findUnique({ where: { id } });
+      if (current?.cashierId) throw new ConflictException('Проведённый кассовый платёж нельзя удалить');
       return await this.prisma.payment.delete({ where: { id }, include: paymentInclude.include });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Платёж');

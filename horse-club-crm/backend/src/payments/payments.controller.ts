@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { CashDeskService } from './cash-desk.service';
+import { CashDeskPaymentDto, CashSummaryQueryDto, OpenCashShiftDto } from './dto/cash-desk.dto';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import type { Response } from 'express';
@@ -17,7 +19,7 @@ import { PaymentsService, type BookingPaymentOption, type PaymentWithRelations }
 @Roles(Role.ADMIN, Role.MANAGER)
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly service: PaymentsService) {}
+  constructor(private readonly service: PaymentsService, private readonly cashDesk: CashDeskService) {}
 
   @Get()
   async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) response: Response): Promise<PaymentWithRelations[]> {
@@ -32,6 +34,24 @@ export class PaymentsController {
     setRefineTotalHeaders(response, data.length);
     return data;
   }
+
+  @Post('cash-desk')
+  pay(@Body() dto: CashDeskPaymentDto, @Req() req: { user: { id: string } }) { return this.cashDesk.pay(dto, req.user.id); }
+
+  @Get('summary')
+  summary(@Query() query: CashSummaryQueryDto) { return this.cashDesk.summary(query); }
+
+  @Get('cash-desk/options/:clientId')
+  options(@Param('clientId', new ParseUUIDPipe()) clientId: string) { return this.cashDesk.options(clientId); }
+
+  @Get('shifts/current')
+  currentShift(@Req() req: { user: { id: string } }) { return this.cashDesk.currentShift(req.user.id); }
+
+  @Post('shifts')
+  openShift(@Body() dto: OpenCashShiftDto, @Req() req: { user: { id: string } }) { return this.cashDesk.openShift(dto, req.user.id); }
+
+  @Post('shifts/:id/close')
+  closeShift(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: { id: string } }) { return this.cashDesk.closeShift(id, req.user.id); }
 
   @Get(':id')
   findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<PaymentWithRelations> { return this.service.findOne(id); }

@@ -1,8 +1,8 @@
-﻿import { defineConfig } from '@playwright/test'
+import { defineConfig } from '@playwright/test'
 export default defineConfig({
   projects: [
     { name: 'live', testMatch: '**/*.live.spec.ts' },
-    { name: 'mock', testMatch: ['**/s3-01.spec.ts', '**/clients-memberships.spec.ts', '**/horse-workload.spec.ts', '**/vk-link.spec.ts', '**/quick-boarding.spec.ts', '**/triad-booking.spec.ts'] },
+    { name: 'mock', testMatch: ['**/s3-01.spec.ts', '**/clients-memberships.spec.ts', '**/horse-workload.spec.ts', '**/vk-link.spec.ts', '**/quick-boarding.spec.ts', '**/triad-booking.spec.ts', '**/cash-desk.spec.ts'] },
   ],
   testDir: './e2e', workers: 1, timeout: 20000,
   reporter: [['list'], ['html', { open: 'never' }]],
