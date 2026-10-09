@@ -32,7 +32,7 @@ const { JwtService } = require('@nestjs/jwt');
 const bcrypt = require('bcrypt');
 const secret = 'test-only-secret-abcdefghijklmnopqrstuvwxyz0123456789';
 const jwt = new JwtService({ secret, signOptions: { algorithm: 'HS256', expiresIn: '30m' } });
-const updatedAt = new Date('2026-09-21T00:00:00Z');
+const tokenVersion = 1;
 const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true,
   transform: true, transformOptions: { enableImplicitConversion: true } });
 const validate = (value, metatype) => pipe.transform(value, { type: 'body', metatype });
@@ -51,7 +51,7 @@ test('DTO rejects extra fields, invalid roles and numeric credentials', async ()
 test('login verifies bcrypt, signs short-lived versioned claims and does not expose the hash', async () => {
   const password = 'test-password-123';
   const user = { id: 'user-1', email: 'admin@example.com', role: Role.ADMIN,
-    updatedAt, passwordHash: await bcrypt.hash(password, 12) };
+    tokenVersion, passwordHash: await bcrypt.hash(password, 12) };
   const service = new AuthService({ user: { findUnique: async () => user } }, jwt);
   await service.onModuleInit();
   const response = await service.login({ email: user.email, password });
@@ -62,7 +62,7 @@ test('login verifies bcrypt, signs short-lived versioned claims and does not exp
   assert.equal(payload.email, user.email);
   assert.equal(payload.role, user.role);
   assert.equal(payload.exp - payload.iat, 30 * 60);
-  assert.equal(payload.authVersion, updatedAt.toISOString());
+  assert.equal(payload.authVersion, String(tokenVersion));
   assert.equal(payload.passwordHash, undefined);
   await assert.rejects(service.validateUser(user.email, 'wrong'), status(401));
   const missing = new AuthService({ user: { findUnique: async () => null } }, jwt);
@@ -88,7 +88,7 @@ test('registration hashes passwords, rejects bcrypt truncation and maps duplicat
 
 function authenticate(token) {
   return new Promise((resolve, reject) => {
-    const strategy = new JwtStrategy({ secret }, { user: { findUnique: async () => ({ id: 'user-1', email: 'admin@example.com', role: Role.ADMIN, updatedAt }) } });
+    const strategy = new JwtStrategy({ secret }, { user: { findUnique: async () => ({ id: 'user-1', email: 'admin@example.com', role: Role.ADMIN, tokenVersion }) } });
     strategy.success = resolve;
     strategy.fail = () => reject(new Error('Unauthorized'));
     strategy.error = reject;
@@ -97,7 +97,7 @@ function authenticate(token) {
 }
 
 test('JWT strategy rejects expired, forged and malformed tokens', async () => {
-  const claims = { sub: 'user-1', email: 'admin@example.com', role: Role.ADMIN, authVersion: updatedAt.toISOString() };
+  const claims = { sub: 'user-1', email: 'admin@example.com', role: Role.ADMIN, authVersion: String(tokenVersion) };
   assert.deepEqual(await authenticate(jwt.sign(claims)), { id: claims.sub, email: claims.email, role: claims.role });
   await assert.rejects(authenticate(jwt.sign(claims, { expiresIn: -1 })));
   await assert.rejects(authenticate(jwt.sign(claims, { secret: 'another-secret' })));
@@ -136,4 +136,17 @@ test('JWT configuration fails closed without a sufficiently long secret', () => 
     if (previous === undefined) delete process.env.JWT_SECRET;
     else process.env.JWT_SECRET = previous;
   }
+});
+
+test('profile and VK updates preserve sessions; token version and role changes revoke them', async () => {
+  const user = { id: 'user-1', email: 'admin@example.com', role: Role.ADMIN, tokenVersion: 1, updatedAt: new Date(0) };
+  const strategy = new JwtStrategy({ secret }, { user: { findUnique: async () => user } });
+  const claims = { sub: user.id, email: user.email, role: user.role, authVersion: '1', exp: 9999999999 };
+  await strategy.validate(claims);
+  user.updatedAt = new Date(); user.vkUserId = 123n;
+  await strategy.validate(claims);
+  user.role = Role.MANAGER;
+  await assert.rejects(strategy.validate(claims), status(401));
+  user.role = Role.ADMIN; user.tokenVersion++;
+  await assert.rejects(strategy.validate(claims), status(401));
 });

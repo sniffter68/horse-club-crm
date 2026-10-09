@@ -1,3 +1,4 @@
+import { ReplaceHorseDto } from './dto/replace-horse.dto';
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { setRefineTotalHeaders } from '../common/refine';
@@ -18,6 +19,11 @@ import { CancelBookingDto } from './dto/cancel-booking.dto';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BookingsController {
   constructor(private readonly bookings: BookingsService, private readonly lifecycle: BookingLifecycleService) {}
+  @Patch(':id/horse')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  replaceHorse(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: ReplaceHorseDto) {
+    return this.bookings.replaceHorse(id, dto.horseId, dto.reason);
+  }
   @Patch(':id/complete')
   @Roles(Role.ADMIN, Role.MANAGER)
   complete(@Param('id', new ParseUUIDPipe()) id: string) { return this.lifecycle.transition(id, 'complete'); }

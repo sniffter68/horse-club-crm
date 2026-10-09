@@ -43,10 +43,10 @@ test('trainer cannot change lesson status through HTTP, manager can', async () =
 });
 
 test('logout revokes copied tokens and deleted users cannot authenticate',async()=>{
-  let row={id:'u',email:'a@example.com',role:'ADMIN',updatedAt:new Date('2020-01-01')};
-  const prisma={user:{findUnique:async()=>row,update:async({data})=>Object.assign(row,data)}};
+  let row={id:'u',email:'a@example.com',role:'ADMIN',tokenVersion:1,updatedAt:new Date('2020-01-01')};
+  const prisma={user:{findUnique:async()=>row,update:async({data})=>Object.assign(row, { tokenVersion: row.tokenVersion + data.tokenVersion.increment })}};
   const strategy=new JwtStrategy({secret:'test-secret-that-is-at-least-32-bytes'},prisma);
-  const claims={sub:row.id,email:row.email,role:row.role,exp:9999999999,authVersion:row.updatedAt.toISOString()};
+  const claims={sub:row.id,email:row.email,role:row.role,exp:9999999999,authVersion:String(row.tokenVersion)};
   await strategy.validate(claims);
   await new AuthService(prisma,{}).logout(row);
   await assert.rejects(strategy.validate(claims),e=>e.getStatus()===401);
@@ -110,9 +110,9 @@ test('foreign or forbidden membership is rejected before booking mutation',async
 test('real HTTP cookie authentication, CSRF rejection and logout revocation',async()=>{
   const oldSecret=process.env.JWT_SECRET;
   process.env.JWT_SECRET='test-only-secret-with-more-than-32-bytes';
-  const row={id:'11111111-1111-4111-8111-111111111111',email:'test@example.com',role:'ADMIN',
+  const row={id:'11111111-1111-4111-8111-111111111111',email:'test@example.com',role:'ADMIN',tokenVersion:1,
     updatedAt:new Date('2020-01-01'),passwordHash:await require('bcrypt').hash('test-password',4)};
-  const prisma={user:{findUnique:async()=>row,update:async({data})=>Object.assign(row,data)}};
+  const prisma={user:{findUnique:async()=>row,update:async({data})=>Object.assign(row, { tokenVersion: row.tokenVersion + data.tokenVersion.increment })}};
   let app;
   try {
     const module=await Test.createTestingModule({imports:[PrismaModule,AuthModule]})

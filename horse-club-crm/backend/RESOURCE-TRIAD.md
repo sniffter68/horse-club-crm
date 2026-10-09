@@ -172,3 +172,10 @@ Verification: `booking-lifecycle.test.cjs`, `booking-lifecycle.postgres.test.cjs
 the isolated triad runner and frontend triad/client-ledger browser suites cover the
 boundary, decimals, idempotency, rollback, concurrent last-unit contenders, legacy
 interoperability, access control and narrow screens.
+
+## Horse replacement
+PATCH /api/bookings/:id/horse (ADMIN/MANAGER): { horseId: UUID, reason?: string (max 500) }.
+Supports direct bookings and legacy lesson participants, only before start and while scheduled.
+Runs BookingRulesService in a serializable transaction, excluding the current booking/lesson and retaining other lesson participants.
+Only horseId and horseChangeReason are written; no billing or membership operations run.
+409 codes: HORSE_NOT_ACTIVE, RIDER_WEIGHT_REQUIRED, RIDER_WEIGHT_EXCEEDED, HORSE_OVERLOADED, HORSE_REST_VIOLATION, BOOKING_NOT_UPCOMING, plus existing resource/contention codes.

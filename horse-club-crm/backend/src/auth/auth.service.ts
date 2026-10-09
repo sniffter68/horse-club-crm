@@ -34,14 +34,14 @@ export class AuthService implements OnModuleInit {
     }
     const user = await this.prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, role: true, passwordHash: true, updatedAt: true },
+      select: { id: true, email: true, role: true, passwordHash: true, tokenVersion: true },
     });
     // Perform bcrypt work for unknown emails as well.
     const valid = await compare(password, user?.passwordHash ?? this.dummyHash);
     if (!user || !valid) {
       throw new UnauthorizedException('Invalid email or password');
     }
-    return { id: user.id, email: user.email, role: user.role, authVersion: user.updatedAt.toISOString() };
+    return { id: user.id, email: user.email, role: user.role, authVersion: String(user.tokenVersion) };
   }
 
   async login(dto: LoginDto): Promise<AccessTokenResponse> {
@@ -52,7 +52,7 @@ export class AuthService implements OnModuleInit {
 
   async logout(user: AuthUser): Promise<{ success: true }> {
     // Revoke every previously issued token for this account, including stolen copies.
-    await this.prisma.user.update({ where: { id: user.id }, data: { updatedAt: new Date() } });
+    await this.prisma.user.update({ where: { id: user.id }, data: { tokenVersion: { increment: 1 } } });
     return { success: true };
   }
 

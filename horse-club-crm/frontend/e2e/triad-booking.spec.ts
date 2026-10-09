@@ -250,3 +250,33 @@ test('resource selectors support pointer selection after asynchronous balance lo
   }
   await expect(modal.getByRole('button', { name: 'Создать бронирование' })).toBeEnabled()
 })
+
+for (const width of [1280, 375]) {
+  test(`replaces horse after Rules Engine conflict at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    let attempts = 0
+    let current = booking
+    await page.route('**/api/bookings?*', route => route.fulfill({ json: [current], headers: { 'x-total-count': '1' } }))
+    await page.route('**/api/bookings/booking1/horse', async route => {
+      expect(route.request().method()).toBe('PATCH')
+      expect(route.request().postDataJSON()).toEqual({ horseId: 'h2', reason: 'Хромота' })
+      attempts++
+      if (attempts === 1) return route.fulfill({ status: 409, json: { code: 'HORSE_REST_VIOLATION', message: 'Лошадь не успеет отдохнуть' } })
+      current = { ...booking, horseId: 'h2', horse: { ...horse, id: 'h2', name: 'Буран' } }
+      return route.fulfill({ json: current })
+    })
+    await page.goto('/schedule')
+    await page.locator('.fc-event').first().click()
+    await page.getByRole('button', { name: 'Заменить лошадь', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Заменить лошадь', exact: true })
+    await choose(page, dialog, 'Новая лошадь', 'Буран')
+    await dialog.getByLabel('Причина замены').fill('Хромота')
+    await dialog.getByRole('button', { name: 'Заменить лошадь', exact: true }).click()
+    await expect(dialog.getByRole('alert')).toContainText('Лошадь не успеет отдохнуть')
+    await expect(dialog.getByLabel('Причина замены')).toHaveValue('Хромота')
+    await dialog.getByRole('button', { name: 'Заменить лошадь', exact: true }).click()
+    await expect(dialog).not.toBeVisible()
+    await expect(page.locator('.fc-event').filter({ hasText: 'Буран' }).first()).toBeVisible()
+    expect(attempts).toBe(2)
+  })
+}

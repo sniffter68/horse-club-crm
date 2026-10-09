@@ -124,6 +124,7 @@ model User {
   vkUserId     BigInt?  @unique
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
+  tokenVersion Int      @default(1)
   passwordHash String
   role         Role
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
@@ -328,6 +329,7 @@ model Booking {
   horseId          String?           @db.Uuid
   membershipId     String?           @db.Uuid
   attended         Boolean           @default(false)
+  horseChangeReason String?
   attendanceStatus BookingAttendance @default(PENDING)
   lesson           Lesson?           @relation(fields: [lessonId], references: [id], onDelete: Restrict)
   client           Client            @relation(fields: [clientId], references: [id])

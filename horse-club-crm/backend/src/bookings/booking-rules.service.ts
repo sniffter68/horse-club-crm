@@ -4,6 +4,7 @@ import { DateTime } from 'luxon';
 import { BookingValidationError } from './booking-validation.error';
 
 export interface BookingRuleInput {
+  requireRiderWeight?: boolean;
   trainerId: string;
   arenaId?: string | null;
   participants: readonly { clientId: string; horseId?: string | null }[];
@@ -60,7 +61,10 @@ export class BookingRulesService {
       if (!participant.horseId) continue;
       const horse = horses.find(h => h.id === participant.horseId);
       if (!horse) throw new BookingValidationError('RESOURCE_NOT_FOUND', 'Лошадь не найдена');
-      if (horse.status !== 'active' || horse.isUnavailable) throw new BookingValidationError('HORSE_UNAVAILABLE', 'Лошадь недоступна для тренировок', { horseId: horse.id });
+      if (horse.status !== 'active' || horse.isUnavailable) throw new BookingValidationError(input.requireRiderWeight ? 'HORSE_NOT_ACTIVE' : 'HORSE_UNAVAILABLE', 'Лошадь недоступна для тренировок', { horseId: horse.id });
+      if (input.requireRiderWeight && client.weightKg == null) {
+        throw new BookingValidationError('RIDER_WEIGHT_REQUIRED', 'Укажите вес всадника в карточке клиента перед заменой лошади');
+      }
       if (client.weightKg !== null && Number(client.weightKg) > horse.maxRiderWeight) {
         throw new BookingValidationError('RIDER_WEIGHT_EXCEEDED', 'Вес всадника превышает допустимый лимит для данной лошади', { horseId: horse.id, clientId: client.id, maxRiderWeight: horse.maxRiderWeight });
       }

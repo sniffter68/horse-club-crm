@@ -111,3 +111,45 @@ test('invalid intervals and costs never start a transaction', async () => {
     await assert.rejects(service.createBooking({ clientId: 'client', trainerId: 'trainer', horseId: 'horse', arenaId: 'arena', startTime: at('10:00').toISOString(), endTime: at('10:30').toISOString(), serviceType: 'dressage', costAmount: 0, ...patch }), error => error.getStatus() === 400);
   }
 });
+
+test('horse replacement validates future scheduled booking and only writes horse and reason', async () => {
+  const f = fixture({ client: { weightKg: 75 } });
+  const startTime = new Date('2030-10-09T10:00:00Z'), endTime = new Date('2030-10-09T10:30:00Z');
+  let saved;
+  const current = { id: 'b', lesson: null, lessonId: null, status: 'scheduled', clientId: 'client', horseId: 'old', trainerId: 'trainer', arenaId: 'arena', startTime, endTime };
+  f.tx.booking.findUnique = async () => current;
+  f.tx.booking.update = async args => { saved = args; return { ...current, ...args.data }; };
+  const service = new BookingsService({ $transaction: async (work, options) => {
+    assert.equal(options.isolationLevel, 'Serializable'); return work(f.tx);
+  } }, rules);
+  await service.replaceHorse('b', 'horse', ' Хромота ');
+  assert.deepEqual(saved, { where: { id: 'b' }, data: { horseId: 'horse', horseChangeReason: 'Хромота' } });
+  saved = null; current.status = 'completed';
+  await assert.rejects(service.replaceHorse('b', 'horse'), failure('BOOKING_NOT_UPCOMING'));
+  assert.equal(saved, null);
+  current.status = 'scheduled'; current.startTime = new Date(0);
+  await assert.rejects(service.replaceHorse('b', 'horse'), failure('BOOKING_NOT_UPCOMING'));
+});
+
+test('horse replacement rejects unavailable horse and unknown rider weight without writes', async () => {
+  for (const [config, code] of [[{ horse: { status: 'sick' }, client: { weightKg: 75 } }, 'HORSE_NOT_ACTIVE'], [{}, 'RIDER_WEIGHT_REQUIRED']]) {
+    const f = fixture(config);
+    f.tx.booking.findUnique = async () => ({ id: 'b', lesson: null, status: 'scheduled', clientId: 'client', trainerId: 'trainer', arenaId: 'arena', startTime: new Date('2030-10-09T10:00Z'), endTime: new Date('2030-10-09T10:30Z') });
+    f.tx.booking.update = async () => assert.fail('invalid replacement was saved');
+    await assert.rejects(new BookingsService({ $transaction: async work => work(f.tx) }, rules).replaceHorse('b', 'horse'), failure(code));
+  }
+});
+
+test('legacy replacement excludes its lesson and validates all participants without duplicate horse assignments', async () => {
+  let input, data;
+  const lesson = { id: 'l', status: 'SCHEDULED', trainerId: 'trainer', arenaId: 'arena', startTime: new Date('2030-10-09T10:00Z'), endTime: new Date('2030-10-09T10:30Z'),
+    bookings: [{ id: 'b', clientId: 'c1', horseId: 'old' }, { id: 'b2', clientId: 'c2', horseId: 'h2' }] };
+  const tx = { booking: { findUnique: async () => ({ id: 'b', lesson }), update: async args => { data = args.data; } } };
+  const service = new BookingsService({ $transaction: async work => work(tx) }, { validate: async (_tx, value) => { input = value; } });
+  await service.replaceHorse('b', 'new');
+  assert.equal(input.excludeLessonId, 'l');
+  assert.equal(input.excludeBookingId, 'b');
+  assert.deepEqual(input.participants, [{ clientId: 'c1', horseId: 'new' }, { clientId: 'c2', horseId: 'h2' }]);
+  assert.deepEqual(data, { horseId: 'new', horseChangeReason: null });
+  await assert.rejects(service.replaceHorse('b', 'h2'), failure('HORSE_REST_VIOLATION'));
+});

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { BookingServiceType, Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { parseRefineQuery } from '../common/refine';
@@ -12,6 +12,37 @@ import type { CreateBookingDto } from './dto/create-booking.dto';
 @Injectable()
 export class BookingsService {
   constructor(private readonly prisma: PrismaService, private readonly rules: BookingRulesService) {}
+
+  async replaceHorse(id: string, horseId: string, reason?: string) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        return await this.prisma.$transaction(async tx => {
+          const booking = await tx.booking.findUnique({ where: { id }, include: { lesson: { include: { bookings: true } } } });
+          if (!booking) throw new NotFoundException('Бронирование не найдено');
+          const lesson = booking.lesson;
+          const start = lesson?.startTime ?? booking.startTime;
+          const end = lesson?.endTime ?? booking.endTime;
+          if ((lesson ? lesson.status !== 'SCHEDULED' : booking.status !== 'scheduled') || start <= new Date()) {
+            throw new BookingValidationError('BOOKING_NOT_UPCOMING', 'Заменить лошадь можно только в предстоящем запланированном занятии');
+          }
+          const participants = lesson
+            ? lesson.bookings.map(row => ({ clientId: row.clientId, horseId: row.id === id ? horseId : row.horseId }))
+            : [{ clientId: booking.clientId, horseId }];
+          const horseIds = participants.flatMap(row => row.horseId ? [row.horseId] : []);
+          if (new Set(horseIds).size !== horseIds.length) throw new BookingValidationError('HORSE_REST_VIOLATION', 'Лошадь уже назначена другому участнику занятия');
+          await this.rules.validate(tx, {
+            trainerId: lesson?.trainerId ?? booking.trainerId!, arenaId: lesson ? lesson.arenaId : booking.arenaId,
+            participants, start, end, excludeBookingId: id, excludeLessonId: lesson?.id, requireRiderWeight: true,
+          });
+          return tx.booking.update({ where: { id }, data: { horseId, horseChangeReason: reason?.trim() || null } });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 10000 });
+      } catch (error: unknown) {
+        if (!isSerializationFailure(error)) throw error;
+        if (attempt === 4) throw new BookingValidationError('BOOKING_CONTENTION', 'Ресурсы изменились одновременно. Повторите замену');
+      }
+    }
+    throw new BookingValidationError('BOOKING_CONTENTION', 'Повторите замену');
+  }
 
   async createBooking(dto: CreateBookingDto) {
     return this.save(dto);

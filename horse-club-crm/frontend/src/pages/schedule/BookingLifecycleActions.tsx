@@ -6,8 +6,8 @@ import { isPenaltyCancellation, type TriadBooking } from './triad'
 
 interface CancellationValues { cancelledBy: 'client' | 'club'; reason: string }
 
-export function BookingLifecycleActions({ booking, report, onSaved, onBusyChange }: {
-  booking: TriadBooking; report: (cause: unknown) => void; onSaved: () => void; onBusyChange: (busy: boolean) => void;
+export function BookingLifecycleActions({ booking, report, onSaved, onBusyChange, disabled = false }: {
+  disabled?: boolean; booking: TriadBooking; report: (cause: unknown) => void; onSaved: () => void; onBusyChange: (busy: boolean) => void;
 }) {
   const { message } = App.useApp()
   const invalidate = useInvalidate()
@@ -27,7 +27,7 @@ export function BookingLifecycleActions({ booking, report, onSaved, onBusyChange
   if (booking.status !== 'scheduled') return null
   const billing = `С абонемента на занятия спишется 1 занятие, с депозита — ${Number(booking.costAmount).toLocaleString('ru-RU')} ₽. Если абонемент не выбран, используется подходящий с ближайшим сроком действия.`
   async function apply(action: 'complete' | 'no-show' | 'cancel', values?: CancellationValues) {
-    if (lock.current) return
+    if (lock.current || disabled) return
     lock.current = true; setBusy(true); onBusyChange(true); setError(undefined)
     try {
       await httpClient.patch(`${API_URL}/bookings/${booking.id}/${action}`, values)
@@ -46,18 +46,18 @@ export function BookingLifecycleActions({ booking, report, onSaved, onBusyChange
     {error && <Alert type="error" role="alert" showIcon message="Не удалось изменить статус" description={error} />}
     <Space wrap>
       <Popconfirm title="Завершить тренировку и списать занятие?" description={<span className="booking-billing-note">{billing}</span>}
-        okText="Завершить и списать" cancelText="Назад" disabled={busy} onConfirm={() => apply('complete')} okButtonProps={{ loading: busy }}>
-        <Button type="primary" disabled={busy}>Завершить</Button>
+        okText="Завершить и списать" cancelText="Назад" disabled={busy || disabled} onConfirm={() => apply('complete')} okButtonProps={{ loading: busy }}>
+        <Button type="primary" disabled={busy || disabled}>Завершить</Button>
       </Popconfirm>
       <Popconfirm title="Зафиксировать неявку со списанием?" description={<span className="booking-billing-note">{billing}</span>}
-        okText="Зафиксировать неявку" cancelText="Назад" disabled={busy} onConfirm={() => apply('no-show')} okButtonProps={{ loading: busy }}>
-        <Button disabled={busy}>Неявка (No-show)</Button>
+        okText="Зафиксировать неявку" cancelText="Назад" disabled={busy || disabled} onConfirm={() => apply('no-show')} okButtonProps={{ loading: busy }}>
+        <Button disabled={busy || disabled}>Неявка (No-show)</Button>
       </Popconfirm>
-      <Button disabled={busy} onClick={() => { setNow(Date.now()); setCancelOpen(true) }}>Отменить</Button>
+      <Button disabled={busy || disabled} onClick={() => { setNow(Date.now()); setCancelOpen(true) }}>Отменить</Button>
     </Space>
     <Modal className="booking-cancellation-modal" open={cancelOpen} title="Отмена бронирования" footer={null} maskClosable={false} keyboard={!busy}
       onCancel={() => { if (!lock.current) setCancelOpen(false) }} destroyOnHidden>
-      <Form name={`cancel-booking-${booking.id}`} form={form} noValidate layout="vertical" initialValues={{ cancelledBy: 'client', reason: '' }} disabled={busy}
+      <Form name={`cancel-booking-${booking.id}`} form={form} noValidate layout="vertical" initialValues={{ cancelledBy: 'client', reason: '' }} disabled={busy || disabled}
         onFinish={values => apply('cancel', { ...values, reason: values.reason.trim() })}>
         <Form.Item name="cancelledBy" label="Инициатор отмены" rules={[{ required: true }]}>
           <Select aria-label="Инициатор отмены" options={[{ value: 'client', label: 'Клиент' }, { value: 'club', label: 'Клуб' }]} />
@@ -70,7 +70,7 @@ export function BookingLifecycleActions({ booking, report, onSaved, onBusyChange
         </Form.Item>
         {error && <Alert type="error" role="alert" showIcon message={error} style={{ marginBottom: 16 }} />}
         <Space wrap><Button type="primary" htmlType="submit" loading={busy} aria-busy={busy}>Подтвердить отмену</Button>
-          <Button disabled={busy} onClick={() => setCancelOpen(false)}>Назад</Button></Space>
+          <Button disabled={busy || disabled} onClick={() => setCancelOpen(false)}>Назад</Button></Space>
       </Form>
     </Modal>
   </section>

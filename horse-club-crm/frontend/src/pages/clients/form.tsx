@@ -1,5 +1,5 @@
 import { useCatalogPermissions } from '../catalogs/permissions'
-import { BooleanField, CatalogForm, TextField } from '../catalogs/shared'
+import { BooleanField, CatalogForm, NumberField, TextField } from '../catalogs/shared'
 import type { Client, ClientValues } from '../catalogs/types'
 
 export function ClientForm({ action }: { action: 'create' | 'edit' }) {
@@ -9,6 +9,7 @@ export function ClientForm({ action }: { action: 'create' | 'edit' }) {
     title={action === 'create' ? 'Новый клиент' : 'Редактирование клиента'} defaults={{ isRider: true, isPayer: false }}
     toPayload={values => ({ ...values, firstName: values.firstName.trim(), lastName: values.lastName?.trim() ?? '',
       name: [values.firstName.trim(), values.lastName?.trim()].filter(Boolean).join(' '), phone: values.phone.trim() })}>
+    <NumberField name="weightKg" label="Вес всадника, кг" min={0.01} max={999.99} precision={2} />
     <TextField name="firstName" label="Имя" required max={75} />
     <TextField name="lastName" label="Фамилия" max={74} />
     <TextField name="phone" label="Телефон" required max={40} />

@@ -143,3 +143,8 @@
 - Static: premium strict audit, forbidden-blue grep, lint, typecheck, unit tests, production build.
 - Browser: dashboard, clients, schedule; desktop and narrow viewport; light/dark/reduced motion when available.
 - Canonical sibling flow: shared catalog list/create/edit.
+
+### Horse replacement
+- Ant Design Modal/Form/Select and App message are reused for future scheduled bookings and legacy lesson participants.
+- ADMIN/MANAGER can change only the horse and optional reason. BookingRulesService validates resources in the same serializable transaction; payments, memberships and ledger entries stay attached to the original booking.
+- Conflicts preserve selection and reason and show both persistent text and a toast. Missing rider weight requires completing the client card before replacement.

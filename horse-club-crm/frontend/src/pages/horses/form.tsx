@@ -5,6 +5,7 @@ export function HorseForm({ action }: { action: 'create' | 'edit' }) {
   return <CatalogForm<Horse, HorseValues> resource="horses" action={action}
     title={action === 'create' ? 'Новая лошадь' : 'Редактирование лошади'}
     defaults={{ maxDailyMinutes: 240, minRestMinutes: 15, isUnavailable: false }}>
+    <NumberField name="maxRiderWeight" label="Максимальный вес всадника, кг" min={1} max={1000} />
     <TextField name="name" label="Кличка" required />
     <TextField name="breed" label="Порода" />
     <TextField name="riderLevel" label="Уровень всадника" max={100} />

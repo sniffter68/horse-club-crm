@@ -49,3 +49,7 @@ JWT подписывается HS256, содержит `sub`, `email`, `role`, `
 с подменой границы Prisma, поскольку исходная схема недоступна. Тесты используют
 настоящие bcrypt, JWT/Passport, ValidationPipe и RolesGuard. Это отдельная проверка
 поведения, которая не заменяет `npm run typecheck` и интеграционные тесты с PostgreSQL.
+
+JWT authVersion содержит строковое значение User.tokenVersion. Обновления профиля/VK не меняют версию.
+Logout увеличивает tokenVersion. Триггер БД увеличивает её при изменении passwordHash или role.
+При первом развёртывании миграции старые JWT с authVersion=updatedAt потребуют повторного входа.
