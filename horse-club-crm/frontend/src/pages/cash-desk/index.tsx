@@ -4,6 +4,8 @@ import { useSearchParams } from 'react-router-dom'
 import { Alert, App, Button, Card, Col, DatePicker, Form, InputNumber, Modal, Result, Row, Segmented, Space, Spin, Statistic, Tag, Typography } from 'antd'
 import { BankOutlined, CreditCardOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import 'dayjs/locale/ru'
+import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { CashDeskButton } from './CashDeskPaymentModal'
@@ -81,7 +83,7 @@ function CashDeskBook() {
       {shift ? <><Typography.Text>Размен на начало: {currency(shift.startingCash)}</Typography.Text><Button onClick={closeShift}>Закрыть смену</Button></> : <Button onClick={() => { setShiftError(undefined); setOpening(true) }}>Открыть смену</Button>}
     </Space></Card>
     <Space className="cash-desk-filters" wrap><Segmented value={period} onChange={value => changeParams({ period: String(value), page: '1' })} options={[{ value: 'today', label: 'Сегодня' }, { value: 'shift', label: 'Текущая смена' }, { value: 'yesterday', label: 'Вчера' }, { value: 'week', label: 'Текущая неделя' }, { value: 'month', label: 'Текущий месяц' }, { value: 'custom', label: 'Выбрать даты' }]} />
-      {period === 'custom' && <DatePicker.RangePicker aria-label="Период кассовой книги" format="DD.MM.YYYY" value={from && to ? [dayjs(from), dayjs(to)] : null} onChange={values => changeParams({ from: values?.[0]?.format('YYYY-MM-DD') || '', to: values?.[1]?.format('YYYY-MM-DD') || '', page: '1' })} />}
+      {period === 'custom' && <DatePicker.RangePicker locale={ruDatePicker} aria-label="Период кассовой книги" format="DD.MM.YYYY" value={from && to ? [dayjs(from), dayjs(to)] : null} onChange={values => changeParams({ from: values?.[0]?.format('YYYY-MM-DD') || '', to: values?.[1]?.format('YYYY-MM-DD') || '', page: '1' })} />}
     </Space>
     {error && <Alert type="error" role="alert" showIcon message="Не удалось загрузить кассу" description={error} />}
     {!error && Number(summary?.totalUnspecified) > 0 && <Alert type="warning" showIcon message={`Ранее внесённые оплаты без указанного способа: ${currency(summary?.totalUnspecified)}`} description="Они включены в выручку, но не отнесены к наличным или безналичным." />}
