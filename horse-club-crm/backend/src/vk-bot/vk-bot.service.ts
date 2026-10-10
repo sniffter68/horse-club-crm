@@ -29,10 +29,31 @@ const lessonsLeft = (count: number) => {
 export class VkBotService {
   private readonly logger = new Logger(VkBotService.name);
   private readonly vk: VK | undefined;
+  private readonly firstNames = new Map<number, { value: Promise<string | undefined>; expiresAt: number }>();
   constructor(private readonly prisma: PrismaService, private readonly links: VkLinkService,
     private readonly ledger: MembershipLedgerService, private readonly leads: LeadsService) {
     const token = process.env.VK_COMMUNITY_TOKEN?.trim() || process.env.VK_BOT_TOKEN?.trim();
     if (token) this.vk = new VK({ token, apiVersion: '5.199', apiTimeout: 5000, apiRetryLimit: 0 });
+  }
+  private getFirstName(sender: number): Promise<string | undefined> {
+    const cached = this.firstNames.get(sender);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    // Bound memory usage and share in-flight lookups for repeated callbacks.
+    this.firstNames.delete(sender);
+    if (this.firstNames.size >= 1000) this.firstNames.delete(this.firstNames.keys().next().value!);
+    const value = (async () => {
+      try {
+        // users.get includes first_name and last_name in its default response.
+        const profiles = await this.vk?.api.users.get({ user_ids: [sender] });
+        const firstName = profiles?.[0]?.first_name;
+        return typeof firstName === 'string' ? firstName.trim() || undefined : undefined;
+      } catch {
+        this.logger.warn('Не удалось получить имя пользователя VK');
+        return undefined;
+      }
+    })();
+    this.firstNames.set(sender, { value, expiresAt: Date.now() + 5 * 60 * 1000 });
+    return value;
   }
   private async send(peer: number, event: string, text: string, keyboard?: KeyboardBuilder) {
     if (!this.vk) throw new ServiceUnavailableException('VK-бот не настроен');
@@ -84,10 +105,6 @@ export class VkBotService {
       || typeof text !== 'string' || typeof eventId !== 'string' || !eventId || eventId.length > 200) throw new BadRequestException('Некорректное сообщение VK');
     if (sender <= 0 || peer !== sender || out === 1) return;
     let command = normalizeVkCommand(text);
-    if (command === 'начать' || command === 'привет') {
-      await this.send(peer, eventId, 'Здравствуйте! Вы подключены к боту конного клуба. Здесь будут приходить напоминания о тренировках и статус бронирований.', welcome);
-      return;
-    }
     let offset = 0;
     if (typeof payload === 'string') {
       try {
@@ -97,6 +114,11 @@ export class VkBotService {
           if (Number.isSafeInteger(parsed.offset) && typeof parsed.offset === 'number' && parsed.offset >= 0 && parsed.offset <= 10000) offset = parsed.offset;
         }
       } catch { /* Ordinary text routes without a payload. */ }
+    }
+    if (command === 'начать' || command === 'привет') {
+      const firstName = await this.getFirstName(sender);
+      await this.send(peer, eventId, `Здравствуйте${firstName ? `, ${firstName}` : ''}! Вы подключены к боту конного клуба. Здесь будут приходить напоминания о тренировках и статус бронирований.`, welcome);
+      return;
     }
     if (command === 'help') { await this.requestAdministrator(peer, eventId); return; }
     try {

@@ -47,7 +47,9 @@ test('main reply keyboard has the requested three rows and stable payloads', () 
   ]);
   assert.deepEqual(result.buttons.flat().map(button => JSON.parse(button.action.payload).command), ['bookings', 'balance', 'about', 'guide', 'help']);
   const guest = keyboard(welcomeMenu());
-  assert.deepEqual(guest.buttons.slice(0, 3), result.buttons);
+  assert.deepEqual(guest.buttons.slice(0, 2), result.buttons.slice(0, 2));
+  assert.equal(guest.buttons[2][0].action.label, '💬 Позвать администратора');
+  assert.equal(JSON.parse(guest.buttons[2][0].action.payload).command, 'help');
   assert.deepEqual(guest.buttons[3].map(button => button.action.label), ['Привязать профиль', 'Первичная заявка']);
   assert.equal(keyboard(mainMenu(true)).buttons[0][0].action.label, 'Расписание на сегодня');
 });
