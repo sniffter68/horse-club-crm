@@ -9,7 +9,7 @@ import { LeadsService } from '../leads/leads.service';
 import { normalizePhone, VkLinkService } from './vk-link.service';
 import { mainMenu as menu, normalizeVkCommand, welcomeMenu } from './vk-bot.keyboard';
 import { clubCard, riderGuide } from './vk-bot.config';
-import { queueVkNotification } from './vk-delivery.module';
+import { queueVkAdminChatNotification } from './vk-delivery.module';
 import { currentLeadConsentVersion as consentVersion } from '../common/lead-consent';
 
 function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
@@ -62,9 +62,8 @@ export class VkBotService {
       ? `https://vk.com/gim${groupId}?sel=${clientPeerId}` : profileUrl;
     if (Number.isSafeInteger(adminPeerId) && adminPeerId > 0 && adminPeerId !== clientPeerId) {
       try {
-        await this.prisma.$transaction(tx => queueVkNotification(tx,
-          `help:${clientPeerId}:${createHash('sha256').update(eventId).digest('hex')}:${adminPeerId}`,
-          BigInt(adminPeerId),
+        await this.prisma.$transaction(tx => queueVkAdminChatNotification(tx,
+          `help:${clientPeerId}:${createHash('sha256').update(eventId).digest('hex')}`,
           `💬 Запрос помощи администратору клуба\nКлиент: ${name}\nПрофиль: ${profileUrl}\n👉 Открыть диалог: ${dialogUrl}\nВремя: ${date(requestedAt)}`));
       } catch { this.logger.error({ event: 'vk_help_not_queued', vkUserId: clientPeerId, eventId }); }
     } else {

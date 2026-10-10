@@ -89,9 +89,13 @@ test('landing DTO saves direction and notes and queues exactly one site card onl
     update: async () => {},
   } });
   delivery.vk = { api: { messages: { send: async () => { throw Object.assign(new Error('VK denied'), { code: 901 }); } } } };
-  delivery.logger.warn = () => {};
+  const warnings = [];
+  delivery.logger.warn = entry => warnings.push(entry);
   await assert.doesNotReject(delivery.flush());
   assert.equal(leads[0].status, 'PENDING');
+  assert.equal(warnings[0].event, 'vk_notification_failed');
+  assert.equal(warnings[0].peerId, '2000000001');
+  assert.equal(warnings[0].errorCode, 901);
 });
 
 test('landing accepts optional direction and missing VK configuration without losing the lead', async () => {
@@ -242,6 +246,90 @@ test('queue failure keeps the saved lead and successful HTTP response', async ()
   const response = await request(app.getHttpServer()).post('/api/leads').send(landingPayload).expect(201);
   assert.equal(response.body.success, true);
   assert.equal(leads.length, 1);
+  assert.equal(notifications.length, 0);
+  queueFails = false;
+  await request(app.getHttpServer()).post('/api/leads').send({ ...landingPayload, name: 'Другое имя', direction: 'Другое направление' }).expect(201);
+  assert.equal(leads.length, 1);
+  assert.equal(notifications.length, 1);
+  assert.match(notifications[0].message, /Имя: Анна/);
+  assert.match(notifications[0].message, /Направление: Конкур/);
+  assert.doesNotMatch(notifications[0].message, /Другое/);
+  await request(app.getHttpServer()).post('/api/leads').send(landingPayload).expect(201);
+  assert.equal(notifications.length, 1);
+});
+
+test('a browser lead is delivered to the admin conversation and marked sent only after VK succeeds', async () => {
+  process.env.VK_ADMIN_PEER_ID = ' 2000000001 ';
+  await request(app.getHttpServer()).post('/api/leads').send(landingPayload).expect(201);
+  const sent = [], updates = [], logs = [];
+  const row = { ...notifications[0], id: 'notification-id', attemptCount: 0, sentAt: null };
+  const delivery = new VkNotifications({ vkNotification: {
+    findMany: async () => row.sentAt ? [] : [row],
+    update: async ({ data }) => { updates.push(data); Object.assign(row, data); },
+  } });
+  delivery.vk = { api: { messages: { send: async args => {
+    assert.equal(updates.length, 0); sent.push(args);
+  } } } };
+  delivery.logger.log = entry => logs.push(entry);
+  await delivery.flush();
+  await delivery.flush();
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].peer_id, 2000000001);
+  assert.equal(sent[0].message, '🔔 Новая заявка с сайта!\n• Имя: Анна\n• Телефон: +79001231111\n• Направление: Конкур\n• Источник: Лендинг');
+  assert.ok(Number.isInteger(sent[0].random_id));
+  assert.ok(row.sentAt instanceof Date);
+  assert.equal(logs[0].event, 'vk_notification_sent');
+  assert.equal(logs[0].peerId, '2000000001');
+});
+
+for (const peer of [undefined, '', 'invalid', '0', '-1', '9007199254740992']) {
+  test(`missing or invalid admin chat ${JSON.stringify(peer)} produces a diagnostic warning and can recover`, async () => {
+    if (peer === undefined) delete process.env.VK_ADMIN_PEER_ID; else process.env.VK_ADMIN_PEER_ID = peer;
+    const warnings = [];
+    const service = new LeadsService(prisma);
+    service.logger = { warn: entry => warnings.push(entry), log: () => {}, error: () => {} };
+    await service.create(lead);
+    assert.equal(leads.length, 1);
+    assert.equal(notifications.length, 0);
+    assert.equal(warnings[0].event, 'lead_vk_notification_skipped');
+    assert.equal(warnings[0].leadId, leadId);
+    process.env.VK_ADMIN_PEER_ID = '2000000001';
+    await service.create({ ...lead, firstName: 'Другое имя', direction: 'Не из сохранённой заявки' });
+    assert.equal(notifications.length, 1);
+    assert.match(notifications[0].message, /Имя: Анна/);
+    assert.match(notifications[0].message, /Направление: Не указано/);
+  });
+}
+
+test('missing community token warns that VK delivery is disabled', () => {
+  const original = { VK_COMMUNITY_TOKEN: process.env.VK_COMMUNITY_TOKEN, VK_BOT_TOKEN: process.env.VK_BOT_TOKEN };
+  try {
+    delete process.env.VK_COMMUNITY_TOKEN;
+    delete process.env.VK_BOT_TOKEN;
+    const warnings = [];
+    const delivery = new VkNotifications(prisma);
+    delivery.logger.warn = entry => warnings.push(entry);
+    delivery.onModuleInit();
+    assert.equal(warnings[0].event, 'vk_delivery_disabled');
+    assert.equal(delivery.timer, undefined);
+  } finally {
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});
+
+test('a queue insertion failure logs the affected lead without failing its creation', async () => {
+  process.env.VK_ADMIN_PEER_ID = '2000000001';
+  queueFails = true;
+  const errors = [];
+  const service = new LeadsService(prisma);
+  service.logger.error = entry => errors.push(entry);
+  await service.create(lead);
+  assert.equal(leads.length, 1);
+  assert.equal(notifications.length, 0);
+  assert.equal(errors[0].event, 'lead_vk_notification_queue_failed');
+  assert.equal(errors[0].leadId, leadId);
 });
 
 test('production public-leads flag controls acceptance', async () => {

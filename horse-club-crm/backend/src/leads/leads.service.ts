@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { LeadRequestStatus, Prisma } from '@prisma/client';
-import { queueVkAdministratorNotification, queueVkNotification } from '../vk-bot/vk-delivery.module';
+import { queueVkAdministratorNotification, queueVkAdminChatNotification } from '../vk-bot/vk-delivery.module';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AcceptLeadDto } from './accept-lead.dto';
 import type { CreateLeadDto } from './create-lead.dto';
@@ -44,11 +44,21 @@ export class LeadsService {
           });
       return { lead, created: !pending };
     });
-    if (result.created) {
+    // Retry a missing outbox entry on resubmission, using the saved lead rather
+    // than new input. The stable notification key also covers already sent rows.
+    if (result.created || (consentSource === 'LANDING' && result.lead.consentSource === 'LANDING')) {
+      const notificationDto = result.created ? dto : {
+        ...dto, firstName: result.lead.firstName, phone: result.lead.phone,
+        serviceId: result.lead.serviceId ?? undefined,
+        direction: result.lead.preferences?.split('\n').find(line => line.startsWith('Направление: '))?.slice('Направление: '.length),
+      };
       try {
-        await this.retrySerializable(tx => this.notifyAdministrator(tx, result.lead.id, dto, consentSource));
-      } catch {
-        this.logger.error(`Не удалось поставить уведомление VK в очередь для заявки ${result.lead.id}`);
+        await this.retrySerializable(tx => this.notifyAdministrator(tx, result.lead.id, notificationDto, consentSource));
+      } catch (error: unknown) {
+        this.logger.error({ event: 'lead_vk_notification_queue_failed', leadId: result.lead.id, source: consentSource,
+          message: 'Не удалось поставить уведомление VK в очередь. Заявка сохранена; повторная отправка восстановит уведомление.',
+          errorType: error instanceof Error ? error.name : 'UnknownError',
+          errorCode: typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined });
       }
     }
     return { success: true, leadId: '', message: 'Заявка успешно принята' };
@@ -98,13 +108,17 @@ export class LeadsService {
   private async notifyAdministrator(tx: Prisma.TransactionClient, leadId: string, dto: CreateLeadDto, source: 'LANDING' | 'VK'): Promise<void> {
     const service = dto.serviceId ? await tx.service.findUnique({ where: { id: dto.serviceId }, select: { title: true, name: true } }) : null;
     if (source === 'LANDING') {
-      const peer = Number(process.env.VK_ADMIN_PEER_ID);
-      if (Number.isSafeInteger(peer) && peer > 0) await queueVkNotification(tx, `lead:${leadId}:${peer}`, BigInt(peer),
+      const peer = await queueVkAdminChatNotification(tx, `lead:${leadId}`,
         `🔔 Новая заявка с сайта!\n• Имя: ${dto.firstName}\n• Телефон: ${dto.phone}\n• Направление: ${dto.direction?.trim() || service?.title || service?.name || 'Не указано'}\n• Источник: Лендинг`);
+      if (peer === undefined) this.logger.warn({ event: 'lead_vk_notification_skipped', leadId,
+        reason: 'admin_peer_not_configured', message: 'Уведомление о заявке не поставлено в очередь: задайте корректный VK_ADMIN_PEER_ID беседы администраторов.' });
+      else this.logger.log({ event: 'lead_vk_notification_registered', leadId, peerId: peer });
       return;
     }
-    await queueVkAdministratorNotification(tx, `lead:${leadId}`,
+    const recipients = await queueVkAdministratorNotification(tx, `lead:${leadId}`,
       `🐎 Новая заявка: ${dto.firstName}, ${dto.phone}, ${service?.title || service?.name || 'Услуга не выбрана'}`);
+    if (!recipients) this.logger.warn({ event: 'lead_vk_notification_skipped', leadId,
+      reason: 'no_admin_recipients', message: 'Не настроены получатели VK: укажите VK_ADMIN_PEER_ID или VK ID администраторов.' });
   }
 
   private async retrySerializable<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
