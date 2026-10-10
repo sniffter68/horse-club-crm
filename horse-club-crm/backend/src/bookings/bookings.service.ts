@@ -8,6 +8,12 @@ import { isSerializationFailure } from '../common/serialization-failure';
 import { BookingRulesService } from './booking-rules.service';
 import { BookingValidationError } from './booking-validation.error';
 import type { CreateBookingDto } from './dto/create-booking.dto';
+import { queueTrainingConfirmation } from '../vk-bot/vk-training-notifications';
+
+const trainingTypes: Record<BookingServiceType, string> = {
+  dressage: 'Выездка', jumping: 'Конкур', walks: 'Прогулка', beginners: 'Начальная подготовка',
+  photoshoot: 'Фотосессия', corde: 'Корда',
+};
 
 @Injectable()
 export class BookingsService {
@@ -79,7 +85,15 @@ export class BookingsService {
             membershipId: dto.membershipId ?? null, startTime: start, endTime: end,
             serviceType: dto.serviceType, costAmount: new Prisma.Decimal(dto.costAmount), status: 'scheduled' as const,
           };
-          return id ? tx.booking.update({ where: { id }, data }) : tx.booking.create({ data });
+          if (id) return tx.booking.update({ where: { id }, data });
+          const created = await tx.booking.create({ data, include: { trainer: true, client: true, horse: true } });
+          await queueTrainingConfirmation(tx, `booking:${created.id}:created`, {
+            startTime: created.startTime, endTime: created.endTime, trainer: created.trainer,
+            trainingType: trainingTypes[dto.serviceType], participants: [{ client: created.client, horse: created.horse }],
+          });
+          // Keep the API response unchanged; included profiles contain BigInt VK IDs.
+          const { trainer, client, horse, ...booking } = created;
+          return booking;
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 10000 });
       } catch (error: unknown) {
         if (!isSerializationFailure(error)) throw error;

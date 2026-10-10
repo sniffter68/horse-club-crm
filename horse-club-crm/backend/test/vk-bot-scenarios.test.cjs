@@ -187,6 +187,10 @@ test('creation, repeated transfers and cancellation enqueue trainer and linked c
   assert.equal(queued.size, 2);
   assert.deepEqual([...queued.values()].map(row => row.peerId), [42n, 43n]);
   assert.match([...queued.values()][0].message, /08\.10\.2026, 12:00/);
+  assert.match([...queued.values()][0].message, /^📅 Новое занятие в вашем расписании!/);
+  assert.match([...queued.values()][0].message, /Клиент: Анна/);
+  assert.match([...queued.values()][1].message, /^✅ Ваша тренировка подтверждена!/);
+  assert.doesNotMatch([...queued.values()][1].message, /Борис/);
   await service.rescheduleLesson('lesson', '2026-10-08T10:00:00Z', 60);
   assert.equal(queued.size, 4); assert.match([...queued.values()].at(-1).message, /Ранее:/);
   await service.rescheduleLesson('lesson', '2026-10-08T09:00:00Z', 60);

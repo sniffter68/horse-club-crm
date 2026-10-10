@@ -31,7 +31,7 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
   }
   onModuleInit() {
     if (!this.vk) return;
-    this.timer = setInterval(() => { void this.flush(); }, 10000);
+    this.timer = setInterval(() => { void this.flush(); }, 1000);
     this.timer.unref();
   }
   onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
@@ -44,7 +44,7 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
         try {
           await this.vk.api.messages.send({ peer_id: Number(row.peerId), message: row.message, random_id: createHash('sha256').update(row.id).digest().readInt32BE(0) || 1 });
           await this.prisma.vkNotification.update({ where: { id: row.id }, data: { sentAt: new Date() } });
-        } catch {
+        } catch (error: unknown) {
           // Failed recipients must not occupy every slot in the next batch.
           const delay = Math.min(3600000, 10000 * 2 ** Math.min(row.attemptCount, 9));
           try {
@@ -52,7 +52,12 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
               attemptCount: { increment: 1 }, nextAttemptAt: new Date(Date.now() + delay),
             } });
           } catch { this.logger.warn('Не удалось обновить время повторной доставки VK'); }
-          this.logger.warn('Уведомление VK сохранено для повторной отправки');
+          this.logger.warn({
+            message: `Не удалось отправить VK-уведомление для userId: ${row.peerId}`,
+            notificationId: row.id, attemptCount: row.attemptCount + 1,
+            errorCode: typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined,
+            errorMessage: error instanceof Error ? error.message : 'Неизвестная ошибка VK',
+          });
         }
       }
     } catch { this.logger.warn('Очередь VK временно недоступна'); }

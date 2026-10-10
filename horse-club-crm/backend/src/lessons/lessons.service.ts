@@ -2,6 +2,7 @@ import { isSerializationFailure } from '../common/serialization-failure';
 import { BookingRulesService } from '../bookings/booking-rules.service';
 import { randomUUID } from 'node:crypto';
 import { queueVkNotification } from '../vk-bot/vk-delivery.module';
+import { queueTrainingConfirmation } from '../vk-bot/vk-training-notifications';
 import {
   BadRequestException,
   ConflictException,
@@ -592,6 +593,16 @@ export class LessonsService {
 
   private async notifyLesson(tx: TransactionClient, lesson: LessonDetails, event: string, title: string,
     clientIds?: string[], previousStart?: Date): Promise<void> {
+    const participants = (lesson.bookings ?? []).filter(row => !clientIds || clientIds.includes(row.clientId));
+    if (!lesson.trainer?.vkUserId && !participants.some(row => row.client?.vkUserId)) return;
+    if (event === 'created' || event.startsWith('booking:')) {
+      await queueTrainingConfirmation(tx, `lesson:${lesson.id}:${event}`, {
+        startTime: lesson.startTime, endTime: lesson.endTime, trainer: lesson.trainer,
+        trainingType: lesson.service.title || lesson.service.name,
+        participants,
+      });
+      return;
+    }
     const recipients = new Set<bigint>();
     if (lesson.trainer?.vkUserId) recipients.add(lesson.trainer.vkUserId);
     for (const booking of lesson.bookings ?? []) {
