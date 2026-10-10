@@ -2,6 +2,8 @@ const assert = require('node:assert/strict');
 const { beforeEach, after, test } = require('node:test');
 require('reflect-metadata');
 const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
+const { VkNotifications } = require('../dist/vk-bot/vk-delivery.module');
+const confirmation = '💬 Мы передали ваш запрос администратору клуба!\nСпециалист свяжется с вами в этом диалоге в ближайшее время. 🐎';
 const { mainMenu, welcomeMenu } = require('../dist/vk-bot/vk-bot.keyboard');
 const { clubCard, riderGuide } = require('../dist/vk-bot/vk-bot.config');
 
@@ -14,7 +16,7 @@ after(() => {
   }
 });
 const keyboard = value => JSON.parse(String(value));
-function harness({ client = null, trainer = null, admins = [], fail = false } = {}) {
+function harness({ client = null, trainer = null, admins = [], fail = false, profileFail = false } = {}) {
   const sent = [], logs = [], queries = [], queued = new Map();
   let transactions = 0;
   const tx = {
@@ -25,7 +27,7 @@ function harness({ client = null, trainer = null, admins = [], fail = false } = 
     } },
   };
   const bot = new VkBotService({
-    client: { findUnique: async () => client }, trainer: { findUnique: async () => trainer },
+    client: { findUnique: async () => { if (profileFail) throw new Error('DB unavailable'); return client; } }, trainer: { findUnique: async () => trainer },
     membership: { findMany: async () => [] }, booking: { findMany: async () => [] },
     $transaction: async fn => { transactions++; return fn(tx); },
   }, {}, {}, {});
@@ -80,26 +82,41 @@ test('club details and guide can be changed through environment without editing 
 
 for (const text of ['💬 Связаться с администратором', 'Связаться с администратором', 'администратор', 'позвать администратора', 'помощь']) {
   test(`administrator request accepts ${text}, records it and sends confirmation`, async () => {
-    const h = harness({ admins: [{ vkUserId: 77n }] });
+    process.env.VK_ADMIN_PEER_ID = '77';
+    const h = harness({ admins: [{ vkUserId: 42n }, { vkUserId: 78n }] });
     await h.send(text);
-    assert.equal(h.sent[0].message, 'Мы передали ваш запрос администратору клуба. Он подключится к диалогу в ближайшее время! 🐎');
+    assert.equal(h.sent.length, 1);
+    assert.equal(h.sent[0].peer_id, 42);
+    assert.equal(h.sent[0].message, confirmation);
+    assert.doesNotMatch(h.sent[0].message, /vk.com|Откройте диалог/);
     assert.equal(h.transactions(), 1); assert.equal(h.queued.size, 1);
-    assert.deepEqual(h.queries[0], { where: { role: 'ADMIN', vkUserId: { not: null } }, select: { vkUserId: true } });
+    assert.equal(h.queries.length, 0);
     assert.equal([...h.queued.values()][0].peerId, 77n);
     assert.match([...h.queued.values()][0].message, /https:\/\/vk.com\/id42/);
+    assert.match([...h.queued.values()][0].message, /Время: \d{2}\.\d{2}\.\d{4} \d{2}:\d{2}/);
     assert.ok(h.logs.some(({ value }) => value.event === 'vk_help_requested' && value.vkUserId === 42));
+    const adminSent = [];
+    const row = [...h.queued.values()][0];
+    const delivery = new VkNotifications({ vkNotification: {
+      findMany: async () => [{ ...row, id: 'notification-id' }], update: async () => {},
+    } });
+    delivery.vk = { api: { messages: { send: async params => adminSent.push(params) } } };
+    await delivery.flush();
+    assert.equal(adminSent.length, 1);
+    assert.equal(adminSent[0].peer_id, 77);
+    assert.equal(adminSent[0].message, row.message);
   });
 }
 
-test('help payload deduplicates admins, fallback recipient and repeated callback delivery', async () => {
+test('help payload uses only the configured recipient and deduplicates repeated callback delivery', async () => {
   process.env.VK_ADMIN_PEER_ID = '77';
   const h = harness({ client: { name: 'Анна Орлова' }, admins: [{ vkUserId: 77n }, { vkUserId: 78n }, { vkUserId: 77n }] });
   await h.send('', { command: 'help' }, 'same-event');
   await h.send('', { command: 'help' }, 'same-event');
-  assert.equal(h.queued.size, 2);
+  assert.equal(h.queued.size, 1);
   assert.match([...h.queued.values()][0].message, /Анна Орлова/);
   await h.send('', { command: 'help' }, 'another-event');
-  assert.equal(h.queued.size, 4);
+  assert.equal(h.queued.size, 2);
 });
 
 test('help can use the configured fallback recipient without an ADMIN VK account', async () => {
@@ -109,11 +126,24 @@ test('help can use the configured fallback recipient without an ADMIN VK account
   assert.match(h.sent[0].message, /Мы передали/);
 });
 
-for (const options of [{}, { fail: true, admins: [{ vkUserId: 77n }] }]) {
-  test(`help reports ${options.fail ? 'database failure' : 'missing recipients'} honestly and logs the failure`, async () => {
+for (const recipient of [undefined, '42', 'invalid', '-1']) {
+  test(`help confirms without service card for admin peer ${recipient}`, async () => {
+    if (recipient !== undefined) process.env.VK_ADMIN_PEER_ID = recipient;
+    const h = harness({ admins: [{ vkUserId: 42n }, { vkUserId: 77n }] });
+    await h.send('помощь');
+    assert.equal(h.queued.size, 0); assert.equal(h.transactions(), 0);
+    assert.equal(h.sent.length, 1); assert.equal(h.sent[0].peer_id, 42);
+    assert.equal(h.sent[0].message, confirmation);
+    assert.ok(h.logs.some(({ value }) => value.event === 'vk_help_requested'));
+    assert.ok(h.logs.some(({ value }) => value.event === 'vk_help_not_queued'));
+  });
+}
+
+for (const options of [{ fail: true }, { fail: true, profileFail: true }]) {
+  test(`help confirms even with database failure (${JSON.stringify(options)})`, async () => {
+    process.env.VK_ADMIN_PEER_ID = '77';
     const h = harness(options); await h.send('помощь');
-    assert.equal(h.queued.size, 0); assert.match(h.sent[0].message, /не удалось передать запрос/);
-    assert.doesNotMatch(h.sent[0].message, /Мы передали/);
+    assert.equal(h.queued.size, 0); assert.equal(h.sent[0].message, confirmation);
     assert.ok(h.logs.some(({ value }) => value.event === 'vk_help_not_queued'));
   });
 }

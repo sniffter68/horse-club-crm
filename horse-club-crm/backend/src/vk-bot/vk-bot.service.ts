@@ -9,7 +9,7 @@ import { LeadsService } from '../leads/leads.service';
 import { normalizePhone, VkLinkService } from './vk-link.service';
 import { mainMenu as menu, normalizeVkCommand, welcomeMenu } from './vk-bot.keyboard';
 import { clubCard, riderGuide } from './vk-bot.config';
-import { queueVkAdministratorNotification } from './vk-delivery.module';
+import { queueVkNotification } from './vk-delivery.module';
 
 function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
 const welcome = welcomeMenu();
@@ -41,6 +41,34 @@ export class VkBotService {
         random_id: createHash('sha256').update(`${process.env.VK_GROUP_ID}:${event}:${peer}`).digest().readInt32BE(0) || 1 });
     } catch { throw new ServiceUnavailableException('Не удалось отправить ответ VK'); }
   }
+  private async requestAdministrator(clientPeerId: number, eventId: string): Promise<void> {
+    const requestedAt = new Date();
+    this.logger.log({ event: 'vk_help_requested', vkUserId: clientPeerId, eventId, requestedAt: requestedAt.toISOString() });
+    let keyboard = welcome;
+    let name = 'Гость';
+    try {
+      const [client, trainer] = await Promise.all([
+        this.prisma.client.findUnique({ where: { vkUserId: BigInt(clientPeerId) } }),
+        this.prisma.trainer.findUnique({ where: { vkUserId: BigInt(clientPeerId) } }),
+      ]);
+      name = client?.name || trainer?.name || name;
+      if (client || trainer) keyboard = menu(Boolean(trainer));
+    } catch { this.logger.warn('Не удалось загрузить профиль для запроса помощи VK'); }
+    const adminPeerId = Number(process.env.VK_ADMIN_PEER_ID);
+    if (Number.isSafeInteger(adminPeerId) && adminPeerId > 0 && adminPeerId !== clientPeerId) {
+      try {
+        await this.prisma.$transaction(tx => queueVkNotification(tx,
+          `help:${clientPeerId}:${createHash('sha256').update(eventId).digest('hex')}:${adminPeerId}`,
+          BigInt(adminPeerId),
+          `💬 Запрос помощи администратору клуба\n${name}\nПользователь VK: https://vk.com/id${clientPeerId}\nВремя: ${date(requestedAt)}\nОткройте диалог с пользователем в сообщениях сообщества.`));
+      } catch { this.logger.error({ event: 'vk_help_not_queued', vkUserId: clientPeerId, eventId }); }
+    } else {
+      this.logger.warn({ event: 'vk_help_not_queued', vkUserId: clientPeerId, eventId,
+        reason: adminPeerId === clientPeerId ? 'same_peer' : 'admin_peer_not_configured' });
+    }
+    await this.send(clientPeerId, eventId,
+      '💬 Мы передали ваш запрос администратору клуба!\nСпециалист свяжется с вами в этом диалоге в ближайшее время. 🐎', keyboard);
+  }
   async handleMessage(object: unknown, eventId: unknown): Promise<void> {
     if (!record(object) || !record(object.message)) throw new BadRequestException('Некорректное сообщение VK');
     const { from_id: sender, peer_id: peer, text, out, payload } = object.message;
@@ -66,6 +94,7 @@ export class VkBotService {
         }
       } catch { /* Ordinary text routes without a payload. */ }
     }
+    if (command === 'help') { await this.requestAdministrator(peer, eventId); return; }
     try {
       const consent = /^согласен\s+([a-zA-Z0-9._-]{1,64})$/i.exec(text.trim());
       if (consent) {
@@ -95,20 +124,6 @@ export class VkBotService {
       const keyboard = client || trainer ? menu(Boolean(trainer)) : welcome;
       if (command === 'about') { await this.send(peer, eventId, clubCard(), keyboard); return; }
       if (command === 'guide') { await this.send(peer, eventId, riderGuide(), keyboard); return; }
-      if (command === 'help') {
-        this.logger.log({ event: 'vk_help_requested', vkUserId: sender, eventId });
-        let queued = 0;
-        try {
-          queued = await this.prisma.$transaction(tx => queueVkAdministratorNotification(tx,
-            `help:${sender}:${createHash('sha256').update(eventId).digest('hex')}`,
-            `💬 Запрос помощи администратору клуба\n${client?.name || trainer?.name || 'Гость'}\nПользователь VK: https://vk.com/id${sender}\nОткройте диалог с пользователем в сообщениях сообщества.`));
-        } catch { this.logger.error('Не удалось сохранить запрос помощи VK'); }
-        if (!queued) this.logger.warn({ event: 'vk_help_not_queued', vkUserId: sender, eventId });
-        await this.send(peer, eventId, queued
-          ? 'Мы передали ваш запрос администратору клуба. Он подключится к диалогу в ближайшее время! 🐎'
-          : 'Сейчас не удалось передать запрос администратору. Попробуйте позже или свяжитесь с клубом по контактам в разделе «О клубе».', keyboard);
-        return;
-      }
       if (!client && !trainer) {
         const lead = /^заявка\s+([^;]{1,100});\s*(.+)$/i.exec(text.trim());
         if (lead) {
