@@ -1,15 +1,42 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Header, Headers, HttpCode, Post, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Header, Headers, HttpCode, Logger, Post, ServiceUnavailableException } from '@nestjs/common';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { VkBotService } from './vk-bot.service';
 
-@Controller('vk')
+@Controller()
 export class VkBotController {
+  private readonly logger = new Logger(VkBotController.name);
   constructor(private readonly bot: VkBotService) {}
 
-  @Post('callback')
+  @Post('vk-bot/callback')
   @HttpCode(200)
   @Header('Content-Type', 'text/plain; charset=utf-8')
-  async callback(@Body() body: unknown, @Headers('secret') headerSecret?: string, @Headers('x-vk-secret') vkHeaderSecret?: string): Promise<string> {
+  callback(@Body() body: unknown): string {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new BadRequestException('Некорректное событие VK');
+    const event = body as Record<string, unknown>;
+    if (event.type === 'confirmation') {
+      const code = process.env.VK_CONFIRMATION_CODE;
+      if (!code) throw new ServiceUnavailableException('Код подтверждения VK не настроен');
+      return code;
+    }
+    const secret = process.env.VK_SECRET_KEY;
+    if (secret && (typeof event.secret !== 'string' || !timingSafeEqual(
+      createHash('sha256').update(secret).digest(), createHash('sha256').update(event.secret).digest(),
+    ))) throw new ForbiddenException('Неверный секрет VK');
+    // Acknowledge before waiting for VK or the database; contain asynchronous failures.
+    if (event.type === 'message_new') {
+      void this.bot.handleMessage(event.object, event.event_id).catch(() => this.logger.error('Не удалось обработать входящее сообщение VK'));
+    }
+    if (event.type === 'message_event') {
+      void this.bot.handleEvent(event.object).catch(() => this.logger.error('Не удалось обработать действие VK'));
+    }
+    return 'ok';
+  }
+
+  // Keep the previously configured endpoint and its stricter authentication contract.
+  @Post('vk/callback')
+  @HttpCode(200)
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  async legacyCallback(@Body() body: unknown, @Headers('secret') headerSecret?: string, @Headers('x-vk-secret') vkHeaderSecret?: string): Promise<string> {
     const secret = process.env.VK_SECRET_KEY;
     const group = process.env.VK_GROUP_ID;
     if (!secret || !group || !/^\d+$/.test(group) || !Number.isSafeInteger(Number(group)) || Number(group) <= 0) {

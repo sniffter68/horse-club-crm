@@ -17,10 +17,11 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
   private vk?: VK;
   private readonly logger = new Logger(VkNotifications.name);
   constructor(private readonly prisma: PrismaService) {
-    if (process.env.VK_BOT_TOKEN) this.vk = new VK({ token: process.env.VK_BOT_TOKEN, apiTimeout: 5000, apiRetryLimit: 0 });
+    const token = process.env.VK_COMMUNITY_TOKEN?.trim() || process.env.VK_BOT_TOKEN?.trim();
+    if (token) this.vk = new VK({ token, apiVersion: '5.199', apiTimeout: 5000, apiRetryLimit: 0 });
   }
   onModuleInit() {
-    if (!process.env.VK_BOT_TOKEN) return;
+    if (!this.vk) return;
     this.timer = setInterval(() => { void this.flush(); }, 10000);
     this.timer.unref();
   }

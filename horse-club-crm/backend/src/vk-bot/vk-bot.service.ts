@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, HttpException, Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { DateTime } from 'luxon';
 import { Keyboard, VK, type KeyboardBuilder } from 'vk-io';
 import { isUUID } from 'class-validator';
@@ -23,8 +23,8 @@ export class VkBotService {
   private readonly vk: VK | undefined;
   constructor(private readonly prisma: PrismaService, private readonly links: VkLinkService,
     private readonly ledger: MembershipLedgerService, private readonly leads: LeadsService) {
-    const token = process.env.VK_BOT_TOKEN?.trim();
-    if (token) this.vk = new VK({ token, apiTimeout: 5000, apiRetryLimit: 0 });
+    const token = process.env.VK_COMMUNITY_TOKEN?.trim() || process.env.VK_BOT_TOKEN?.trim();
+    if (token) this.vk = new VK({ token, apiVersion: '5.199', apiTimeout: 5000, apiRetryLimit: 0 });
   }
   private async send(peer: number, event: string, text: string, keyboard?: KeyboardBuilder) {
     if (!this.vk) throw new ServiceUnavailableException('VK-бот не настроен');
@@ -36,10 +36,18 @@ export class VkBotService {
   async handleMessage(object: unknown, eventId: unknown): Promise<void> {
     if (!record(object) || !record(object.message)) throw new BadRequestException('Некорректное сообщение VK');
     const { from_id: sender, peer_id: peer, text, out, payload } = object.message;
+    if (eventId === undefined) {
+      const id = object.message.id ?? object.message.conversation_message_id;
+      eventId = typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? `message:${peer}:${id}` : randomUUID();
+    }
     if (typeof sender !== 'number' || !Number.isSafeInteger(sender) || typeof peer !== 'number' || !Number.isSafeInteger(peer)
       || typeof text !== 'string' || typeof eventId !== 'string' || !eventId || eventId.length > 200) throw new BadRequestException('Некорректное сообщение VK');
     if (sender <= 0 || peer !== sender || out === 1) return;
     let command = text.trim().toLowerCase();
+    if (command === 'начать' || command === 'привет') {
+      await this.send(peer, eventId, 'Здравствуйте! Вы подключены к боту конного клуба. Здесь будут приходить напоминания о тренировках и статус бронирований.', welcome);
+      return;
+    }
     let offset = 0;
     if (typeof payload === 'string') {
       try {

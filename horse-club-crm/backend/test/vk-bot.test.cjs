@@ -10,9 +10,9 @@ const { VkLinkService } = require('../dist/vk-bot/vk-link.service');
 const { MembershipLedgerService } = require('../dist/memberships/membership-ledger.service');
 const { LeadsService } = require('../dist/leads/leads.service');
 let app, bot, lookup, sent;
-const original = Object.fromEntries(['VK_SECRET_KEY', 'VK_GROUP_ID', 'VK_CONFIRMATION_CODE', 'VK_BOT_TOKEN'].map(key => [key, process.env[key]]));
+const original = Object.fromEntries(['VK_SECRET_KEY', 'VK_GROUP_ID', 'VK_CONFIRMATION_CODE', 'VK_BOT_TOKEN', 'VK_COMMUNITY_TOKEN'].map(key => [key, process.env[key]]));
 before(async () => {
-  process.env.VK_SECRET_KEY = 'test-secret'; process.env.VK_GROUP_ID = '123'; process.env.VK_CONFIRMATION_CODE = 'confirmation-code'; delete process.env.VK_BOT_TOKEN;
+  process.env.VK_SECRET_KEY = 'test-secret'; process.env.VK_GROUP_ID = '123'; process.env.VK_CONFIRMATION_CODE = 'confirmation-code'; delete process.env.VK_BOT_TOKEN; delete process.env.VK_COMMUNITY_TOKEN;
   const module = await Test.createTestingModule({ controllers: [VkBotController], providers: [VkBotService,
     { provide: VkLinkService, useValue: { bind: async (sender, phone, code) => {
       assert.equal(sender, 42); assert.equal(phone, '+79991234567'); assert.equal(code, '1234'); return 'CLIENT';
@@ -37,7 +37,7 @@ for (const patch of [{ secret: 'wrong' }, { secret: null }, { group_id: 456 }]) 
   await request(app.getHttpServer()).post('/api/vk/callback').send({ ...event, ...patch }).expect(403);
   assert.equal(lookup.length, 0);
 });
-const message = { ...event, type: 'message_new', event_id: 'event-1', object: { message: { from_id: 42, peer_id: 42, text: 'начать', out: 0 } } };
+const message = { ...event, type: 'message_new', event_id: 'event-1', object: { message: { from_id: 42, peer_id: 42, text: '/start', out: 0 } } };
 
 test('/start binding command returns personalized role greeting through the callback', async () => {
   await request(app.getHttpServer()).post('/api/vk/callback').send({ ...message,

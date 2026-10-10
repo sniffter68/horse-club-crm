@@ -63,7 +63,7 @@ test('client balance query is limited to the linked owner and active memberships
 test('unlinked visitor is offered supported VK keyboard and a lead form', async () => {
   const { service, sent } = bot({ client: { findUnique: async () => null }, trainer: { findUnique: async () => null } });
   await service.handleMessage(message('привет'), 'welcome');
-  assert.match(sent[0].message, /код/);
+  assert.equal(sent[0].message, 'Здравствуйте! Вы подключены к боту конного клуба. Здесь будут приходить напоминания о тренировках и статус бронирований.');
   assert.match(String(sent[0].keyboard), /Привязать профиль/);
   assert.doesNotMatch(String(sent[0].keyboard), /request_contact/);
 });

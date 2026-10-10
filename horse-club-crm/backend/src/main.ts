@@ -9,7 +9,7 @@ async function bootstrap(): Promise<void> {
   if (process.env.NODE_ENV === 'production' && !process.env.LEAD_CONSENT_VERSION?.trim()) {
     throw new Error('LEAD_CONSENT_VERSION is required in production');
   }
-  if (process.env.NODE_ENV === 'production' && process.env.VK_BOT_TOKEN?.trim() && !process.env.PUBLIC_LANDING_URL?.trim()) {
+  if (process.env.NODE_ENV === 'production' && (process.env.VK_COMMUNITY_TOKEN?.trim() || process.env.VK_BOT_TOKEN?.trim()) && !process.env.PUBLIC_LANDING_URL?.trim()) {
     throw new Error('PUBLIC_LANDING_URL is required when VK bot is enabled');
   }
   const app = await NestFactory.create(AppModule);
