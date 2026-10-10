@@ -14,14 +14,20 @@ const { Prisma } = require('@prisma/client');
 const serviceId = '11111111-1111-4111-8111-111111111111';
 const leadId = '22222222-2222-4222-8222-222222222222';
 const clientId = '33333333-3333-4333-8333-333333333333';
-let clients, leads, notifications, app;
+let clients, leads, notifications, app, queueFails;
 const originalPeer = process.env.VK_ADMIN_PEER_ID;
 const prisma = {
   vkNotification: { upsert: async ({ create }) => {
+    if (queueFails) throw new Error('Queue unavailable');
     if (!notifications.some(row => row.key === create.key)) notifications.push(create);
   } },
   user: { findMany: async () => [] },
-  $transaction: async callback => callback(prisma),
+  $transaction: async callback => {
+    const savedLeads = structuredClone(leads);
+    const savedNotifications = structuredClone(notifications);
+    try { return await callback(prisma); }
+    catch (error) { leads = savedLeads; notifications = savedNotifications; throw error; }
+  },
   client: {
     findUnique: async ({ where }) => clients.find(row => row.phone === where.phone) ?? null,
     create: async ({ data }) => { const row = { id: clientId, ...data }; clients.push(row); return row; },
@@ -45,7 +51,7 @@ before(async () => {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true } }));
   await app.init();
 });
-beforeEach(() => { clients = []; leads = []; notifications = []; delete process.env.VK_ADMIN_PEER_ID; });
+beforeEach(() => { queueFails = false; clients = []; leads = []; notifications = []; delete process.env.VK_ADMIN_PEER_ID; });
 after(async () => {
   if (originalPeer === undefined) delete process.env.VK_ADMIN_PEER_ID; else process.env.VK_ADMIN_PEER_ID = originalPeer;
   await app?.close();
@@ -152,4 +158,48 @@ test('BigInt JSON conversion preserves nested VK ids, dates and decimal prices',
   const json = JSON.parse(JSON.stringify(serializeBigInt(value)));
   assert.equal(json.bookings[0].client.vkUserId, '9007199254740993');
   assert.equal(json.price, '12.5'); assert.equal(json.date, '2026-01-01T00:00:00.000Z');
+});
+
+const landingPayload = {
+  consentAccepted: true, consentVersion: '2026-09-19', name: 'Анна',
+  phone: '+7 (900) 123-11-11', direction: 'Конкур', source: 'landing', notes: 'Первое занятие',
+};
+
+test('POST normalizes a masked landing phone and deduplicates canonical resubmission', async () => {
+  process.env.VK_ADMIN_PEER_ID = '2000000001';
+  await request(app.getHttpServer()).post('/api/leads').send(landingPayload).expect(201);
+  assert.equal(leads[0].phone, '+79001231111');
+  assert.equal(leads[0].firstName, 'Анна');
+  assert.equal(leads[0].preferences, 'Направление: Конкур\nПервое занятие');
+  assert.equal(notifications.length, 1);
+  assert.match(notifications[0].message, /\+79001231111/);
+  await request(app.getHttpServer()).post('/api/leads').send({ ...landingPayload, phone: '+79001231111' }).expect(201);
+  assert.equal(leads.length, 1);
+  assert.equal(notifications.length, 1);
+});
+
+test('queue failure keeps the saved lead and successful HTTP response', async () => {
+  process.env.VK_ADMIN_PEER_ID = '2000000001';
+  queueFails = true;
+  const response = await request(app.getHttpServer()).post('/api/leads').send(landingPayload).expect(201);
+  assert.equal(response.body.success, true);
+  assert.equal(leads.length, 1);
+});
+
+test('production public-leads flag controls acceptance', async () => {
+  const previous = { NODE_ENV: process.env.NODE_ENV, PUBLIC_LEADS_ENABLED: process.env.PUBLIC_LEADS_ENABLED };
+  try {
+    process.env.NODE_ENV = 'production';
+    delete process.env.PUBLIC_LEADS_ENABLED;
+    const response = await request(app.getHttpServer()).post('/api/leads').send(landingPayload).expect(503);
+    assert.equal(response.body.message, 'Приём заявок временно отключён');
+    assert.equal(leads.length, 0);
+    process.env.PUBLIC_LEADS_ENABLED = 'true';
+    await request(app.getHttpServer()).post('/api/leads').send(landingPayload).expect(201);
+    assert.equal(leads.length, 1);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
 });

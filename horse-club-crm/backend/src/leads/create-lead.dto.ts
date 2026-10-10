@@ -39,6 +39,7 @@ export class CreateLeadDto {
   @Equals('landing')
   source?: 'landing';
 
+  @Transform(({ value }: { value: unknown }) => typeof value === 'string' ? value.replace(/[\s()-]/g, '') : value)
   @IsString()
   @Matches(/^\+[1-9]\d{6,14}$/, { message: 'phone должен быть в международном формате, например +79991234567' })
   @IsPhoneNumber()

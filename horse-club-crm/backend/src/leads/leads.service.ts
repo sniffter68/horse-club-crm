@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { LeadRequestStatus, Prisma } from '@prisma/client';
 import { queueVkAdministratorNotification, queueVkNotification } from '../vk-bot/vk-delivery.module';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,6 +7,7 @@ import type { CreateLeadDto } from './create-lead.dto';
 
 @Injectable()
 export class LeadsService {
+  private readonly logger = new Logger(LeadsService.name);
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateLeadDto, consentSource: 'LANDING' | 'VK' = 'LANDING'): Promise<{ success: true; leadId: string; message: string }> {
@@ -18,7 +19,7 @@ export class LeadsService {
       throw new BadRequestException('Текст согласия обновился. Обновите страницу и подтвердите актуальную редакцию');
     }
     const consentedAt = new Date();
-    return this.retrySerializable(async tx => {
+    const result = await this.retrySerializable(async tx => {
       if (dto.serviceId && !await tx.service.findUnique({ where: { id: dto.serviceId }, select: { id: true } })) {
         throw new NotFoundException('Услуга не найдена');
       }
@@ -40,9 +41,16 @@ export class LeadsService {
               consentSource,
             },
           });
-      if (!pending) await this.notifyAdministrator(tx, lead.id, dto, consentSource);
-      return { success: true as const, leadId: '', message: 'Заявка успешно принята' };
+      return { lead, created: !pending };
     });
+    if (result.created) {
+      try {
+        await this.retrySerializable(tx => this.notifyAdministrator(tx, result.lead.id, dto, consentSource));
+      } catch {
+        this.logger.error(`Не удалось поставить уведомление VK в очередь для заявки ${result.lead.id}`);
+      }
+    }
+    return { success: true, leadId: '', message: 'Заявка успешно принята' };
   }
 
   async accept(id: string, dto: AcceptLeadDto) {
