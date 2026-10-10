@@ -15,7 +15,7 @@ npm --prefix frontend run build
 
 echo "===> 2.1. Building landing dist..."
 npm --prefix landing ci
-npm --prefix landing run build
+"${compose[@]}" config --format json | node scripts/build-landing.cjs
 
 echo "===> 3. Building backend, applying migrations and waiting for health..."
 "${compose[@]}" up -d --build --wait backend

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+const expectedConsentVersion = process.env.VITE_LEGAL_CONSENT_VERSION?.trim() || '2026-09-19';
 
 async function fillForm(page: import('@playwright/test').Page) {
   await page.goto('/');
@@ -44,7 +45,7 @@ test('validates input, masks phone, sends real form data and waits for success w
   release();
   await expect(page.getByRole('status')).toContainText('Заявка принята');
   expect(sent).toEqual({ name: 'Анна', phone: '+79991234567', direction: 'Конкур', source: 'landing',
-    notes: 'Первое занятие', consentAccepted: true, consentVersion: '2026-09-19' });
+    notes: 'Первое занятие', consentAccepted: true, consentVersion: expectedConsentVersion });
   expect(requests).toBe(1);
 });
 

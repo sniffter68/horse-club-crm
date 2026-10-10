@@ -3,6 +3,28 @@ const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 const script = path.resolve(__dirname, '../../scripts/check-public-leads-config.cjs');
+const { landingBuildEnv } = require('../../scripts/build-landing.cjs');
+const { currentLeadConsentVersion } = require('../dist/common/lead-consent');
+
+for (const configured of [undefined, '', '  ', '2026-09-19', '  2026-10-10  ']) {
+  test(`landing build and backend resolve the same consent for ${JSON.stringify(configured)}`, () => {
+    const original = process.env.LEAD_CONSENT_VERSION;
+    if (configured === undefined) delete process.env.LEAD_CONSENT_VERSION; else process.env.LEAD_CONSENT_VERSION = configured;
+    try {
+      const env = landingBuildEnv({ services: { backend: { environment: { LEAD_CONSENT_VERSION: configured } } } },
+        { VITE_LEGAL_CONSENT_VERSION: 'stale-build-value', VITE_API_URL: '  /api  ' });
+      assert.equal(env.VITE_LEGAL_CONSENT_VERSION, currentLeadConsentVersion());
+      assert.equal(env.VITE_API_URL, '/api');
+    } finally {
+      if (original === undefined) delete process.env.LEAD_CONSENT_VERSION; else process.env.LEAD_CONSENT_VERSION = original;
+    }
+  });
+}
+
+test('landing builder sets the same-origin API fallback and rejects invalid consent configuration', () => {
+  assert.equal(landingBuildEnv({}, {}).VITE_API_URL, '/api');
+  assert.throws(() => landingBuildEnv({ services: { backend: { environment: { LEAD_CONSENT_VERSION: 'wrong version' } } } }), /Invalid backend/);
+});
 
 for (const flag of ['true', 'false', undefined, 'TRUE', ' true ']) {
   test(`deployment public-lead preflight checks the resolved container flag ${JSON.stringify(flag)}`, () => {

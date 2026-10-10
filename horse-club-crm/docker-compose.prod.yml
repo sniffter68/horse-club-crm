@@ -58,7 +58,7 @@ services:
       VK_CLUB_PHONE: ${VK_CLUB_PHONE:-}
       VK_CLUB_MAP_URL: ${VK_CLUB_MAP_URL:-}
       VK_RIDER_GUIDE: ${VK_RIDER_GUIDE:-}
-      LEAD_CONSENT_VERSION: ${LEAD_CONSENT_VERSION:?Set the published consent version}
+      LEAD_CONSENT_VERSION: ${LEAD_CONSENT_VERSION:-2026-09-19}
       PUBLIC_LANDING_URL: https://${LANDING_SITE:?Set LANDING_SITE}
       ENABLE_MEDICAL_NOTES: ${ENABLE_MEDICAL_NOTES:-false}
       PUBLIC_LEADS_ENABLED: ${PUBLIC_LEADS_ENABLED:?Set PUBLIC_LEADS_ENABLED=true to accept landing applications or false for maintenance}

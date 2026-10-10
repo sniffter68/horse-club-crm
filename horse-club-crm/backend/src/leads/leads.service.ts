@@ -4,6 +4,7 @@ import { queueVkAdministratorNotification, queueVkNotification } from '../vk-bot
 import { PrismaService } from '../prisma/prisma.service';
 import type { AcceptLeadDto } from './accept-lead.dto';
 import type { CreateLeadDto } from './create-lead.dto';
+import { currentLeadConsentVersion } from '../common/lead-consent';
 
 @Injectable()
 export class LeadsService {
@@ -14,7 +15,7 @@ export class LeadsService {
     if (process.env.PUBLIC_LEADS_ENABLED !== 'true' && process.env.NODE_ENV === 'production') {
       throw new ServiceUnavailableException('Приём заявок временно отключён');
     }
-    const currentConsentVersion = process.env.LEAD_CONSENT_VERSION?.trim() || '2026-09-19';
+    const currentConsentVersion = currentLeadConsentVersion();
     if (dto.consentVersion !== currentConsentVersion) {
       throw new BadRequestException('Текст согласия обновился. Обновите страницу и подтвердите актуальную редакцию');
     }

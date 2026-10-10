@@ -10,11 +10,11 @@ import { normalizePhone, VkLinkService } from './vk-link.service';
 import { mainMenu as menu, normalizeVkCommand, welcomeMenu } from './vk-bot.keyboard';
 import { clubCard, riderGuide } from './vk-bot.config';
 import { queueVkNotification } from './vk-delivery.module';
+import { currentLeadConsentVersion as consentVersion } from '../common/lead-consent';
 
 function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
 const welcome = welcomeMenu();
 const zone = () => process.env.CLUB_TIME_ZONE || 'Europe/Moscow';
-const consentVersion = () => process.env.LEAD_CONSENT_VERSION?.trim() || '2026-09-19';
 const consentUrl = () => `${(process.env.PUBLIC_LANDING_URL || '').replace(/\/$/, '')}/#consent`;
 const date = (value: Date) => DateTime.fromJSDate(value, { zone: zone() }).setLocale('ru').toFormat('dd.MM.yyyy HH:mm');
 const expiryDate = (value: Date) => DateTime.fromJSDate(value, { zone: zone() }).setLocale('ru').toFormat('dd.MM.yyyy');

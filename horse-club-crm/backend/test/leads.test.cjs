@@ -173,6 +173,25 @@ test('lead rejects a stale consent version', async () => {
   assert.equal(leads.length, 0);
 });
 
+for (const [configured, submitted, status] of [
+  [undefined, '2026-09-19', 201], ['', '2026-09-19', 201], ['   ', '2026-09-19', 201],
+  ['2026-09-19', '2026-09-19', 201], ['  2026-09-19  ', '2026-09-19', 201],
+  ['  2026-10-10  ', '2026-10-10', 201], ['2026-10-10', '2026-09-19', 400],
+]) {
+  test(`consent configuration ${JSON.stringify(configured)} accepts only current version ${submitted}`, async () => {
+    const original = process.env.LEAD_CONSENT_VERSION;
+    if (configured === undefined) delete process.env.LEAD_CONSENT_VERSION; else process.env.LEAD_CONSENT_VERSION = configured;
+    try {
+      const result = await request(app.getHttpServer()).post('/api/leads').send({ ...lead, consentVersion: submitted }).expect(status);
+      assert.equal(leads.length, status === 201 ? 1 : 0);
+      if (status === 201) assert.equal(leads[0].consentVersion, submitted);
+      else assert.match(result.body.message, /Текст согласия обновился/);
+    } finally {
+      if (original === undefined) delete process.env.LEAD_CONSENT_VERSION; else process.env.LEAD_CONSENT_VERSION = original;
+    }
+  });
+}
+
 test('administrator acceptance creates a client and closes the request', async () => {
   await new LeadsService(prisma).create({ ...lead, serviceId });
   const result = await new LeadsService(prisma).accept(leadId, {
