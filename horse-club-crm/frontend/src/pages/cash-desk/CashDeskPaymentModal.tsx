@@ -1,9 +1,12 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useInvalidate, usePermissions } from '@refinedev/core'
 import { Alert, App, Button, Form, Input, InputNumber, Modal, Segmented, Select, Space, Statistic } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { PlusOutlined, UserAddOutlined } from '@ant-design/icons'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { currency, cashTime } from './shared'
+import { QuickCreateClientModal, type CreatedClient } from '../clients/QuickCreateClientModal'
+
+const clientOption = (row: CreatedClient) => ({ value: row.id, label: `${row.name || [row.lastName, row.firstName].filter(Boolean).join(' ')} · ${row.phone || 'без телефона'}` })
 
 type Choice = { value: string; label: string; price: number; bookingId?: string; membershipId?: string; serviceId?: string; serviceType?: string }
 type Values = { clientId: string; choice: string; amount: number; cashGiven?: number; method: string; nonCash: string; notes?: string }
@@ -28,6 +31,10 @@ export function CashDeskPaymentModal({ onClose }: { onClose: () => void }) {
   const [clients, setClients] = useState<Array<{ value: string; label: string }>>([])
   const [choices, setChoices] = useState<Choice[]>([])
   const [search, setSearch] = useState('')
+  const [quickCreate, setQuickCreate] = useState(false)
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false)
+  const createdClients = useRef<CreatedClient[]>([])
+  const restoreFocus = useRef(false)
   const [loading, setLoading] = useState(false)
   const [optionsLoading, setOptionsLoading] = useState(false)
   const [error, setError] = useState<string>()
@@ -43,16 +50,24 @@ export function CashDeskPaymentModal({ onClose }: { onClose: () => void }) {
   const choice = Form.useWatch('choice', form)
   const change = (Math.round(cashGiven * 100) - Math.round(amount * 100)) / 100
   useEffect(() => {
+    if (quickCreate) return
     const controller = new AbortController()
     const timer = setTimeout(() => {
       setLoading(true)
       httpClient.get(`${API_URL}/clients`, { params: { q: search, _start: 0, _end: 30 }, signal: controller.signal })
-        .then(({ data }) => { if (!controller.signal.aborted) setClients(data.map((row: { id: string; name: string; firstName: string; lastName: string; phone: string }) => ({ value: row.id, label: `${row.name || [row.lastName, row.firstName].filter(Boolean).join(' ')} · ${row.phone || 'без телефона'}` }))) })
+        .then(({ data }: { data: CreatedClient[] }) => {
+          if (controller.signal.aborted) return
+          const rows = new Map(data.map(row => [row.id, row]))
+          for (const row of createdClients.current) {
+            if (!search || `${row.name} ${row.phone ?? ''}`.toLocaleLowerCase('ru').includes(search.toLocaleLowerCase('ru'))) rows.set(row.id, row)
+          }
+          setClients([...rows.values()].map(clientOption))
+        })
         .catch(cause => { if (!controller.signal.aborted) setError(toHttpError(cause).message) })
         .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     }, search ? 300 : 0)
     return () => { clearTimeout(timer); controller.abort() }
-  }, [search])
+  }, [search, quickCreate])
   useEffect(() => {
     if (!clientId) return
     const controller = new AbortController()
@@ -74,6 +89,22 @@ export function CashDeskPaymentModal({ onClose }: { onClose: () => void }) {
     if (pending.current) return
     if (form.isFieldsTouched()) modal.confirm({ title: 'Закрыть кассу?', content: 'Введённые данные платежа будут потеряны.', okText: 'Закрыть', cancelText: 'Продолжить', onOk: onClose })
     else onClose()
+  }
+  const returnToPayment = () => { restoreFocus.current = true; setQuickCreate(false) }
+  const clientCreated = (client: CreatedClient) => {
+    createdClients.current.push(client)
+    setClients(rows => [...rows.filter(row => row.value !== client.id), clientOption(client)])
+    // A booking or membership belongs to its original client; generic services can be retained.
+    const selected = choices.find(row => row.value === form.getFieldValue('choice'))
+    if (selected?.bookingId || selected?.membershipId) {
+      form.setFieldValue('choice', undefined)
+      void message.info('Выберите услугу для нового клиента')
+    }
+    form.setFieldValue('clientId', client.id)
+    setOptionsLoading(true)
+    setSearch('')
+    void invalidate({ resource: 'clients', invalidates: ['list', 'many'] })
+    returnToPayment()
   }
   const pay = async (values: Values) => {
     if (pending.current) return
@@ -103,12 +134,25 @@ export function CashDeskPaymentModal({ onClose }: { onClose: () => void }) {
       if (failure.statusCode > 0 && failure.statusCode < 500) { submitted.current = null; setLocked(false) }
     } finally { pending.current = false; setBusy(false) }
   }
-  return <Modal className="cash-desk-modal" open title="Принять оплату / Касса" onCancel={close} maskClosable={false} width={600}
+  return <><Modal className="cash-desk-modal" forceRender open={!quickCreate} title="Принять оплату / Касса" onCancel={close} maskClosable={false} width={600}
+    focusTriggerAfterClose={!quickCreate} afterOpenChange={visible => {
+      if (visible && restoreFocus.current) { restoreFocus.current = false; form.scrollToField('amount', { focus: true }) }
+    }}
     footer={<Space><Button disabled={busy} onClick={close}>Отмена</Button><Button type="primary" loading={busy} disabled={optionsLoading || !choice || amount <= 0 || (method === 'CASH' && change < 0)} onClick={() => form.submit()}>Провести платёж</Button></Space>}>
     {error && <Alert role="alert" type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
     <Form form={form} layout="vertical" noValidate initialValues={{ method: 'CASH', nonCash: 'CARD_TERMINAL' }} onFinish={pay} disabled={busy || locked} scrollToFirstError>
       <Form.Item name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}>
-        <Select aria-label="Клиент" showSearch allowClear onChange={value => { form.setFieldsValue({ choice: undefined, amount: undefined }); setChoices([]); setOptionsLoading(Boolean(value)) }} filterOption={false} searchValue={search} onSearch={setSearch} onClear={() => setSearch('')} loading={loading} options={clients} placeholder="Имя или телефон" notFoundContent={loading ? 'Загрузка…' : 'Клиенты не найдены'} />
+        <Select aria-label="Клиент" showSearch allowClear onChange={value => { form.setFieldsValue({ choice: undefined, amount: undefined }); setChoices([]); setOptionsLoading(Boolean(value)); setSearch('') }}
+          open={clientDropdownOpen} onOpenChange={setClientDropdownOpen}
+          filterOption={false} searchValue={search} onSearch={value => { setLoading(true); setSearch(value) }} onClear={() => setSearch('')}
+          loading={loading} options={clients} placeholder="Имя или телефон" notFoundContent={loading ? 'Загрузка…' : 'Ничего не найдено'}
+          popupRender={menu => <>{menu}<div style={{ borderTop: '1px solid var(--ant-color-border-secondary, #E4DAD0)', padding: 8 }}>
+            <Button block type="link" icon={<UserAddOutlined aria-hidden />} disabled={busy || locked}
+              style={{ height: 'auto', whiteSpace: 'normal', textAlign: 'left' }}
+              onClick={() => { setClientDropdownOpen(false); setQuickCreate(true) }}>
+              {!loading && clients.length === 0 && search.trim() ? `Создать клиента «${search.trim()}»` : '+ Новый клиент'}
+            </Button>
+          </div></>} />
       </Form.Item>
       <Form.Item name="choice" label="Услуга / занятие / абонемент" rules={[{ required: true, message: 'Выберите услугу' }]}>
         <Select aria-label="Услуга / занятие / абонемент" showSearch optionFilterProp="label" loading={optionsLoading} disabled={!clientId || optionsLoading || busy || locked} options={choices} placeholder="Выберите основание платежа" onChange={value => form.setFieldValue('amount', choices.find(row => row.value === value)?.price)} />
@@ -123,4 +167,6 @@ export function CashDeskPaymentModal({ onClose }: { onClose: () => void }) {
       <Form.Item name="notes" label="Комментарий"><Input.TextArea rows={2} maxLength={500} style={{ resize: 'none' }} /></Form.Item>
     </Form>
   </Modal>
+    {quickCreate && <QuickCreateClientModal initialQuery={search} onCreated={clientCreated} onCancel={returnToPayment} />}
+  </>
 }
