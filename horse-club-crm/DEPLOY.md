@@ -84,3 +84,19 @@ docker compose --env-file .env.production -f docker-compose.prod.yml logs --tail
 ```
 
 Сервисы `postgres`, `backend` и `caddy` должны быть Healthy/Up, а `migrate` — завершиться с кодом 0. Настройте ежедневный запуск `scripts/backup.sh`, храните дополнительную копию вне VPS и проверьте восстановление на отдельной базе. Подробности находятся в `PRODUCTION.md`.
+
+## Automatic deployment and landing applications
+
+Run `bash deploy.sh` from the repository on the production host. The script uses `.env.production` by default (`ENV_FILE` overrides it), validates Compose configuration, installs locked frontend/landing dependencies, builds both static sites, builds the backend and waits for migrations and backend health, then recreates Caddy. Any failed step stops deployment before the Caddy restart.
+
+Caddy already serves `landing/dist` through the read-only mount `/var/www/landing-dist` in `docker-compose.prod.yml`; frontend assets use `frontend/dist`. Build-time Vite settings belong in `landing/.env.production` and `frontend/.env.production`, respectively. No secrets should be placed in `VITE_*` settings.
+
+For landing applications, set `PUBLIC_LEADS_ENABLED=true`, `LEAD_CONSENT_VERSION` matching the published `VITE_LEGAL_CONSENT_VERSION`, `VK_COMMUNITY_TOKEN` and `VK_ADMIN_PEER_ID` in `.env.production`. For a VK administrator conversation, use the conversation's full peer ID (typically `2000000000 + chat_id`). The community must be able to send messages to that conversation. Default landing requests use the same-origin `/api/leads`; Caddy proxies `/api/*` to `backend:3000`.
+
+The public DTO accepts `name`, `phone` (international format), optional `direction`, `notes`, `source: "landing"`, plus the existing required `consentAccepted: true` and `consentVersion`. Existing callers using `firstName`, `preferences`, `serviceId` and `email` remain supported. The form normalizes Russian telephone input and only shows success after the API confirms it.
+
+Applications are stored as pending `LeadRequest` records, visible in the CRM leads list. Direction and notes are saved in `preferences`; acceptance remains an administrator action. Duplicate pending requests for the same phone do not overwrite the first application or enqueue another notification. The response does not expose an application ID or whether the phone already exists.
+
+Website notifications go only to the configured `VK_ADMIN_PEER_ID`, through the persistent `VkNotification` queue after transaction commit. VK API failures are logged and retried without changing the successful HTTP response or losing the application. Missing VK configuration does not block storage. The existing recipient rules for VK-bot applications remain unchanged.
+
+Checks: `npm --prefix backend test`, `npm --prefix frontend test`, `npm --prefix landing test`; run `npm --prefix <project> run build` for all three projects. Landing tests use mocked HTTP responses in a real browser; `npm --prefix landing run test:e2e` also discovers the optional live integration test, which requires `RUN_LANDING_LIVE=true`, a local backend and its test database configuration.

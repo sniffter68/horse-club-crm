@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { LeadRequestStatus, Prisma } from '@prisma/client';
-import { queueVkAdministratorNotification } from '../vk-bot/vk-delivery.module';
+import { queueVkAdministratorNotification, queueVkNotification } from '../vk-bot/vk-delivery.module';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AcceptLeadDto } from './accept-lead.dto';
 import type { CreateLeadDto } from './create-lead.dto';
@@ -33,14 +33,14 @@ export class LeadsService {
               firstName: dto.firstName,
               phone: dto.phone,
               email: dto.email,
-              preferences: dto.preferences,
+              preferences: [dto.direction?.trim() ? `Направление: ${dto.direction.trim()}` : '', dto.notes?.trim(), dto.preferences?.trim()].filter(Boolean).join('\n') || undefined,
               serviceId: dto.serviceId,
               consentVersion: dto.consentVersion,
               consentedAt,
               consentSource,
             },
           });
-      if (!pending) await this.notifyAdministrator(tx, lead.id, dto);
+      if (!pending) await this.notifyAdministrator(tx, lead.id, dto, consentSource);
       return { success: true as const, leadId: '', message: 'Заявка успешно принята' };
     });
   }
@@ -86,8 +86,14 @@ export class LeadsService {
     return { success: true as const, message: 'Заявка отклонена' };
   }
 
-  private async notifyAdministrator(tx: Prisma.TransactionClient, leadId: string, dto: CreateLeadDto): Promise<void> {
+  private async notifyAdministrator(tx: Prisma.TransactionClient, leadId: string, dto: CreateLeadDto, source: 'LANDING' | 'VK'): Promise<void> {
     const service = dto.serviceId ? await tx.service.findUnique({ where: { id: dto.serviceId }, select: { title: true, name: true } }) : null;
+    if (source === 'LANDING') {
+      const peer = Number(process.env.VK_ADMIN_PEER_ID);
+      if (Number.isSafeInteger(peer) && peer > 0) await queueVkNotification(tx, `lead:${leadId}:${peer}`, BigInt(peer),
+        `🔔 Новая заявка с сайта!\n• Имя: ${dto.firstName}\n• Телефон: ${dto.phone}\n• Направление: ${dto.direction?.trim() || service?.title || service?.name || 'Не указано'}\n• Источник: Лендинг`);
+      return;
+    }
     await queueVkAdministratorNotification(tx, `lead:${leadId}`,
       `🐎 Новая заявка: ${dto.firstName}, ${dto.phone}, ${service?.title || service?.name || 'Услуга не выбрана'}`);
   }

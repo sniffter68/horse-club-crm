@@ -6,6 +6,7 @@ const { ValidationPipe } = require('@nestjs/common');
 const request = require('supertest');
 const { LeadsController } = require('../dist/leads/leads.controller');
 const { LeadsService } = require('../dist/leads/leads.service');
+const { VkNotifications } = require('../dist/vk-bot/vk-delivery.module');
 const { PrismaService } = require('../dist/prisma/prisma.service');
 const { serializeBigInt } = require('../dist/common/interceptors/bigint-json.interceptor');
 const { Prisma } = require('@prisma/client');
@@ -13,8 +14,12 @@ const { Prisma } = require('@prisma/client');
 const serviceId = '11111111-1111-4111-8111-111111111111';
 const leadId = '22222222-2222-4222-8222-222222222222';
 const clientId = '33333333-3333-4333-8333-333333333333';
-let clients, leads, app;
+let clients, leads, notifications, app;
+const originalPeer = process.env.VK_ADMIN_PEER_ID;
 const prisma = {
+  vkNotification: { upsert: async ({ create }) => {
+    if (!notifications.some(row => row.key === create.key)) notifications.push(create);
+  } },
   user: { findMany: async () => [] },
   $transaction: async callback => callback(prisma),
   client: {
@@ -40,8 +45,11 @@ before(async () => {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true } }));
   await app.init();
 });
-beforeEach(() => { clients = []; leads = []; });
-after(async () => app?.close());
+beforeEach(() => { clients = []; leads = []; notifications = []; delete process.env.VK_ADMIN_PEER_ID; });
+after(async () => {
+  if (originalPeer === undefined) delete process.env.VK_ADMIN_PEER_ID; else process.env.VK_ADMIN_PEER_ID = originalPeer;
+  await app?.close();
+});
 
 const lead = { consentAccepted: true, consentVersion: '2026-09-19', firstName: 'Анна', phone: '+79991234567' };
 
@@ -57,6 +65,39 @@ test('public valid lead creates a pending request without creating a client', as
   assert.ok(leads[0].consentedAt instanceof Date);
 });
 
+test('landing DTO saves direction and notes and queues exactly one site card only to the configured admin chat', async () => {
+  process.env.VK_ADMIN_PEER_ID = '2000000001';
+  const input = { name: ' Анна ', phone: lead.phone, direction: 'Конкур', source: 'landing', notes: 'Первое занятие',
+    consentAccepted: true, consentVersion: lead.consentVersion };
+  await request(app.getHttpServer()).post('/api/leads').send(input).expect(201);
+  await request(app.getHttpServer()).post('/api/leads').send(input).expect(201);
+  assert.equal(leads.length, 1); assert.equal(notifications.length, 1);
+  assert.equal(leads[0].firstName, 'Анна'); assert.equal(leads[0].consentSource, 'LANDING');
+  assert.equal(leads[0].preferences, 'Направление: Конкур\nПервое занятие');
+  assert.equal(notifications[0].peerId, 2000000001n);
+  assert.equal(notifications[0].message, '🔔 Новая заявка с сайта!\n• Имя: Анна\n• Телефон: +79991234567\n• Направление: Конкур\n• Источник: Лендинг');
+
+  const delivery = new VkNotifications({ vkNotification: {
+    findMany: async () => notifications.map(row => ({ ...row, id: row.key, attemptCount: 0 })),
+    update: async () => {},
+  } });
+  delivery.vk = { api: { messages: { send: async () => { throw Object.assign(new Error('VK denied'), { code: 901 }); } } } };
+  delivery.logger.warn = () => {};
+  await assert.doesNotReject(delivery.flush());
+  assert.equal(leads[0].status, 'PENDING');
+});
+
+test('landing accepts optional direction and missing VK configuration without losing the lead', async () => {
+  await request(app.getHttpServer()).post('/api/leads').send({ ...lead, firstName: undefined, name: 'Анна', source: 'landing' }).expect(201);
+  assert.equal(leads.length, 1); assert.equal(notifications.length, 0);
+});
+
+test('landing without direction sends a readable fallback', async () => {
+  process.env.VK_ADMIN_PEER_ID = '2000000001';
+  await request(app.getHttpServer()).post('/api/leads').send(lead).expect(201);
+  assert.match(notifications[0].message, /Направление: Не указано/);
+});
+
 for (const [title, input] of Object.entries({
   'missing phone': { firstName: 'Анна' }, 'missing name': { phone: lead.phone },
   'empty name': { ...lead, firstName: '  ' }, 'invalid phone': { ...lead, phone: '123' },
@@ -64,6 +105,8 @@ for (const [title, input] of Object.entries({
   'invalid service': { ...lead, serviceId: 'bad' }, 'unknown field': { ...lead, medicalNotes: 'private' },
   'missing consent': { firstName: lead.firstName, phone: lead.phone, consentVersion: lead.consentVersion },
   'false consent': { ...lead, consentAccepted: false }, 'invalid consent version': { ...lead, consentVersion: 'draft consent' },
+  'invalid source': { ...lead, source: 'VK' }, 'invalid direction': { ...lead, direction: 123 },
+  'overlong notes': { ...lead, notes: 'x'.repeat(2001) },
 })) test(`lead rejects ${title}`, async () => {
   await request(app.getHttpServer()).post('/api/leads').send(input).expect(400);
   assert.equal(clients.length, 0);

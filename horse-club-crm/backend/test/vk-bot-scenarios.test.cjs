@@ -147,7 +147,7 @@ test('new lead targets only ADMIN VK recipients, deduplicates delivery and names
   try {
     const leads = new LeadsService({ $transaction: async fn => fn(tx) });
     const dto = { firstName: 'Анна', phone: '+79991234567', serviceId: 'service', consentVersion: '2026-09-19' };
-    await leads.create(dto); await leads.create(dto);
+    await leads.create(dto, 'VK'); await leads.create(dto, 'VK');
     assert.deepEqual(query.where, { role: 'ADMIN', vkUserId: { not: null } });
     assert.equal(created, 1); assert.equal(queued.size, 2);
     assert.match([...queued.values()][0].message, /🐎 Новая заявка: Анна, \+79991234567, Выездка/);

@@ -1,4 +1,4 @@
-import { Transform } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { Equals, IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
 
 export class CreateLeadDto {
@@ -11,10 +11,33 @@ export class CreateLeadDto {
   consentVersion!: string;
 
   @IsString()
-  @Transform(({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value)
+  @Expose()
+  @Transform(({ value, obj }: { value: unknown; obj: { name?: unknown } }) => {
+    const name = value ?? obj.name;
+    return typeof name === 'string' ? name.trim() : name;
+  })
   @IsNotEmpty()
   @MaxLength(100)
   firstName!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  direction?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  notes?: string;
+
+  @IsOptional()
+  @Equals('landing')
+  source?: 'landing';
 
   @IsString()
   @Matches(/^\+[1-9]\d{6,14}$/, { message: 'phone должен быть в международном формате, например +79991234567' })

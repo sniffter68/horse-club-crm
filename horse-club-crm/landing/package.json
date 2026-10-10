@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test": "playwright test landing.spec.ts",
     "dev": "vite",
     "dev:test": "vite --mode test",
     "build": "tsc && vite build",

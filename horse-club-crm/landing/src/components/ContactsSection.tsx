@@ -1,5 +1,7 @@
-import { useState, type ReactElement, type FormEvent } from 'react';
+import { useRef, useState, type ReactElement, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { phoneDigits, phoneMask, sendLead } from '../lead';
+import { legal } from '../legal';
 
 const serviceOptions = [
   'Выездка',
@@ -15,13 +17,39 @@ export function ContactsSection(): ReactElement {
   const [phone, setPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [invalidField, setInvalidField] = useState('');
+  const [consent, setConsent] = useState(false);
+  const submitting = useRef(false);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!name.trim() || !phone.trim()) return;
-
-    // Имитация отправки формы (сюда можно подключить Telegram Webhook или API)
-    setIsSubmitted(true);
+    if (submitting.current) return;
+    const form = e.currentTarget;
+    const invalid = !name.trim() ? ['Укажите имя', 'contact-name']
+      : phoneDigits(phone).length !== 11 ? ['Укажите телефон полностью: +7 и 10 цифр', 'contact-phone']
+      : !consent ? ['Подтвердите согласие, чтобы отправить заявку', 'personal-data-consent'] : null;
+    if (invalid) {
+      setError(invalid[0]);
+      setInvalidField(invalid[1]);
+      form.querySelector<HTMLElement>(`#${invalid[1]}`)?.focus();
+      return;
+    }
+    submitting.current = true;
+    setLoading(true);
+    setError('');
+    setInvalidField('');
+    try {
+      await sendLead({ name: name.trim(), phone: `+${phoneDigits(phone)}`, direction: selectedService,
+        notes: notes.trim() || undefined, source: 'landing', consentAccepted: true, consentVersion: legal.consentVersion });
+      setIsSubmitted(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Не удалось отправить заявку. Попробуйте ещё раз.');
+    } finally {
+      submitting.current = false;
+      setLoading(false);
+    }
   };
 
   return (
@@ -153,6 +181,7 @@ export function ContactsSection(): ReactElement {
                 {isSubmitted ? (
                   <motion.div
                     key="success"
+                    role="status"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
@@ -165,7 +194,7 @@ export function ContactsSection(): ReactElement {
                       Заявка принята
                     </h3>
                     <p className="mt-3 max-w-md text-sm leading-relaxed text-[#6E645F]">
-                      Благодарим вас, <span className="font-semibold text-[#241E1C]">{name}</span>! Администратор клуба свяжется с вами по номеру <span className="font-semibold text-[#241E1C]">{phone}</span> в течение 15 минут для подтверждения времени и подбора лошади.
+                      Благодарим вас, <span className="font-semibold text-[#241E1C]">{name}</span>! Администратор клуба свяжется с вами по номеру <span className="font-semibold text-[#241E1C]">{phone}</span> для подтверждения времени и подбора лошади.
                     </p>
                     <button
                       type="button"
@@ -174,6 +203,8 @@ export function ContactsSection(): ReactElement {
                         setName('');
                         setPhone('');
                         setNotes('');
+                        setConsent(false);
+                        setError('');
                       }}
                       className="mt-8 rounded-full border border-black/15 bg-transparent px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-[#3A2F2B] transition-all hover:bg-black/5"
                     >
@@ -184,6 +215,8 @@ export function ContactsSection(): ReactElement {
                   <motion.form
                     key="form"
                     onSubmit={handleSubmit}
+                    noValidate
+                    aria-busy={loading}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -213,6 +246,8 @@ export function ContactsSection(): ReactElement {
                             <button
                               key={srv}
                               type="button"
+                              disabled={loading}
+                              aria-pressed={isSel}
                               onClick={() => setSelectedService(srv)}
                               className={`rounded-full px-4 py-2 text-xs font-medium transition-all ${
                                 isSel
@@ -230,11 +265,17 @@ export function ContactsSection(): ReactElement {
                     {/* Поля ввода: Имя и Телефон */}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
+                        <label htmlFor="contact-name" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
                           Ваше имя *
                         </label>
                         <input
                           type="text"
+                          id="contact-name"
+                          aria-invalid={invalidField === 'contact-name'}
+                          aria-describedby={invalidField === 'contact-name' ? 'contact-error' : undefined}
+                          autoComplete="given-name"
+                          maxLength={100}
+                          disabled={loading}
                           required
                           value={name}
                           onChange={(e) => setName(e.target.value)}
@@ -244,14 +285,19 @@ export function ContactsSection(): ReactElement {
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
+                        <label htmlFor="contact-phone" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
                           Телефон *
                         </label>
                         <input
                           type="tel"
+                          id="contact-phone"
+                          aria-invalid={invalidField === 'contact-phone'}
+                          aria-describedby={invalidField === 'contact-phone' ? 'contact-error' : undefined}
+                          autoComplete="tel"
+                          disabled={loading}
                           required
                           value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
+                          onChange={(e) => setPhone(phoneMask(e.target.value))}
                           placeholder="+7 (900) 000-00-00"
                           className="w-full rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
                         />
@@ -260,10 +306,13 @@ export function ContactsSection(): ReactElement {
 
                     {/* Пожелания / комментарий */}
                     <div>
-                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
+                      <label htmlFor="contact-notes" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
                         Удобная дата или опыт верховой езды (необязательно)
                       </label>
                       <textarea
+                        id="contact-notes"
+                        maxLength={2000}
+                        disabled={loading}
                         rows={3}
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
@@ -274,11 +323,22 @@ export function ContactsSection(): ReactElement {
 
                     {/* Кнопка отправки и согласие */}
                     <div className="pt-2">
+                      <label className="mb-4 flex items-start gap-3 text-xs text-[#6E645F]">
+                        <input id="personal-data-consent" type="checkbox" checked={consent} disabled={loading}
+                          aria-invalid={invalidField === 'personal-data-consent'}
+                          aria-describedby={invalidField === 'personal-data-consent' ? 'contact-error' : undefined}
+                          onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 accent-[#614535]" />
+                        <span>Я даю согласие на обработку персональных данных для рассмотрения заявки.</span>
+                      </label>
+                      <div className="min-h-12 text-sm text-[#8C3838]" aria-live="polite">
+                        {error && <p id="contact-error" role="alert">{error}</p>}
+                      </div>
                       <button
                         type="submit"
-                        className="w-full rounded-2xl bg-[#614535] py-4 text-xs font-semibold uppercase tracking-[0.16em] text-white shadow-lg transition-all hover:bg-[#432F24] hover:scale-[1.01] active:scale-[0.99]"
+                        disabled={loading}
+                        className="w-full cursor-pointer rounded-2xl bg-[#614535] py-4 text-xs font-semibold uppercase tracking-[0.16em] text-white shadow-lg transition-all hover:bg-[#432F24] hover:scale-[1.01] active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 disabled:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#614535]"
                       >
-                        Отправить заявку на тренировку ↗
+                        {loading ? 'Отправляем…' : 'Отправить заявку на тренировку ↗'}
                       </button>
 
                       <p className="mt-3 text-center text-[11px] text-[#9C8F87]">
