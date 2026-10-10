@@ -29,7 +29,20 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up -d --wai
 
 Сид `backend/prisma/seed.cjs` создаёт администратора с общеизвестным тестовым паролем — на production его не запускайте. Перенос существующих пользователей выполняйте через проверенный дамп; для новой базы создайте администратора с индивидуальным bcrypt-хешем через контролируемую административную процедуру.
 
-VK-параметры заполняются в `.env.production`; адрес Callback API — `https://club.example.com/api/vk/callback`. Не публикуйте `.env.production` и дампы в репозитории.
+VK-параметры заполняются в `.env.production`, включая `VK_COMMUNITY_TOKEN` (старое имя `VK_BOT_TOKEN` остаётся резервным). Новый адрес Callback API — `http://<IP>/api/vk-bot/callback` или `https://<домен>/api/vk-bot/callback`. Старый `/api/vk/callback` сохранён, но требует секрет и совпадающий `VK_GROUP_ID` даже для confirmation. Не публикуйте `.env.production` и дампы в репозитории.
+
+На порту 80 Caddy напрямую проксирует `/api/vk/*` и `/api/vk-bot/*` в `backend:3000`, сохраняя путь и тело запроса. Автоматические редиректы отключены через `auto_https disable_redirects`; для остальных HTTP-путей явно задан редирект на HTTPS. Выпуск и обновление сертификатов продолжают работать. В Compose опубликованы TCP 80/443 и UDP 443, порт backend остаётся внутренним.
+
+После обновления Caddyfile проверьте конфигурацию и примените её. Если меняли VK-переменные, пересоздайте backend, чтобы он получил новое окружение:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build backend
+docker compose --env-file .env.production -f docker-compose.prod.yml exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker compose --env-file .env.production -f docker-compose.prod.yml exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+curl -i -X POST http://localhost/api/vk-bot/callback -H 'Content-Type: application/json' -d '{"type":"confirmation","group_id":226780791}'
+```
+
+Ожидается HTTP 200, `Content-Type: text/plain`, тело точно равно `VK_CONFIRMATION_CODE`, заголовка `Location` нет. Не используйте `curl -L`: он скроет нежелательный редирект. Повторите запрос с публичным IP извне сервера. Для остальных событий с настроенным секретом неверное значение должно вернуть 403 от backend, а не редирект.
 
 ## Обновления и проверки
 

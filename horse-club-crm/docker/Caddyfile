@@ -1,3 +1,19 @@
+{
+	# Explicit HTTP routes below must run before any HTTPS redirect.
+	# Certificate provisioning and renewal remain automatic.
+	auto_https disable_redirects
+}
+
+:80 {
+	@vkCallbacks path /api/vk/* /api/vk-bot/*
+	handle @vkCallbacks {
+		reverse_proxy backend:3000
+	}
+	handle {
+		redir https://{host}{uri} 308
+	}
+}
+
 (common) {
 	encode zstd gzip
 	@privateFiles path_regexp privateFiles (?i)(^|/)(\.[^/]+|[^/]+\.(env|sql|dump|bak|log|gz))($|/)
