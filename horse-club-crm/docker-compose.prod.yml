@@ -61,7 +61,7 @@ services:
       LEAD_CONSENT_VERSION: ${LEAD_CONSENT_VERSION:?Set the published consent version}
       PUBLIC_LANDING_URL: https://${LANDING_SITE:?Set LANDING_SITE}
       ENABLE_MEDICAL_NOTES: ${ENABLE_MEDICAL_NOTES:-false}
-      PUBLIC_LEADS_ENABLED: ${PUBLIC_LEADS_ENABLED:-false}
+      PUBLIC_LEADS_ENABLED: ${PUBLIC_LEADS_ENABLED:?Set PUBLIC_LEADS_ENABLED=true to accept landing applications or false for maintenance}
     depends_on:
       postgres: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }

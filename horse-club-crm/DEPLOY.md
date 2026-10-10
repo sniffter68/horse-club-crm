@@ -89,6 +89,21 @@ docker compose --env-file .env.production -f docker-compose.prod.yml logs --tail
 
 Run `bash deploy.sh` from the repository on the production host. The script uses `.env.production` by default (`ENV_FILE` overrides it), validates Compose configuration, installs locked frontend/landing dependencies, builds both static sites, builds the backend and waits for migrations and backend health, then recreates Caddy. Any failed step stops deployment before the Caddy restart.
 
+The deployment now checks the resolved backend environment before builds and refuses to report a successful landing deployment if `PUBLIC_LEADS_ENABLED` is not exactly `true`. Compose requires an explicit value rather than silently defaulting to `false`. After backend startup, a non-mutating HTTP probe verifies that the browser DTO reaches `LeadsService` with public leads enabled; a random stale consent version prevents creating a diagnostic application or sending a VK notification.
+
+### Если production отвечает «Приём заявок временно отключён»
+
+Это HTTP 503 из `LeadsService`, а не ошибка CORS или Caddy. В используемом файле окружения (по умолчанию `.env.production`, другой путь задаётся через `ENV_FILE`) установите `PUBLIC_LEADS_ENABLED=true`. Значение в отдельном `.env` не участвует в деплое с `--env-file .env.production`. Затем выполните `bash deploy.sh`: контейнер backend должен быть пересоздан, простой `docker compose restart` не обновляет его окружение.
+
+Для быстрой проверки работающего контейнера без вывода секретов:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T backend node -e 'console.log({PUBLIC_LEADS_ENABLED:process.env.PUBLIC_LEADS_ENABLED})'
+docker compose --env-file .env.production -f docker-compose.prod.yml logs --tail=100 backend caddy
+```
+
+Запрос со случайной устаревшей версией согласия должен возвращать HTTP 400 «Текст согласия обновился…»; HTTP 503 означает, что приём по-прежнему выключен. Такой запрос не сохраняется в БД. Полную запись и уведомление проверяйте реальной заявкой с актуальным согласием; smoke-проверка деплоя намеренно не создаёт фиктивные лиды.
+
 Caddy already serves `landing/dist` through the read-only mount `/var/www/landing-dist` in `docker-compose.prod.yml`; frontend assets use `frontend/dist`. Build-time Vite settings belong in `landing/.env.production` and `frontend/.env.production`, respectively. No secrets should be placed in `VITE_*` settings.
 
 For landing applications, set `PUBLIC_LEADS_ENABLED=true`, `LEAD_CONSENT_VERSION` matching the published `VITE_LEGAL_CONSENT_VERSION`, `VK_COMMUNITY_TOKEN` and `VK_ADMIN_PEER_ID` in `.env.production`. For a VK administrator conversation, use the conversation's full peer ID (typically `2000000000 + chat_id`). The community must be able to send messages to that conversation. Default landing requests use the same-origin `/api/leads`; Caddy proxies `/api/*` to `backend:3000`.

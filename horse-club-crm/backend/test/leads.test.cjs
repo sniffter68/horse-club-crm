@@ -7,6 +7,7 @@ const request = require('supertest');
 const { LeadsController } = require('../dist/leads/leads.controller');
 const { LeadsService } = require('../dist/leads/leads.service');
 const { VkNotifications } = require('../dist/vk-bot/vk-delivery.module');
+const { requestLimits } = require('../dist/common/request-limits');
 const { PrismaService } = require('../dist/prisma/prisma.service');
 const { serializeBigInt } = require('../dist/common/interceptors/bigint-json.interceptor');
 const { Prisma } = require('@prisma/client');
@@ -102,6 +103,44 @@ test('landing without direction sends a readable fallback', async () => {
   process.env.VK_ADMIN_PEER_ID = '2000000001';
   await request(app.getHttpServer()).post('/api/leads').send(lead).expect(201);
   assert.match(notifications[0].message, /Направление: Не указано/);
+});
+
+test('production same-origin browser request returns 503 while disabled and 201 with a DB lead and VK queue record once enabled', async () => {
+  const oldNodeEnv = process.env.NODE_ENV;
+  const oldEnabled = process.env.PUBLIC_LEADS_ENABLED;
+  process.env.NODE_ENV = 'production';
+  process.env.PUBLIC_LEADS_ENABLED = 'false';
+  process.env.VK_ADMIN_PEER_ID = '2000000001';
+  const module = await Test.createTestingModule({ controllers: [LeadsController],
+    providers: [LeadsService, { provide: PrismaService, useValue: prisma }] }).compile();
+  const productionApp = module.createNestApplication();
+  productionApp.getHttpAdapter().getInstance().set('trust proxy', 1);
+  productionApp.use(requestLimits());
+  productionApp.setGlobalPrefix('api');
+  productionApp.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true,
+    transformOptions: { enableImplicitConversion: true } }));
+  await productionApp.init();
+  const input = { name: 'Анна', phone: lead.phone, direction: 'Выездка', source: 'landing', notes: 'Первый визит',
+    consentAccepted: true, consentVersion: lead.consentVersion };
+  const post = () => request(productionApp.getHttpServer()).post('/api/leads')
+    .set('Host', 'club.horseclub68.ru').set('Origin', 'https://club.horseclub68.ru')
+    .set('X-Forwarded-Proto', 'https').send(input);
+  try {
+    const disabled = await post().expect(503);
+    assert.equal(disabled.body.message, 'Приём заявок временно отключён');
+    assert.equal(leads.length, 0); assert.equal(notifications.length, 0);
+    process.env.PUBLIC_LEADS_ENABLED = 'true';
+    const enabled = await post().expect(201);
+    assert.equal(enabled.body.success, true);
+    assert.equal(leads.length, 1); assert.equal(leads[0].status, 'PENDING');
+    assert.equal(leads[0].preferences, 'Направление: Выездка\nПервый визит');
+    assert.equal(notifications.length, 1); assert.equal(notifications[0].peerId, 2000000001n);
+    assert.match(notifications[0].message, /Новая заявка с сайта/);
+  } finally {
+    await productionApp.close();
+    if (oldNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = oldNodeEnv;
+    if (oldEnabled === undefined) delete process.env.PUBLIC_LEADS_ENABLED; else process.env.PUBLIC_LEADS_ENABLED = oldEnabled;
+  }
 });
 
 for (const [title, input] of Object.entries({
