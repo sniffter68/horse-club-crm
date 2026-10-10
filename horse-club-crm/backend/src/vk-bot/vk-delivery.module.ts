@@ -10,6 +10,15 @@ export async function queueVkNotification(tx: Prisma.TransactionClient, key: str
   await tx.vkNotification.upsert({ where: { key }, update: {}, create: { key, peerId, message } });
 }
 
+export async function queueVkAdministratorNotification(tx: Prisma.TransactionClient, key: string, message: string): Promise<number> {
+  const admins = await tx.user.findMany({ where: { role: 'ADMIN', vkUserId: { not: null } }, select: { vkUserId: true } });
+  const recipients = new Set(admins.flatMap(admin => admin.vkUserId ? [admin.vkUserId] : []));
+  const peer = Number(process.env.VK_ADMIN_PEER_ID);
+  if (Number.isSafeInteger(peer) && peer > 0) recipients.add(BigInt(peer));
+  for (const recipient of recipients) await queueVkNotification(tx, `${key}:${recipient}`, recipient, message);
+  return recipients.size;
+}
+
 @Injectable()
 export class VkNotifications implements OnModuleInit, OnModuleDestroy {
   private timer?: NodeJS.Timeout;

@@ -20,7 +20,9 @@ export class UsersService {
         const user = await tx.user.findUnique({ where: { id } });
         if (!user || user.role !== Role.ADMIN) throw new BadRequestException('Получателем заявок может быть только администратор');
         if (user.vkUserId && user.vkUserId !== (vkUserId ? BigInt(vkUserId) : null)) {
-          await tx.vkNotification.deleteMany({ where: { peerId: user.vkUserId, sentAt: null, key: { startsWith: 'lead:' } } });
+          await tx.vkNotification.deleteMany({ where: { peerId: user.vkUserId, sentAt: null,
+            OR: [{ key: { startsWith: 'lead:' } }, { key: { startsWith: 'help:' } }],
+          } });
         }
         return tx.user.update({ where: { id }, data: { vkUserId: vkUserId ? BigInt(vkUserId) : null }, select: publicUserSelect });
       });

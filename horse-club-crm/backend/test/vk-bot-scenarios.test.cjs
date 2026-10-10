@@ -302,7 +302,7 @@ test('VK management endpoints validate input and enforce ADMIN/MANAGER permissio
   } finally { await app.close(); }
 });
 
-test('lead recipient configuration rejects non-admin users and revokes previous pending leads', async () => {
+test('administrator recipient configuration rejects non-admin users and revokes pending leads and help', async () => {
   const { UsersService } = require('../dist/users/users.service');
   const deleted = [];
   let user = { role: 'MANAGER', vkUserId: null };
@@ -314,5 +314,7 @@ test('lead recipient configuration rejects non-admin users and revokes previous 
   user = { role: 'ADMIN', vkUserId: 42n };
   await service.setVkRecipient(bookingId, null);
   assert.equal(user.vkUserId, null);
-  assert.deepEqual(deleted[0].where, { peerId: 42n, sentAt: null, key: { startsWith: 'lead:' } });
+  assert.deepEqual(deleted[0].where, { peerId: 42n, sentAt: null,
+    OR: [{ key: { startsWith: 'lead:' } }, { key: { startsWith: 'help:' } }],
+  });
 });

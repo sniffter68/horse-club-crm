@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, HttpException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import { DateTime } from 'luxon';
 import { Keyboard, VK, type KeyboardBuilder } from 'vk-io';
@@ -7,12 +7,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MembershipLedgerService } from '../memberships/membership-ledger.service';
 import { LeadsService } from '../leads/leads.service';
 import { normalizePhone, VkLinkService } from './vk-link.service';
+import { mainMenu as menu, normalizeVkCommand, welcomeMenu } from './vk-bot.keyboard';
+import { clubCard, riderGuide } from './vk-bot.config';
+import { queueVkAdministratorNotification } from './vk-delivery.module';
 
 function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
-const menu = (trainer: boolean) => Keyboard.keyboard(trainer
-  ? [Keyboard.textButton({ label: 'Расписание на сегодня', payload: { command: 'today' } })]
-  : [Keyboard.textButton({ label: 'Мой баланс', payload: { command: 'balance' } }), Keyboard.textButton({ label: 'Мои тренировки', payload: { command: 'bookings' } })]);
-const welcome = Keyboard.keyboard([Keyboard.textButton({ label: 'Привязать профиль' }), Keyboard.textButton({ label: 'Первичная заявка' })]);
+const welcome = welcomeMenu();
 const zone = () => process.env.CLUB_TIME_ZONE || 'Europe/Moscow';
 const consentVersion = () => process.env.LEAD_CONSENT_VERSION?.trim() || '2026-09-19';
 const consentUrl = () => `${(process.env.PUBLIC_LANDING_URL || '').replace(/\/$/, '')}/#consent`;
@@ -27,6 +27,7 @@ const lessonsLeft = (count: number) => {
 
 @Injectable()
 export class VkBotService {
+  private readonly logger = new Logger(VkBotService.name);
   private readonly vk: VK | undefined;
   constructor(private readonly prisma: PrismaService, private readonly links: VkLinkService,
     private readonly ledger: MembershipLedgerService, private readonly leads: LeadsService) {
@@ -50,7 +51,7 @@ export class VkBotService {
     if (typeof sender !== 'number' || !Number.isSafeInteger(sender) || typeof peer !== 'number' || !Number.isSafeInteger(peer)
       || typeof text !== 'string' || typeof eventId !== 'string' || !eventId || eventId.length > 200) throw new BadRequestException('Некорректное сообщение VK');
     if (sender <= 0 || peer !== sender || out === 1) return;
-    let command = text.trim().toLowerCase();
+    let command = normalizeVkCommand(text);
     if (command === 'начать' || command === 'привет') {
       await this.send(peer, eventId, 'Здравствуйте! Вы подключены к боту конного клуба. Здесь будут приходить напоминания о тренировках и статус бронирований.', welcome);
       return;
@@ -60,7 +61,7 @@ export class VkBotService {
       try {
         const parsed: unknown = JSON.parse(payload);
         if (record(parsed)) {
-          if (typeof parsed.command === 'string') command = parsed.command;
+          if (typeof parsed.command === 'string') command = normalizeVkCommand(parsed.command);
           if (Number.isSafeInteger(parsed.offset) && typeof parsed.offset === 'number' && parsed.offset >= 0 && parsed.offset <= 10000) offset = parsed.offset;
         }
       } catch { /* Ordinary text routes without a payload. */ }
@@ -91,6 +92,23 @@ export class VkBotService {
       const [client, trainer] = await Promise.all([
         this.prisma.client.findUnique({ where: { vkUserId: BigInt(sender) } }), this.prisma.trainer.findUnique({ where: { vkUserId: BigInt(sender) } }),
       ]);
+      const keyboard = client || trainer ? menu(Boolean(trainer)) : welcome;
+      if (command === 'about') { await this.send(peer, eventId, clubCard(), keyboard); return; }
+      if (command === 'guide') { await this.send(peer, eventId, riderGuide(), keyboard); return; }
+      if (command === 'help') {
+        this.logger.log({ event: 'vk_help_requested', vkUserId: sender, eventId });
+        let queued = 0;
+        try {
+          queued = await this.prisma.$transaction(tx => queueVkAdministratorNotification(tx,
+            `help:${sender}:${createHash('sha256').update(eventId).digest('hex')}`,
+            `💬 Запрос помощи администратору клуба\n${client?.name || trainer?.name || 'Гость'}\nПользователь VK: https://vk.com/id${sender}\nОткройте диалог с пользователем в сообщениях сообщества.`));
+        } catch { this.logger.error('Не удалось сохранить запрос помощи VK'); }
+        if (!queued) this.logger.warn({ event: 'vk_help_not_queued', vkUserId: sender, eventId });
+        await this.send(peer, eventId, queued
+          ? 'Мы передали ваш запрос администратору клуба. Он подключится к диалогу в ближайшее время! 🐎'
+          : 'Сейчас не удалось передать запрос администратору. Попробуйте позже или свяжитесь с клубом по контактам в разделе «О клубе».', keyboard);
+        return;
+      }
       if (!client && !trainer) {
         const lead = /^заявка\s+([^;]{1,100});\s*(.+)$/i.exec(text.trim());
         if (lead) {
