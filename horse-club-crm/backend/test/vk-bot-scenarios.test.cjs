@@ -58,7 +58,7 @@ test('client balance query is limited to the linked owner and active memberships
   });
   await service.handleMessage(message('Мой баланс'), 'balance-1');
   assert.equal(query.where.clientId, 'owner'); assert.equal(query.where.remainedLessons.gt, 0);
-  assert.ok(query.where.validUntil.gte instanceof Date); assert.match(sent[0].message, /4 занятий/);
+  assert.ok(query.where.validUntil.gte instanceof Date); assert.match(sent[0].message, /4 занятия/);
 });
 test('unlinked visitor is offered supported VK keyboard and a lead form', async () => {
   const { service, sent } = bot({ client: { findUnique: async () => null }, trainer: { findUnique: async () => null } });

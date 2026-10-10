@@ -17,6 +17,13 @@ const zone = () => process.env.CLUB_TIME_ZONE || 'Europe/Moscow';
 const consentVersion = () => process.env.LEAD_CONSENT_VERSION?.trim() || '2026-09-19';
 const consentUrl = () => `${(process.env.PUBLIC_LANDING_URL || '').replace(/\/$/, '')}/#consent`;
 const date = (value: Date) => DateTime.fromJSDate(value, { zone: zone() }).setLocale('ru').toFormat('dd.MM.yyyy HH:mm');
+const expiryDate = (value: Date) => DateTime.fromJSDate(value, { zone: zone() }).setLocale('ru').toFormat('dd.MM.yyyy');
+const trainingDate = (value: Date) => DateTime.fromJSDate(value, { zone: zone() }).setLocale('ru').toFormat("d MMMM (ccc) 'в' HH:mm");
+const lessonPlural = new Intl.PluralRules('ru');
+const lessonsLeft = (count: number) => {
+  const plural = lessonPlural.select(count);
+  return `осталось ${count} ${plural === 'one' ? 'занятие' : plural === 'few' ? 'занятия' : 'занятий'}`;
+};
 
 @Injectable()
 export class VkBotService {
@@ -101,13 +108,26 @@ export class VkBotService {
       }
       if (trainer && ['today', 'расписание на сегодня'].includes(command)) { await this.today(trainer.id, peer, eventId, offset); return; }
       if (client && ['balance', 'мой баланс', 'баланс абонемента'].includes(command)) {
-        const rows = await this.prisma.membership.findMany({ where: { clientId: client.id, validUntil: { gte: new Date() }, remainedLessons: { gt: 0 } }, orderBy: [{ validUntil: 'asc' }, { id: 'asc' }], skip: offset, take: 11 });
-        await this.send(peer, eventId, rows.length ? rows.slice(0, 10).map(row => `Абонемент ${row.id}: ${row.remainedLessons} занятий, до ${date(row.validUntil)}`).join('\n') : 'Активных абонементов нет.', rows.length > 10 ? this.next('balance', offset) : menu(false)); return;
+        const rows = await this.prisma.membership.findMany({ where: { clientId: client.id, validUntil: { gte: new Date() }, remainedLessons: { gt: 0 } },
+          include: { pricingPlan: { select: { name: true } } }, orderBy: [{ validUntil: 'asc' }, { id: 'asc' }], skip: offset, take: 11 });
+        const lines = rows.slice(0, 10).map(row => {
+          const title = row.title?.trim() || row.pricingPlan?.name.trim() || 'Абонемент';
+          return `• «${title}»: ${lessonsLeft(row.remainedLessons)} (до ${expiryDate(row.validUntil)})`;
+        });
+        await this.send(peer, eventId, lines.length ? `💳 Ваши абонементы:\n${lines.join('\n')}` : 'У вас пока нет активных абонементов.', rows.length > 10 ? this.next('balance', offset) : menu(false)); return;
       }
       if (client && ['bookings', 'мои тренировки'].includes(command)) {
         const rows = await this.prisma.booking.findMany({ where: { clientId: client.id, lesson: { status: 'SCHEDULED', startTime: { gte: new Date() } } },
-          include: { horse: true, lesson: { include: { trainer: true } } }, orderBy: [{ lesson: { startTime: 'asc' } }, { id: 'asc' }], skip: offset, take: 11 });
-        await this.send(peer, eventId, rows.length ? rows.slice(0, 10).filter(row => row.lesson !== null).map(row => `${date(row.lesson!.startTime)} — ${row.lesson!.trainer.name}${row.horse ? `, лошадь ${row.horse.name}` : ''}`).join('\n') : 'Предстоящих тренировок нет.', rows.length > 10 ? this.next('bookings', offset) : menu(false)); return;
+          include: { horse: true, lesson: { include: { trainer: true, arena: true } } }, orderBy: [{ lesson: { startTime: 'asc' } }, { id: 'asc' }], skip: offset, take: 11 });
+        const cards = rows.slice(0, 10).filter(row => row.lesson !== null).map(row => {
+          const lesson = row.lesson!;
+          return [`• ${trainingDate(lesson.startTime)}`,
+            `  Лошадь: ${row.horse?.name.trim() || 'пока не назначена'}`,
+            `  Тренер: ${lesson.trainer.name.trim() || 'пока не назначен'}`,
+            ...(lesson.arena?.name.trim() ? [`  Манеж: ${lesson.arena.name.trim()}`] : []),
+          ].join('\n');
+        });
+        await this.send(peer, eventId, cards.length ? `📅 Предстоящие тренировки:\n${cards.join('\n\n')}` : 'Предстоящих тренировок пока нет.', rows.length > 10 ? this.next('bookings', offset) : menu(false)); return;
       }
       await this.send(peer, eventId, `Здравствуйте, ${trainer?.name || client?.firstName || 'всадник'}! Выберите действие. Время: ${zone()}.`, menu(Boolean(trainer)));
     } catch (error) {
