@@ -13,7 +13,7 @@ const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 let app, bot, controller, sent, failures;
 const path = '/api/vk-bot/callback';
 const greeting = 'Здравствуйте! Вы подключены к боту конного клуба. Здесь будут приходить напоминания о тренировках и статус бронирований.';
-const event = (text = 'Привет') => ({ type: 'message_new', secret: 'test-secret', event_id: 'new-1',
+const event = (text = 'Начать') => ({ type: 'message_new', secret: 'test-secret', event_id: 'new-1',
   object: { message: { from_id: 42, peer_id: 42, text, out: 0 } } });
 
 before(async () => {
@@ -63,11 +63,21 @@ test('unknown events return ok with valid secret and with optional secret unset'
   assert.equal(sent[0].message, greeting);
 });
 
-for (const text of ['Начать', 'Привет']) test(`${text} greets directly without a database lookup`, async () => {
+for (const text of ['Начать', 'start']) test(`${text} greets directly without a database lookup`, async () => {
   const response = await request(app.getHttpServer()).post(path).send(event(text)).expect(200);
   assert.equal(response.text, 'ok'); assert.equal(sent.length, 1);
   assert.equal(sent[0].message, greeting); assert.equal(sent[0].peer_id, 42);
   assert.ok(Number.isInteger(sent[0].random_id)); assert.notEqual(sent[0].random_id, 0);
+});
+
+test('ordinary messages are acknowledged without replying or failing', async () => {
+  for (const text of ['Добрый вечер! Все в силе?', 'Привет', '1234']) {
+    const response = await request(app.getHttpServer()).post(path).send(event(text)).expect(200);
+    assert.equal(response.text, 'ok');
+  }
+  await nextTurn();
+  assert.deepEqual(sent, []);
+  assert.deepEqual(failures, []);
 });
 
 test('acknowledges message while processing is still pending', async () => {

@@ -115,7 +115,13 @@ export class VkBotService {
         }
       } catch { /* Ordinary text routes without a payload. */ }
     }
-    if (command === 'начать' || command === 'привет') {
+    // Leave ordinary community messages for the live administrator conversation.
+    const textCommand = /^(?:заявка|согласен|привязать|\/start)(?:\s|$)/i.test(text.trim());
+    const menuCommand = ['начать', 'help', 'about', 'guide', 'первичная заявка', 'привязать профиль',
+      'today', 'расписание на сегодня', 'balance', 'мой баланс', 'баланс абонемента',
+      'bookings', 'мои тренировки'].includes(command);
+    if (!textCommand && !menuCommand) return;
+    if (command === 'начать') {
       const firstName = await this.getFirstName(sender);
       await this.send(peer, eventId, `Здравствуйте${firstName ? `, ${firstName}` : ''}! Вы подключены к боту конного клуба. Здесь будут приходить напоминания о тренировках и статус бронирований.`, welcome);
       return;
@@ -133,7 +139,7 @@ export class VkBotService {
         });
         await this.send(peer, eventId, 'Согласие принято. Теперь отправьте: заявка Имя; +79991234567', welcome); return;
       }
-      const shortCode = /^(?:\/start\s+)?(\d{4})$/i.exec(text.trim());
+      const shortCode = /^\/start\s+(\d{4})$/i.exec(text.trim());
       if (shortCode) {
         await this.send(peer, eventId, `Для подтверждения телефона отправьте: привязать ВАШ_ТЕЛЕФОН ${shortCode[1]}. Код действует 5 минут.`, welcome); return;
       }

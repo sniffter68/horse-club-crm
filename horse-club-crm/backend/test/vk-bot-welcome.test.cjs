@@ -22,8 +22,8 @@ function harness(get = async () => [{ id: 42, first_name: ' Анна ', last_nam
 }
 
 for (const [text, payload] of [
-  ['Начать'], ['  ПРИВЕТ  '], ['', JSON.stringify({ command: 'начать' })],
-  ['Кнопка', JSON.stringify({ command: 'Привет' })], ['Начать', '{invalid'],
+  ['Начать'], ['  НАЧАТЬ  '], ['', JSON.stringify({ command: 'начать' })],
+  ['Кнопка', JSON.stringify({ command: 'Начать' })], ['Начать', '{invalid'],
   ['Начать', JSON.stringify({ command: 'start' })],
 ]) test(`personalized welcome handles text and button payload: ${JSON.stringify([text, payload])}`, async () => {
   const h = harness();
@@ -47,7 +47,7 @@ for (const profiles of [[], undefined, [{}], [{ first_name: '' }], [{ first_name
 test('VK failure is logged and does not prevent the welcome reply', async () => {
   const h = harness(async () => { throw new Error('VK unavailable'); });
   await h.send('Начать');
-  await h.send('Привет');
+  await h.send('Начать');
   assert.equal(h.sent.length, 2);
   assert.equal(h.sent[0].message, `Здравствуйте! ${body}`);
   assert.equal(String(h.sent[0].keyboard), String(welcomeMenu()));
@@ -57,12 +57,12 @@ test('VK failure is logged and does not prevent the welcome reply', async () => 
 
 test('cache shares concurrent lookups, expires and isolates users', async () => {
   const h = harness(async ({ user_ids }) => [{ first_name: user_ids[0] === 42 ? 'Анна' : 'Иван' }]);
-  await Promise.all([h.send('Начать'), h.send('Привет')]);
+  await Promise.all([h.send('Начать'), h.send('Начать')]);
   assert.equal(h.queries.length, 1);
   await h.send('Начать', undefined, 43);
   assert.equal(h.sent[2].message, `Здравствуйте, Иван! ${body}`);
   h.bot.firstNames.get(42).expiresAt = 0;
-  await h.send('Привет');
+  await h.send('Начать');
   assert.equal(h.queries.length, 3);
 });
 

@@ -62,7 +62,7 @@ test('client balance query is limited to the linked owner and active memberships
 });
 test('unlinked visitor is offered supported VK keyboard and a lead form', async () => {
   const { service, sent } = bot({ client: { findUnique: async () => null }, trainer: { findUnique: async () => null } });
-  await service.handleMessage(message('привет'), 'welcome');
+  await service.handleMessage(message('начать'), 'welcome');
   assert.equal(sent[0].message, 'Здравствуйте! Вы подключены к боту конного клуба. Здесь будут приходить напоминания о тренировках и статус бронирований.');
   assert.match(String(sent[0].keyboard), /Привязать профиль/);
   assert.doesNotMatch(String(sent[0].keyboard), /request_contact/);
@@ -235,9 +235,9 @@ test('failed lesson transaction leaves no notification and transport failure can
   assert.equal(marked, 2); assert.equal(sends[0].random_id, sends[2].random_id);
 });
 
-test('short code and /start code request phone verification; linked /start greets the client', async () => {
+test('/start code requests phone verification; linked /start greets the client', async () => {
   const { service, sent } = bot({ client: { findUnique: async () => ({ firstName: 'Анна' }) }, trainer: { findUnique: async () => null } });
-  for (const text of ['1234', '/start 1234']) {
+  for (const text of ['/start 1234']) {
     await service.handleMessage(message(text), `code-${text}`);
     assert.match(sent.at(-1).message, /привязать ВАШ_ТЕЛЕФОН 1234/);
   }
