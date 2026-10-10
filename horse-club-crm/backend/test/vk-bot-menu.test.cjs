@@ -7,7 +7,7 @@ const confirmation = '💬 Мы передали ваш запрос админ�
 const { mainMenu, welcomeMenu } = require('../dist/vk-bot/vk-bot.keyboard');
 const { clubCard, riderGuide } = require('../dist/vk-bot/vk-bot.config');
 
-const envKeys = ['VK_ADMIN_PEER_ID', 'VK_CLUB_NAME', 'VK_CLUB_ADDRESS', 'VK_CLUB_HOURS', 'VK_CLUB_PHONE', 'VK_CLUB_MAP_URL', 'VK_RIDER_GUIDE'];
+const envKeys = ['VK_ADMIN_PEER_ID', 'VK_GROUP_ID', 'VK_CLUB_NAME', 'VK_CLUB_ADDRESS', 'VK_CLUB_HOURS', 'VK_CLUB_PHONE', 'VK_CLUB_MAP_URL', 'VK_RIDER_GUIDE'];
 const original = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
 beforeEach(() => { for (const key of envKeys) delete process.env[key]; });
 after(() => {
@@ -105,6 +105,21 @@ for (const text of ['💬 Связаться с администратором',
     assert.equal(adminSent.length, 1);
     assert.equal(adminSent[0].peer_id, 77);
     assert.equal(adminSent[0].message, row.message);
+  });
+}
+
+for (const groupId of ['228514574', '-228514574', '  -228514574  ', undefined, '', 'invalid', '0', '9007199254740992']) {
+  test(`administrator card includes a community dialog link or profile fallback for group ${JSON.stringify(groupId)}`, async () => {
+    process.env.VK_ADMIN_PEER_ID = '77';
+    if (groupId !== undefined) process.env.VK_GROUP_ID = groupId;
+    const h = harness({ client: { name: 'Анна Орлова' } });
+    await h.send('помощь');
+    const message = [...h.queued.values()][0].message;
+    assert.match(message, /Клиент: Анна Орлова\nПрофиль: https:\/\/vk.com\/id42/);
+    const expectedUrl = groupId?.includes('228514574')
+      ? 'https://vk.com/gim228514574?sel=42' : 'https://vk.com/id42';
+    assert.ok(message.includes(`👉 Открыть диалог: ${expectedUrl}\nВремя:`));
+    assert.equal(h.sent[0].message, confirmation);
   });
 }
 

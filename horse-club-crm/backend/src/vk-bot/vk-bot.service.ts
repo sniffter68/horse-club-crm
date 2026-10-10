@@ -55,12 +55,17 @@ export class VkBotService {
       if (client || trainer) keyboard = menu(Boolean(trainer));
     } catch { this.logger.warn('Не удалось загрузить профиль для запроса помощи VK'); }
     const adminPeerId = Number(process.env.VK_ADMIN_PEER_ID);
+    const configuredGroupId = process.env.VK_GROUP_ID?.trim() || '';
+    const groupId = /^-?\d+$/.test(configuredGroupId) ? Math.abs(Number(configuredGroupId)) : 0;
+    const profileUrl = `https://vk.com/id${clientPeerId}`;
+    const dialogUrl = Number.isSafeInteger(groupId) && groupId > 0
+      ? `https://vk.com/gim${groupId}?sel=${clientPeerId}` : profileUrl;
     if (Number.isSafeInteger(adminPeerId) && adminPeerId > 0 && adminPeerId !== clientPeerId) {
       try {
         await this.prisma.$transaction(tx => queueVkNotification(tx,
           `help:${clientPeerId}:${createHash('sha256').update(eventId).digest('hex')}:${adminPeerId}`,
           BigInt(adminPeerId),
-          `💬 Запрос помощи администратору клуба\n${name}\nПользователь VK: https://vk.com/id${clientPeerId}\nВремя: ${date(requestedAt)}\nОткройте диалог с пользователем в сообщениях сообщества.`));
+          `💬 Запрос помощи администратору клуба\nКлиент: ${name}\nПрофиль: ${profileUrl}\n👉 Открыть диалог: ${dialogUrl}\nВремя: ${date(requestedAt)}`));
       } catch { this.logger.error({ event: 'vk_help_not_queued', vkUserId: clientPeerId, eventId }); }
     } else {
       this.logger.warn({ event: 'vk_help_not_queued', vkUserId: clientPeerId, eventId,
