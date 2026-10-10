@@ -96,6 +96,16 @@
 
 ## Validation
 
+### Lead conversion with immediate training
+
+- Owner: `frontend/src/pages/dashboard/PendingLeads.tsx`; ADMIN-only conversion through `PATCH /leads/:id/accept`.
+- «Сразу назначить тренировку» reveals club-local date/time, duration, service, active trainer, available horse and optional location. Ant Design Form/Select/Modal and the existing typed `datetime-local` variant own controls and validation; `schedule/time.ts` converts club wall time to UTC.
+- Catalogs load with pagination and cancellation; failures offer retry. Horse availability reuses `useTriadAvailability`; loading, unavailable or failed checks block scheduling. The backend remains authoritative for conflicts, workload, rest, capacity and club hours.
+- The primary action changes between «Создать клиента» and «Создать клиента и назначить занятие». Turning scheduling off excludes all lesson fields from the request. The service defaults to the lead's selected service and can be changed.
+- Client lookup/creation by phone, lesson participant, pending service charge, VK outbox and lead status `ACCEPTED` commit in one serializable transaction. `ACCEPTED` is the existing converted state; no new status or migration is introduced. This reuses `LessonsService.createLesson` and preserves the existing schedule's grouping and payment rules.
+- Busy writes block duplicate requests, closing and editing. Failure preserves input and shows a persistent alert; dirty cancellation asks before discarding. Success closes the modal, removes the lead from the dashboard and invalidates client/lesson/booking lists.
+- Evidence: `backend/test/lead-conversion-lesson.test.cjs`, `frontend/src/pages/dashboard/leadConversion.test.ts`, `frontend/e2e/lead-conversion.spec.ts`.
+
 ### Quick boarding
 
 - Canonical owner: `frontend/src/pages/boarding-contracts/quick.tsx`, shared by horse and stall detail cards; Ant Design Form/Modal/Select/DatePicker primitives.

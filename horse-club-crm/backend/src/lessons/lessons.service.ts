@@ -198,7 +198,7 @@ export class LessonsService {
     });
   }
 
-  async createLesson(dto: CreateLessonDto): Promise<LessonDetails> {
+  async createLesson(dto: CreateLessonDto, transaction?: Prisma.TransactionClient): Promise<LessonDetails> {
     if (dto.participants && (dto.clientId || dto.horseId || dto.membershipId)) {
       throw new BadRequestException('Передайте участников либо в participants, либо в устаревших полях clientId/horseId/membershipId');
     }
@@ -225,7 +225,7 @@ export class LessonsService {
     }
     const start = this.parseDate(dto.startTime, 'Некорректное время начала занятия');
 
-    return this.runSerializable(async (tx) => {
+    const create = async (tx: Prisma.TransactionClient): Promise<LessonDetails> => {
       const service = await tx.service.findUnique({
         where: { id: dto.serviceId },
         select: { durationMinutes: true, price: true, title: true, name: true, maxCapacity: true, allowMembership: true },
@@ -380,7 +380,8 @@ export class LessonsService {
       });
       await this.notifyLesson(tx, created, 'created', 'Запись на тренировку подтверждена');
       return created;
-    });
+    };
+    return transaction ? create(transaction) : this.runSerializable(create);
   }
 
   async findAll(query: ListLessonsQueryDto): Promise<LessonDetails[]> {

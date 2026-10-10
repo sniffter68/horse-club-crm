@@ -1,15 +1,16 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { LeadRequestStatus, Prisma } from '@prisma/client';
 import { queueVkAdministratorNotification, queueVkAdminChatNotification } from '../vk-bot/vk-delivery.module';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AcceptLeadDto } from './accept-lead.dto';
 import type { CreateLeadDto } from './create-lead.dto';
 import { currentLeadConsentVersion } from '../common/lead-consent';
+import { LessonsService } from '../lessons/lessons.service';
 
 @Injectable()
 export class LeadsService {
   private readonly logger = new Logger(LeadsService.name);
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly lessons?: LessonsService) {}
 
   async create(dto: CreateLeadDto, consentSource: 'LANDING' | 'VK' = 'LANDING'): Promise<{ success: true; leadId: string; message: string }> {
     if (process.env.PUBLIC_LEADS_ENABLED !== 'true' && process.env.NODE_ENV === 'production') {
@@ -69,6 +70,9 @@ export class LeadsService {
       const lead = await tx.leadRequest.findUnique({ where: { id } });
       if (!lead) throw new NotFoundException('Заявка не найдена');
       if (lead.status !== LeadRequestStatus.PENDING) throw new BadRequestException('Заявка уже обработана');
+      const serviceId = dto.lesson?.serviceId || lead.serviceId;
+      if (dto.lesson && !serviceId) throw new BadRequestException('Выберите услугу для занятия');
+      if (dto.lesson && !dto.isRider) throw new BadRequestException('Для записи на занятие отметьте клиента как всадника');
 
       const existing = await tx.client.findUnique({ where: { phone: dto.phone } });
       const data = {
@@ -85,11 +89,20 @@ export class LeadsService {
       const client = existing
         ? await tx.client.update({ where: { id: existing.id }, data })
         : await tx.client.create({ data });
+      let lessonId: string | undefined;
+      if (dto.lesson) {
+        if (!this.lessons) throw new ServiceUnavailableException('Сервис занятий недоступен');
+        const { horseId, ...lessonInput } = dto.lesson;
+        const lesson = await this.lessons.createLesson({ ...lessonInput, serviceId: serviceId!,
+          participants: [{ clientId: client.id, horseId }] }, tx);
+        lessonId = lesson.id;
+      }
       await tx.leadRequest.update({
         where: { id },
         data: { status: LeadRequestStatus.ACCEPTED, clientId: client.id, processedAt: new Date() },
       });
-      return { success: true as const, client, message: 'Клиент создан' };
+      return { success: true as const, client, ...(lessonId ? { lessonId } : {}),
+        message: lessonId ? 'Клиент создан, занятие назначено' : 'Клиент создан' };
     });
   }
 
@@ -124,7 +137,7 @@ export class LeadsService {
   private async retrySerializable<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt += 1) {
       try {
-        return await this.prisma.$transaction(operation, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        return await this.prisma.$transaction(operation, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 10000 });
       } catch (error: unknown) {
         if (attempt < 3 && error instanceof Prisma.PrismaClientKnownRequestError && ['P2002', 'P2034'].includes(error.code)) continue;
         throw error;

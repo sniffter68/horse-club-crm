@@ -21,15 +21,7 @@ import { ResourceSchedule, type ResourceGrouping } from './ResourceSchedule'
 import { bookingStatusLabels, clientName as personName, dayBounds, disciplines, scheduleEntries, type ScheduleEntry, type TriadBooking, type TriadValues } from './triad'
 import { useTriadAvailability } from './useTriadAvailability'
 import { BookingLifecycleActions } from './BookingLifecycleActions'
-
-async function catalog<T>(resource: string, signal: AbortSignal, params: Record<string, string | undefined> = {}): Promise<T[]> {
-  const records: T[] = []
-  for (let start = 0; ; start += 100) {
-    const response = await httpClient.get<T[]>(`${API_URL}/${resource}`, { signal, params: { ...params, _start: start, _end: start + 100 } })
-    records.push(...response.data)
-    if (response.data.length < 100 || records.length >= Number(response.headers['x-total-count'])) return records
-  }
-}
+import { catalog } from '../catalogs/loadCatalog'
 const membershipDate = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeZone: CLUB_TIME_ZONE })
 const lessonHorses = (lesson: Lesson) => [...new Set(lesson.bookings.map(booking => booking.horse?.name).filter((name): name is string => Boolean(name)))]
 
