@@ -1,5 +1,5 @@
 import { type ReactElement } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface StandardItem {
   number: string;
@@ -55,7 +55,6 @@ const standards: StandardItem[] = [
 ];
 
 export function ClubStandardsSection(): ReactElement {
-  const reducedMotion = useReducedMotion();
   return (
     <section
       id="about"
@@ -88,7 +87,7 @@ export function ClubStandardsSection(): ReactElement {
           {standards.map((item, index) => (
             <motion.div
               key={item.number}
-              initial={reducedMotion ? false : { opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-60px' }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
@@ -106,7 +105,7 @@ export function ClubStandardsSection(): ReactElement {
                 </div>
 
                 <div className="mt-8">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6E645F]">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7E77]">
                     {item.category}
                   </span>
                   <h3 className="mt-2 font-serif text-2xl sm:text-3xl font-normal leading-snug text-[#3A2F2B]">
@@ -120,7 +119,7 @@ export function ClubStandardsSection(): ReactElement {
 
               {/* Нижняя метрика */}
               <div className="mt-10 flex items-baseline justify-between border-t border-black/5 pt-6">
-                <span className="text-xs uppercase tracking-wider text-[#6E645F]">
+                <span className="text-xs uppercase tracking-wider text-[#8C7E77]">
                   {item.metricLabel}
                 </span>
                 <span className="font-serif text-2xl sm:text-3xl font-light text-[#3A2F2B]">

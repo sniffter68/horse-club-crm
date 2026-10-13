@@ -67,7 +67,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
   return (
     <section
       id="contacts"
-      className="relative overflow-hidden bg-[#241E1C] px-4 py-20 text-white sm:px-10 sm:py-28 lg:px-16"
+      className="relative overflow-hidden bg-[#241E1C] px-6 py-28 text-white sm:px-10 lg:px-16"
     >
       {/* Декоративное теплое свечение сзади */}
       <div
@@ -178,8 +178,8 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
           </div>
 
           {/* Правая колонка: Форма записи */}
-          <div id="booking-form" className="min-w-0 lg:col-span-7">
-            <div className="relative rounded-[2rem] bg-white p-5 text-[#241E1C] shadow-2xl sm:rounded-[2.8rem] sm:p-12">
+          <div id="booking-form" className="lg:col-span-7">
+            <div className="relative rounded-[2.8rem] bg-white p-8 text-[#241E1C] shadow-2xl sm:p-12">
               <AnimatePresence mode="wait">
                 {isSubmitted ? (
                   <motion.div
@@ -240,7 +240,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
 
                     {/* Выбор направления */}
                     <div>
-                      <p id="direction-heading" className="block text-[11px] font-semibold uppercase tracking-wider text-[#6E645F] mb-2.5">
+                      <p id="direction-heading" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-2.5">
                         Направление
                       </p>
                       <div className="flex flex-wrap gap-2" role="group" aria-labelledby="direction-heading">
@@ -266,7 +266,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2" aria-live="polite">
                         {(['horse', 'trainer'] as const).map(kind => selection[kind] && <button key={kind} type="button"
-                          disabled={loading} className="booking-choice" onClick={() => onRemove(kind)}
+                          disabled={loading} className="rounded-full border border-black/10 bg-[#FAF7F2] px-4 py-2 text-xs font-medium text-[#6E645F]" onClick={() => onRemove(kind)}
                           aria-label={`Убрать ${kind === 'horse' ? 'лошадь' : 'тренера'}: ${selection[kind]!.name}`}>
                           {kind === 'horse' ? 'Лошадь' : 'Тренер'}: {selection[kind]!.name} <span aria-hidden="true">×</span>
                         </button>)}
@@ -276,7 +276,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                     {/* Поля ввода: Имя и Телефон */}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
-                        <label htmlFor="contact-name" className="block text-[11px] font-semibold uppercase tracking-wider text-[#6E645F] mb-1.5">
+                        <label htmlFor="contact-name" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
                           Ваше имя *
                         </label>
                         <input
@@ -296,7 +296,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                       </div>
 
                       <div>
-                        <label htmlFor="contact-phone" className="block text-[11px] font-semibold uppercase tracking-wider text-[#6E645F] mb-1.5">
+                        <label htmlFor="contact-phone" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
                           Телефон *
                         </label>
                         <input
@@ -317,7 +317,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
 
                     {/* Пожелания / комментарий */}
                     <div>
-                      <label htmlFor="contact-notes" className="block text-[11px] font-semibold uppercase tracking-wider text-[#6E645F] mb-1.5">
+                      <label htmlFor="contact-notes" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
                         Удобная дата или опыт верховой езды (необязательно)
                       </label>
                       <textarea
@@ -354,7 +354,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                         {loading ? 'Отправляем…' : 'Отправить заявку на тренировку ↗'}
                       </button>
 
-                      <p className="mt-3 text-center text-[11px] text-[#6E645F]">
+                      <p className="mt-3 text-center text-[11px] text-[#9C8F87]">
                         Нажимая кнопку, вы соглашаетесь на обработку персональных данных в соответствии с политикой конфиденциальности клуба.
                       </p>
                     </div>

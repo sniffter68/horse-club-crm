@@ -25,12 +25,12 @@ export function InfrastructureSection({ cards }: InfrastructureSectionProps): Re
           <div>
             {/* Медиа контейнер со скруглением */}
             <div className="relative mb-6 aspect-[16/10] w-full overflow-hidden rounded-2xl bg-luxury-surface border border-luxury-border/60">
-              <img
+              <img loading="lazy" decoding="async"
                 src={card.imageUrl}
                 alt={card.title}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 loading="lazy"
-               decoding="async"/>
+              />
               <span className="absolute top-3 left-3 rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-luxury-dark backdrop-blur-md shadow-sm border border-luxury-border/40">
                 {card.badge}
               </span>

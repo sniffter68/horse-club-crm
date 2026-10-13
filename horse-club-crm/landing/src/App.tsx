@@ -20,8 +20,7 @@ export default function App(): ReactElement {
       {/* Умная навигационная капсула (сворачивается в бургер при скролле) */}
       <Navbar />
 
-      <a className="skip-link" href="#main-content">Перейти к содержимому</a>
-      <main id="main-content" tabIndex={-1}>
+      <main>
         {/* 1. Секция Hero с кинематографичным взмыванием всадника */}
         <HeroSection />
 
@@ -42,10 +41,10 @@ export default function App(): ReactElement {
       </main>
 
       {/* Футер */}
-      <footer className="border-t border-white/10 bg-[#1D1817] px-4 py-8 text-center text-xs text-[#BFB1A6] sm:px-6">
+      <footer className="border-t border-white/10 bg-[#1D1817] px-6 py-8 text-center text-xs text-[#8C7E77]">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
           <p>© 2026 СЛКС Тамбов. Конный клуб и спортивная школа верховой езды.</p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
+          <div className="flex items-center gap-6">
             <a href="#services" className="transition-colors hover:text-white">
               Услуги
             </a>

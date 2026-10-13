@@ -92,10 +92,9 @@ export function InfrastructureMapSection(): ReactElement {
           style={{ scale: mapScale }}
           className="absolute inset-0 -z-10 origin-center"
         >
-          <img
+          <img loading="lazy" decoding="async"
             src={mapImageSrc}
             alt="Территория конного клуба СЛКС Тамбов"
-            loading="lazy" decoding="async"
             onError={() => {
               if (mapImageSrc !== fallbackImage) {
                 setMapImageSrc(fallbackImage);
