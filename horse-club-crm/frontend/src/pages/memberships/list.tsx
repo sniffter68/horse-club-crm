@@ -28,7 +28,7 @@ export function MembershipList() {
 
   return <>
     <RefineList title="Абонементы" headerButtons={<CreateButton>Продать абонемент</CreateButton>}>
-      <Form {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q">
+      <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q">
         <Input.Search placeholder="Поиск клиента" allowClear onSearch={() => searchFormProps.form?.submit()} />
       </Form.Item></Form>
       <ResponsiveTable<Membership> {...tableProps} rowKey="id" columns={[

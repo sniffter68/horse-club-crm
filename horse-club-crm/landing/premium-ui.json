@@ -6,12 +6,15 @@
   "ownership": {
     "Select/Listbox": "native"
   },
-  "requiredCommands": ["build", "e2e"],
+  "requiredCommands": ["lint", "typecheck", "build", "e2e"],
   "commands": {
+    "lint": "npm run lint",
+    "typecheck": "npm run typecheck",
     "build": "npm run build",
-    "e2e": "npx playwright test tests/landing.spec.ts"
+    "e2e": "npm run test:e2e"
   },
   "evidence": {
-    "failurePaths": "tests/landing.spec.ts"
+    "failurePaths": "tests/landing.spec.ts",
+    "accessibility": "tests/polish.spec.ts"
   }
 }

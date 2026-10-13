@@ -10,7 +10,7 @@ export function LoginPage() {
       <Card className="login-card">
         <Typography.Title level={2}>Вход в Horse CRM</Typography.Title>
         {message && <Alert type="error" showIcon message={message} className="login-error" />}
-        <Form<LoginCredentials> layout="vertical" requiredMark={false} onFinish={(values) => login(values)} disabled={isPending}>
+        <Form<LoginCredentials> noValidate layout="vertical" requiredMark={false} onFinish={(values) => login(values)} disabled={isPending}>
           <Form.Item label="Email" name="email" rules={[{ required: true, message: 'Введите email' }, { type: 'email', message: 'Введите корректный email' }]}>
             <Input autoComplete="username" type="email" size="large" autoFocus />
           </Form.Item>

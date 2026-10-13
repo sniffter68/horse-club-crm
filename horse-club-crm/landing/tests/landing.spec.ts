@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 const expectedConsentVersion = process.env.VITE_LEGAL_CONSENT_VERSION?.trim() || '2026-09-19';
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/public/content', route => route.fulfill({ json: { horses: [], trainers: [], services: [] } }));
+});
 
 async function fillForm(page: import('@playwright/test').Page) {
   await page.goto('/');
@@ -10,7 +13,7 @@ async function fillForm(page: import('@playwright/test').Page) {
   await page.getByLabel('Я даю согласие').check();
 }
 
-for (const width of [390, 768, 1440]) {
+for (const width of [320, 390, 768, 1440]) {
   test(`booking form remains usable at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/');

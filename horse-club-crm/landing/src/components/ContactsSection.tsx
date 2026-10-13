@@ -1,7 +1,10 @@
 import { useRef, useState, type ReactElement, type FormEvent } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { phoneDigits, phoneMask, sendLead } from '../lead';
 import { legal } from '../legal';
+import { bookingNotes, type BookingSelection, type BookingKind, type ChooseBooking } from '../booking';
+import type { PublicService } from '../usePublicContent';
+import { landingData } from '../data/landingContent';
 
 const serviceOptions = [
   'Выездка',
@@ -11,8 +14,15 @@ const serviceOptions = [
   'Экскурсия по клубу',
 ];
 
-export function ContactsSection(): ReactElement {
-  const [selectedService, setSelectedService] = useState<string>('Выездка');
+export function ContactsSection({ services, selection, onChoose, onRemove, onReset }: {
+  services: PublicService[]; selection: BookingSelection; onChoose: ChooseBooking;
+  onRemove: (kind: BookingKind) => void; onReset: () => void;
+}): ReactElement {
+  const reducedMotion = useReducedMotion();
+  const options = services.map(service => ({ id: service.id, name: service.title }));
+  const fallbackOptions = serviceOptions.map(name => ({ id: name, name }));
+  const available = [...options, ...fallbackOptions.filter(option => !options.some(item => item.name === option.name))];
+  const selectedService = selection.service?.name || 'Выездка';
   const [name, setName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -29,6 +39,7 @@ export function ContactsSection(): ReactElement {
     const form = e.currentTarget;
     const invalid = !name.trim() ? ['Укажите имя', 'contact-name']
       : phoneDigits(phone).length !== 11 ? ['Укажите телефон полностью: +7 и 10 цифр', 'contact-phone']
+      : bookingNotes(selection, notes).length > 2000 ? ['Сократите комментарий: вместе с выбранной лошадью и тренером допускается 2000 символов', 'contact-notes']
       : !consent ? ['Подтвердите согласие, чтобы отправить заявку', 'personal-data-consent'] : null;
     if (invalid) {
       setError(invalid[0]);
@@ -41,8 +52,9 @@ export function ContactsSection(): ReactElement {
     setError('');
     setInvalidField('');
     try {
-      await sendLead({ name: name.trim(), phone: `+${phoneDigits(phone)}`, direction: selectedService,
-        notes: notes.trim() || undefined, source: 'landing', consentAccepted: true, consentVersion: legal.consentVersion });
+      await sendLead({ name: name.trim(), phone: `+${phoneDigits(phone)}`, direction: selectedService.slice(0, 100),
+        ...(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(selection.service?.id || '') ? { serviceId: selection.service!.id } : {}),
+        notes: bookingNotes(selection, notes) || undefined, source: 'landing', consentAccepted: true, consentVersion: legal.consentVersion });
       setIsSubmitted(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Не удалось отправить заявку. Попробуйте ещё раз.');
@@ -55,7 +67,7 @@ export function ContactsSection(): ReactElement {
   return (
     <section
       id="contacts"
-      className="relative overflow-hidden bg-[#241E1C] px-6 py-28 text-white sm:px-10 lg:px-16"
+      className="relative overflow-hidden bg-[#241E1C] px-4 py-20 text-white sm:px-10 sm:py-28 lg:px-16"
     >
       {/* Декоративное теплое свечение сзади */}
       <div
@@ -123,41 +135,32 @@ export function ContactsSection(): ReactElement {
                   Прямой телефон
                 </span>
                 <a
-                  href="tel:+79000000000"
+                  href={`tel:${landingData.contacts.phone.replace(/[^+\d]/g, '')}`}
                   className="mt-2 block font-serif text-xl text-white transition-colors hover:text-[#E4DAD0]"
                 >
-                  +7 (900) 000-00-00
+                  {landingData.contacts.phone}
                 </a>
                 <span className="mt-1 block text-[11px] text-[#A6988E]">
-                  Ежедневно 09:00 — 20:00
+                  {landingData.contacts.workingHours}
                 </span>
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
                 <span className="block text-[10px] font-semibold uppercase tracking-widest text-[#A6988E]">
-                  Мессенджеры
+                  Новости клуба
                 </span>
                 <div className="mt-2 flex gap-3">
                   <a
-                    href="https://t.me/"
+                    href={landingData.contacts.vkGroup}
                     target="_blank"
                     rel="noreferrer"
                     className="font-serif text-base text-[#E4DAD0] underline underline-offset-4 hover:text-white transition-colors"
                   >
-                    Telegram
-                  </a>
-                  <span className="text-white/20">·</span>
-                  <a
-                    href="https://wa.me/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-serif text-base text-[#E4DAD0] underline underline-offset-4 hover:text-white transition-colors"
-                  >
-                    WhatsApp
+                    ВКонтакте
                   </a>
                 </div>
                 <span className="mt-1 block text-[11px] text-[#A6988E]">
-                  Быстрый ответ дежурного
+                  События и жизнь клуба
                 </span>
               </div>
             </div>
@@ -175,14 +178,14 @@ export function ContactsSection(): ReactElement {
           </div>
 
           {/* Правая колонка: Форма записи */}
-          <div className="lg:col-span-7">
-            <div className="relative rounded-[2.8rem] bg-white p-8 text-[#241E1C] shadow-2xl sm:p-12">
+          <div id="booking-form" className="min-w-0 lg:col-span-7">
+            <div className="relative rounded-[2rem] bg-white p-5 text-[#241E1C] shadow-2xl sm:rounded-[2.8rem] sm:p-12">
               <AnimatePresence mode="wait">
                 {isSubmitted ? (
                   <motion.div
                     key="success"
                     role="status"
-                    initial={{ opacity: 0, scale: 0.95 }}
+                    initial={reducedMotion ? false : { opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="flex flex-col items-center justify-center py-12 text-center"
@@ -205,6 +208,7 @@ export function ContactsSection(): ReactElement {
                         setNotes('');
                         setConsent(false);
                         setError('');
+                        onReset();
                       }}
                       className="mt-8 rounded-full border border-black/15 bg-transparent px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-[#3A2F2B] transition-all hover:bg-black/5"
                     >
@@ -217,7 +221,7 @@ export function ContactsSection(): ReactElement {
                     onSubmit={handleSubmit}
                     noValidate
                     aria-busy={loading}
-                    initial={{ opacity: 0 }}
+                    initial={reducedMotion ? false : { opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     className="flex flex-col gap-6"
@@ -226,7 +230,7 @@ export function ContactsSection(): ReactElement {
                       <div className="inline-block rounded-full bg-[#E4DAD0]/60 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5A483E] mb-3">
                         Онлайн-запись
                       </div>
-                      <h3 className="font-serif text-3xl sm:text-4xl font-normal text-[#241E1C]">
+                      <h3 id="booking-heading" tabIndex={-1} className="font-serif text-3xl sm:text-4xl font-normal text-[#241E1C]">
                         Забронировать занятие
                       </h3>
                       <p className="mt-1 text-xs text-[#6E645F]">
@@ -236,36 +240,43 @@ export function ContactsSection(): ReactElement {
 
                     {/* Выбор направления */}
                     <div>
-                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-2.5">
+                      <p id="direction-heading" className="block text-[11px] font-semibold uppercase tracking-wider text-[#6E645F] mb-2.5">
                         Направление
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {serviceOptions.map((srv) => {
-                          const isSel = selectedService === srv;
+                      </p>
+                      <div className="flex flex-wrap gap-2" role="group" aria-labelledby="direction-heading">
+                        {available.map((srv) => {
+                          const isSel = selectedService === srv.name;
                           return (
                             <button
-                              key={srv}
+                              key={srv.id}
                               type="button"
                               disabled={loading}
                               aria-pressed={isSel}
-                              onClick={() => setSelectedService(srv)}
+                              onClick={() => onChoose('service', srv)}
                               className={`rounded-full px-4 py-2 text-xs font-medium transition-all ${
                                 isSel
                                   ? 'bg-[#3A2F2B] text-white shadow-sm'
                                   : 'border border-black/10 bg-[#FAF7F2] text-[#6E645F] hover:text-[#241E1C] hover:border-black/20'
                               }`}
                             >
-                              {srv}
+                              {srv.name}
                             </button>
                           );
                         })}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2" aria-live="polite">
+                        {(['horse', 'trainer'] as const).map(kind => selection[kind] && <button key={kind} type="button"
+                          disabled={loading} className="booking-choice" onClick={() => onRemove(kind)}
+                          aria-label={`Убрать ${kind === 'horse' ? 'лошадь' : 'тренера'}: ${selection[kind]!.name}`}>
+                          {kind === 'horse' ? 'Лошадь' : 'Тренер'}: {selection[kind]!.name} <span aria-hidden="true">×</span>
+                        </button>)}
                       </div>
                     </div>
 
                     {/* Поля ввода: Имя и Телефон */}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
-                        <label htmlFor="contact-name" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
+                        <label htmlFor="contact-name" className="block text-[11px] font-semibold uppercase tracking-wider text-[#6E645F] mb-1.5">
                           Ваше имя *
                         </label>
                         <input
@@ -285,7 +296,7 @@ export function ContactsSection(): ReactElement {
                       </div>
 
                       <div>
-                        <label htmlFor="contact-phone" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
+                        <label htmlFor="contact-phone" className="block text-[11px] font-semibold uppercase tracking-wider text-[#6E645F] mb-1.5">
                           Телефон *
                         </label>
                         <input
@@ -306,11 +317,13 @@ export function ContactsSection(): ReactElement {
 
                     {/* Пожелания / комментарий */}
                     <div>
-                      <label htmlFor="contact-notes" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
+                      <label htmlFor="contact-notes" className="block text-[11px] font-semibold uppercase tracking-wider text-[#6E645F] mb-1.5">
                         Удобная дата или опыт верховой езды (необязательно)
                       </label>
                       <textarea
                         id="contact-notes"
+                        aria-invalid={invalidField === 'contact-notes'}
+                        aria-describedby={invalidField === 'contact-notes' ? 'contact-error' : undefined}
                         maxLength={2000}
                         disabled={loading}
                         rows={3}
@@ -341,7 +354,7 @@ export function ContactsSection(): ReactElement {
                         {loading ? 'Отправляем…' : 'Отправить заявку на тренировку ↗'}
                       </button>
 
-                      <p className="mt-3 text-center text-[11px] text-[#9C8F87]">
+                      <p className="mt-3 text-center text-[11px] text-[#6E645F]">
                         Нажимая кнопку, вы соглашаетесь на обработку персональных данных в соответствии с политикой конфиденциальности клуба.
                       </p>
                     </div>

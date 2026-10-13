@@ -66,7 +66,7 @@ export function SettingsPage() {
     {role === 'TRAINER' && <Alert type="info" showIcon message="Доступ только для чтения" description="График изменяют администратор и менеджер клуба." />}
     {error && <Alert type="error" showIcon message={error} action={!loaded && <Button disabled={loading} onClick={() => { setError(undefined); setLoading(true); setRevision(value => value + 1) }}>Повторить</Button>} />}
     <Card><Spin spinning={loading || permissionsLoading}>
-      <Form form={form} layout="vertical" onFinish={save} disabled={!canManage || !loaded || loading || saving}
+      <Form noValidate form={form} layout="vertical" onFinish={save} disabled={!canManage || !loaded || loading || saving}
         onKeyDown={event => {
           // Enter confirms typed time without implicitly submitting the whole form.
           if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.closest('.ant-picker')) event.preventDefault()

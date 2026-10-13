@@ -95,6 +95,7 @@ export function InfrastructureMapSection(): ReactElement {
           <img
             src={mapImageSrc}
             alt="Территория конного клуба СЛКС Тамбов"
+            loading="lazy" decoding="async"
             onError={() => {
               if (mapImageSrc !== fallbackImage) {
                 setMapImageSrc(fallbackImage);

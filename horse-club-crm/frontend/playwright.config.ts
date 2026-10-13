@@ -6,5 +6,5 @@ export default defineConfig({
   ],
   testDir: './e2e', workers: 1, timeout: 20000,
   reporter: [['list'], ['html', { open: 'never' }]],
-  use: { baseURL: 'http://localhost:5173', channel: 'msedge', headless: true, screenshot: 'only-on-failure' },
+  use: { baseURL: process.env.CRM_TEST_BASE_URL || 'http://localhost:5173', channel: 'msedge', headless: true, screenshot: 'only-on-failure' },
 })

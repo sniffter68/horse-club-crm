@@ -156,6 +156,11 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
 - Browser: dashboard, clients, schedule; desktop and narrow viewport; light/dark/reduced motion when available.
 - Canonical sibling flow: shared catalog list/create/edit.
 
+### UI audit adapter
+
+- `scripts/audit-ui.py` runs the installed premium auditor without rule exclusions. It preserves source positions while recognizing JSX component names and generic arguments. Ant `Form` still owns validation and must declare `noValidate`; `Form.Item` is not an HTML form, and Ant `Select` is not an OS-owned select.
+- Native form/select/textarea and `motion.form` remain visible to all upstream rules. Parser regression tests: `scripts/test_audit_ui.py`.
+
 ### Horse replacement
 - Ant Design Modal/Form/Select and App message are reused for future scheduled bookings and legacy lesson participants.
 - ADMIN/MANAGER can change only the horse and optional reason. BookingRulesService validates resources in the same serializable transaction; payments, memberships and ledger entries stay attached to the original booking.

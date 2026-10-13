@@ -40,7 +40,7 @@ export function PaymentList() {
       <Alert type="info" showIcon message="Простой внутренний учёт"
         description="Начисления создаются автоматически. Нажмите «Оплачено», когда деньги получены. Кассовые чеки и бухгалтерия ведутся отдельно."
         style={{ marginBottom: 20 }} />
-      <Form {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}>
+      <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}>
         <Form.Item name="q" style={{ width: 320, maxWidth: '100%' }}><Input.Search placeholder="Клиент, лошадь или комментарий" allowClear onSearch={() => searchFormProps.form?.submit()} /></Form.Item>
         <Button htmlType="submit">Найти</Button>
       </Form>

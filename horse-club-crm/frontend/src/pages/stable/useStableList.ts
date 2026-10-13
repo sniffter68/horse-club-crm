@@ -6,6 +6,7 @@ export interface StablePage<T> { data: T[]; total: number; ownerAccount?: { id: 
 export function useStableList<T>(path: string) {
   const { query } = useCustom<StablePage<T>, HttpError>({ url: `${API_URL}/${path}`, method: 'get', errorNotification: false,
     queryOptions: { retry: false, staleTime: 0 } })
-  const refresh = useCallback(() => { void query.refetch() }, [query.refetch])
+  const { refetch } = query
+  const refresh = useCallback(() => { void refetch() }, [refetch])
   return { result: query.data?.data, loading: query.isFetching, error: query.error?.message, refresh }
 }

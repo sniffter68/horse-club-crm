@@ -1,8 +1,9 @@
 import { useRef, type ReactElement } from 'react';
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
-import riderImg from '../assets/rider.png';
+import { motion, useScroll, useTransform, useSpring, useReducedMotion } from 'framer-motion';
+const riderImg = '/images/rider-cutout.webp';
 
 export function HeroSection(): ReactElement {
+  const reducedMotion = useReducedMotion();
   const containerRef = useRef<HTMLElement>(null);
 
   // Скролл-прогресс по секции Hero
@@ -51,7 +52,7 @@ export function HeroSection(): ReactElement {
       {/* Интерактивный слой со всадником */}
       <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-end overflow-hidden pr-0 sm:pr-8 lg:pr-14">
         <motion.div
-          style={{
+          style={reducedMotion ? {} : {
             x: riderX,
             y: riderY,
             rotate: riderRotate,
@@ -63,9 +64,7 @@ export function HeroSection(): ReactElement {
         >
           {/* Мягкое парение на месте в покое */}
           <motion.div
-            animate={{
-              y: [0, -6, 0],
-            }}
+            animate={reducedMotion ? undefined : { y: [0, -6, 0] }}
             transition={{
               duration: 4,
               repeat: Infinity,
@@ -76,7 +75,7 @@ export function HeroSection(): ReactElement {
               src={riderImg}
               alt="Всадник СЛКС Тамбов"
               className="h-auto w-full object-contain"
-              loading="eager"
+              loading="eager" decoding="async" fetchPriority="high" width={880} height={1100}
             />
           </motion.div>
         </motion.div>
@@ -86,7 +85,7 @@ export function HeroSection(): ReactElement {
       <div className="relative z-20 mx-auto grid w-full max-w-7xl grid-cols-1 items-end gap-8 pb-4 lg:grid-cols-12">
         {/* Левая часть: Гео-бейдж и заголовок */}
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={reducedMotion ? false : { opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           className="flex flex-col items-start lg:col-span-7"
@@ -107,7 +106,7 @@ export function HeroSection(): ReactElement {
 
         {/* Правая часть: Плавающая карточка */}
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={reducedMotion ? false : { opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
           className="relative z-30 lg:col-span-5"

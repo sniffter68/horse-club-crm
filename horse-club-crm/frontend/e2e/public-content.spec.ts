@@ -1,7 +1,30 @@
 import { expect, test } from '@playwright/test'
 
 const uploadedPhoto = '/uploads/65ecf169-6c22-4e89-8baf-ddc3399da7ad.png'
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWuoAAAAASUVORK5CYII=', 'base64')
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAE0lEQVR4nGMs8rFkgAEmOAsvBwAxewD/Xm6DKwAAAABJRU5ErkJggg==', 'base64')
+
+test('phone photos are resized and encoded before uploading', async ({ page }) => {
+  await page.goto('/login')
+  const result = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 2400; canvas.height = 3200
+    const context = canvas.getContext('2d')!
+    const gradient = context.createLinearGradient(0, 0, 2400, 3200)
+    gradient.addColorStop(0, '#724c39'); gradient.addColorStop(1, '#e4dad0')
+    context.fillStyle = gradient; context.fillRect(0, 0, 2400, 3200)
+    const input = await new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!), 'image/png'))
+    const modulePath = '/src/imageOptimization.ts'
+    const { optimizeCatalogImage } = await import(/* @vite-ignore */ modulePath)
+    const output = await optimizeCatalogImage(new File([input], 'phone.png', { type: 'image/png' }), new AbortController().signal)
+    const bitmap = await createImageBitmap(output)
+    const dimensions = [bitmap.width, bitmap.height]
+    bitmap.close()
+    return { type: output.type, input: input.size, size: output.size, dimensions }
+  })
+  expect(result.type).toBe('image/webp')
+  expect(result.size).toBeLessThan(result.input)
+  expect(result.dimensions).toEqual([1200, 1600])
+})
 
 for (const resource of ['horses', 'trainers', 'services']) {
   test(`${resource}: upload preview, validation, failure recovery and persistence`, async ({ page }) => {

@@ -11,3 +11,4 @@ caddy_config/
 project-*.txt
 
 uploads/
+__pycache__/

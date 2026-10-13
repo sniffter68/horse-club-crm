@@ -17,7 +17,7 @@ export function UserList() {
   })
   return <List title="Пользователи" canCreate={false}
     headerButtons={role === 'ADMIN' ? <Link to="/users/new"><Button type="primary">Создать</Button></Link> : undefined}>
-    <Form {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q"><Input.Search placeholder="Поиск по email" allowClear onSearch={() => searchFormProps.form?.submit()} /></Form.Item><Button htmlType="submit">Найти</Button></Form>
+    <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q"><Input.Search placeholder="Поиск по email" allowClear onSearch={() => searchFormProps.form?.submit()} /></Form.Item><Button htmlType="submit">Найти</Button></Form>
     <ResponsiveTable<User> {...tableProps} rowKey="id" columns={[
       { key: 'email', dataIndex: 'email', title: 'Email', sorter: true },
       { key: 'role', dataIndex: 'role', title: 'Роль', sorter: true, render: (value: Role) => <Tag color={roleColor[value]}>{value}</Tag> },

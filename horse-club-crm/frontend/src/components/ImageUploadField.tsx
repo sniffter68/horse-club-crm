@@ -3,6 +3,7 @@ import { Button, Form, Image, Input, Space, Typography } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
 import { API_URL, httpClient, toHttpError } from '../httpClient'
 import { CatalogFormActivity } from '../pages/catalogs/CatalogFormActivity'
+import { optimizeCatalogImage } from '../imageOptimization'
 
 const uploadedPath = /^\/uploads\/[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/
 const externalUrl = /^https?:\/\//i
@@ -36,9 +37,10 @@ export function ImageUploadField() {
     const controller = new AbortController()
     request.current = controller
     setBusy(true); setFormBusy(true)
-    const data = new FormData()
-    data.append('file', file)
     try {
+      const optimized = await optimizeCatalogImage(file, controller.signal)
+      const data = new FormData()
+      data.append('file', optimized)
       const response = await httpClient.post<{ url: string }>(`${API_URL}/upload/image`, data, { signal: controller.signal })
       if (controller.signal.aborted) return
       form.setFieldValue('imageUrl', response.data.url)

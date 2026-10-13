@@ -15,8 +15,12 @@ export interface UploadedImage { buffer: Buffer; mimetype: string; size: number 
 
 export function serveUploads(app: NestExpressApplication, directory = uploadsDirectory): void {
   app.useStaticAssets(directory, {
-    prefix: '/uploads/', index: false, dotfiles: 'ignore', fallthrough: true,
-    setHeaders: (response) => { response.setHeader('X-Content-Type-Options', 'nosniff'); },
+    prefix: '/uploads/', index: false, dotfiles: 'ignore', fallthrough: true, maxAge: '1y', immutable: true,
+    setHeaders: (response) => {
+      response.setHeader('X-Content-Type-Options', 'nosniff');
+      // Override the API middleware's no-store only for successfully resolved public files.
+      response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    },
   });
 }
 

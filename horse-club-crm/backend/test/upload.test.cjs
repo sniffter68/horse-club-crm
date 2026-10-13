@@ -72,7 +72,7 @@ test('authenticated image upload validates files, persists unique names and serv
         urls.add(body.url);
         assert.deepEqual(await readFile(join(directory, body.url.split('/').pop())), png);
         const response = await request(server).get(body.url).expect(200).expect('Content-Type', /image\/png/)
-          .expect('X-Content-Type-Options', 'nosniff');
+          .expect('X-Content-Type-Options', 'nosniff').expect('Cache-Control', /immutable/);
         assert.deepEqual(response.body, png);
       }
       assert.equal(urls.size, 2);

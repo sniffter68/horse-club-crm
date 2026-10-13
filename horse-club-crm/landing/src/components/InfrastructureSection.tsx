@@ -30,7 +30,7 @@ export function InfrastructureSection({ cards }: InfrastructureSectionProps): Re
                 alt={card.title}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 loading="lazy"
-              />
+               decoding="async"/>
               <span className="absolute top-3 left-3 rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-luxury-dark backdrop-blur-md shadow-sm border border-luxury-border/40">
                 {card.badge}
               </span>

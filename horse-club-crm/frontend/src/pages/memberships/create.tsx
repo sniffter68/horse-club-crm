@@ -49,7 +49,7 @@ export function MembershipCreate() {
   })) ?? []
 
   return <Create title="Продажа абонемента" saveButtonProps={{ ...saveButtonProps, children: 'Создать абонемент' }}>
-    <Form<Values>
+    <Form<Values> noValidate
       {...formProps}
       layout="vertical"
       style={{ maxWidth: 720 }}

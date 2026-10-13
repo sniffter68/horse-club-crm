@@ -2,6 +2,7 @@
   "name": "horse-club-crm",
   "private": true,
   "scripts": {
+    "audit:ui": "python scripts/audit-ui.py . --mode strict && python scripts/audit-ui.py landing --mode strict",
     "build:frontends": "npm --prefix frontend run build && npm --prefix landing run build",
     "test:concurrency": "npm --prefix backend run build && node backend/test/concurrency-hardening.test.cjs",
     "prod:validate": "docker compose --env-file .env.production -f docker-compose.prod.yml config --quiet"

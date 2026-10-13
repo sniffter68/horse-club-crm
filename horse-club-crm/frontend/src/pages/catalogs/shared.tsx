@@ -30,7 +30,7 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
     </Space>,
   }] : []
   return <List title={title} canCreate={canManage} createButtonProps={{ children: 'Создать' }}>
-    <Form {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}>
+    <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}>
       <Form.Item name="q" style={{ width: 320, maxWidth: '100%' }}>
         <Input.Search aria-label="Поиск" placeholder="Поиск" allowClear onSearch={() => searchFormProps.form?.submit()} />
       </Form.Item>

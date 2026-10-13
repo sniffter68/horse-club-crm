@@ -142,7 +142,7 @@ export function LessonHistoryPage() {
 
   return <>
     <RefineList title="Журнал занятий" canCreate={false}>
-      <Form<FilterValues> form={form} layout="vertical" onFinish={applyFilters}>
+      <Form<FilterValues> noValidate form={form} layout="vertical" onFinish={applyFilters}>
         <Space align="end" wrap size="middle">
           <Form.Item name="q" label="Поиск"><Input.Search placeholder="Клиент, телефон, услуга, тренер, лошадь" allowClear onSearch={() => form.submit()} style={{ width: 300 }} /></Form.Item>
           <Form.Item name="period" label="Период"><DatePicker.RangePicker format="DD.MM.YYYY" /></Form.Item>
