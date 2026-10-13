@@ -24,7 +24,7 @@ export function TrainersSection({ trainers }: TrainersSectionProps): ReactElemen
         >
           {/* Портрет тренера */}
           <div className="relative mb-5 aspect-[16/10] w-full overflow-hidden rounded-2xl bg-luxury-surface border border-luxury-border/50">
-            <img loading="lazy" decoding="async"
+            <img
               src={trainer.imageUrl}
               alt={trainer.name}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"

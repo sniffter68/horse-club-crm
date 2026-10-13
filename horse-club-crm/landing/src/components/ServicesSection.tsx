@@ -2,7 +2,6 @@ import { handleCatalogImageError } from '../catalogImage';
 import type { PublicService } from '../usePublicContent';
 import { useState, type ReactElement } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { ChooseBooking } from '../booking';
 
 interface ServiceItem {
   id: string;
@@ -15,15 +14,14 @@ interface ServiceItem {
   badge: string;
 }
 
-export function ServicesSection({ services, onChoose }: { services: PublicService[]; onChoose: ChooseBooking }): ReactElement {
+export function ServicesSection({ services }: { services: PublicService[] }): ReactElement {
   const servicesData: ServiceItem[] = services.map(item => ({
     id: item.id, title: item.title, cardTitle: item.title, desc: item.description,
     price: item.price, duration: item.durationMinutes ? `Длительность: ${item.durationMinutes} мин` : '',
     image: item.imageUrl, badge: item.category,
   }));
-  const [activeTab, setActiveTab] = useState<string>(servicesData[0]?.id || '');
+  const [activeTab, setActiveTab] = useState<string>(servicesData[0].id);
   const currentService = servicesData.find((s) => s.id === activeTab) || servicesData[0];
-  if (!currentService) return <></>;
 
   return (
     <section id="services" className="relative overflow-hidden bg-[#241E1C] px-4 py-20 text-white sm:px-10 sm:py-28 lg:px-16">
@@ -52,7 +50,6 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
                   type="button"
-                  aria-pressed={isActive}
                   className={`group relative flex shrink-0 snap-start items-center justify-between rounded-full px-5 py-3 text-left transition-all duration-300 lg:w-full lg:rounded-2xl lg:px-7 lg:py-5 ${
                     isActive
                       ? 'border border-white/20 bg-white/10 text-white shadow-lg backdrop-blur-md'
@@ -101,7 +98,7 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
                     }}
                     className="flex h-full w-full items-center justify-center"
                   >
-                    <img loading="lazy" decoding="async"
+                    <img
                   onError={handleCatalogImageError}
                       src={currentService.image}
                       alt={currentService.title}
@@ -163,7 +160,6 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
 
                   <a
                     href="#contacts"
-                    onClick={event => { event.preventDefault(); onChoose('service', { id: currentService.id, name: currentService.title }); }}
                     className="inline-flex w-full items-center justify-center rounded-2xl bg-[#614535] px-6 py-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-md transition-all hover:scale-105 hover:bg-[#432F24] active:scale-95 sm:w-auto sm:px-8"
                   >
                     Записаться на занятие

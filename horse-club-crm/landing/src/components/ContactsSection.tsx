@@ -1,10 +1,7 @@
 import { useRef, useState, type ReactElement, type FormEvent } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { phoneDigits, phoneMask, sendLead } from '../lead';
 import { legal } from '../legal';
-import { bookingNotes, type BookingSelection, type BookingKind, type ChooseBooking } from '../booking';
-import type { PublicService } from '../usePublicContent';
-import { landingData } from '../data/landingContent';
 
 const serviceOptions = [
   'Выездка',
@@ -14,15 +11,8 @@ const serviceOptions = [
   'Экскурсия по клубу',
 ];
 
-export function ContactsSection({ services, selection, onChoose, onRemove, onReset }: {
-  services: PublicService[]; selection: BookingSelection; onChoose: ChooseBooking;
-  onRemove: (kind: BookingKind) => void; onReset: () => void;
-}): ReactElement {
-  const reducedMotion = useReducedMotion();
-  const options = services.map(service => ({ id: service.id, name: service.title }));
-  const fallbackOptions = serviceOptions.map(name => ({ id: name, name }));
-  const available = [...options, ...fallbackOptions.filter(option => !options.some(item => item.name === option.name))];
-  const selectedService = selection.service?.name || 'Выездка';
+export function ContactsSection(): ReactElement {
+  const [selectedService, setSelectedService] = useState<string>('Выездка');
   const [name, setName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -39,7 +29,6 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
     const form = e.currentTarget;
     const invalid = !name.trim() ? ['Укажите имя', 'contact-name']
       : phoneDigits(phone).length !== 11 ? ['Укажите телефон полностью: +7 и 10 цифр', 'contact-phone']
-      : bookingNotes(selection, notes).length > 2000 ? ['Сократите комментарий: вместе с выбранной лошадью и тренером допускается 2000 символов', 'contact-notes']
       : !consent ? ['Подтвердите согласие, чтобы отправить заявку', 'personal-data-consent'] : null;
     if (invalid) {
       setError(invalid[0]);
@@ -52,9 +41,8 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
     setError('');
     setInvalidField('');
     try {
-      await sendLead({ name: name.trim(), phone: `+${phoneDigits(phone)}`, direction: selectedService.slice(0, 100),
-        ...(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(selection.service?.id || '') ? { serviceId: selection.service!.id } : {}),
-        notes: bookingNotes(selection, notes) || undefined, source: 'landing', consentAccepted: true, consentVersion: legal.consentVersion });
+      await sendLead({ name: name.trim(), phone: `+${phoneDigits(phone)}`, direction: selectedService,
+        notes: notes.trim() || undefined, source: 'landing', consentAccepted: true, consentVersion: legal.consentVersion });
       setIsSubmitted(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Не удалось отправить заявку. Попробуйте ещё раз.');
@@ -135,32 +123,41 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                   Прямой телефон
                 </span>
                 <a
-                  href={`tel:${landingData.contacts.phone.replace(/[^+\d]/g, '')}`}
+                  href="tel:+79000000000"
                   className="mt-2 block font-serif text-xl text-white transition-colors hover:text-[#E4DAD0]"
                 >
-                  {landingData.contacts.phone}
+                  +7 (900) 000-00-00
                 </a>
                 <span className="mt-1 block text-[11px] text-[#A6988E]">
-                  {landingData.contacts.workingHours}
+                  Ежедневно 09:00 — 20:00
                 </span>
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
                 <span className="block text-[10px] font-semibold uppercase tracking-widest text-[#A6988E]">
-                  Новости клуба
+                  Мессенджеры
                 </span>
                 <div className="mt-2 flex gap-3">
                   <a
-                    href={landingData.contacts.vkGroup}
+                    href="https://t.me/"
                     target="_blank"
                     rel="noreferrer"
                     className="font-serif text-base text-[#E4DAD0] underline underline-offset-4 hover:text-white transition-colors"
                   >
-                    ВКонтакте
+                    Telegram
+                  </a>
+                  <span className="text-white/20">·</span>
+                  <a
+                    href="https://wa.me/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-serif text-base text-[#E4DAD0] underline underline-offset-4 hover:text-white transition-colors"
+                  >
+                    WhatsApp
                   </a>
                 </div>
                 <span className="mt-1 block text-[11px] text-[#A6988E]">
-                  События и жизнь клуба
+                  Быстрый ответ дежурного
                 </span>
               </div>
             </div>
@@ -178,14 +175,14 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
           </div>
 
           {/* Правая колонка: Форма записи */}
-          <div id="booking-form" className="lg:col-span-7">
+          <div className="lg:col-span-7">
             <div className="relative rounded-[2.8rem] bg-white p-8 text-[#241E1C] shadow-2xl sm:p-12">
               <AnimatePresence mode="wait">
                 {isSubmitted ? (
                   <motion.div
                     key="success"
                     role="status"
-                    initial={reducedMotion ? false : { opacity: 0, scale: 0.95 }}
+                    initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="flex flex-col items-center justify-center py-12 text-center"
@@ -208,7 +205,6 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                         setNotes('');
                         setConsent(false);
                         setError('');
-                        onReset();
                       }}
                       className="mt-8 rounded-full border border-black/15 bg-transparent px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-[#3A2F2B] transition-all hover:bg-black/5"
                     >
@@ -221,7 +217,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                     onSubmit={handleSubmit}
                     noValidate
                     aria-busy={loading}
-                    initial={reducedMotion ? false : { opacity: 0 }}
+                    initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     className="flex flex-col gap-6"
@@ -230,7 +226,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                       <div className="inline-block rounded-full bg-[#E4DAD0]/60 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5A483E] mb-3">
                         Онлайн-запись
                       </div>
-                      <h3 id="booking-heading" tabIndex={-1} className="font-serif text-3xl sm:text-4xl font-normal text-[#241E1C]">
+                      <h3 className="font-serif text-3xl sm:text-4xl font-normal text-[#241E1C]">
                         Забронировать занятие
                       </h3>
                       <p className="mt-1 text-xs text-[#6E645F]">
@@ -240,36 +236,29 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
 
                     {/* Выбор направления */}
                     <div>
-                      <p id="direction-heading" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-2.5">
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-2.5">
                         Направление
-                      </p>
-                      <div className="flex flex-wrap gap-2" role="group" aria-labelledby="direction-heading">
-                        {available.map((srv) => {
-                          const isSel = selectedService === srv.name;
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {serviceOptions.map((srv) => {
+                          const isSel = selectedService === srv;
                           return (
                             <button
-                              key={srv.id}
+                              key={srv}
                               type="button"
                               disabled={loading}
                               aria-pressed={isSel}
-                              onClick={() => onChoose('service', srv)}
+                              onClick={() => setSelectedService(srv)}
                               className={`rounded-full px-4 py-2 text-xs font-medium transition-all ${
                                 isSel
                                   ? 'bg-[#3A2F2B] text-white shadow-sm'
                                   : 'border border-black/10 bg-[#FAF7F2] text-[#6E645F] hover:text-[#241E1C] hover:border-black/20'
                               }`}
                             >
-                              {srv.name}
+                              {srv}
                             </button>
                           );
                         })}
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2" aria-live="polite">
-                        {(['horse', 'trainer'] as const).map(kind => selection[kind] && <button key={kind} type="button"
-                          disabled={loading} className="rounded-full border border-black/10 bg-[#FAF7F2] px-4 py-2 text-xs font-medium text-[#6E645F]" onClick={() => onRemove(kind)}
-                          aria-label={`Убрать ${kind === 'horse' ? 'лошадь' : 'тренера'}: ${selection[kind]!.name}`}>
-                          {kind === 'horse' ? 'Лошадь' : 'Тренер'}: {selection[kind]!.name} <span aria-hidden="true">×</span>
-                        </button>)}
                       </div>
                     </div>
 
@@ -322,8 +311,6 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                       </label>
                       <textarea
                         id="contact-notes"
-                        aria-invalid={invalidField === 'contact-notes'}
-                        aria-describedby={invalidField === 'contact-notes' ? 'contact-error' : undefined}
                         maxLength={2000}
                         disabled={loading}
                         rows={3}

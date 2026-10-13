@@ -25,7 +25,7 @@ export function InfrastructureSection({ cards }: InfrastructureSectionProps): Re
           <div>
             {/* Медиа контейнер со скруглением */}
             <div className="relative mb-6 aspect-[16/10] w-full overflow-hidden rounded-2xl bg-luxury-surface border border-luxury-border/60">
-              <img loading="lazy" decoding="async"
+              <img
                 src={card.imageUrl}
                 alt={card.title}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"

@@ -1,6 +1,5 @@
 import { usePublicContent } from './usePublicContent';
-import { useState, type ReactElement } from 'react';
-import { scrollToBooking, type BookingSelection, type ChooseBooking } from './booking';
+import type { ReactElement } from 'react';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { ServicesSection } from './components/ServicesSection';
@@ -10,11 +9,6 @@ import { ContactsSection } from './components/ContactsSection';
 
 export default function App(): ReactElement {
   const content = usePublicContent();
-  const [selection, setSelection] = useState<BookingSelection>({});
-  const choose: ChooseBooking = (kind, choice) => {
-    setSelection(previous => ({ ...previous, [kind]: choice }));
-    scrollToBooking();
-  };
   return (
     <div className="min-h-screen bg-[#E4DAD0] text-[#3A2F2B] selection:bg-[#3A2F2B] selection:text-[#E4DAD0] antialiased">
       {/* Умная навигационная капсула (сворачивается в бургер при скролле) */}
@@ -25,19 +19,16 @@ export default function App(): ReactElement {
         <HeroSection />
 
         {/* 2. Тёмная секция услуг с интерактивными парящими предметами */}
-        <ServicesSection services={content.services} onChoose={choose} />
+        <ServicesSection services={content.services} />
 
         {/* 3. Каталог лошадей и тренеров с модальными окнами */}
-        <HorsesAndTrainersSection horses={content.horses} trainers={content.trainers} onChoose={choose} />
+        <HorsesAndTrainersSection horses={content.horses} trainers={content.trainers} />
 
         {/* 4. Блок "Стандарты клуба" (архитектура, еврогрунт, гуманный тренинг) */}
         <ClubStandardsSection />
 
         {/* 5. Премиальный блок контактов с интерактивной формой бронирования */}
-        <ContactsSection services={content.services} selection={selection}
-          onChoose={(kind, choice) => setSelection(previous => ({ ...previous, [kind]: choice }))}
-          onRemove={kind => setSelection(previous => ({ ...previous, [kind]: undefined }))}
-          onReset={() => setSelection({})} />
+        <ContactsSection />
       </main>
 
       {/* Футер */}

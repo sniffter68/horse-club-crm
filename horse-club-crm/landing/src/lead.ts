@@ -1,5 +1,3 @@
-import { API_BASE } from './apiBase';
-
 export function phoneDigits(value: string): string {
   let digits = value.replace(/\D/g, '')
   if (digits.startsWith('8')) digits = '7' + digits.slice(1)
@@ -13,11 +11,12 @@ export function phoneMask(value: string): string {
   return '+7' + (rest ? ' (' + rest.slice(0, 3) : '') + (rest.length >= 3 ? ')' : '')
     + (rest.length > 3 ? ' ' + rest.slice(3, 6) : '') + (rest.length > 6 ? '-' + rest.slice(6, 8) : '') + (rest.length > 8 ? '-' + rest.slice(8, 10) : '')
 }
-export interface LeadPayload { consentAccepted: true; consentVersion: string; name: string; phone: string; direction?: string; serviceId?: string; source: 'landing'; notes?: string }
+export interface LeadPayload { consentAccepted: true; consentVersion: string; name: string; phone: string; direction?: string; source: 'landing'; notes?: string }
 export async function sendLead(payload: LeadPayload): Promise<void> {
+  const base = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '')
   let response: Response
   try {
-    response = await fetch(`${API_BASE}/leads`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(15000) })
+    response = await fetch(`${base}/leads`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(15000) })
   } catch { throw new Error('Не удалось связаться с клубом. Проверьте интернет и попробуйте ещё раз. Если заявка уже отправилась, повтор не создаст второго клиента.') }
   const body: unknown = await response.json().catch(() => null)
   if (!response.ok) {
