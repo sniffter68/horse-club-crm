@@ -1,7 +1,8 @@
+import { PublicationDto } from '../../common/dto/publication.dto';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
-export class CreateServiceDto {
+export class CreateServiceDto extends PublicationDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

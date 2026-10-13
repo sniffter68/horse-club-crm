@@ -1,3 +1,5 @@
+import { handleCatalogImageError } from '../catalogImage';
+import type { PublicService } from '../usePublicContent';
 import { useState, type ReactElement } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -12,50 +14,12 @@ interface ServiceItem {
   badge: string;
 }
 
-const servicesData: ServiceItem[] = [
-  {
-    id: 'dressage',
-    title: 'Выездка',
-    cardTitle: 'Индивидуальные занятия по выездке',
-    desc: 'Выездка — высшая школа верховой езды и настоящее искусство управления лошадью. Отработка правильной посадки, баланса, средств управления и элементов манежной езды под руководством опытного наставника.',
-    price: '3 500 ₽',
-    duration: 'Длительность: 50 минут',
-    image: '/images/services/dressage.png',
-    badge: 'Олимпийский класс',
-  },
-  {
-    id: 'jumping',
-    title: 'Конкур',
-    cardTitle: 'Тренировки по преодолению препятствий',
-    desc: 'Динамичная и зрелищная дисциплина. Обучение расчету темпа, технике прыжка, правильному прохождению маршрутов разной сложности на подготовленных турнирных лошадях.',
-    price: '4 000 ₽',
-    duration: 'Длительность: 60 минут',
-    image: '/images/services/jumping.png',
-    badge: 'Спортивный профиль',
-  },
-  {
-    id: 'trail',
-    title: 'Прогулки',
-    cardTitle: 'Конные маршруты на природе',
-    desc: 'Спокойный отдых верхом по живописным маршрутам Тамбовской области. Идеальный вариант для перезагрузки, знакомства с лошадьми и романтических свиданий.',
-    price: '2 800 ₽',
-    duration: 'Длительность: 1.5 часа',
-    image: '/images/services/trail.png',
-    badge: 'Для любого уровня',
-  },
-  {
-    id: 'photo',
-    title: 'Фотосессии',
-    cardTitle: 'Аренда лошадей для съемок',
-    desc: 'Создайте памятные кадры с грациозными лошадьми клуба. Предоставляем спокойных, ухоженных лошадей, ассистента и доступ к живописным локациям комплекса.',
-    price: '3 000 ₽',
-    duration: 'Длительность: 1 час',
-    image: '/images/services/photo.png',
-    badge: 'Стилизованные съемки',
-  },
-];
-
-export function ServicesSection(): ReactElement {
+export function ServicesSection({ services }: { services: PublicService[] }): ReactElement {
+  const servicesData: ServiceItem[] = services.map(item => ({
+    id: item.id, title: item.title, cardTitle: item.title, desc: item.description,
+    price: item.price, duration: item.durationMinutes ? `Длительность: ${item.durationMinutes} мин` : '',
+    image: item.imageUrl, badge: item.category,
+  }));
   const [activeTab, setActiveTab] = useState<string>(servicesData[0].id);
   const currentService = servicesData.find((s) => s.id === activeTab) || servicesData[0];
 
@@ -80,7 +44,7 @@ export function ServicesSection(): ReactElement {
           {/* Левая колонка */}
           <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-2 sm:-mx-10 sm:px-10 lg:mx-0 lg:col-span-5 lg:flex-col lg:gap-3 lg:overflow-visible lg:px-0 lg:pb-0">
             {servicesData.map((item) => {
-              const isActive = activeTab === item.id;
+              const isActive = currentService.id === item.id;
               return (
                 <button
                   key={item.id}
@@ -135,6 +99,7 @@ export function ServicesSection(): ReactElement {
                     className="flex h-full w-full items-center justify-center"
                   >
                     <img
+                  onError={handleCatalogImageError}
                       src={currentService.image}
                       alt={currentService.title}
                       className="h-full w-full object-contain drop-shadow-[0_20px_25px_rgba(0,0,0,0.45)]"

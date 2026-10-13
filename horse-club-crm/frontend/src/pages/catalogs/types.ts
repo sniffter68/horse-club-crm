@@ -1,3 +1,4 @@
+export interface PublicationValues { isPublic?: boolean; imageUrl?: string | null; description?: string | null; role?: string | null; order?: number }
 export interface ClientValues {
   name?: string; firstName: string; lastName?: string; phone: string; email?: string | null;
   isRider: boolean; isPayer: boolean; preferences?: string; medicalNotes?: string;
@@ -8,7 +9,8 @@ export interface Client extends Omit<ClientValues, 'phone' | 'preferences' | 'me
   vkUserId?: string | null;
   id: string; createdAt: string; phone: string | null; preferences: string | null; medicalNotes?: string | null;
 }
-export interface HorseValues {
+export interface HorseValues extends PublicationValues {
+  maxRiderWeight?: number;
   feedingNotes?: string | null;
   name: string; breed?: string; riderLevel?: string; maxDailyMinutes: number; minRestMinutes: number; isUnavailable: boolean;
 }
@@ -35,13 +37,13 @@ export interface HorseDetails extends Horse {
     client: { id: string; name: string; firstName: string; lastName: string } | null; stall: { id: string; name: string } | null; payments: RelationPayment[] }>;
   bookings: Array<RelationBooking & { client: { id: string; name: string; firstName: string; lastName: string } }>;
 }
-export interface TrainerValues { name: string; phone?: string; qualification?: string; maxDailyLoad: number; baseRate?: number }
+export interface TrainerValues extends PublicationValues { name: string; phone?: string; qualification?: string; maxDailyLoad: number; baseRate?: number }
 export interface Trainer extends Omit<TrainerValues, 'baseRate' | 'phone' | 'qualification'> {
   fullName?: string; specializations?: string[]; isActive?: boolean;
   vkUserId?: string | null;
   id: string; baseRate?: string | number; phone: string | null; qualification: string | null;
 }
-export interface ServiceValues {
+export interface ServiceValues extends PublicationValues {
   name?: string; title: string; durationMinutes: number; maxCapacity: number;
   price?: number; cancellationWindowHours: number; allowMembership: boolean;
 }

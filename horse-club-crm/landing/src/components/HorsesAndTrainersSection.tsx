@@ -1,3 +1,5 @@
+import { handleCatalogImageError } from '../catalogImage';
+import type { PublicHorse, PublicTrainer } from '../usePublicContent';
 import { useState, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactElement } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -33,97 +35,17 @@ interface TrainerItem {
 
 type ModalItem = HorseItem | TrainerItem;
 
-const horsesData: HorseItem[] = [
-  {
-    id: 'h1',
-    type: 'horse',
-    name: 'Гранд Эмир',
-    breed: 'Ганноверская порода',
-    discipline: 'Конкур до 130 см',
-    age: '9 лет',
-    height: '172 см в холке',
-    suit: 'Гнедая',
-    character: 'Мощный, чуткий к средствам управления, надёжный турнирный боец.',
-    fullBio:
-      'Рожден в племенном конном заводе с безупречной конкурной родословной. Отличается мощным техничным прыжком, гибкостью и абсолютным хладнокровием на маршрутах повышенной сложности. Отличный боевой партнер для всадников с опытом.',
-    achievements: ['Призёр кубка Черноземья по конкуру', 'Маршруты 120-130 см без штрафных', 'Лицензированный спортивный паспорт'],
-    image: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    id: 'h2',
-    type: 'horse',
-    name: 'Бельканто',
-    breed: 'Тракененская порода',
-    discipline: 'Выездка (Малый приз)',
-    age: '8 лет',
-    height: '168 см в холке',
-    suit: 'Вороная',
-    character: 'Элегантные природные аллюры, уравновешенный темперамент, идеален для обучения.',
-    fullBio:
-      'Изящный выездковый жеребец с высокой природной каденцией и ритмичной рысью. Прекрасно слышит корпус всадника, чутко реагирует на малейшие полупируэты и боковые движения. Идеален для оттачивания высшей школы верховой езды.',
-    achievements: ['Выполнение норматива Малого Приза', 'Широкая пластичная рысь с выраженным подвисанием', 'Мягкий контакт на поводе'],
-    image: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    id: 'h3',
-    type: 'horse',
-    name: 'Кавалер',
-    breed: 'Голштинская порода',
-    discipline: 'Начальная подготовка и прогулки',
-    age: '11 лет',
-    height: '166 см в холке',
-    suit: 'Серая в яблоках',
-    character: 'Терпеливый, добронравный партнёр для уверенных первых шагов в седле.',
-    fullBio:
-      'Любимец детских групп и начинающих всадников. Отличается редким спокойствием, вниманием к человеку и мягкими диванными аллюрами, на которых легко осваивать учебную рысь и правильное равновесие.',
-    achievements: ['Более 5 лет безопасной работы с новичками', 'Идеален для фотосессий и лесных маршрутов', 'Дружелюбный контактный нрав'],
-    image: 'https://images.unsplash.com/photo-1598974357801-cbca100e6571?auto=format&fit=crop&w=1200&q=80',
-  },
-];
-
-const trainersData: TrainerItem[] = [
-  {
-    id: 't1',
-    type: 'trainer',
-    name: 'Елена Воронова',
-    role: 'Старший тренер по выездке',
-    experience: 'Стаж 14+ лет',
-    qualification: 'Мастер спорта, судья всероссийской категории',
-    quote: '«Гармония в паре начинается с взаимоуважения и правильной базовой посадки».',
-    fullBio:
-      'Выпускница Академии физической культуры и спорта по профилю конного спорта. Подготовила более 20 спортсменов-разрядников и призеров юношеских первенств. Методика строится на бережной биомеханике движения без форсирования.',
-    specialization: ['Выездка уровней от юношеских езд до СП-1', 'Коррекция посадки всадника', 'Подготовка турнирных пар к стартам'],
-    image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    id: 't2',
-    type: 'trainer',
-    name: 'Михаил Селезнёв',
-    role: 'Тренер по конкуру',
-    experience: 'Стаж 11 лет',
-    qualification: 'КМС по конкуру, действующий турнирный всадник',
-    quote: '«Прыжок — это не просто высота, а точный расчет каждого темпа галопа».',
-    fullBio:
-      'Специализируется на скоростных и маршрутных тренировках, расчете траекторий и работе над дистанцией. Учит читать барьеры, спокойно реагировать на закидки и выстраивать ментальное хладнокровие на турнирном поле.',
-    specialization: ['Конкур от кавалетти до высоты 135 см', 'Гимнастика для спортивных лошадей', 'Тактика прохождения маршрутов'],
-    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    id: 't3',
-    type: 'trainer',
-    name: 'Анна Кузнецова',
-    role: 'Инструктор базовой верховой езды',
-    experience: 'Стаж 7 лет',
-    qualification: 'Специалист по адаптивной езде и детским группам',
-    quote: '«Помогаю преодолеть страх и почувствовать лошадь с первой же тренировки».',
-    fullBio:
-      'Отвечает за самый важный этап — первое знакомство с клубом. Благодаря чуткому психологическому подходу мягко снимает мышечные зажимы у новичков, обучает правильному языку тела и технике безопасности на манеже.',
-    specialization: ['Обучение верховой езде с нуля для взрослых и детей от 6 лет', 'Преодоление страха высоты и скорости', 'Посадка на корде'],
-    image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=1200&q=80',
-  },
-];
-
-export function HorsesAndTrainersSection(): ReactElement {
+export function HorsesAndTrainersSection({ horses, trainers }: { horses: PublicHorse[]; trainers: PublicTrainer[] }): ReactElement {
+  const horsesData: HorseItem[] = horses.map(item => ({
+    id: item.id, type: 'horse', name: item.name, breed: item.breed, discipline: item.role,
+    age: '', height: '', suit: '', character: item.description,
+    fullBio: item.description, achievements: [], image: item.imageUrl,
+  }));
+  const trainersData: TrainerItem[] = trainers.map(item => ({
+    id: item.id, type: 'trainer', name: item.name, role: item.role, experience: item.experience,
+    qualification: item.qualification, quote: '', fullBio: item.description,
+    specialization: item.specializations, image: item.imageUrl,
+  }));
   const [tab, setTab] = useState<TabType>('horses');
   const [selectedItem, setSelectedItem] = useState<ModalItem | null>(null);
   const modalTriggerRef = useRef<HTMLButtonElement>(null);
@@ -239,6 +161,7 @@ export function HorsesAndTrainersSection(): ReactElement {
                 >
                   <div className="relative h-72 w-full overflow-hidden">
                     <img
+                  onError={handleCatalogImageError}
                       src={horse.image}
                       alt={horse.name}
                       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
@@ -292,6 +215,7 @@ export function HorsesAndTrainersSection(): ReactElement {
                 >
                   <div className="relative h-72 w-full overflow-hidden">
                     <img
+                  onError={handleCatalogImageError}
                       src={trainer.image}
                       alt={trainer.name}
                       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
@@ -376,6 +300,7 @@ export function HorsesAndTrainersSection(): ReactElement {
               {/* Левая половина: крупная фотография */}
               <div className="relative h-56 w-full shrink-0 overflow-hidden md:h-auto md:w-5/12">
                 <img
+                  onError={handleCatalogImageError}
                   src={selectedItem.image}
                   alt={selectedItem.name}
                   className="h-full w-full object-cover"
@@ -396,12 +321,12 @@ export function HorsesAndTrainersSection(): ReactElement {
 
                   {selectedItem.type === 'trainer' && (
                     <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-[#8C7E77]">
-                      {selectedItem.qualification} · {selectedItem.experience}
+                      {[selectedItem.qualification, selectedItem.experience].filter(Boolean).join(' · ')}
                     </p>
                   )}
 
                   {/* Параметры лошади */}
-                  {selectedItem.type === 'horse' && (
+                  {selectedItem.type === 'horse' && selectedItem.age && (
                     <div className="mt-5 grid grid-cols-3 gap-3 rounded-2xl bg-white/80 p-3.5 border border-black/5 text-center">
                       <div>
                         <span className="block text-[10px] uppercase text-[#8C7E77]">Возраст</span>
@@ -419,24 +344,24 @@ export function HorsesAndTrainersSection(): ReactElement {
                   )}
 
                   {/* Цитата тренера */}
-                  {selectedItem.type === 'trainer' && (
+                  {selectedItem.type === 'trainer' && selectedItem.quote && (
                     <blockquote className="mt-4 rounded-2xl border-l-2 border-[#724C39] bg-white/70 p-4 text-xs italic leading-relaxed text-[#5C4F49]">
                       {selectedItem.quote}
                     </blockquote>
                   )}
 
                   {/* Полный биографический текст */}
-                  <div className="mt-5">
+                  {selectedItem.fullBio && <div className="mt-5">
                     <h4 className="text-[11px] uppercase tracking-wider text-[#8C7E77] font-semibold mb-1.5">
                       {selectedItem.type === 'horse' ? 'Особенности и подготовка' : 'О наставнике'}
                     </h4>
                     <p className="text-xs sm:text-sm leading-relaxed text-[#6E645F]">
                       {selectedItem.fullBio}
                     </p>
-                  </div>
+                  </div>}
 
                   {/* Список достижений / специализаций */}
-                  <div className="mt-5">
+                  {(selectedItem.type === 'horse' ? selectedItem.achievements : selectedItem.specialization).length > 0 && <div className="mt-5">
                     <h4 className="text-[11px] uppercase tracking-wider text-[#8C7E77] font-semibold mb-2">
                       {selectedItem.type === 'horse' ? 'Ключевые преимущества' : 'Специализация'}
                     </h4>
@@ -451,7 +376,7 @@ export function HorsesAndTrainersSection(): ReactElement {
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </div>}
                 </div>
 
                 {/* Нижняя планка с кнопкой записи */}

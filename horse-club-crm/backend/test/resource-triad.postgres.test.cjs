@@ -39,7 +39,7 @@ run('migration preserves membership units, timestamps and original operations, p
   const orphan = await prisma.membership.findUniqueOrThrow({ where: { id: id(8) } });
   assert.equal(orphan.clientId, null); assert.equal(orphan.legacyUnassigned, true);
   assert.equal(await prisma.membershipOp.count(), 3);
-  const transactions = await prisma.ledgerTransaction.findMany({ orderBy: { amount: 'desc' } });
+  const transactions = await prisma.ledgerTransaction.findMany({ where: { membershipId: id(7) }, orderBy: { amount: 'desc' } });
   assert.equal(transactions.length, 2);
   assert.deepEqual(transactions.map(row => [row.transactionType, Number(row.amount)]), [['purchase', 8], ['usage', -1]]);
   assert.equal(transactions[1].bookingId, id(9)); assert.equal(transactions[1].sourceMembershipOpId, id(12));

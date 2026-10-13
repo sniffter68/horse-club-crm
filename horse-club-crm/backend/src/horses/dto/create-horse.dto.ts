@@ -1,8 +1,9 @@
+import { PublicationDto } from '../../common/dto/publication.dto';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { HorseStatus } from '@prisma/client';
 
-export class CreateHorseDto {
+export class CreateHorseDto extends PublicationDto {
   @ApiPropertyOptional({ enum: HorseStatus }) @IsOptional() @IsEnum(HorseStatus) status?: HorseStatus;
   @ApiPropertyOptional({ default: 85 }) @IsOptional() @IsInt() @Min(1) @Max(1000) maxRiderWeight?: number;
   @ApiPropertyOptional({ default: 120 }) @IsOptional() @IsInt() @Min(1) @Max(1440) maxDailyWorkloadMinutes?: number;

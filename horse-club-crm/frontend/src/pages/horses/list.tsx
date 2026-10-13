@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Descriptions, Empty, List, Space, Tag, Typography } from 'antd'
+import { Descriptions, Empty, List, Space, Tabs, Tag, Typography } from 'antd'
 import { money } from '../catalogs/format'
 import { CatalogList } from '../catalogs/shared'
 import type { Horse, HorseDetails } from '../catalogs/types'
@@ -7,10 +7,16 @@ import { dateOnly, dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
 import { QuickBoardingActions } from '../boarding-contracts/quick'
 import { HorseFeeding } from './feeding'
+import { HorseBoardingExpenses } from '../stable/boarding'
+import { VetJournal } from '../stable/vet'
+import { useCatalogPermissions } from '../catalogs/permissions'
+import { HorseStatusEditor } from '../stable/horse-status'
+import { horseStatuses } from '../stable/types'
 
 const healthLabels = { VACCINATION: 'Вакцинация', FARRIER: 'Коваль', DEWORMING: 'Дегельминтизация', INSPECTION: 'Осмотр' }
 
 export function HorseList() {
+  const { canManage } = useCatalogPermissions()
   const [selectedId, setSelectedId] = useState<string>()
   return <>
     <CatalogList<Horse> resource="horses" title="Лошади" columns={[
@@ -26,12 +32,13 @@ export function HorseList() {
       {(horse, ready) => <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'name', label: 'Кличка', children: horse.name },
-          { key: 'status', label: 'Статус', children: <Tag color={horse.isUnavailable ? 'red' : 'green'}>{horse.isUnavailable ? 'Недоступна' : 'Доступна'}</Tag> },
+          { key: 'status', label: 'Статус', children: <Tag className={`crm-tag crm-tag--${horse.status === 'sick' || horse.status === 'quarantine' ? 'danger' : horse.isUnavailable ? 'warning' : 'success'}`}>{horse.status ? horseStatuses[horse.status] : horse.isUnavailable ? 'Недоступна' : 'Доступна'}</Tag> },
           { key: 'breed', label: 'Порода', children: horse.breed || '—' },
           { key: 'level', label: 'Уровень всадника', children: horse.riderLevel || '—' },
           { key: 'load', label: 'Лимит нагрузки', children: `${horse.maxDailyMinutes} мин/день` },
           { key: 'rest', label: 'Минимальный отдых', children: `${horse.minRestMinutes} мин` },
         ]} />
+        {canManage && <HorseStatusEditor horse={horse} />}
         <section><Typography.Title level={5}>Постой</Typography.Title>
           <QuickBoardingActions key={horse.id} context={{ kind: 'HORSE', id: horse.id, name: horse.name, ownerClientId: horse.boardingContracts[0]?.client?.id }}
             contracts={horse.boardingContracts} currentContract={horse.currentBoardingContract} disabled={!ready} />
@@ -42,6 +49,10 @@ export function HorseList() {
           </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Постоя нет" />}
         </section>
         <HorseFeeding key={horse.id} horse={horse} disabled={!ready} />
+        <Tabs destroyOnHidden items={[
+          ...(canManage ? [{ key: 'boarding', label: 'Постой и расходы', children: <HorseBoardingExpenses horseId={horse.id} privateBoarding={Boolean(horse.currentBoardingContract?.client)} /> }] : []),
+          { key: 'vet', label: 'Здоровье и ковка', children: <VetJournal horseId={horse.id} /> },
+        ]} />
         <section><Typography.Title level={5}>Журнал здоровья</Typography.Title>
           {horse.healthLogs.length ? <List dataSource={horse.healthLogs} renderItem={log => <List.Item>
             <Space wrap><Tag>{healthLabels[log.type]}</Tag><span>{dateOnly(log.occurredAt)}</span>

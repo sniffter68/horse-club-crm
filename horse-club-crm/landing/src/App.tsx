@@ -1,3 +1,4 @@
+import { usePublicContent } from './usePublicContent';
 import type { ReactElement } from 'react';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
@@ -7,6 +8,7 @@ import { ClubStandardsSection } from './components/ClubStandardsSection';
 import { ContactsSection } from './components/ContactsSection';
 
 export default function App(): ReactElement {
+  const content = usePublicContent();
   return (
     <div className="min-h-screen bg-[#E4DAD0] text-[#3A2F2B] selection:bg-[#3A2F2B] selection:text-[#E4DAD0] antialiased">
       {/* Умная навигационная капсула (сворачивается в бургер при скролле) */}
@@ -17,10 +19,10 @@ export default function App(): ReactElement {
         <HeroSection />
 
         {/* 2. Тёмная секция услуг с интерактивными парящими предметами */}
-        <ServicesSection />
+        <ServicesSection services={content.services} />
 
         {/* 3. Каталог лошадей и тренеров с модальными окнами */}
-        <HorsesAndTrainersSection />
+        <HorsesAndTrainersSection horses={content.horses} trainers={content.trainers} />
 
         {/* 4. Блок "Стандарты клуба" (архитектура, еврогрунт, гуманный тренинг) */}
         <ClubStandardsSection />

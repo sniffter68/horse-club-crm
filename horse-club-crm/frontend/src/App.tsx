@@ -6,6 +6,7 @@ import { ClientList } from './pages/clients/list'
 import { ClientCreate } from './pages/clients/create'
 import { ClientEdit } from './pages/clients/edit'
 import { HorseList } from './pages/horses/list'
+import { VetCalendarPage } from './pages/stable/vet'
 import { HorseCreate } from './pages/horses/create'
 import { HorseEdit } from './pages/horses/edit'
 import { TrainerList } from './pages/trainers/list'
@@ -72,6 +73,7 @@ const resources: ResourceProps[] = [
   { name: 'users', list: '/users', create: '/users/new', meta: { label: 'Пользователи' } },
   { name: 'cash-desk', list: '/cash-desk', meta: { label: 'Касса' } },
   { name: 'payments', list: '/payments', meta: { label: 'Оплаты' } },
+  { name: 'vet', list: '/vet', meta: { label: 'Ветеринарный журнал' } },
 ]
 function LoadingPage() {
   return <div className="loading-page"><Spin size="large" aria-label="Загрузка" /></div>
@@ -182,6 +184,7 @@ export default function App() {
                 <Route path="users"><Route index element={<UserList />} /><Route path="new" element={<UserCreate />} /></Route>
                 <Route path="cash-desk" element={<CashDeskPage />} />
                 <Route path="payments" element={<PaymentList />} />
+                <Route path="vet" element={<VetCalendarPage />} />
                 <Route path="*" element={<Result status="404" title="404" subTitle="Страница не найдена" />} />
               </Route>
               <Route element={<Authenticated key="public" fallback={<Outlet />} loading={<LoadingPage />}><Navigate to="/" replace /></Authenticated>}>

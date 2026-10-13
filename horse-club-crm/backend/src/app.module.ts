@@ -1,5 +1,7 @@
+import { PublicModule } from './public/public.module';
 import { Module } from '@nestjs/common';
 import { BookingsModule } from './bookings/bookings.module';
+import { BoardingModule } from './boarding/boarding.module';
 import { LeadsModule } from './leads/leads.module';
 import { VkBotModule } from './vk-bot/vk-bot.module';
 import { AuthModule } from './auth/auth.module';
@@ -25,7 +27,9 @@ import { DashboardModule } from './dashboard/dashboard.module';
 @Module({
   imports: [
     BookingsModule,
+    BoardingModule,
     LeadsModule,
+    PublicModule,
     VkBotModule,
     PrismaModule,
     CommonModule,

@@ -39,6 +39,8 @@
 | Toast | Ant Design App notification/message | app provider | success / warning / info / error | live region/browser |
 | CRUD | Refine resources and shared catalog wrappers | route/resource definitions | return-to-list | full-flow E2E |
 
+Publication fields for horses, trainers and services reuse `frontend/src/pages/catalogs/PublicationFields.tsx` inside the existing Ant Design/Refine catalog form. HTTP(S) photo URLs receive inline validation; clearing the field saves `null`. Publication, description, role and order follow the same save/error/navigation behavior as other catalog fields. Source: `docs/public-landing-content.md`; verification: `frontend/e2e/public-content.spec.ts`.
+
 ## Component behavior
 
 | Component | Default | Hover | Focus | Active | Disabled | Busy | Error |

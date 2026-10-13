@@ -52,7 +52,7 @@ export function ClientLedger({ clientId }: { clientId: string }) {
     queryOptions: { retry: false },
   })
   return <div className="client-ledger">
-    <Typography.Paragraph type="secondary">Операции по всем абонементам клиента. Время московское.</Typography.Paragraph>
+    <Typography.Paragraph type="secondary">Операции по абонементам и постою клиента. Время московское.</Typography.Paragraph>
     <Button style={{ marginBottom: 16 }} loading={tableQuery.isFetching} onClick={() => void tableQuery.refetch()}>
       {tableQuery.error ? 'Повторить' : 'Обновить'}
     </Button>
@@ -69,7 +69,7 @@ export function ClientLedger({ clientId }: { clientId: string }) {
           { key: 'reason', title: 'Комментарий / тренировка', render: (_: unknown, row) => <>
             <div>{row.reason || 'Без комментария'}</div>
             {row.lesson && <div>{dateTime(row.lesson.startTime)} · {row.lesson.service.title || row.lesson.service.name}</div>}
-            <Typography.Text type="secondary">{row.membership?.title || row.membership?.pricingPlan?.name || 'Индивидуальный абонемент'}</Typography.Text>
+            <Typography.Text type="secondary">{row.membership?.title || row.membership?.pricingPlan?.name || (row.unit === 'RUB' ? 'Рублёвый счёт' : 'Индивидуальный абонемент')}</Typography.Text>
           </> },
         ]} />}
   </div>
