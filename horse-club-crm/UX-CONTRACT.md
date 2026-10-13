@@ -39,7 +39,7 @@
 | Toast | Ant Design App notification/message | app provider | success / warning / info / error | live region/browser |
 | CRUD | Refine resources and shared catalog wrappers | route/resource definitions | return-to-list | full-flow E2E |
 
-Publication fields for horses, trainers and services reuse `frontend/src/pages/catalogs/PublicationFields.tsx` inside the existing Ant Design/Refine catalog form. HTTP(S) photo URLs receive inline validation; clearing the field saves `null`. Publication, description, role and order follow the same save/error/navigation behavior as other catalog fields. Source: `docs/public-landing-content.md`; verification: `frontend/e2e/public-content.spec.ts`.
+Publication fields for horses, trainers and services reuse `frontend/src/pages/catalogs/PublicationFields.tsx` inside the existing Ant Design/Refine catalog form. HTTP(S) photo URLs and uploaded `/uploads/<uuid>.<extension>` paths receive inline validation; clearing the field saves `null`. The shared `ImageUploadField` uses native file selection, Ant Design Button/Image and persistent inline errors. Upload is immediate; save waits for completion. Failure/cancellation preserves the previous URL; retry can select the same file. Unmount aborts the request. Publication, description, role and order follow the same save/error/navigation behavior as other catalog fields. Source: `docs/public-landing-content.md`, `docs/image-uploads.md`; verification: `frontend/e2e/public-content.spec.ts`.
 
 ## Component behavior
 

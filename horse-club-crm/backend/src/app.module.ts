@@ -1,4 +1,5 @@
 import { PublicModule } from './public/public.module';
+import { UploadModule } from './upload/upload.module';
 import { Module } from '@nestjs/common';
 import { BookingsModule } from './bookings/bookings.module';
 import { BoardingModule } from './boarding/boarding.module';
@@ -26,6 +27,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
+    UploadModule,
     BookingsModule,
     BoardingModule,
     LeadsModule,

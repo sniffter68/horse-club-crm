@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, isURL, Max, MaxLength, Min, ValidateBy } from 'class-validator';
 
 export class PublicationDto {
   @ApiPropertyOptional({ default: true })
@@ -9,7 +9,13 @@ export class PublicationDto {
 
   @ApiPropertyOptional({ nullable: true })
   @Transform(({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() || null : value)
-  @IsOptional() @IsUrl({ protocols: ['http', 'https'], require_protocol: true }) @MaxLength(2048)
+  @IsOptional() @ValidateBy({ name: 'imageUrl', validator: {
+    validate: (value: unknown) => typeof value === 'string' && (
+      /^\/uploads\/[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/.test(value)
+      || isURL(value, { protocols: ['http', 'https'], require_protocol: true })
+    ),
+    defaultMessage: () => 'imageUrl must be an HTTP(S) URL or an uploaded image path',
+  } }) @MaxLength(2048)
   imageUrl?: string | null;
 
   @ApiPropertyOptional({ nullable: true })

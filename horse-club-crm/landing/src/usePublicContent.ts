@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { catalogPlaceholder } from './catalogImage';
+import { resolveCatalogImage } from './catalogImage';
 import { landingData, type HorseCard, type TrainerCard, type ServiceItem } from './data/landingContent';
 
 export interface PublicHorse extends HorseCard { description: string }
@@ -21,8 +21,7 @@ function rows(value: unknown): Row[] {
 }
 function text(value: unknown): string { return typeof value === 'string' ? value.trim() : ''; }
 function photo(value: unknown): string {
-  const url = text(value);
-  return /^https?:\/\//i.test(url) ? url : catalogPlaceholder;
+  return resolveCatalogImage(value);
 }
 
 export function parsePublicContent(value: unknown): PublicContent {
@@ -58,7 +57,7 @@ export function usePublicContent(): PublicContent {
   useEffect(() => {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8000);
-    const base = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '');
+    const base = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '');
     void fetch(`${base}/public/content`, { signal: controller.signal, credentials: 'omit' })
       .then(response => { if (!response.ok) throw new Error('Content unavailable'); return response.json() as Promise<unknown>; })
       .then(data => { if (!controller.signal.aborted) setContent(parsePublicContent(data)); })

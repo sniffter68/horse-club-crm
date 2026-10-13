@@ -67,6 +67,8 @@ services:
       migrate: { condition: service_completed_successfully }
     networks: [crm_network]
     read_only: true
+    volumes:
+      - backend_uploads:/app/uploads
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
@@ -100,6 +102,7 @@ services:
 networks:
   crm_network:
 volumes:
+  backend_uploads:
   postgres_data:
   caddy_data:
   caddy_config:

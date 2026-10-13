@@ -58,8 +58,10 @@ test('all catalog create/update DTOs accept publication fields, validate photos 
       const result = await pipe.transform(input, meta);
       assert.equal(result.isPublic, false);
       assert.equal(result.imageUrl, input.imageUrl);
+      const uploaded = '/uploads/65ecf169-6c22-4e89-8baf-ddc3399da7ad.png';
+      assert.equal((await pipe.transform({ ...input, imageUrl: uploaded }, meta)).imageUrl, uploaded);
       assert.equal((await pipe.transform({ ...input, imageUrl: '' }, meta)).imageUrl, null);
-      for (const imageUrl of ['javascript:alert(1)', '/relative.jpg', 'not a URL']) {
+      for (const imageUrl of ['javascript:alert(1)', '/relative.jpg', 'not a URL', '/uploads/../secret.png', '/uploads/file.svg', '//evil.example/photo.png']) {
         await assert.rejects(pipe.transform({ ...input, imageUrl }, meta));
       }
       await assert.rejects(pipe.transform({ ...input, order: -1 }, meta));

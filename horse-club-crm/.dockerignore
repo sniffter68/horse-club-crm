@@ -12,3 +12,4 @@ backups
 landing
 frontend
 .tmp
+**/uploads

@@ -1,5 +1,29 @@
 import { expect, test } from '@playwright/test';
 
+test('resolves uploaded photos against the API origin and displays them in all catalog sections', async ({ page }) => {
+  const photo = '/uploads/65ecf169-6c22-4e89-8baf-ddc3399da7ad.png';
+  await page.route('**/api/public/content', route => route.fulfill({ json: {
+    horses: content.horses.map(item => ({ ...item, imageUrl: photo })),
+    trainers: content.trainers.map(item => ({ ...item, imageUrl: photo })),
+    services: content.services.map(item => ({ ...item, imageUrl: photo })),
+  } }));
+  await page.route('**/uploads/*', route => route.fulfill({ contentType: 'image/png',
+    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWuoAAAAASUVORK5CYII=', 'base64') }));
+  await page.goto('/');
+  await expect(page.locator('#services img').first()).toHaveAttribute('src', photo);
+  await expect(page.locator('#horses-trainers img').first()).toHaveAttribute('src', photo);
+  await page.locator('#horses-trainers').getByRole('button', { name: 'Тренеры', exact: true }).click();
+  await expect(page.locator('#horses-trainers img').first()).toHaveAttribute('src', photo);
+  const urls = await page.evaluate(async (path) => {
+    // Vite serves the actual application module; no duplicate resolver in the test.
+    const modulePath = '/src/catalogImage.ts';
+    const { resolveCatalogImage } = await import(/* @vite-ignore */ modulePath);
+    return [resolveCatalogImage(path, 'https://api.example.com/api'), resolveCatalogImage(path, '/api'),
+      resolveCatalogImage('https://cdn.example.com/photo.jpg'), resolveCatalogImage('//evil.example/photo.jpg')];
+  }, photo);
+  expect(urls).toEqual([`https://api.example.com${photo}`, photo, 'https://cdn.example.com/photo.jpg', '/images/catalog-placeholder.svg']);
+});
+
 const content = {
   horses: [{ id: 'horse-1', name: 'Лошадь из CRM', breed: 'Орловская', role: 'Для начинающих', description: 'Описание лошади из базы', imageUrl: null }],
   trainers: [{ id: 'trainer-1', name: 'Тренер из CRM', role: 'Инструктор', description: 'Биография из базы', qualification: 'КМС', specializations: ['Конкур'], imageUrl: null }],

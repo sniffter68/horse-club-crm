@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { useState } from 'react'
+import { CatalogFormActivity } from './CatalogFormActivity'
 import { type BaseRecord, type HttpError } from '@refinedev/core'
 import { Create, Edit, List, EditButton, DeleteButton, useForm, useTable } from '@refinedev/antd'
 import { Alert, Button, Checkbox, Form, Input, InputNumber, Result, Space, Spin, type TableColumnsType } from 'antd'
@@ -52,18 +54,19 @@ export function CatalogForm<T extends BaseRecord, V extends object>({ resource, 
 function WritableCatalogForm<T extends BaseRecord, V extends object>({ resource, action, title, defaults, toPayload, children }: {
   resource: string; action: 'create' | 'edit'; title: string; defaults?: Partial<V>; toPayload?: (values: V) => V; children: ReactNode
 }) {
+  const [uploading, setUploading] = useState(false)
   const { formProps, saveButtonProps, formLoading, query } = useForm<T, HttpError, V>({ resource, action, redirect: 'list',
     queryOptions: { retry: (count, error) => (error.statusCode === 0 || error.statusCode >= 500) && count < 2 },
   })
   const Wrapper = action === 'create' ? Create : Edit
-  return <Wrapper title={title} isLoading={formLoading} canDelete={false}
-    saveButtonProps={{ ...saveButtonProps, children: 'Сохранить', 'aria-label': 'Сохранить', disabled: saveButtonProps.disabled || !!query?.error }}>
+  return <CatalogFormActivity.Provider value={setUploading}><Wrapper title={title} isLoading={formLoading} canDelete={false}
+    saveButtonProps={{ ...saveButtonProps, children: 'Сохранить', 'aria-label': 'Сохранить', disabled: saveButtonProps.disabled || !!query?.error || uploading }}>
     {query?.error ? <Alert type="error" showIcon message="Не удалось загрузить запись" description={query.error.message} /> :
-      <Form<V> {...formProps} noValidate onFinish={values => formProps.onFinish?.(toPayload ? toPayload(values) : values)} layout="vertical" style={{ maxWidth: 720 }}
+      <Form<V> {...formProps} noValidate onFinish={values => !uploading && formProps.onFinish?.(toPayload ? toPayload(values) : values)} layout="vertical" style={{ maxWidth: 720 }}
         initialValues={action === 'create' ? defaults : formProps.initialValues}>
         {children}
       </Form>}
-  </Wrapper>
+  </Wrapper></CatalogFormActivity.Provider>
 }
 
 export function TextField({ name, label, required = false, max = 150, multiline = false, email = false }: {
