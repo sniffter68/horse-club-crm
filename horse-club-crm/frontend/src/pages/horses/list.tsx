@@ -53,7 +53,7 @@ export function HorseList() {
         <HorseFeeding key={horse.id} horse={horse} disabled={!ready} />
         <Tabs destroyOnHidden items={[
           ...(canManage ? [{ key: 'boarding', label: 'Постой и расходы', children: <HorseBoardingExpenses horseId={horse.id} privateBoarding={Boolean(horse.currentBoardingContract?.client)} /> }] : []),
-          { key: 'vet', label: 'Здоровье и ковка', children: <VetJournal horseId={horse.id} /> },
+          { key: 'vet', label: 'Здоровье и ковка', children: <VetJournal key={horse.id} horseId={horse.id} /> },
         ]} />
         <section><Typography.Title level={5}>Журнал здоровья</Typography.Title>
           {horse.healthLogs.length ? <List dataSource={horse.healthLogs} renderItem={log => <List.Item>

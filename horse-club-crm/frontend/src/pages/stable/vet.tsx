@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSelect } from '@refinedev/antd'
 import { useSearchParams } from 'react-router-dom'
-import { Button, DatePicker, Form, Input, List, Select, Space, Tag, Typography } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, List, Select, Space, Tag, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import 'dayjs/locale/ru'
 import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
@@ -13,7 +13,9 @@ import type { Horse } from '../catalogs/types'
 import { CLUB_TIME_ZONE, toInstant } from '../schedule/time'
 import { StableEntryModal, StableListState } from './shared'
 import { useStableList } from './useStableList'
-import { vetTypes, type VetEvent, type VetType } from './types'
+import { stablePagination } from './pagination'
+import { isHorseUuid } from './horseId'
+import { vetTypeForApi, vetTypes, type VetEvent, type VetType } from './types'
 
 const typeOptions = Object.entries(vetTypes).map(([value, label]) => ({ value, label }))
 type VetValues = { horseId: string; type: VetType; eventDate: Dayjs; nextDueDate?: Dayjs; status: 'scheduled' | 'completed'; performedBy?: string; notes?: string }
@@ -29,12 +31,13 @@ export function VetEntry({ horseId, event, onClose, onSaved }: { horseId?: strin
     save={values => {
       const details = { nextDueDate: values.nextDueDate ? instant(values.nextDueDate) : undefined, performedBy: values.performedBy, notes: values.notes }
       return event ? httpClient.patch(`${API_URL}/vet/events/${event.id}/complete`, details)
-        : httpClient.post(`${API_URL}/vet/events`, { ...details, horseId: horseId || values.horseId, type: values.type,
+        : httpClient.post(`${API_URL}/vet/events`, { ...details, horseId: horseId || values.horseId, type: vetTypeForApi(values.type),
           eventDate: values.status === 'completed' && values.eventDate.isSame(today, 'day') ? new Date().toISOString() : instant(values.eventDate), status: values.status })
     }}>
     {event ? <Typography.Paragraph>Процедура будет отмечена выполненной сейчас. Укажите следующую дату, чтобы она появилась в календаре.</Typography.Paragraph> : <>
       {!horseId && <Form.Item name="horseId" label="Лошадь" rules={[{ required: true, message: 'Выберите лошадь' }]}><Select {...selectProps} showSearch optionFilterProp="label" /></Form.Item>}
-      <Form.Item name="type" label="Процедура" initialValue="shoeing" rules={[{ required: true }]}><Select options={typeOptions} /></Form.Item>
+      <Form.Item name="type" label="Процедура" initialValue="shoeing" rules={[{ required: true, message: 'Выберите процедуру' },
+        { type: 'enum', enum: Object.keys(vetTypes), message: 'Выберите процедуру из списка' }]}><Select aria-label="Процедура" options={typeOptions} /></Form.Item>
       <Form.Item name="status" label="Состояние" initialValue="scheduled"><Select options={[{ value: 'scheduled', label: 'Запланирована' }, { value: 'completed', label: 'Уже выполнена' }]} /></Form.Item>
       <Form.Item name="eventDate" label="Дата процедуры (Москва)" initialValue={today} rules={[{ required: true, message: 'Укажите дату' }]}>
         <DatePicker locale={ruDatePicker} format="DD.MM.YYYY" style={{ width: '100%' }} />
@@ -46,28 +49,39 @@ export function VetEntry({ horseId, event, onClose, onSaved }: { horseId?: strin
   </StableEntryModal>
 }
 
-export function VetJournal({ horseId }: { horseId?: string }) {
+export function VetJournal({ horseId, scope = 'horse' }: { horseId?: string; scope?: 'horse' | 'all' }) {
+  const horseScoped = scope === 'horse'
+  const validHorseId = isHorseUuid(horseId)
   const { canManage } = useCatalogPermissions()
   const [search, setSearch] = useSearchParams()
   const [horsePage, setHorsePage] = useState(1)
   const [horseType, setHorseType] = useState<VetType>()
   const [showHistory, setShowHistory] = useState(false)
   const [editor, setEditor] = useState<VetEvent | 'new'>()
-  const type = horseId ? horseType : (search.get('type') && search.get('type')! in vetTypes ? search.get('type') as VetType : undefined)
-  const page = horseId ? horsePage : Math.max(1, Number(search.get('page')) || 1)
-  const setPage = (next: number) => { if (horseId) setHorsePage(next); else setSearch(previous => { previous.set('page', String(next)); return previous }) }
-  const params = new URLSearchParams({ limit: '20', offset: String((page - 1) * 20) })
-  if (horseId) params.set('horseId', horseId)
+  const type = horseScoped ? horseType : (search.get('type') && search.get('type')! in vetTypes ? search.get('type') as VetType : undefined)
+  const { page, offset, limit } = stablePagination(horseScoped ? horsePage : search.get('page'))
+  const setPage = (next: number) => {
+    const safePage = stablePagination(next).page
+    if (horseScoped) setHorsePage(safePage)
+    else setSearch(previous => { previous.set('page', String(safePage)); return previous })
+  }
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+  if (horseScoped && validHorseId) params.set('horseId', horseId)
   if (type) params.set('type', type)
-  const query = useStableList<VetEvent>(`vet/${horseId || showHistory ? 'events' : 'upcoming'}?${params}`)
+  const query = useStableList<VetEvent>(`vet/${horseScoped || showHistory ? 'events' : 'upcoming'}?${params}`, {
+    enabled: !horseScoped || validHorseId, horseIdRequired: horseScoped,
+  })
+  if (horseScoped && !validHorseId) return <section aria-label="Здоровье и ковка" className="stable-section">
+    <Alert type="info" showIcon message="Журнал здоровья недоступен" description="Дождитесь загрузки карточки лошади. Если журнал не появился, обновите карточку: требуется корректный идентификатор лошади." />
+  </section>
   return <section aria-label="Здоровье и ковка" className="stable-section">
     <Space wrap>
       <Select aria-label="Тип процедуры" placeholder="Все процедуры" allowClear value={type} style={{ minWidth: 160 }} options={typeOptions}
         onChange={(next: VetType | undefined) => {
-          if (horseId) { setHorseType(next); setHorsePage(1) }
+          if (horseScoped) { setHorseType(next); setHorsePage(1) }
           else setSearch(previous => { if (next) previous.set('type', next); else previous.delete('type'); previous.delete('page'); return previous })
         }} />
-      {!horseId && <Select aria-label="Период веткалендаря" value={showHistory ? 'history' : 'upcoming'} style={{ minWidth: 190 }}
+      {!horseScoped && <Select aria-label="Период веткалендаря" value={showHistory ? 'history' : 'upcoming'} style={{ minWidth: 190 }}
         options={[{ value: 'upcoming', label: 'Просрочено и 14 дней' }, { value: 'history', label: 'Все процедуры' }]}
         onChange={value => { setShowHistory(value === 'history'); setPage(1) }} />}
       {canManage && <Button type="primary" onClick={() => setEditor('new')}>Добавить процедуру</Button>}
@@ -90,5 +104,5 @@ export function VetJournal({ horseId }: { horseId?: string }) {
 
 export function VetCalendarPage() {
   return <div className="stable-dashboard"><Typography.Title level={2}>Ветеринарный журнал</Typography.Title>
-    <Typography.Paragraph>Ближайшие процедуры и просроченные назначения по всей конюшне.</Typography.Paragraph><VetJournal /></div>
+    <Typography.Paragraph>Ближайшие процедуры и просроченные назначения по всей конюшне.</Typography.Paragraph><VetJournal scope="all" /></div>
 }
