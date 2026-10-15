@@ -223,6 +223,9 @@ test('quick boarding HTTP endpoints validate dates and restrict changes to ADMIN
   const { RolesGuard } = require('../dist/auth/guards/roles.guard');
   const calls = [];
   const module = await Test.createTestingModule({ controllers: [BoardingContractsController], providers: [RolesGuard,
+    { provide: require('../dist/auth/role-access.service').RoleAccessService, useValue: {
+      permissions: async role => require('../dist/auth/role-access').defaultRolePermissions(role),
+    } },
     { provide: BoardingContractsService, useValue: {
       availability: async value => { calls.push(value); return { horses: [], stalls: [] }; },
       terminate: async value => { calls.push(value); return { id: value, status: 'TERMINATED' }; },

@@ -12,6 +12,8 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingsService } from './bookings.service';
 import { BookingLifecycleService } from './booking-lifecycle.service';
 import { CancelBookingDto } from './dto/cancel-booking.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthUser } from '../auth/auth.types';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
@@ -27,12 +29,15 @@ export class BookingsController {
     return result.data;
   }
   @Get(':id/available-horses')
-  @Roles(Role.ADMIN, Role.MANAGER)
-  availableHorses(@Param('id', new ParseUUIDPipe()) id: string) { return this.bookings.availableHorses(id); }
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  availableHorses(@Param('id', new ParseUUIDPipe()) id: string, @CurrentUser() user: AuthUser) { return this.bookings.availableHorses(id, user); }
+  @Get(':id/horse-history')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  horseHistory(@Param('id', new ParseUUIDPipe()) id: string, @CurrentUser() user: AuthUser) { return this.bookings.horseHistory(id, user); }
   @Patch(':id/horse')
-  @Roles(Role.ADMIN, Role.MANAGER)
-  replaceHorse(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: ReplaceHorseDto) {
-    return this.bookings.replaceHorse(id, dto.horseId, dto.reason);
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  replaceHorse(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: ReplaceHorseDto, @CurrentUser() user: AuthUser) {
+    return this.bookings.replaceHorse(id, dto.horseId, dto.reason, user);
   }
   @Patch(':id/complete')
   @Roles(Role.ADMIN, Role.MANAGER)

@@ -1,6 +1,6 @@
 import type { User } from '@prisma/client';
 
-export type AuthUser = Pick<User, 'id' | 'email' | 'role'>;
+export type AuthUser = Pick<User, 'id' | 'email' | 'role'> & { trainerId?: string | null };
 
 export interface JwtPayload {
   sub: User['id'];

@@ -5,6 +5,7 @@ import type { Response } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { RequirePermission, RoleAccessGuard } from '../auth/role-access.guard';
 import { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { setRefineTotalHeaders } from '../common/refine';
 import { CreateStallDto } from './dto/create-stall.dto';
@@ -13,7 +14,8 @@ import { StallsService, type StallWithContracts } from './stalls.service';
 
 @ApiTags('Stalls')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard)
+@RequirePermission('boardingAccess')
 @Controller('stalls')
 export class StallsController {
   constructor(private readonly service: StallsService) {}

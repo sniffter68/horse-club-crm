@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { BookingServiceType, Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { parseRefineQuery } from '../common/refine';
@@ -9,6 +9,8 @@ import { BookingRulesService } from './booking-rules.service';
 import { BookingValidationError } from './booking-validation.error';
 import type { CreateBookingDto } from './dto/create-booking.dto';
 import { queueTrainingConfirmation } from '../vk-bot/vk-training-notifications';
+import type { AuthUser } from '../auth/auth.types';
+import { assertHorseReplacement, defaultRolePermissions } from '../auth/role-access';
 
 const trainingTypes: Record<BookingServiceType, string> = {
   dressage: 'Выездка', jumping: 'Конкур', walks: 'Прогулка', beginners: 'Начальная подготовка',
@@ -33,16 +35,27 @@ export class BookingsService {
       this.prisma.booking.count({ where }),
       this.prisma.booking.findMany({ where, skip: paging.skip, take: paging.take, orderBy: [{ startTime: 'asc' }, { id: 'asc' }],
         include: { horse: true, client: { select: { id: true, name: true, firstName: true, lastName: true } },
-          lesson: { select: { startTime: true, endTime: true } } } }),
+          lesson: { select: { startTime: true, endTime: true, trainerId: true } } } }),
     ]);
-    return { total, data: bookings.map(b => ({ id: b.id, horseId: b.horseId, horseName: b.horse?.name,
+    return { total, data: bookings.map(b => ({ id: b.id, horseId: b.horseId, horseName: b.horse?.name, trainerId: b.lesson?.trainerId ?? b.trainerId,
       client: b.client, startTime: b.lesson?.startTime ?? b.startTime, endTime: b.lesson?.endTime ?? b.endTime })) };
   }
 
-  private async replacementInput(tx: Prisma.TransactionClient, id: string, horseId: string) {
+  private async authorizeReplacement(tx: Prisma.TransactionClient, actor: AuthUser, trainerId: string) {
+    const permissions = actor?.role === 'TRAINER'
+      ? await tx.roleAccess.findUnique({ where: { role: 'TRAINER' } }) ?? defaultRolePermissions('TRAINER')
+      : defaultRolePermissions(actor?.role);
+    // Read the current account binding inside the transaction, never from request body.
+    const current = actor?.role === 'TRAINER' ? await tx.user.findUnique({ where: { id: actor.id }, select: { trainerId: true } }) : null;
+    if (actor?.role === 'TRAINER' && !current) throw new ForbiddenException('Вы можете заменять лошадей только в своих занятиях');
+    assertHorseReplacement(actor?.role === 'TRAINER' ? { ...actor, trainerId: current?.trainerId ?? null } : actor, trainerId, permissions);
+  }
+
+  private async replacementInput(tx: Prisma.TransactionClient, id: string, horseId: string, actor: AuthUser) {
     const booking = await tx.booking.findUnique({ where: { id }, include: { lesson: { include: { bookings: true } } } });
     if (!booking) throw new NotFoundException('Бронирование не найдено');
     const lesson = booking.lesson;
+    await this.authorizeReplacement(tx, actor, lesson?.trainerId ?? booking.trainerId);
     const start = lesson?.startTime ?? booking.startTime;
     const end = lesson?.endTime ?? booking.endTime;
     if ((lesson ? lesson.status !== 'SCHEDULED' : booking.status !== 'scheduled') || start <= new Date()) {
@@ -57,17 +70,17 @@ export class BookingsService {
       excludeLessonId: lesson?.id, existingRiders: lesson ? lesson.bookings.length - 1 : 0, requireRiderWeight: true };
   }
 
-  async availableHorses(id: string) {
+  async availableHorses(id: string, actor: AuthUser) {
     return this.prisma.$transaction(async tx => {
       const booking = await tx.booking.findUnique({ where: { id } });
       if (!booking) throw new NotFoundException('Бронирование не найдено');
+      await this.replacementInput(tx, id, booking.horseId ?? '', actor);
       const horses = await tx.horse.findMany({ where: { status: 'active', isUnavailable: false, id: { not: booking.horseId ?? undefined } }, orderBy: { name: 'asc' } });
       const available: typeof horses = [];
       // Check the record even when no active alternatives exist.
-      await this.replacementInput(tx, id, booking.horseId ?? '');
       for (const horse of horses) {
         try {
-          await this.rules.validate(tx, { ...await this.replacementInput(tx, id, horse.id), lockResources: false });
+          await this.rules.validate(tx, { ...await this.replacementInput(tx, id, horse.id, actor), lockResources: false });
           available.push(horse);
         } catch (error) {
           if (!(error instanceof BookingValidationError)) throw error;
@@ -78,12 +91,17 @@ export class BookingsService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, maxWait: 5000, timeout: 10000 });
   }
 
-  async replaceHorse(id: string, horseId: string, reason?: string) {
+  async replaceHorse(id: string, horseId: string, reason: string | undefined, actor: AuthUser) {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         return await this.prisma.$transaction(async tx => {
-          await this.rules.validate(tx, await this.replacementInput(tx, id, horseId));
-          return tx.booking.update({ where: { id }, data: { horseId, horseChangeReason: reason?.trim() || null } });
+          const previous = await tx.booking.findUnique({ where: { id } });
+          const oldHorseId = previous?.horseId ?? null;
+          await this.rules.validate(tx, await this.replacementInput(tx, id, horseId, actor));
+          const updated = await tx.booking.update({ where: { id }, data: { horseId, horseChangeReason: reason?.trim() || null } });
+          await tx.bookingHorseChange.create({ data: { bookingId: id, actorUserId: actor.id,
+            oldHorseId, newHorseId: horseId, reason: reason?.trim() || null } });
+          return updated;
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 10000 });
       } catch (error: unknown) {
         if (!isSerializationFailure(error)) throw error;
@@ -91,6 +109,15 @@ export class BookingsService {
       }
     }
     throw new BookingValidationError('BOOKING_CONTENTION', 'Повторите замену');
+  }
+
+  async horseHistory(id: string, actor: AuthUser) {
+    return this.prisma.$transaction(async tx => {
+      const booking = await tx.booking.findUnique({ where: { id }, include: { lesson: { select: { trainerId: true } } } });
+      if (!booking) throw new NotFoundException('Бронирование не найдено');
+      await this.authorizeReplacement(tx, actor, booking.lesson?.trainerId ?? booking.trainerId);
+      return tx.bookingHorseChange.findMany({ where: { bookingId: id }, orderBy: [{ changedAt: 'desc' }, { id: 'asc' }], take: 100 });
+    });
   }
 
   async createBooking(dto: CreateBookingDto) {
@@ -135,7 +162,7 @@ export class BookingsService {
             trainingType: trainingTypes[dto.serviceType], participants: [{ client: created.client, horse: created.horse }],
           });
           // Keep the API response unchanged; included profiles contain BigInt VK IDs.
-          const { trainer, client, horse, ...booking } = created;
+          const { trainer: _trainer, client: _client, horse: _horse, ...booking } = created;
           return booking;
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 10000 });
       } catch (error: unknown) {

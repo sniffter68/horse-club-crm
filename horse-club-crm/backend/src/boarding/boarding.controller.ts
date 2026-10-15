@@ -7,8 +7,9 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { BoardingBillingService, BoardingServicesService } from './boarding.service';
 import { VetCalendarService } from './vet-calendar.service';
 import { BoardingQueryDto, CompleteVetEventDto, CreateBoardingLogDto, CreateVetEventDto, VetQueryDto } from './boarding.dto';
+import { RequirePermission, RoleAccessGuard } from '../auth/role-access.guard';
 
-@ApiTags('Boarding') @ApiBearerAuth() @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Boarding') @ApiBearerAuth() @UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard) @RequirePermission('boardingAccess')
 @Roles(Role.ADMIN, Role.MANAGER) @Controller('boarding')
 export class BoardingServicesController {
   constructor(private readonly service: BoardingServicesService, private readonly billing: BoardingBillingService) {}
@@ -20,7 +21,7 @@ export class BoardingServicesController {
   @Post('billing/monthly') @Roles(Role.ADMIN) bill() { return this.billing.triggerMonthlyBoardingBilling(); }
 }
 
-@ApiTags('Veterinary calendar') @ApiBearerAuth() @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Veterinary calendar') @ApiBearerAuth() @UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard) @RequirePermission('healthRead')
 @Controller('vet')
 export class VetCalendarController {
   constructor(private readonly service: VetCalendarService) {}
@@ -28,8 +29,8 @@ export class VetCalendarController {
   upcoming(@Query() query: VetQueryDto) { return this.service.list(query, true); }
   @Get('events') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
   list(@Query() query: VetQueryDto) { return this.service.list(query); }
-  @Post('events') @Roles(Role.ADMIN, Role.MANAGER)
+  @Post('events') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER) @RequirePermission('healthWrite')
   create(@Body() dto: CreateVetEventDto) { return this.service.create(dto); }
-  @Patch('events/:id/complete') @Roles(Role.ADMIN, Role.MANAGER)
+  @Patch('events/:id/complete') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER) @RequirePermission('healthWrite')
   complete(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CompleteVetEventDto) { return this.service.complete(id, dto); }
 }

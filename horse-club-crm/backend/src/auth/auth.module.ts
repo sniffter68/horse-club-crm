@@ -10,9 +10,11 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { RoleAccessModule } from './role-access.module';
 
 @Module({
   imports: [
+    RoleAccessModule,
     AuthConfigModule,
     PassportModule.register({ defaultStrategy: 'jwt', session: false }),
     JwtModule.registerAsync({
@@ -27,6 +29,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
-  exports: [AuthService, JwtAuthGuard, RolesGuard, PassportModule],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, PassportModule, RoleAccessModule],
 })
 export class AuthModule {}

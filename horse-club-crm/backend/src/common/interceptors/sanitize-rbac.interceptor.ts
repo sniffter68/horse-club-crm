@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import type {
   CallHandler,
   ExecutionContext,
@@ -7,15 +7,17 @@ import type {
 import { Reflector } from '@nestjs/core';
 import { Role } from '@prisma/client';
 import type { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { from } from 'rxjs';
+import { map, switchMap } from 'rxjs/operators';
 import type { AuthRequest } from '../../auth/auth.types';
 import { TRAINER_HIDDEN_FIELDS } from '../decorators/sanitize-trainer-fields.decorator';
+import { RoleAccessService } from '../../auth/role-access.service';
 
 type JsonObject = Record<string, unknown>;
 
 @Injectable()
 export class SanitizeRbacInterceptor implements NestInterceptor {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(private readonly reflector: Reflector, @Optional() private readonly access?: RoleAccessService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const extraFields = this.reflector.getAllAndOverride<string[]>(TRAINER_HIDDEN_FIELDS, [
@@ -29,7 +31,14 @@ export class SanitizeRbacInterceptor implements NestInterceptor {
     const fields = [...new Set(['medicalNotes', 'preferences', 'email', 'phone', 'vkUserId',
       'baseRate', 'price', 'monthlyRate', 'payments', 'membership', 'memberships',
       'membershipId', 'operations', 'passwordHash', ...(extraFields ?? [])])];
-    return next.handle().pipe(map((value: unknown) => this.sanitize(value, fields)));
+    if (!this.access) return next.handle().pipe(map((value: unknown) => this.sanitize(value, fields)));
+    return from(this.access.permissions(request.user.role)).pipe(switchMap(permissions => {
+      let hidden = fields;
+      if (permissions.financeRead) hidden = hidden.filter(field => !['baseRate', 'price', 'monthlyRate', 'payments', 'membership', 'memberships', 'membershipId', 'operations'].includes(field));
+      if (!permissions.healthRead) hidden = [...hidden, 'healthLogs', 'vetEvents', 'lastShoeingAt', 'lastVaccinationAt', 'lastDewormingAt', 'lastVetCheckAt', 'lastDentistAt'];
+      if (!permissions.boardingAccess) hidden = [...hidden, 'boardingContracts', 'currentBoardingContract'];
+      return next.handle().pipe(map((value: unknown) => this.sanitize(value, hidden)));
+    }));
   }
 
   private sanitize(value: unknown, fields: readonly string[]): unknown {
@@ -39,9 +48,10 @@ export class SanitizeRbacInterceptor implements NestInterceptor {
       .filter(([key]) => !fields.includes(key))
       .map(([key, item]) => [key, this.sanitize(item, fields)]));
     // Preserve collection shape for existing read-only screens without exposing records.
-    for (const key of ['payments', 'memberships', 'operations']) {
-      if (Array.isArray((value as JsonObject)[key])) result[key] = [];
+    for (const key of ['payments', 'memberships', 'operations', 'healthLogs', 'vetEvents', 'boardingContracts']) {
+      if (fields.includes(key) && Array.isArray((value as JsonObject)[key])) result[key] = [];
     }
+    if (fields.includes('currentBoardingContract') && 'currentBoardingContract' in value) result.currentBoardingContract = null;
     return result;
   }
 }

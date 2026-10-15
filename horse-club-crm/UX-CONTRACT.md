@@ -170,6 +170,14 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
 - Status and edit forms preview affected future lessons before saving. The horse card supplies quick replacement actions after a status change. Status and assignment events refresh the shared lists and schedule. Group replacements validate the changed rider and total arena capacity, allowing other unavailable horses to be repaired one at a time.
 - Evidence: `backend/test/horse-issues.test.cjs`, `backend/test/booking-rules.test.cjs`, `frontend/e2e/horse-replacement.spec.ts`, `frontend/e2e/triad-booking.spec.ts`.
 
+### Role access and lesson ownership
+
+- Canonical policy: `docs/role-access.md`, `backend/src/auth/role-access.ts` and `RoleAccessService`. ADMIN/MANAGER retain replacement in any future scheduled lesson; TRAINER needs the own-lesson permission and a server-verified trainer/account binding. Both replacement and alternative-horse lookup enforce ownership; group lessons use the current lesson trainer.
+- UI owner: `frontend/src/access.ts` and `ReplaceHorseAction`; foreign-lesson actions are hidden. Server identity must load before a trainer action is enabled. Backend remains authoritative. Each successful change appends actor, old/new horse, reason and time to transactional history.
+- Settings: Ant Design Tabs/Card/Form/Switch/Modal/Select own «Роли и доступ». Only ADMIN edits TRAINER policy and account bindings; admin/manager authority is fixed. Confirmation names role-wide consequences or session revocation. Loading/busy blocks changes; failure preserves drafts with an inline error. The binding card title wraps on mobile.
+- Health read/write, boarding access and financial-report read permissions are enforced by server guards and mirrored in navigation/cards. Health/boarding restrictions also sanitize nested responses. Report access grants no financial writes; trainer boarding access grants no contract writes. Only health catalog forms adopt the configurable healthWrite permission.
+- Evidence: `backend/test/role-access.test.cjs`, `backend/test/trainer-account-binding.test.cjs`, `frontend/e2e/role-access.spec.ts`; deployment needs the documented migration and trainer bindings.
+
 ## Cash desk
 
 - Owner: `frontend/src/pages/cash-desk`; reusable payment modal via `CashDeskProvider` in the private layout.

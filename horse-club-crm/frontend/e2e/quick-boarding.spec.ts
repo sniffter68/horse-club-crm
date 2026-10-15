@@ -10,6 +10,7 @@ const available = { horses: [{ id: 'h1', name: 'Кролик' }, { id: 'h2', nam
   stalls: [{ id: 's1', name: 'Денник №1' }, { id: 's2', name: 'Денник №2' }] }
 
 async function setup(page: Page, { occupied = false, unavailable = false, role = 'ADMIN', privateHorse = false } = {}) {
+  await page.route('**/api/settings/access/me*', route => route.fulfill({ json: { role, userId: 'u1', trainerId: 't1', permissions: { horseReplaceOwn: true, horseReplaceAny: role !== 'TRAINER', healthRead: true, healthWrite: role !== 'TRAINER', financeRead: role !== 'TRAINER', boardingAccess: true } } }))
   await page.clock.setFixedTime(new Date('2026-10-08T09:00:00Z'))
   await page.addInitScript(role => {
     localStorage.setItem('horsecrm.access_token', 'cookie-session')

@@ -12,7 +12,7 @@ test('PostgreSQL replacement race, rollback and profile/password auth versions',
   assert.ok(['127.0.0.1', 'localhost'].includes(url.hostname) && url.pathname.startsWith('/horse_os_triad_check_'));
   const p = new PrismaClient(), service = new BookingsService(p, new BookingRulesService());
   const clients = [], horses = [], trainers = [], arenas = [], bookings = [];
-  let user;
+  let user, trainerUser;
   try {
     user = await p.user.create({ data: { email: `${randomUUID()}@test.local`, passwordHash: 'test-hash', role: 'ADMIN' } });
     const strategy = new JwtStrategy({ secret: 'test-only-secret-more-than-32-bytes' }, p);
@@ -32,7 +32,8 @@ test('PostgreSQL replacement race, rollback and profile/password auth versions',
         startTime: '2030-10-09T10:00:00Z', endTime: '2030-10-09T11:00:00Z', serviceType: 'dressage', costAmount: 1500 });
       bookings.push(booking);
     }
-    const results = await Promise.allSettled(bookings.map(b => service.replaceHorse(b.id, shared.id, 'Хромота')));
+    const actor = { id: user.id, email: user.email, role: 'ADMIN' };
+    const results = await Promise.allSettled(bookings.map(b => service.replaceHorse(b.id, shared.id, 'Хромота', actor)));
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
     const rejected = results.find(r => r.status === 'rejected');
     assert.ok(fail('HORSE_REST_VIOLATION')(rejected.reason));
@@ -44,14 +45,30 @@ test('PostgreSQL replacement race, rollback and profile/password auth versions',
       assert.equal(await p.payment.count({ where: { bookingId: original.id } }), 0);
     }
     await p.horse.update({ where: { id: shared.id }, data: { status: 'sick' } });
-    await assert.rejects(service.replaceHorse(bookings[0].id, shared.id), fail('HORSE_NOT_ACTIVE'));
+    await assert.rejects(service.replaceHorse(bookings[0].id, shared.id, undefined, actor), fail('HORSE_NOT_ACTIVE'));
+    trainerUser = await p.user.create({ data: { email: `${randomUUID()}@trainer.test.local`, passwordHash: 'test-hash', role: 'TRAINER', trainerId: trainers[0] } });
+    const assigned = { id: trainerUser.id, email: trainerUser.email, role: 'TRAINER', trainerId: trainers[0] };
+    const personalHorse = await p.horse.create({ data: { name: 'Owned lesson replacement QA', maxRiderWeight: 90 } }); horses.push(personalHorse.id);
+    await service.replaceHorse(bookings[0].id, personalHorse.id, 'trainer repair', assigned);
+    const history = await p.bookingHorseChange.findFirstOrThrow({ where: { bookingId: bookings[0].id, actorUserId: trainerUser.id } });
+    assert.equal(history.newHorseId, personalHorse.id);
+    const beforeForeign = await p.booking.findUniqueOrThrow({ where: { id: bookings[1].id } });
+    const beforeAuditCount = await p.bookingHorseChange.count({ where: { bookingId: bookings[1].id } });
+    await assert.rejects(service.replaceHorse(bookings[1].id, personalHorse.id, undefined, assigned), e => e.getStatus() === 403);
+    assert.equal((await p.booking.findUniqueOrThrow({ where: { id: bookings[1].id } })).horseId, beforeForeign.horseId);
+    assert.equal(await p.bookingHorseChange.count({ where: { bookingId: bookings[1].id } }), beforeAuditCount);
+    const adminHorse = await p.horse.create({ data: { name: 'Admin lesson replacement QA', maxRiderWeight: 90 } }); horses.push(adminHorse.id);
+    await service.replaceHorse(bookings[1].id, adminHorse.id, 'admin repair', actor);
+    assert.equal((await p.bookingHorseChange.findFirstOrThrow({ where: { bookingId: bookings[1].id, newHorseId: adminHorse.id } })).actorUserId, user.id);
   } finally {
+    await p.bookingHorseChange.deleteMany({ where: { bookingId: { in: bookings.map(b => b.id) } } });
     await p.booking.deleteMany({ where: { id: { in: bookings.map(b => b.id) } } });
     await p.client.deleteMany({ where: { id: { in: clients } } });
     await p.horse.deleteMany({ where: { id: { in: horses } } });
     await p.trainer.deleteMany({ where: { id: { in: trainers } } });
     await p.arena.deleteMany({ where: { id: { in: arenas } } });
     if (user) await p.user.delete({ where: { id: user.id } });
+    if (trainerUser) await p.user.delete({ where: { id: trainerUser.id } });
     await p.$disconnect();
   }
 });

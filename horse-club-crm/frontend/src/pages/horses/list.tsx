@@ -13,11 +13,13 @@ import { useCatalogPermissions } from '../catalogs/permissions'
 import { HorseStatusEditor } from '../stable/horse-status'
 import { horseStatuses } from '../stable/types'
 import { HorseIssues } from '../schedule/HorseIssues'
+import { useRoleAccess } from '../../access'
 
 const healthLabels = { VACCINATION: 'Вакцинация', FARRIER: 'Коваль', DEWORMING: 'Дегельминтизация', INSPECTION: 'Осмотр' }
 
 export function HorseList() {
   const { canManage } = useCatalogPermissions()
+  const { permissions } = useRoleAccess()
   const [selectedId, setSelectedId] = useState<string>()
   return <>
     <CatalogList<Horse> resource="horses" title="Лошади" columns={[
@@ -41,7 +43,7 @@ export function HorseList() {
         ]} />
         {canManage && <HorseStatusEditor horse={horse} />}
         <HorseIssues key={horse.id} horseId={horse.id} />
-        <section><Typography.Title level={5}>Постой</Typography.Title>
+        {permissions.boardingAccess && <section><Typography.Title level={5}>Постой</Typography.Title>
           <QuickBoardingActions key={horse.id} context={{ kind: 'HORSE', id: horse.id, name: horse.name, ownerClientId: horse.boardingContracts[0]?.client?.id }}
             contracts={horse.boardingContracts} currentContract={horse.currentBoardingContract} disabled={!ready} />
           {horse.boardingContracts.length ? <List dataSource={horse.boardingContracts} renderItem={contract => <List.Item>
@@ -49,18 +51,18 @@ export function HorseList() {
               <span>{contract.client ? personName(contract.client) : 'Лошадь клуба'}</span><span>Денник: {contract.stall?.name || 'не назначен'}</span>
               {contract.client && <span>{money(contract.monthlyRate)} / мес.</span>}</Space>
           </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Постоя нет" />}
-        </section>
+        </section>}
         <HorseFeeding key={horse.id} horse={horse} disabled={!ready} />
         <Tabs destroyOnHidden items={[
-          ...(canManage ? [{ key: 'boarding', label: 'Постой и расходы', children: <HorseBoardingExpenses horseId={horse.id} privateBoarding={Boolean(horse.currentBoardingContract?.client)} /> }] : []),
-          { key: 'vet', label: 'Здоровье и ковка', children: <VetJournal key={horse.id} horseId={horse.id} /> },
+          ...(canManage && permissions.boardingAccess ? [{ key: 'boarding', label: 'Постой и расходы', children: <HorseBoardingExpenses horseId={horse.id} privateBoarding={Boolean(horse.currentBoardingContract?.client)} /> }] : []),
+          ...(permissions.healthRead ? [{ key: 'vet', label: 'Здоровье и ковка', children: <VetJournal key={horse.id} horseId={horse.id} /> }] : []),
         ]} />
-        <section><Typography.Title level={5}>Журнал здоровья</Typography.Title>
+        {permissions.healthRead && <section><Typography.Title level={5}>Журнал здоровья</Typography.Title>
           {horse.healthLogs.length ? <List dataSource={horse.healthLogs} renderItem={log => <List.Item>
             <Space wrap><Tag>{healthLabels[log.type]}</Tag><span>{dateOnly(log.occurredAt)}</span>
               {log.nextDueAt && <span>Следующее: {dateOnly(log.nextDueAt)}</span>}<span>{log.notes || ''}</span></Space>
           </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Записей нет" />}
-        </section>
+        </section>}
         <section><Typography.Title level={5}>Последние занятия</Typography.Title>
           {horse.bookings.length ? <List dataSource={horse.bookings} renderItem={booking => <List.Item>
             <Space wrap><span>{dateTime(booking.lesson.startTime)}</span><strong>{booking.lesson.service.title || booking.lesson.service.name}</strong>

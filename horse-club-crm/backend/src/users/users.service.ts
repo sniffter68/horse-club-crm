@@ -7,12 +7,27 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BCRYPT_ROUNDS } from '../auth/auth.config';
 import type { CreateUserDto } from './dto/create-user.dto';
 
-export type PublicUser = { id: string; email: string; role: Role; vkUserId: bigint | null; createdAt: Date; updatedAt: Date };
-const publicUserSelect = { id: true, email: true, role: true, vkUserId: true, createdAt: true, updatedAt: true } satisfies Prisma.UserSelect;
+export type PublicUser = { id: string; email: string; role: Role; trainerId: string | null; vkUserId: bigint | null; createdAt: Date; updatedAt: Date };
+const publicUserSelect = { id: true, email: true, role: true, trainerId: true, vkUserId: true, createdAt: true, updatedAt: true } satisfies Prisma.UserSelect;
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async setTrainer(id: string, trainerId: string | null) {
+    if (trainerId === undefined) throw new BadRequestException('Укажите тренера или null для снятия привязки');
+    try {
+      return await this.prisma.$transaction(async tx => {
+        const user = await tx.user.findUnique({ where: { id } });
+        if (!user || user.role !== Role.TRAINER) throw new BadRequestException('Привязка доступна только для учётной записи тренера');
+        if (trainerId && !await tx.trainer.findUnique({ where: { id: trainerId } })) throw new BadRequestException('Тренер не найден');
+        return tx.user.update({ where: { id }, data: { trainerId, tokenVersion: { increment: 1 } }, select: publicUserSelect });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException('Этот тренер уже привязан к другой учётной записи');
+      throw error;
+    }
+  }
 
   async setVkRecipient(id: string, vkUserId: string | null): Promise<PublicUser> {
     try {

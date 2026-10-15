@@ -2,19 +2,17 @@ import { useCallback, useEffect, useState } from 'react'
 import { useOnError } from '@refinedev/core'
 import { Alert, Button, Empty, List, Pagination, Space, Spin, Typography } from 'antd'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
-import { useCatalogPermissions } from '../catalogs/permissions'
 import { clientName } from './triad'
 import type { Client } from '../catalogs/types'
 import { formatTime } from './time'
 import { ReplaceHorseAction } from './ReplaceHorseAction'
 
 interface HorseIssue {
-  id: string; horseId: string; horseName: string; startTime: string; endTime: string;
+  id: string; horseId: string; horseName: string; trainerId?: string; startTime: string; endTime: string;
   client: Pick<Client, 'id' | 'name' | 'firstName' | 'lastName'>;
 }
 
 export function HorseIssues({ horseId, revision = 0, readOnly = false }: { horseId?: string; revision?: number; readOnly?: boolean }) {
-  const { canManage } = useCatalogPermissions()
   const { mutate: onError } = useOnError()
   const report = useCallback((cause: unknown) => onError(toHttpError(cause)), [onError])
   const [page, setPage] = useState(1)
@@ -63,7 +61,7 @@ export function HorseIssues({ horseId, revision = 0, readOnly = false }: { horse
       {loading ? <Spin aria-label="Загрузка предстоящих занятий" /> : error ? <Alert role="alert" type="error" message={error} /> : <>
         <List dataSource={rows} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Предстоящих занятий нет" /> }} renderItem={row => <List.Item key={row.id}>
           <Space wrap><span>{formatTime(row.startTime)} — {formatTime(row.endTime)}</span><strong>{clientName(row.client)}</strong><span>{row.horseName}</span>
-            {canManage && !readOnly && <ReplaceHorseAction bookingId={row.id} report={report} disabled={busy} onBusyChange={setBusy} onSaved={() => {}} />}
+            {!readOnly && <ReplaceHorseAction bookingId={row.id} trainerId={row.trainerId} report={report} disabled={busy} onBusyChange={setBusy} onSaved={() => {}} />}
           </Space>
         </List.Item>} />
         {total > 10 && <Pagination simple current={page} pageSize={10} total={total} showSizeChanger={false} disabled={busy} onChange={setPage} />}

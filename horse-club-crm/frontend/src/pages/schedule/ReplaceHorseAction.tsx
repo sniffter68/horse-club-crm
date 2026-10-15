@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, Form, Input, Modal, Select, Space, Typography } from 'antd'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import type { Horse } from '../catalogs/types'
+import { useRoleAccess } from '../../access'
 
 
-export function ReplaceHorseAction({ bookingId, disabled, report, onSaved, onBusyChange }: {
+export function ReplaceHorseAction({ bookingId, trainerId, disabled, report, onSaved, onBusyChange }: {
+  trainerId?: string;
   bookingId: string; horseId?: string; startTime?: string; endTime?: string; horses?: Horse[]; disabled?: boolean;
   report: (cause: unknown) => void; onSaved: () => void; onBusyChange: (busy: boolean) => void;
 }) {
   const { message, modal } = App.useApp()
+  const { canReplaceHorse } = useRoleAccess()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -49,6 +52,7 @@ export function ReplaceHorseAction({ bookingId, disabled, report, onSaved, onBus
       if (failure.statusCode === 401) report(cause)
     } finally { lock.current = false; setBusy(false); onBusyChange(false) }
   }
+  if (!canReplaceHorse(trainerId)) return null
   return <>
     <Button disabled={disabled || busy} onClick={() => { form.resetFields(); setError(undefined); setOptions([]); reload(); setOpen(true) }}>Сменить лошадь</Button>
     <Modal title="Сменить лошадь" open={open} footer={null} keyboard={!busy} maskClosable={!busy} closable={!busy} onCancel={close}>

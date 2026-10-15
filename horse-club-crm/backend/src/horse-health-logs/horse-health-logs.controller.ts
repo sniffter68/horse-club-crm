@@ -10,10 +10,12 @@ import { setRefineTotalHeaders } from '../common/refine';
 import { CreateHorseHealthLogDto } from './dto/create-horse-health-log.dto';
 import { UpdateHorseHealthLogDto } from './dto/update-horse-health-log.dto';
 import { HorseHealthLogsService, type HorseHealthLogWithHorse } from './horse-health-logs.service';
+import { RequirePermission, RoleAccessGuard } from '../auth/role-access.guard';
 
 @ApiTags('Horse health logs')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard)
+@RequirePermission('healthRead')
 @Controller('horse-health-logs')
 export class HorseHealthLogsController {
   constructor(private readonly service: HorseHealthLogsService) {}
@@ -33,13 +35,15 @@ export class HorseHealthLogsController {
   }
 
   @Post()
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @RequirePermission('healthWrite')
   create(@Body() dto: CreateHorseHealthLogDto): Promise<HorseHealthLogWithHorse> {
     return this.service.create(dto);
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @RequirePermission('healthWrite')
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateHorseHealthLogDto,
@@ -49,6 +53,7 @@ export class HorseHealthLogsController {
 
   @Delete(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
+  @RequirePermission('healthWrite')
   remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<HorseHealthLogWithHorse> {
     return this.service.remove(id);
   }

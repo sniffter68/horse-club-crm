@@ -10,7 +10,7 @@ import { ResponsiveTable } from '../../components/ResponsiveTable'
 export function CatalogList<T extends BaseRecord>({ resource, title, columns, extraActions }: {
   resource: string; title: string; columns: TableColumnsType<T>; extraActions?: (record: T) => ReactNode
 }) {
-  const { canManage } = useCatalogPermissions()
+  const { canManage, role } = useCatalogPermissions(resource)
   const { tableProps, searchFormProps, tableQuery, sorters } = useTable<T, HttpError, { q?: string }>({
     resource, pagination: { pageSize: 10 }, sorters: { mode: 'server' },
     queryOptions: { retry: (count, error) => (error.statusCode === 0 || error.statusCode >= 500) && count < 2 },
@@ -25,8 +25,8 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
     render: (_: unknown, record: T) => <Space wrap>
       <EditButton resource={resource} recordItemId={record.id} size="small" aria-label="Редактировать">Редактировать</EditButton>
       {extraActions?.(record)}
-      <DeleteButton resource={resource} recordItemId={record.id} size="small" aria-label="Удалить"
-        confirmTitle="Удалить запись?" confirmOkText="Удалить" confirmCancelText="Отмена">Удалить</DeleteButton>
+      {(resource !== 'horse-health-logs' || role !== 'TRAINER') && <DeleteButton resource={resource} recordItemId={record.id} size="small" aria-label="Удалить"
+        confirmTitle="Удалить запись?" confirmOkText="Удалить" confirmCancelText="Отмена">Удалить</DeleteButton>}
     </Space>,
   }] : []
   return <List title={title} canCreate={canManage} createButtonProps={{ children: 'Создать' }}>
@@ -45,7 +45,7 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
 export function CatalogForm<T extends BaseRecord, V extends object>({ resource, action, title, defaults, toPayload, children }: {
   resource: string; action: 'create' | 'edit'; title: string; defaults?: Partial<V>; toPayload?: (values: V) => V; children: ReactNode
 }) {
-  const { canManage, isLoading } = useCatalogPermissions()
+  const { canManage, isLoading } = useCatalogPermissions(resource)
   if (isLoading) return <Spin />
   if (!canManage) return <Result status="403" title="Доступ только для чтения" subTitle="Изменять каталоги могут администратор и менеджер." />
   return <WritableCatalogForm<T, V> resource={resource} action={action} title={title} defaults={defaults} toPayload={toPayload}>{children}</WritableCatalogForm>

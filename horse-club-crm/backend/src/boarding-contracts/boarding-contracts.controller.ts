@@ -11,10 +11,12 @@ import { BoardingContractsService, type BoardingContractWithRelations } from './
 import { CreateBoardingContractDto } from './dto/create-boarding-contract.dto';
 import { UpdateBoardingContractDto } from './dto/update-boarding-contract.dto';
 import { BoardingAvailabilityQueryDto } from './dto/boarding-availability-query.dto';
+import { RequirePermission, RoleAccessGuard } from '../auth/role-access.guard';
 
 @ApiTags('Boarding contracts')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard)
+@RequirePermission('boardingAccess')
 @Controller('boarding-contracts')
 export class BoardingContractsController {
   constructor(private readonly service: BoardingContractsService) {}

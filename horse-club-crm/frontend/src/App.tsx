@@ -2,6 +2,8 @@ import { CashDeskPage } from './pages/cash-desk'
 import { CashDeskProvider, CashDeskButton } from './pages/cash-desk/CashDeskPaymentModal'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { SettingsPage } from './pages/settings'
+import { PermissionGate } from './components/PermissionGate'
+import { FinancialReportsPage } from './pages/settings/FinancialReports'
 import { ClientList } from './pages/clients/list'
 import { ClientCreate } from './pages/clients/create'
 import { ClientEdit } from './pages/clients/edit'
@@ -74,6 +76,7 @@ const resources: ResourceProps[] = [
   { name: 'cash-desk', list: '/cash-desk', meta: { label: 'Касса' } },
   { name: 'payments', list: '/payments', meta: { label: 'Оплаты' } },
   { name: 'vet', list: '/vet', meta: { label: 'Ветеринарный журнал' } },
+  { name: 'financial-reports', list: '/financial-reports', meta: { label: 'Финансовые отчёты' } },
 ]
 function LoadingPage() {
   return <div className="loading-page"><Spin size="large" aria-label="Загрузка" /></div>
@@ -171,9 +174,9 @@ export default function App() {
                 <Route index element={<DashboardRoute />} />
                 {catalogs.map(({ name, ListPage, CreatePage, EditPage }) => (
                   <Route key={name} path={name}>
-                    <Route index element={<ListPage />} />
-                    <Route path="new" element={<CreatePage />} />
-                    <Route path="edit/:id" element={<EditPage />} />
+                    <Route index element={name === 'horse-health-logs' || name === 'boarding-contracts' || name === 'stalls' ? <PermissionGate permission={name === 'horse-health-logs' ? 'healthRead' : 'boardingAccess'}><ListPage /></PermissionGate> : <ListPage />} />
+                    <Route path="new" element={name === 'horse-health-logs' ? <PermissionGate permission="healthWrite"><CreatePage /></PermissionGate> : <CreatePage />} />
+                    <Route path="edit/:id" element={name === 'horse-health-logs' ? <PermissionGate permission="healthWrite"><EditPage /></PermissionGate> : <EditPage />} />
                   </Route>
                 ))}
                 <Route path="schedule" element={<Suspense fallback={<LoadingPage />}><SchedulePage /></Suspense>} />
@@ -184,6 +187,7 @@ export default function App() {
                 <Route path="users"><Route index element={<UserList />} /><Route path="new" element={<UserCreate />} /></Route>
                 <Route path="cash-desk" element={<CashDeskPage />} />
                 <Route path="payments" element={<PaymentList />} />
+                <Route path="financial-reports" element={<PermissionGate permission="financeRead"><FinancialReportsPage /></PermissionGate>} />
                 <Route path="vet" element={<VetCalendarPage />} />
                 <Route path="*" element={<Result status="404" title="404" subTitle="Страница не найдена" />} />
               </Route>

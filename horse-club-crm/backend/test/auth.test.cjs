@@ -98,7 +98,7 @@ function authenticate(token) {
 
 test('JWT strategy rejects expired, forged and malformed tokens', async () => {
   const claims = { sub: 'user-1', email: 'admin@example.com', role: Role.ADMIN, authVersion: String(tokenVersion) };
-  assert.deepEqual(await authenticate(jwt.sign(claims)), { id: claims.sub, email: claims.email, role: claims.role });
+  assert.deepEqual(await authenticate(jwt.sign(claims)), { id: claims.sub, email: claims.email, role: claims.role, trainerId: null });
   await assert.rejects(authenticate(jwt.sign(claims, { expiresIn: -1 })));
   await assert.rejects(authenticate(jwt.sign(claims, { secret: 'another-secret' })));
   await assert.rejects(authenticate(jwt.sign({ ...claims, role: 'OWNER' })));

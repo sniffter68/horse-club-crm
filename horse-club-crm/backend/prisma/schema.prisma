@@ -123,6 +123,9 @@ enum LeadRequestStatus {
 }
 
 model User {
+  trainerId    String? @unique @db.Uuid
+  trainer      Trainer? @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  horseChanges BookingHorseChange[]
   cashPayments Payment[]
   cashShifts CashShift[]
   vkUserId     BigInt?  @unique
@@ -157,6 +160,7 @@ model Service {
 }
 
 model Trainer {
+  user User?
   isPublic Boolean @default(true)
   imageUrl String?
   description String?
@@ -335,6 +339,7 @@ model PricingPlan {
 }
 
 model Booking {
+  horseChanges BookingHorseChange[]
   isPaid Boolean @default(false)
   trainerId           String              @db.Uuid
   arenaId             String?             @db.Uuid
@@ -372,6 +377,30 @@ model Booking {
   @@index([trainerId, status, startTime, endTime])
   @@index([horseId, status, startTime, endTime])
   @@index([arenaId, status, startTime, endTime])
+}
+
+model BookingHorseChange {
+  id          String @id @default(uuid()) @db.Uuid
+  bookingId   String @db.Uuid
+  actorUserId String @db.Uuid
+  oldHorseId  String? @db.Uuid
+  newHorseId  String @db.Uuid
+  reason      String?
+  changedAt   DateTime @default(now()) @db.Timestamptz(6)
+  booking     Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  actor       User @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  @@index([bookingId, changedAt])
+}
+
+model RoleAccess {
+  role              Role @id
+  horseReplaceOwn   Boolean @default(false)
+  horseReplaceAny   Boolean @default(false)
+  healthRead        Boolean @default(true)
+  healthWrite       Boolean @default(false)
+  financeRead       Boolean @default(false)
+  boardingAccess    Boolean @default(true)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(6)
 }
 
 model Arena {

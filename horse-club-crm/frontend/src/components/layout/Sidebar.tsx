@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Drawer, Grid, Layout, Menu, type MenuProps } from 'antd'
 import { Link } from 'react-router-dom'
+import { useRoleAccess } from '../../access'
 
 function BrandMark({ collapsed = false }: { collapsed?: boolean }) {
   return <Link className={`sidebar-brand${collapsed ? ' sidebar-brand--collapsed' : ''}`} to="/" aria-label="Horse Club OS — главная">
@@ -34,7 +35,7 @@ function toMenuItems(resources: TreeMenuItem[]): NonNullable<MenuProps['items']>
 
 const menuCategories = [
   { key: 'category-lessons', label: 'Занятия', icon: <CalendarOutlined />, resources: ['lessons', 'lesson-history'] },
-  { key: 'category-clients', label: 'Клиенты и финансы', icon: <CreditCardOutlined />, resources: ['clients', 'memberships', 'pricing-plans', 'payments', 'cash-desk'] },
+  { key: 'category-clients', label: 'Клиенты и финансы', icon: <CreditCardOutlined />, resources: ['clients', 'memberships', 'pricing-plans', 'payments', 'cash-desk', 'financial-reports'] },
   { key: 'category-horses', label: 'Лошади и постой', icon: <HomeOutlined />, resources: ['horses', 'vet', 'horse-health-logs', 'stalls', 'boarding-contracts'] },
   { key: 'category-club', label: 'Клуб и команда', icon: <TeamOutlined />, resources: ['trainers', 'services', 'arenas'] },
   { key: 'category-admin', label: 'Администрирование', icon: <SettingOutlined />, resources: ['users', 'settings'] },
@@ -62,6 +63,7 @@ export function Sidebar({ darkMode, onToggleTheme }: { darkMode: boolean; onTogg
   const { menuItems, selectedKey, defaultOpenKeys } = useMenu()
   const { mutate: logout, isPending } = useLogout()
   const { data: role } = usePermissions<Role>({})
+  const { permissions } = useRoleAccess()
   const visibleMenuItems = menuItems.filter(item =>
     (item.name !== 'settings' || role === 'ADMIN' || role === 'MANAGER') &&
     (item.name !== 'users' || role === 'ADMIN') &&
@@ -69,7 +71,10 @@ export function Sidebar({ darkMode, onToggleTheme }: { darkMode: boolean; onTogg
     (item.name !== 'pricing-plans' || role !== 'TRAINER') &&
     (item.name !== 'cash-desk' || role === 'ADMIN' || role === 'MANAGER') &&
     (item.name !== 'payments' || role !== 'TRAINER') &&
-    (item.name !== 'dashboard' || role !== 'TRAINER'),
+    (item.name !== 'dashboard' || role !== 'TRAINER') &&
+    (!['vet', 'horse-health-logs'].includes(item.name) || permissions.healthRead) &&
+    (!['stalls', 'boarding-contracts'].includes(item.name) || permissions.boardingAccess) &&
+    (item.name !== 'financial-reports' || permissions.financeRead),
   )
   const dashboardItems = visibleMenuItems.filter(item => item.name === 'dashboard')
   const uncategorizedItems = visibleMenuItems.filter(item => item.name !== 'dashboard' && !categorizedResourceNames.has(item.name))

@@ -387,8 +387,8 @@ export function SchedulePage() {
         { key: 'horse', label: 'Лошадь', children: triadDetail.horse.name }, { key: 'trainer', label: 'Тренер', children: triadDetail.trainer.fullName || triadDetail.trainer.name },
         { key: 'client', label: 'Всадник', children: personName(triadDetail.client) }, { key: 'arena', label: 'Локация', children: triadDetail.arena.name },
         { key: 'time', label: 'Интервал', children: `${formatTime(triadDetail.startTime)} — ${formatTime(triadDetail.endTime)}` }, { key: 'discipline', label: 'Дисциплина', children: disciplines[triadDetail.serviceType] },
-      ]} />{canManage && triadDetail.status === 'scheduled' && new Date(triadDetail.startTime) > new Date() && <ReplaceHorseAction
-        bookingId={triadDetail.id} horseId={triadDetail.horseId} startTime={triadDetail.startTime} endTime={triadDetail.endTime} horses={horses}
+      ]} />{triadDetail.status === 'scheduled' && new Date(triadDetail.startTime) > new Date() && <ReplaceHorseAction
+        bookingId={triadDetail.id} trainerId={triadDetail.trainerId} horseId={triadDetail.horseId} startTime={triadDetail.startTime} endTime={triadDetail.endTime} horses={horses}
         disabled={triadLifecycleBusy || !ready} report={report} onBusyChange={setTriadLifecycleBusy}
         onSaved={() => { setTriadDetail(undefined); setRevision(value => value + 1) }} />}
       {canManage && <BookingLifecycleActions disabled={triadLifecycleBusy} key={triadDetail.id} booking={triadDetail} report={report} onBusyChange={setTriadLifecycleBusy} onSaved={() => { setTriadDetail(undefined); setTriadLifecycleBusy(false); setRevision(r => r + 1) }} />}{canManage && <Button disabled={triadLifecycleBusy || triadDetail.status !== 'scheduled' || !ready} onClick={() => openTriad({ clientId: triadDetail.clientId, horseId: triadDetail.horseId, trainerId: triadDetail.trainerId,
@@ -453,8 +453,8 @@ export function SchedulePage() {
             <span>{personName(booking.client)}</span>
             <Tag>{booking.horse?.name || 'Без лошади'}</Tag>
             <HorseWorkloadBadge date={toLocalInput(new Date(detail.startTime)).slice(0, 10)} workload={dayWorkloads.byDate[toLocalInput(new Date(detail.startTime)).slice(0, 10)]?.find(row => row.horseId === booking.horse?.id)} />
-            {canManage && detail.status === 'SCHEDULED' && new Date(detail.startTime) > new Date() && <ReplaceHorseAction
-              bookingId={booking.id} horseId={booking.horse?.id} startTime={detail.startTime} endTime={detail.endTime} horses={horses}
+            {detail.status === 'SCHEDULED' && new Date(detail.startTime) > new Date() && <ReplaceHorseAction
+              bookingId={booking.id} trainerId={detail.trainer.id} horseId={booking.horse?.id} startTime={detail.startTime} endTime={detail.endTime} horses={horses}
               disabled={saving || !ready} report={report} onBusyChange={busy => { savingRef.current = busy; setSaving(busy) }}
               onSaved={() => { setDetail(undefined); setRevision(value => value + 1) }} />}
             {booking.membership && <Tag color="green">Абонемент: {booking.membership.remainedLessons} / {booking.membership.totalLessons}</Tag>}

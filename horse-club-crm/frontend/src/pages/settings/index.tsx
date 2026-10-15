@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useOnError, usePermissions } from '@refinedev/core'
-import { Alert, App, Button, Card, Form, Select, Space, Spin, TimePicker, Typography } from 'antd'
+import { Alert, App, Button, Card, Form, Select, Space, Spin, Tabs, TimePicker, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import type { Role } from '../../authStorage'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
+import { RoleAccessPage } from './RoleAccess'
 
 interface ClubSchedule { id: number; openTime: string; closeTime: string; daysOfWeekOff: number[] }
 interface ScheduleForm { openTime: Dayjs; closeTime: Dayjs; daysOfWeekOff: number[] }
@@ -15,6 +16,14 @@ const toForm = (schedule: ClubSchedule): ScheduleForm => ({
 })
 
 export function SettingsPage() {
+  const { data: role } = usePermissions<Role>({})
+  return <Tabs items={[
+    { key: 'schedule', label: 'Режим работы', children: <ClubScheduleSettings /> },
+    ...(role === 'ADMIN' ? [{ key: 'roles', label: 'Роли и доступ', children: <RoleAccessPage /> }] : []),
+  ]} />
+}
+
+function ClubScheduleSettings() {
   const { data: role, isLoading: permissionsLoading } = usePermissions<Role>({})
   const canManage = role === 'ADMIN' || role === 'MANAGER'
   const { mutate: onError } = useOnError()

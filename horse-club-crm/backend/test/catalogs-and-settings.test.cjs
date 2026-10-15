@@ -80,6 +80,9 @@ before(async () => {
     providers: [
       ClientsService,
       SettingsService,
+      { provide: require('../dist/auth/role-access.service').RoleAccessService, useValue: {
+        permissions: async role => require('../dist/auth/role-access').defaultRolePermissions(role),
+      } },
       RolesGuard,
       SanitizeRbacInterceptor,
       { provide: PrismaService, useValue: prisma },

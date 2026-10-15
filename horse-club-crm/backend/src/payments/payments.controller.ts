@@ -12,10 +12,11 @@ import { setRefineTotalHeaders } from '../common/refine';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { PaymentsService, type BookingPaymentOption, type PaymentWithRelations } from './payments.service';
+import { RequirePermission, RoleAccessGuard } from '../auth/role-access.guard';
 
 @ApiTags('Payments')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard)
 @Roles(Role.ADMIN, Role.MANAGER)
 @Controller('payments')
 export class PaymentsController {
@@ -39,6 +40,8 @@ export class PaymentsController {
   pay(@Body() dto: CashDeskPaymentDto, @Req() req: { user: { id: string } }) { return this.cashDesk.pay(dto, req.user.id); }
 
   @Get('summary')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @RequirePermission('financeRead')
   summary(@Query() query: CashSummaryQueryDto) { return this.cashDesk.summary(query); }
 
   @Get('cash-desk/options/:clientId')

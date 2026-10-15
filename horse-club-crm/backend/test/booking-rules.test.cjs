@@ -5,10 +5,12 @@ const { BookingRulesService } = require('../dist/bookings/booking-rules.service'
 const { BookingsService } = require('../dist/bookings/bookings.service');
 const { Prisma } = require('@prisma/client');
 const rules = new BookingRulesService();
+const actor = { id: 'admin', email: 'admin@test.local', role: 'ADMIN' };
 const at = time => new Date(`2026-10-09T${time}:00Z`);
 function fixture({ horse = {}, client = {}, arena = {}, trainer = {}, bookings = [], lessons = [] } = {}) {
   const locks = [], writes = [];
   const tx = {
+    bookingHorseChange: { create: async () => ({}) },
     $queryRaw: async sql => { locks.push({ query: sql.text, values: sql.values }); return []; },
     horse: { findMany: async () => [{ id: 'horse', status: 'active', isUnavailable: false, maxRiderWeight: 85, maxDailyWorkloadMinutes: 120, requiredRestMinutes: 45, ...horse }] },
     client: { findMany: async () => [{ id: 'client', weightKg: null, ...client }] },
@@ -131,13 +133,13 @@ test('horse replacement validates future scheduled booking and only writes horse
   const service = new BookingsService({ $transaction: async (work, options) => {
     assert.equal(options.isolationLevel, 'Serializable'); return work(f.tx);
   } }, rules);
-  await service.replaceHorse('b', 'horse', ' Хромота ');
+  await service.replaceHorse('b', 'horse', ' Хромота ', actor);
   assert.deepEqual(saved, { where: { id: 'b' }, data: { horseId: 'horse', horseChangeReason: 'Хромота' } });
   saved = null; current.status = 'completed';
-  await assert.rejects(service.replaceHorse('b', 'horse'), failure('BOOKING_NOT_UPCOMING'));
+  await assert.rejects(service.replaceHorse('b', 'horse', undefined, actor), failure('BOOKING_NOT_UPCOMING'));
   assert.equal(saved, null);
   current.status = 'scheduled'; current.startTime = new Date(0);
-  await assert.rejects(service.replaceHorse('b', 'horse'), failure('BOOKING_NOT_UPCOMING'));
+  await assert.rejects(service.replaceHorse('b', 'horse', undefined, actor), failure('BOOKING_NOT_UPCOMING'));
 });
 
 test('horse replacement rejects unavailable horse and unknown rider weight without writes', async () => {
@@ -145,7 +147,7 @@ test('horse replacement rejects unavailable horse and unknown rider weight witho
     const f = fixture(config);
     f.tx.booking.findUnique = async () => ({ id: 'b', lesson: null, status: 'scheduled', clientId: 'client', trainerId: 'trainer', arenaId: 'arena', startTime: new Date('2030-10-09T10:00Z'), endTime: new Date('2030-10-09T10:30Z') });
     f.tx.booking.update = async () => assert.fail('invalid replacement was saved');
-    await assert.rejects(new BookingsService({ $transaction: async work => work(f.tx) }, rules).replaceHorse('b', 'horse'), failure(code));
+    await assert.rejects(new BookingsService({ $transaction: async work => work(f.tx) }, rules).replaceHorse('b', 'horse', undefined, actor), failure(code));
   }
 });
 
@@ -153,13 +155,13 @@ test('legacy replacement excludes its lesson and validates the changed participa
   let input, data;
   const lesson = { id: 'l', status: 'SCHEDULED', trainerId: 'trainer', arenaId: 'arena', startTime: new Date('2030-10-09T10:00Z'), endTime: new Date('2030-10-09T10:30Z'),
     bookings: [{ id: 'b', clientId: 'c1', horseId: 'old' }, { id: 'b2', clientId: 'c2', horseId: 'h2' }] };
-  const tx = { booking: { findUnique: async () => ({ id: 'b', clientId: 'c1', lesson }), update: async args => { data = args.data; } } };
+  const tx = { bookingHorseChange: { create: async () => ({}) }, booking: { findUnique: async () => ({ id: 'b', clientId: 'c1', horseId: 'old', lesson }), update: async args => { data = args.data; } } };
   const service = new BookingsService({ $transaction: async work => work(tx) }, { validate: async (_tx, value) => { input = value; } });
-  await service.replaceHorse('b', 'new');
+  await service.replaceHorse('b', 'new', undefined, actor);
   assert.equal(input.excludeLessonId, 'l');
   assert.equal(input.excludeBookingId, 'b');
   assert.deepEqual(input.participants, [{ clientId: 'c1', horseId: 'new' }]);
   assert.equal(input.existingRiders, 1);
   assert.deepEqual(data, { horseId: 'new', horseChangeReason: null });
-  await assert.rejects(service.replaceHorse('b', 'h2'), failure('HORSE_REST_VIOLATION'));
+  await assert.rejects(service.replaceHorse('b', 'h2', undefined, actor), failure('HORSE_REST_VIOLATION'));
 });

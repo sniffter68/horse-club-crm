@@ -10,6 +10,7 @@ import { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { setRefineTotalHeaders } from '../common/refine';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UsersService, type PublicUser } from './users.service';
+import { UpdateUserTrainerDto } from './dto/update-user-trainer.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -18,6 +19,8 @@ import { UsersService, type PublicUser } from './users.service';
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+  @Patch(':id/trainer')
+  setTrainer(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateUserTrainerDto) { return this.usersService.setTrainer(id, dto.trainerId); }
   @Patch(':id/vk')
   setVk(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserVkDto): Promise<PublicUser> {
     return this.usersService.setVkRecipient(id, dto.vkUserId);

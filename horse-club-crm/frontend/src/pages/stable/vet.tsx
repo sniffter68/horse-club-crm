@@ -8,7 +8,7 @@ import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
 import { DateTime } from 'luxon'
 import { API_URL, httpClient } from '../../httpClient'
 import { dateOnly } from '../cards/format'
-import { useCatalogPermissions } from '../catalogs/permissions'
+import { useRoleAccess } from '../../access'
 import type { Horse } from '../catalogs/types'
 import { CLUB_TIME_ZONE, toInstant } from '../schedule/time'
 import { StableEntryModal, StableListState } from './shared'
@@ -52,7 +52,8 @@ export function VetEntry({ horseId, event, onClose, onSaved }: { horseId?: strin
 export function VetJournal({ horseId, scope = 'horse' }: { horseId?: string; scope?: 'horse' | 'all' }) {
   const horseScoped = scope === 'horse'
   const validHorseId = isHorseUuid(horseId)
-  const { canManage } = useCatalogPermissions()
+  const { permissions } = useRoleAccess()
+  const canManage = permissions.healthWrite
   const [search, setSearch] = useSearchParams()
   const [horsePage, setHorsePage] = useState(1)
   const [horseType, setHorseType] = useState<VetType>()
@@ -69,8 +70,9 @@ export function VetJournal({ horseId, scope = 'horse' }: { horseId?: string; sco
   if (horseScoped && validHorseId) params.set('horseId', horseId)
   if (type) params.set('type', type)
   const query = useStableList<VetEvent>(`vet/${horseScoped || showHistory ? 'events' : 'upcoming'}?${params}`, {
-    enabled: !horseScoped || validHorseId, horseIdRequired: horseScoped,
+    enabled: permissions.healthRead && (!horseScoped || validHorseId), horseIdRequired: horseScoped,
   })
+  if (!permissions.healthRead) return <Alert type="info" showIcon message="Просмотр журнала здоровья недоступен вашей роли" />
   if (horseScoped && !validHorseId) return <section aria-label="Здоровье и ковка" className="stable-section">
     <Alert type="info" showIcon message="Журнал здоровья недоступен" description="Дождитесь загрузки карточки лошади. Если журнал не появился, обновите карточку: требуется корректный идентификатор лошади." />
   </section>
