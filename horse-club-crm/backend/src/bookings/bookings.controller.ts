@@ -2,7 +2,7 @@ import { ReplaceHorseDto } from './dto/replace-horse.dto';
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { setRefineTotalHeaders } from '../common/refine';
-import { BookingAvailabilityDto, ListBookingsDto } from './dto/booking-query.dto';
+import { BookingAvailabilityDto, HorseIssuesQueryDto, ListBookingsDto } from './dto/booking-query.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -19,6 +19,16 @@ import { CancelBookingDto } from './dto/cancel-booking.dto';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BookingsController {
   constructor(private readonly bookings: BookingsService, private readonly lifecycle: BookingLifecycleService) {}
+  @Get('horse-issues')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  async horseIssues(@Query() query: HorseIssuesQueryDto, @Res({ passthrough: true }) response: Response) {
+    const result = await this.bookings.horseIssues(query);
+    setRefineTotalHeaders(response, result.total);
+    return result.data;
+  }
+  @Get(':id/available-horses')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  availableHorses(@Param('id', new ParseUUIDPipe()) id: string) { return this.bookings.availableHorses(id); }
   @Patch(':id/horse')
   @Roles(Role.ADMIN, Role.MANAGER)
   replaceHorse(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: ReplaceHorseDto) {

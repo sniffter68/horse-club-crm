@@ -6,6 +6,8 @@ const client = { id: 'c1', name: 'Анна Орлова', firstName: 'Анна',
 const arena = { id: 'a1', name: 'Крытый манеж', capacity: 6, maxRidersCapacity: 6, isActive: true, isUnavailable: false }
 const booking = { id: 'booking1', clientId: 'c1', horseId: 'h1', trainerId: 't1', arenaId: 'a1', membershipId: null, startTime: '2026-10-09T07:00:00Z', endTime: '2026-10-09T08:00:00Z', serviceType: 'dressage', costAmount: '1500', status: 'scheduled', client, horse, trainer, arena }
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
+  await page.route('**/api/bookings/booking1/available-horses', route => route.fulfill({ json: [{ ...horse, id: 'h2', name: 'Буран', maxRiderWeight: 110 }] }))
   await page.clock.setFixedTime(new Date('2026-10-09T06:00:00Z'))
   await page.addInitScript(() => { localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.role', 'ADMIN'); localStorage.setItem('horsecrm.email', 'qa@example.com') })
   await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } }))
@@ -267,14 +269,14 @@ for (const width of [1280, 375]) {
     })
     await page.goto('/schedule')
     await page.locator('.fc-event').first().click()
-    await page.getByRole('button', { name: 'Заменить лошадь', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'Заменить лошадь', exact: true })
+    await page.getByRole('button', { name: 'Сменить лошадь', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Сменить лошадь', exact: true })
     await choose(page, dialog, 'Новая лошадь', 'Буран')
     await dialog.getByLabel('Причина замены').fill('Хромота')
-    await dialog.getByRole('button', { name: 'Заменить лошадь', exact: true }).click()
+    await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click()
     await expect(dialog.getByRole('alert')).toContainText('Лошадь не успеет отдохнуть')
     await expect(dialog.getByLabel('Причина замены')).toHaveValue('Хромота')
-    await dialog.getByRole('button', { name: 'Заменить лошадь', exact: true }).click()
+    await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click()
     await expect(dialog).not.toBeVisible()
     await expect(page.locator('.fc-event').filter({ hasText: 'Буран' }).first()).toBeVisible()
     expect(attempts).toBe(2)

@@ -1,4 +1,5 @@
 import { ReplaceHorseAction } from './ReplaceHorseAction'
+import { HorseIssues } from './HorseIssues'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DateTime } from 'luxon'
 import FullCalendar from '@fullcalendar/react'
@@ -140,7 +141,13 @@ export function SchedulePage() {
   useEffect(() => {
     const refresh = () => setRevision(value => value + 1)
     window.addEventListener('cash-desk-paid', refresh)
-    return () => window.removeEventListener('cash-desk-paid', refresh)
+    window.addEventListener('horse-assignment-changed', refresh)
+    window.addEventListener('horse-status-changed', refresh)
+    return () => {
+      window.removeEventListener('cash-desk-paid', refresh)
+      window.removeEventListener('horse-assignment-changed', refresh)
+      window.removeEventListener('horse-status-changed', refresh)
+    }
   }, [])
   const [range, setRange] = useState<{ from: string; to: string }>()
   const [trainerId, setTrainerId] = useState<string>()
@@ -311,6 +318,7 @@ export function SchedulePage() {
     <Typography.Title level={2}>Расписание занятий</Typography.Title>
     <Typography.Text type="secondary">Часовой пояс клуба: {CLUB_TIME_ZONE}</Typography.Text>
     {failure}
+    <HorseIssues revision={revision} />
     <Space className="schedule-toolbar" wrap>
       <Select aria-label="Фильтр по тренеру" placeholder="Все тренеры" allowClear showSearch optionFilterProp="label" style={{ width: compactLayout ? '100%' : 240 }} options={trainerOptions} value={trainerId} onChange={setTrainerId} />
       <Select aria-label="Фильтр по лошади" placeholder="Все лошади" allowClear showSearch optionFilterProp="label" style={{ width: compactLayout ? '100%' : 240 }} options={horseOptions.map(option => ({ ...option, disabled: false }))} value={horseId} onChange={setHorseId} />
@@ -431,7 +439,7 @@ export function SchedulePage() {
           loading={saving} disabled={!ready || workloadBlocked} style={{ marginTop: 16 }}>{editingLesson ? 'Сохранить перенос' : 'Создать занятие'}</Button>
       </Form>
     </Modal>
-    <Modal title="Карточка занятия" open={Boolean(detail)} onCancel={() => { if (!saving) setDetail(undefined) }} footer={null}>
+    <Modal title="Карточка занятия" open={Boolean(detail)} keyboard={!saving} maskClosable={!saving} closable={!saving} onCancel={() => { if (!saving) setDetail(undefined) }} footer={null}>
       {failure}
       {detail && <Space direction="vertical" style={{ width: '100%' }}>
         <Tag className="status-badge" bordered={false} style={{ background: statuses[detail.status].background, color: statuses[detail.status].text }}>{statuses[detail.status].label}</Tag>

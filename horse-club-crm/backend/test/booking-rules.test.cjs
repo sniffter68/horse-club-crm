@@ -50,6 +50,15 @@ test('rejects rider weight, but accepts the exact horse limit and unknown weight
   const f = fixture({ client: { weightKg: 85.01 } });
   await assert.rejects(rules.validate(f.tx, f.input), failure('RIDER_WEIGHT_EXCEEDED'));
 });
+
+test('availability preview uses the same rest rules without acquiring reservation locks', async () => {
+  const f = fixture();
+  await rules.validate(f.tx, { ...f.input, lockResources: false });
+  assert.equal(f.locks.length, 0);
+  const busy = fixture({ bookings: [{ ...f.booking, startTime: at('09:30'), endTime: at('10:00') }] });
+  await assert.rejects(rules.validate(busy.tx, { ...busy.input, lockResources: false }), failure('HORSE_REST_VIOLATION'));
+  assert.equal(busy.locks.length, 0);
+});
 test('rejects unavailable horses, trainers and arenas', async () => {
   for (const status of ['rest', 'sick', 'quarantine']) { const f = fixture({ horse: { status } }); await assert.rejects(rules.validate(f.tx, f.input), failure('HORSE_UNAVAILABLE')); }
   for (const [config, code] of [[{ trainer: { isActive: false } }, 'TRAINER_UNAVAILABLE'], [{ arena: { isActive: false } }, 'ARENA_UNAVAILABLE']]) {
@@ -140,16 +149,17 @@ test('horse replacement rejects unavailable horse and unknown rider weight witho
   }
 });
 
-test('legacy replacement excludes its lesson and validates all participants without duplicate horse assignments', async () => {
+test('legacy replacement excludes its lesson and validates the changed participant without duplicate horse assignments', async () => {
   let input, data;
   const lesson = { id: 'l', status: 'SCHEDULED', trainerId: 'trainer', arenaId: 'arena', startTime: new Date('2030-10-09T10:00Z'), endTime: new Date('2030-10-09T10:30Z'),
     bookings: [{ id: 'b', clientId: 'c1', horseId: 'old' }, { id: 'b2', clientId: 'c2', horseId: 'h2' }] };
-  const tx = { booking: { findUnique: async () => ({ id: 'b', lesson }), update: async args => { data = args.data; } } };
+  const tx = { booking: { findUnique: async () => ({ id: 'b', clientId: 'c1', lesson }), update: async args => { data = args.data; } } };
   const service = new BookingsService({ $transaction: async work => work(tx) }, { validate: async (_tx, value) => { input = value; } });
   await service.replaceHorse('b', 'new');
   assert.equal(input.excludeLessonId, 'l');
   assert.equal(input.excludeBookingId, 'b');
-  assert.deepEqual(input.participants, [{ clientId: 'c1', horseId: 'new' }, { clientId: 'c2', horseId: 'h2' }]);
+  assert.deepEqual(input.participants, [{ clientId: 'c1', horseId: 'new' }]);
+  assert.equal(input.existingRiders, 1);
   assert.deepEqual(data, { horseId: 'new', horseChangeReason: null });
   await assert.rejects(service.replaceHorse('b', 'h2'), failure('HORSE_REST_VIOLATION'));
 });

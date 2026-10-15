@@ -1,14 +1,22 @@
 import { usePublicContent } from './usePublicContent';
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
+import { scrollToBooking, type BookingSelection, type ChooseBooking } from './booking';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { ServicesSection } from './components/ServicesSection';
 import { HorsesAndTrainersSection } from './components/HorsesAndTrainersSection';
 import { ClubStandardsSection } from './components/ClubStandardsSection';
+import { FirstLessonSection } from './components/FirstLessonSection';
+import { GiftCertificatesSection } from './components/GiftCertificatesSection';
 import { ContactsSection } from './components/ContactsSection';
 
 export default function App(): ReactElement {
   const content = usePublicContent();
+  const [selection, setSelection] = useState<BookingSelection>({});
+  const choose: ChooseBooking = (kind, choice) => {
+    setSelection(previous => ({ ...previous, [kind]: choice }));
+    scrollToBooking();
+  };
   return (
     <div className="min-h-screen bg-[#E4DAD0] text-[#3A2F2B] selection:bg-[#3A2F2B] selection:text-[#E4DAD0] antialiased">
       {/* Умная навигационная капсула (сворачивается в бургер при скролле) */}
@@ -19,16 +27,22 @@ export default function App(): ReactElement {
         <HeroSection />
 
         {/* 2. Тёмная секция услуг с интерактивными парящими предметами */}
-        <ServicesSection services={content.services} />
+        <ServicesSection services={content.services} onChoose={choose} />
 
         {/* 3. Каталог лошадей и тренеров с модальными окнами */}
-        <HorsesAndTrainersSection horses={content.horses} trainers={content.trainers} />
+        <HorsesAndTrainersSection horses={content.horses} trainers={content.trainers} onChoose={choose} />
 
         {/* 4. Блок "Стандарты клуба" (архитектура, еврогрунт, гуманный тренинг) */}
         <ClubStandardsSection />
 
+        <FirstLessonSection />
+        <GiftCertificatesSection />
+
         {/* 5. Премиальный блок контактов с интерактивной формой бронирования */}
-        <ContactsSection />
+        <ContactsSection services={content.services} selection={selection}
+          onChoose={(kind, choice) => setSelection(previous => ({ ...previous, [kind]: choice }))}
+          onRemove={kind => setSelection(previous => ({ ...previous, [kind]: undefined }))}
+          onReset={() => setSelection({})} />
       </main>
 
       {/* Футер */}

@@ -24,11 +24,10 @@ export function HorsesSection({ horses }: HorsesSectionProps): ReactElement {
         >
           {/* Портрет лошади */}
           <div className="relative mb-5 aspect-[4/3] w-full overflow-hidden rounded-2xl bg-luxury-surface border border-luxury-border/50">
-            <img
+            <img loading="lazy" decoding="async"
               src={horse.imageUrl}
               alt={horse.name}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-              loading="lazy"
             />
           </div>
 

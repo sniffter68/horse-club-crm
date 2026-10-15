@@ -4,6 +4,8 @@ import { DateTime } from 'luxon';
 import { BookingValidationError } from './booking-validation.error';
 
 export interface BookingRuleInput {
+  /** Availability previews do not reserve resources. Writes always acquire locks. */
+  lockResources?: boolean;
   requireRiderWeight?: boolean;
   trainerId: string;
   arenaId?: string | null;
@@ -42,10 +44,12 @@ export class BookingRulesService {
     const clientIds = [...new Set(input.participants.map(p => p.clientId))].sort();
 
     // All writers lock in the same table/UUID order. Values are parameterized.
-    if (arenaId) await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Arena" WHERE "id" = ${arenaId}::uuid FOR UPDATE`);
-    for (const id of horseIds) await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Horse" WHERE "id" = ${id}::uuid FOR UPDATE`);
-    await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Trainer" WHERE "id" = ${trainerId}::uuid FOR UPDATE`);
-    for (const id of clientIds) await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Client" WHERE "id" = ${id}::uuid FOR UPDATE`);
+    if (input.lockResources !== false) {
+      if (arenaId) await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Arena" WHERE "id" = ${arenaId}::uuid FOR UPDATE`);
+      for (const id of horseIds) await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Horse" WHERE "id" = ${id}::uuid FOR UPDATE`);
+      await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Trainer" WHERE "id" = ${trainerId}::uuid FOR UPDATE`);
+      for (const id of clientIds) await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Client" WHERE "id" = ${id}::uuid FOR UPDATE`);
+    }
 
     const trainer = await tx.trainer.findUnique({ where: { id: trainerId } });
     if (!trainer) throw new BookingValidationError('RESOURCE_NOT_FOUND', 'Тренер не найден');

@@ -165,6 +165,10 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
 - Ant Design Modal/Form/Select and App message are reused for future scheduled bookings and legacy lesson participants.
 - ADMIN/MANAGER can change only the horse and optional reason. BookingRulesService validates resources in the same serializable transaction; payments, memberships and ledger entries stay attached to the original booking.
 - Conflicts preserve selection and reason and show both persistent text and a toast. Missing rider weight requires completing the client card before replacement.
+- «Сменить лошадь» loads server-validated alternatives for the exact booking, including rider weight, daily workload, rest and other participants. Availability is advisory; saving revalidates in the transaction. Loading/errors/empty alternatives block saving, retry preserves recoverable input, and dirty cancellation asks before discarding.
+- `HorseIssues.tsx` owns the paginated future-record list shared by the schedule banner and horse cards. The banner includes all dates and ignores calendar filters; horse cards include all upcoming scheduled records for that horse. Legacy lesson times/status are authoritative. TRAINER reads the list; ADMIN/MANAGER can replace horses directly.
+- Status and edit forms preview affected future lessons before saving. The horse card supplies quick replacement actions after a status change. Status and assignment events refresh the shared lists and schedule. Group replacements validate the changed rider and total arena capacity, allowing other unavailable horses to be repaired one at a time.
+- Evidence: `backend/test/horse-issues.test.cjs`, `backend/test/booking-rules.test.cjs`, `frontend/e2e/horse-replacement.spec.ts`, `frontend/e2e/triad-booking.spec.ts`.
 
 ## Cash desk
 

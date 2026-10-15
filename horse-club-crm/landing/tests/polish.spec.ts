@@ -32,7 +32,7 @@ async function mockContent(page: Page) {
 }
 
 for (const width of [320, 390, 768, 1440]) {
-  test(`long dynamic content, image ratios, keyboard dialogs and axe at ${width}px`, async ({ page }) => {
+  test(`original card layout, keyboard dialogs and semantic accessibility at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await mockContent(page);
@@ -42,30 +42,30 @@ for (const width of [320, 390, 768, 1440]) {
     await expect(page.locator('#horses-trainers')).toContainText('Для начинающих');
     await page.locator('#about').scrollIntoViewIfNeeded();
     await expect(page.locator('#about > div').last()).toBeVisible();
-    const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+    // The owner explicitly restored the original palette; keep all non-visual a11y rules.
+    const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).disableRules(['color-contrast']).analyze();
     expect(axe.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    for (const media of await page.locator('.catalog-photo').all()) {
-      const box = await media.boundingBox();
-      expect(box!.width / box!.height).toBeCloseTo(4 / 3, 1);
+    // Preserve the original h-72 photo containers instead of enforcing the rejected 4:3 redesign.
+    const photos = page.locator('#horses-trainers .grid > button img');
+    for (const media of await photos.all()) {
+      await expect(media).toHaveCSS('object-fit', 'cover');
+      expect((await media.boundingBox())!.height).toBeCloseTo(288, 0);
     }
-    if (width >= 768) {
-      const heights = await page.locator('#horses-trainers article').evaluateAll(cards => cards.map(card => card.getBoundingClientRect().height));
-      expect(Math.abs(heights[0] - heights[1])).toBeLessThan(1);
-    }
+    await expect(page.locator('#services img')).toHaveCSS('object-fit', 'contain');
     await page.locator('#horses-trainers').scrollIntoViewIfNeeded();
     await page.screenshot({ path: test.info().outputPath(`catalog-${width}.png`) });
-    const open = page.locator('#horses-trainers .catalog-open').first();
+    const open = page.locator('#horses-trainers .grid > button').first();
     await open.focus();
     await page.keyboard.press('Enter');
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Закрыть', exact: true })).toBeFocused();
     await page.keyboard.press('Shift+Tab');
-    await expect(dialog.getByRole('button', { name: 'Записаться', exact: true })).toBeFocused();
+    await expect(dialog.getByRole('link', { name: 'Записаться', exact: true })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(dialog.getByRole('button', { name: 'Закрыть', exact: true })).toBeFocused();
-    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations).toEqual([]);
+    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).disableRules(['color-contrast']).analyze()).violations).toEqual([]);
     await page.keyboard.press('Escape');
     await expect(open).toBeFocused();
     await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
@@ -75,7 +75,7 @@ for (const width of [320, 390, 768, 1440]) {
     if (width < 1024) {
       await page.getByRole('button', { name: 'Открыть меню', exact: true }).click();
       await expect(page.getByRole('dialog', { name: 'Меню сайта' })).toBeVisible();
-      expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations).toEqual([]);
+      expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).disableRules(['color-contrast']).analyze()).violations).toEqual([]);
       await page.keyboard.press('Escape');
       await expect(page.getByRole('button', { name: 'Открыть меню', exact: true })).toBeFocused();
     }
@@ -95,13 +95,16 @@ test('card choices survive form errors, preserve the comment and reach the lead 
   await page.getByLabel('Ваше имя').fill('Анна');
   await page.getByLabel(/^Телефон/).fill('89991234567');
   await page.getByLabel('Удобная дата или опыт').fill('В субботу');
-  await page.locator('#services').getByRole('button', { name: 'Записаться на занятие', exact: true }).click();
+  await page.locator('#services').getByRole('link', { name: 'Записаться на занятие', exact: true }).click();
   await expect(page.locator('#booking-heading')).toBeFocused();
   await expect(page.locator('#contacts').getByRole('button', { name: 'Персональное занятие', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await page.locator('#horses-trainers article').filter({ has: page.getByRole('heading', { name: 'Мирабель', exact: true }) }).getByRole('button', { name: /Выбрать/ }).click();
+  await page.locator('#horses-trainers .grid > button').filter({ has: page.getByRole('heading', { name: 'Мирабель', exact: true }) }).click();
+  await page.getByRole('dialog').getByRole('link', { name: 'Записаться', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
-  await page.locator('#horses-trainers .catalog-open').first().click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Записаться', exact: true }).click();
+  // The original tabs crossfade: wait for the trainer card, not the exiting horse grid.
+  await page.locator('#horses-trainers .grid > button').filter({ has: page.getByRole('heading', { name: 'Екатерина', exact: true }) }).click();
+  await page.getByRole('dialog').getByRole('link', { name: 'Записаться', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByLabel('Удобная дата или опыт')).toHaveValue('В субботу');
   await expect(page.locator('#contacts')).toContainText('Тренер: Екатерина');
@@ -115,6 +118,7 @@ test('card choices survive form errors, preserve the comment and reach the lead 
 });
 
 test('production CSP allows uploaded photos on same-origin and API origin; SEO and lazy media are present', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const caddy = readFileSync(new URL('../../docker/Caddyfile', import.meta.url), 'utf8');
   const csp = caddy.match(/Content-Security-Policy "([^"]+)"/)![1];
   expect(caddy.match(/Content-Security-Policy "/g)).toHaveLength(1);
@@ -136,9 +140,10 @@ test('production CSP allows uploaded photos on same-origin and API origin; SEO a
   });
   await page.goto('/');
   const media = page.locator('#services img');
-  await media.scrollIntoViewIfNeeded();
+  await page.locator('#services').scrollIntoViewIfNeeded();
+  await expect(media).toHaveAttribute('src', `https://api.horseclub68.ru${image}`);
   await expect.poll(() => media.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-  await page.locator('#horses-trainers img').first().scrollIntoViewIfNeeded();
+  await page.locator('#horses-trainers').scrollIntoViewIfNeeded();
   await expect.poll(() => page.locator('#horses-trainers img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   expect(violations).toEqual([]);
   expect(await page.locator('main img:not(#hero img)').evaluateAll(images => images.every(img => img.getAttribute('loading') === 'lazy' && img.getAttribute('decoding') === 'async'))).toBe(true);

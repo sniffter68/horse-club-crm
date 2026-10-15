@@ -2,6 +2,7 @@ import { handleCatalogImageError } from '../catalogImage';
 import type { PublicHorse, PublicTrainer } from '../usePublicContent';
 import { useState, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactElement } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { ChooseBooking } from '../booking';
 
 type TabType = 'horses' | 'trainers';
 
@@ -35,7 +36,7 @@ interface TrainerItem {
 
 type ModalItem = HorseItem | TrainerItem;
 
-export function HorsesAndTrainersSection({ horses, trainers }: { horses: PublicHorse[]; trainers: PublicTrainer[] }): ReactElement {
+export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horses: PublicHorse[]; trainers: PublicTrainer[]; onChoose: ChooseBooking }): ReactElement {
   const horsesData: HorseItem[] = horses.map(item => ({
     id: item.id, type: 'horse', name: item.name, breed: item.breed, discipline: item.role,
     age: '', height: '', suit: '', character: item.description,
@@ -160,7 +161,7 @@ export function HorsesAndTrainersSection({ horses, trainers }: { horses: PublicH
                   className="group relative flex w-full flex-col overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/90 text-left shadow-[0_15px_35px_rgba(58,47,43,0.06)] backdrop-blur-lg transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_45px_rgba(58,47,43,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#724C39]"
                 >
                   <div className="relative h-72 w-full overflow-hidden">
-                    <img
+                    <img loading="lazy" decoding="async"
                   onError={handleCatalogImageError}
                       src={horse.image}
                       alt={horse.name}
@@ -214,7 +215,7 @@ export function HorsesAndTrainersSection({ horses, trainers }: { horses: PublicH
                   className="group relative flex w-full flex-col overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/90 text-left shadow-[0_15px_35px_rgba(58,47,43,0.06)] backdrop-blur-lg transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_45px_rgba(58,47,43,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#724C39]"
                 >
                   <div className="relative h-72 w-full overflow-hidden">
-                    <img
+                    <img loading="lazy" decoding="async"
                   onError={handleCatalogImageError}
                       src={trainer.image}
                       alt={trainer.name}
@@ -299,7 +300,7 @@ export function HorsesAndTrainersSection({ horses, trainers }: { horses: PublicH
 
               {/* Левая половина: крупная фотография */}
               <div className="relative h-56 w-full shrink-0 overflow-hidden md:h-auto md:w-5/12">
-                <img
+                <img loading="lazy" decoding="async"
                   onError={handleCatalogImageError}
                   src={selectedItem.image}
                   alt={selectedItem.name}
@@ -387,11 +388,15 @@ export function HorsesAndTrainersSection({ horses, trainers }: { horses: PublicH
 
                   <a
                     href="#contacts"
-                    onClick={() => setSelectedItem(null)}
+                    onClick={event => {
+                      event.preventDefault();
+                      setSelectedItem(null);
+                      onChoose(selectedItem.type, { id: selectedItem.id, name: selectedItem.name });
+                    }}
                     className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[#3A2F2B] px-6 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-sm transition-all hover:scale-105 hover:bg-[#5A483E] active:scale-95 sm:w-auto"
                   >
                     <span>Записаться</span>
-                    <span>↗</span>
+                    <span aria-hidden="true">↗</span>
                   </a>
                 </div>
               </div>

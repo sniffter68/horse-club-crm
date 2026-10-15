@@ -12,6 +12,7 @@ import { VetJournal } from '../stable/vet'
 import { useCatalogPermissions } from '../catalogs/permissions'
 import { HorseStatusEditor } from '../stable/horse-status'
 import { horseStatuses } from '../stable/types'
+import { HorseIssues } from '../schedule/HorseIssues'
 
 const healthLabels = { VACCINATION: 'Вакцинация', FARRIER: 'Коваль', DEWORMING: 'Дегельминтизация', INSPECTION: 'Осмотр' }
 
@@ -39,6 +40,7 @@ export function HorseList() {
           { key: 'rest', label: 'Минимальный отдых', children: `${horse.minRestMinutes} мин` },
         ]} />
         {canManage && <HorseStatusEditor horse={horse} />}
+        <HorseIssues key={horse.id} horseId={horse.id} />
         <section><Typography.Title level={5}>Постой</Typography.Title>
           <QuickBoardingActions key={horse.id} context={{ kind: 'HORSE', id: horse.id, name: horse.name, ownerClientId: horse.boardingContracts[0]?.client?.id }}
             contracts={horse.boardingContracts} currentContract={horse.currentBoardingContract} disabled={!ready} />

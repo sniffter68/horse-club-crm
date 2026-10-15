@@ -13,6 +13,7 @@ const workloads = (date: string | null, exclude?: string | null) => [
 ]
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   await page.route('**/api/bookings/availability?*', route => {
     const date = new URL(route.request().url()).searchParams.get('from')?.slice(0, 10) || '2026-10-08'
