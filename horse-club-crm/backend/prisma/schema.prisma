@@ -13,6 +13,30 @@ enum Role {
   TRAINER
 }
 
+enum HorseSex {
+  STALLION
+  MARE
+  GELDING
+}
+
+enum StallZone {
+  MAIN
+  SUMMER
+  QUARANTINE
+}
+
+enum StallSide {
+  LEFT
+  RIGHT
+}
+
+enum StallStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  QUARANTINE
+}
+
 enum HorseOwnerType {
   club
   private
@@ -193,6 +217,9 @@ model Horse {
   ownerType               HorseOwnerType @default(club)
   ownerId                 String?        @db.Uuid
   owner                   Client?        @relation("HorseOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  sex                     HorseSex?
+  birthYear               Int?
+  stall                   Stall?
   stallNumber             String?
   maxRiderWeight          Int            @default(85)
   maxDailyWorkloadMinutes Int            @default(120)
@@ -465,6 +492,17 @@ model HorseHealthLog {
 }
 
 model Stall {
+  number        String?
+  zone          StallZone @default(MAIN)
+  side          StallSide @default(LEFT)
+  position      Int?
+  status        StallStatus @default(AVAILABLE)
+  horseId       String? @unique @db.Uuid
+  horse         Horse? @relation(fields: [horseId], references: [id], onDelete: Restrict)
+  notes         String?
+
+  @@unique([zone, side, position])
+  @@unique([zone, number])
   id            String             @id @default(uuid()) @db.Uuid
   name          String             @unique
   description   String?

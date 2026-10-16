@@ -1,6 +1,12 @@
 ﻿import { test, expect, type Page } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
+  await page.route('**/api/settings/access/me*', async route => {
+    const role = await page.evaluate(() => localStorage.getItem('horsecrm.role') ?? 'ADMIN')
+    await route.fulfill({ json: { role, permissions: { horseReplaceOwn: true, horseReplaceAny: role !== 'TRAINER',
+      healthRead: true, healthWrite: role !== 'TRAINER', financeRead: role !== 'TRAINER', boardingAccess: true } } })
+  })
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { date: '2026-10-08', horseWorkloads: [], arenaOccupancy: [] } }))
   await page.route('**/api/auth/logout', route => route.fulfill({ json: { success: true } }))

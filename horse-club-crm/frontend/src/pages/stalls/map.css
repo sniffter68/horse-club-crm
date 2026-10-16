@@ -1,0 +1,46 @@
+.stall-map-toolbar { display: flex; margin-bottom: 24px; }
+.stall-map-toolbar h2 { margin: 0 auto 0 0; }
+.stall-map-toolbar .ant-select { min-width: 210px; }
+.stall-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stall-aisle-header, .stall-aisle-row { display: grid; grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr); }
+.stall-aisle-header { text-align: center; margin-bottom: 12px; }
+.stall-aisle { margin-bottom: 24px; }
+.stall-aisle-row { align-items: stretch; }
+.stall-tile { font: inherit; color: inherit; background: var(--crm-paper); border: 1px solid var(--crm-border); border-radius: 16px; padding: 16px; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; min-width: 0; overflow-wrap: anywhere; }
+.stall-tile:hover { border-color: var(--crm-saddle); }
+.stall-tile:focus-visible { outline: 2px solid var(--crm-saddle); outline-offset: 2px; }
+.stall-tile-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.stall-tile--maintenance, .stall-tile--quarantine { border-style: dashed; }
+.stall-horse-name { font-family: Georgia, serif; font-size: 24px; }
+.stall-passage { display: grid; place-items: center; background: var(--crm-alabaster); border-inline: 1px dashed var(--crm-border); color: var(--crm-saddle); font-variant-numeric: tabular-nums; }
+.stall-warning { color: var(--crm-warning, #8c6527); }
+html[data-theme='dark'] .stall-warning { color: var(--crm-beige); }
+.stall-assignment { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
+.stall-unplaced { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.stall-sign { color: #241e1c; background: #fff; padding: 24px; }
+.stall-sign h1 { font: bold 48px Georgia, serif; overflow-wrap: anywhere; margin: 20px 0; }
+.stall-sign table { width: 100%; border-collapse: collapse; }
+.stall-sign caption { caption-side: top; font-weight: bold; text-align: left; padding-bottom: 8px; }
+.stall-sign th, .stall-sign td { border: 1px solid #724c39; padding: 10px; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
+.stall-sign-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .stall-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stall-aisle-header, .stall-aisle-row { grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr); }
+  .stall-aisle-header { font-size: 11px; }
+  .stall-tile { padding: 10px; font-size: 12px; }
+  .stall-horse-name { font-size: 20px; }
+  .stall-sign { padding: 8px; }
+}
+@media print {
+  @page { size: A4; margin: 15mm; }
+  body:has(.stall-sign) * { visibility: hidden !important; }
+  body:has(.stall-sign) .stall-sign, body:has(.stall-sign) .stall-sign * { visibility: visible !important; }
+  body:has(.stall-sign) .ant-modal-root, body:has(.stall-sign) .ant-modal-wrap,
+  body:has(.stall-sign) .ant-modal, body:has(.stall-sign) .ant-modal-content,
+  body:has(.stall-sign) .ant-modal-body { position: static !important; width: auto !important; height: auto !important; max-height: none !important; overflow: visible !important; transform: none !important; padding: 0 !important; margin: 0 !important; }
+  body:has(.stall-sign) #root, body:has(.stall-sign) .ant-modal-mask,
+  body:has(.stall-sign) .ant-modal-header, body:has(.stall-sign) .ant-modal-footer,
+  body:has(.stall-sign) .ant-modal-close, body:has(.stall-sign) .ant-modal-wrap:not(:has(.stall-sign)) { display: none !important; }
+  .stall-sign { padding: 0; font-size: 14pt; }
+  .stall-sign tr { break-inside: avoid; }
+}

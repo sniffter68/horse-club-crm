@@ -10,6 +10,7 @@ import { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { setRefineTotalHeaders } from '../common/refine';
 import { CreateStallDto } from './dto/create-stall.dto';
 import { UpdateStallDto } from './dto/update-stall.dto';
+import { AssignStallDto } from './dto/assign-stall.dto';
 import { StallsService, type StallWithContracts } from './stalls.service';
 
 @ApiTags('Stalls')
@@ -26,6 +27,20 @@ export class StallsController {
     const { data, total } = await this.service.findAll(query);
     setRefineTotalHeaders(response, total);
     return data;
+  }
+
+  @Get('map')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  map() { return this.service.map(); }
+
+  @Get('assignment-horses')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  assignmentHorses() { return this.service.assignmentHorses(); }
+
+  @Patch(':id/assign')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  assign(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: AssignStallDto) {
+    return this.service.assign(id, dto.horseId);
   }
 
   @Get(':id')

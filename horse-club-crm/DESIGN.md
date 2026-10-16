@@ -41,6 +41,8 @@ components:
 
 # Horse Club OS Design System
 
+Карта денников (`/stable`) использует общие CSS-токены `--crm-paper`, `--crm-border`, `--crm-saddle`, `--crm-alabaster` и Ant Design Form/Select/Modal. Отличительный элемент — два ряда денников с центральным проходом; номера позиций кодируют реальное соседство. Печатная табличка — отдельная белая поверхность для бумаги в обеих темах. Контракт и правила: `docs/stall-map.md`.
+
 ## Overview
 
 ### Creative North Star

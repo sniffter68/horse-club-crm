@@ -31,6 +31,7 @@ import { HorseHealthLogList } from './pages/horse-health-logs/list'
 import { HorseHealthLogCreate } from './pages/horse-health-logs/create'
 import { HorseHealthLogEdit } from './pages/horse-health-logs/edit'
 import { StallList } from './pages/stalls/list'
+import { StallMap } from './pages/stalls/map'
 import { StallCreate } from './pages/stalls/create'
 import { StallEdit } from './pages/stalls/edit'
 import { BoardingContractList } from './pages/boarding-contracts/list'
@@ -66,6 +67,7 @@ const SchedulePage = lazy(() => import('./pages/schedule').then(module => ({ def
 const THEME_STORAGE_KEY = 'horsecrm.color_mode'
 const resources: ResourceProps[] = [
   { name: 'dashboard', list: '/', meta: { label: 'Дашборд' } },
+  { name: 'stall-map', list: '/stable', meta: { label: 'Карта денников' } },
   { name: 'lessons', list: '/schedule', meta: { label: 'Расписание' } },
   { name: 'lesson-history', list: '/lesson-history', meta: { label: 'Журнал занятий' } },
   ...catalogs.map(({ name, label }) => ({ name, list: `/${name}`, create: `/${name}/new`, edit: `/${name}/edit/:id`, meta: { label } })),
@@ -189,6 +191,7 @@ export default function App() {
                 <Route path="payments" element={<PaymentList />} />
                 <Route path="financial-reports" element={<PermissionGate permission="financeRead"><FinancialReportsPage /></PermissionGate>} />
                 <Route path="vet" element={<VetCalendarPage />} />
+                <Route path="stable" element={<PermissionGate permission="boardingAccess"><StallMap /></PermissionGate>} />
                 <Route path="*" element={<Result status="404" title="404" subTitle="Страница не найдена" />} />
               </Route>
               <Route element={<Authenticated key="public" fallback={<Outlet />} loading={<LoadingPage />}><Navigate to="/" replace /></Authenticated>}>

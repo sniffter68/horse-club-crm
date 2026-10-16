@@ -61,6 +61,8 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
 
 ## Flow ledger
 
+Карта денников: Ant Design Modal и общий `StableEntryModal`; сохранение закрывает карточку, обновляет карту и показывает общий toast. Ошибка сохраняет форму и выбор лошади. Несохранённые статус/заметки защищены подтверждением закрытия, заселение до их сохранения отключено. TRAINER получает просмотр и печать; ADMIN/MANAGER — управление, с учётом `boardingAccess`. Источник бизнес-правил: `docs/stall-map.md`, backend StallsService/guards; проверка: `frontend/e2e/stall-map.spec.ts`, `backend/test/stall-map.test.cjs`.
+
 | Operation | Trigger | Pending | Success destination | Success feedback | Failure recovery | Focus outcome | Source ref |
 |---|---|---|---|---|---|---|---|
 | Create | Создать | stable busy button | owning list | shared toast | form preserved | list context | shared catalog form |

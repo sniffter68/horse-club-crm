@@ -10,6 +10,8 @@ export interface Client extends Omit<ClientValues, 'phone' | 'preferences' | 'me
   id: string; createdAt: string; phone: string | null; preferences: string | null; medicalNotes?: string | null;
 }
 export interface HorseValues extends PublicationValues {
+  sex?: 'STALLION' | 'MARE' | 'GELDING' | null;
+  birthYear?: number | null;
   maxRiderWeight?: number;
   feedingNotes?: string | null;
   name: string; breed?: string; riderLevel?: string; maxDailyMinutes: number; minRestMinutes: number; isUnavailable: boolean;
@@ -50,7 +52,8 @@ export interface ServiceValues extends PublicationValues {
 export interface Service extends Omit<ServiceValues, 'price'> { id: string; price?: string | number }
 export interface ArenaValues { name: string; description?: string; capacity: number; isUnavailable: boolean }
 export interface Arena extends Omit<ArenaValues, 'description'> { id: string; description: string | null; createdAt: string; updatedAt: string; maxRidersCapacity?: number; isActive?: boolean }
-export interface StallValues { name: string; description?: string; isUnavailable: boolean }
+export interface StallValues { name: string; description?: string; isUnavailable: boolean;
+  number?: string; zone?: 'MAIN' | 'SUMMER' | 'QUARANTINE'; side?: 'LEFT' | 'RIGHT'; position?: number }
 export interface StallContractSummary {
   id: string; status: 'DRAFT' | 'ACTIVE' | 'SUSPENDED'; startsAt: string; endsAt: string | null;
   horse: { id: string; name: string };

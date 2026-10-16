@@ -49,7 +49,7 @@ test('PostgreSQL: resource and last-balance races', { skip: !enabled, timeout: 6
       assert.deepEqual(responses.map(response => response.status).sort(), [201, 409, 409, 409, 409]);
     });
     await t.test('two different lessons compete for the last membership credit', async () => {
-      await p.membership.create({ data: { id: membershipId, remainedLessons: 1, validUntil: new Date(Date.now() + 30 * 86400000) } });
+      await p.membership.create({ data: { id: membershipId, clientId: clients[0], totalLessons: 1, remainedLessons: 1, validUntil: new Date(Date.now() + 30 * 86400000) } });
       assert.equal(lessons.length, 2);
       const results = await Promise.allSettled(lessons.map(id => ledger.debitLesson(membershipId, id, 'QA last credit')));
       assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
@@ -59,6 +59,7 @@ test('PostgreSQL: resource and last-balance races', { skip: !enabled, timeout: 6
       assert.equal(await p.membershipOp.count({ where: { membershipId, type: 'DEBIT' } }), 1);
     });
   } finally {
+    await p.ledgerTransaction.deleteMany({ where: { membershipId } });
     await p.membershipOp.deleteMany({ where: { membershipId } });
     await p.membership.deleteMany({ where: { id: membershipId } });
     await p.booking.deleteMany({ where: { lessonId: { in: lessons } } });

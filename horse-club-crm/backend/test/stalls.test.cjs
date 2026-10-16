@@ -16,7 +16,7 @@ test('stall list supports Refine pagination, search and sorting', async () => {
   const prisma = {
     stall: {
       count: async () => 1,
-      findMany: async args => { findManyArgs = args; return [{ id: 'stall-1', name: 'Денник 1' }]; },
+      findMany: async args => { if (args.where) findManyArgs = args; return [{ id: 'stall-1', name: 'Денник 1' }]; },
     },
     $transaction: async operations => Promise.all(operations),
   };
@@ -49,5 +49,5 @@ test('stall creation normalizes its name and description', async () => {
     description: '  Первый корпус  ',
     isUnavailable: false,
   });
-  assert.deepEqual(data, { name: 'Денник 1', description: 'Первый корпус', isUnavailable: false });
+  assert.deepEqual(data, { name: 'Денник 1', description: 'Первый корпус', isUnavailable: false, status: 'AVAILABLE' });
 });

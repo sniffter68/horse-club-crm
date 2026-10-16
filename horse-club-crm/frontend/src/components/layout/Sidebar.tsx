@@ -36,7 +36,7 @@ function toMenuItems(resources: TreeMenuItem[]): NonNullable<MenuProps['items']>
 const menuCategories = [
   { key: 'category-lessons', label: 'Занятия', icon: <CalendarOutlined />, resources: ['lessons', 'lesson-history'] },
   { key: 'category-clients', label: 'Клиенты и финансы', icon: <CreditCardOutlined />, resources: ['clients', 'memberships', 'pricing-plans', 'payments', 'cash-desk', 'financial-reports'] },
-  { key: 'category-horses', label: 'Лошади и постой', icon: <HomeOutlined />, resources: ['horses', 'vet', 'horse-health-logs', 'stalls', 'boarding-contracts'] },
+  { key: 'category-horses', label: 'Лошади и постой', icon: <HomeOutlined />, resources: ['horses', 'stall-map', 'vet', 'horse-health-logs', 'stalls', 'boarding-contracts'] },
   { key: 'category-club', label: 'Клуб и команда', icon: <TeamOutlined />, resources: ['trainers', 'services', 'arenas'] },
   { key: 'category-admin', label: 'Администрирование', icon: <SettingOutlined />, resources: ['users', 'settings'] },
 ] as const
@@ -73,7 +73,7 @@ export function Sidebar({ darkMode, onToggleTheme }: { darkMode: boolean; onTogg
     (item.name !== 'payments' || role !== 'TRAINER') &&
     (item.name !== 'dashboard' || role !== 'TRAINER') &&
     (!['vet', 'horse-health-logs'].includes(item.name) || permissions.healthRead) &&
-    (!['stalls', 'boarding-contracts'].includes(item.name) || permissions.boardingAccess) &&
+    (!['stalls', 'stall-map', 'boarding-contracts'].includes(item.name) || permissions.boardingAccess) &&
     (item.name !== 'financial-reports' || permissions.financeRead),
   )
   const dashboardItems = visibleMenuItems.filter(item => item.name === 'dashboard')

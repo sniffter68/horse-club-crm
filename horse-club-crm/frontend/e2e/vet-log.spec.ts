@@ -8,6 +8,9 @@ const procedures = [
 ] as const
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/settings/access/me*', route => route.fulfill({ json: { role: 'ADMIN', permissions: {
+    horseReplaceOwn: true, horseReplaceAny: true, healthRead: true, healthWrite: true, financeRead: true, boardingAccess: true,
+  } } }))
   await page.addInitScript(() => {
     localStorage.setItem('horsecrm.access_token', 'cookie-session')
     localStorage.setItem('horsecrm.role', 'ADMIN')
