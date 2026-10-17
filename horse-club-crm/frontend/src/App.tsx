@@ -1,4 +1,5 @@
 import { CashDeskPage } from './pages/cash-desk'
+import { StaffPage } from './pages/staff'
 import { CashDeskProvider, CashDeskButton } from './pages/cash-desk/CashDeskPaymentModal'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { SettingsPage } from './pages/settings'
@@ -66,6 +67,7 @@ const catalogs = [
 const SchedulePage = lazy(() => import('./pages/schedule').then(module => ({ default: module.SchedulePage })))
 const THEME_STORAGE_KEY = 'horsecrm.color_mode'
 const resources: ResourceProps[] = [
+  { name: 'staff', list: '/staff', meta: { label: 'Персонал' } },
   { name: 'dashboard', list: '/', meta: { label: 'Дашборд' } },
   { name: 'stall-map', list: '/stable', meta: { label: 'Карта денников' } },
   { name: 'lessons', list: '/schedule', meta: { label: 'Расписание' } },
@@ -130,6 +132,10 @@ export default function App() {
       boxShadowSecondary: '0 18px 48px rgba(58, 47, 43, 0.10)',
     },
     components: {
+      Tabs: {
+        itemSelectedColor: darkMode ? '#FAF7F2' : '#241E1C',
+        inkBarColor: darkMode ? '#CBBFB6' : '#241E1C',
+      },
       Button: {
         primaryShadow: '0 8px 20px rgba(36, 30, 28, 0.16)',
         defaultBg: darkMode ? '#2D2522' : '#FFFFFF',
@@ -188,6 +194,7 @@ export default function App() {
                 <Route path="pricing-plans"><Route index element={<PricingPlanList />} /><Route path="new" element={<PricingPlanCreate />} /><Route path="edit/:id" element={<PricingPlanEdit />} /></Route>
                 <Route path="users"><Route index element={<UserList />} /><Route path="new" element={<UserCreate />} /></Route>
                 <Route path="cash-desk" element={<CashDeskPage />} />
+                <Route path="staff" element={<StaffPage />} />
                 <Route path="payments" element={<PaymentList />} />
                 <Route path="financial-reports" element={<PermissionGate permission="financeRead"><FinancialReportsPage /></PermissionGate>} />
                 <Route path="vet" element={<VetCalendarPage />} />

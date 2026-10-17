@@ -73,6 +73,9 @@ export class FinanceService {
       const existing = await tx.expense.findUnique({ where: { id } });
       if (!existing) throw new NotFoundException('Расход не найден');
       if (existing.cancelledAt) return existing;
+      if (existing.category === 'SALARY' && await tx.payrollCalculation.findUnique({ where: { expenseId: id } })) {
+        throw new ConflictException('Расход связан с выплаченной ведомостью. Отмена зарплаты через кассу недоступна');
+      }
       return tx.expense.update({ where: { id }, data: { cancelledAt: new Date(), cancelledById: user.id } });
     });
   }

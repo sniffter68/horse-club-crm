@@ -1,0 +1,14 @@
+.staff-page { min-width: 0; }
+.staff-toolbar { margin-bottom: 20px; }
+.staff-feedback { margin-bottom: 16px; }
+.staff-pagination { margin-top: 20px; }
+.staff-grid-scroll { overflow: auto; max-width: 100%; scrollbar-gutter: stable; }
+.staff-grid { border-collapse: collapse; width: max-content; min-width: 100%; font-variant-numeric: tabular-nums; }
+.staff-grid caption { text-align: left; padding: 0 0 12px; color: var(--crm-saddle); }
+.staff-grid th, .staff-grid td { padding: 10px; text-align: center; border: 1px solid var(--crm-border); min-width: 100px; }
+.staff-grid th { background: var(--crm-paper); }
+.staff-grid th:first-child { position: sticky; left: 0; z-index: 1; text-align: left; min-width: 200px; max-width: 240px; white-space: normal; }
+.staff-grid small { display: block; font-weight: 400; }
+.staff-grid td > div { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.staff-grid .ant-tag { margin: 0; white-space: normal; }
+.staff-shift-button.ant-btn { height: auto; padding: 0; border: 0; background: transparent; }

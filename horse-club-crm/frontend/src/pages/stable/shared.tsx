@@ -13,9 +13,10 @@ export function StableListState({ loading, error, total, page, onPage, refresh, 
         <Pagination current={page} total={total} pageSize={20} showSizeChanger={false} onChange={onPage} simple /></>}
   </>
 }
-export function StableEntryModal<T extends object>({ title, form, submitLabel, onClose, onSaved, save, children }: {
+export function StableEntryModal<T extends object>({ title, form, submitLabel, onClose, onSaved, save, children, resources = ['horses', 'clients', 'boarding-contracts'], successMessage = 'Запись сохранена' }: {
   title: string; form: FormInstance<T>; submitLabel: string; onClose: () => void; onSaved: () => void;
   save: (values: T) => Promise<unknown>; children: ReactNode
+  resources?: string[]; successMessage?: string
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -34,8 +35,8 @@ export function StableEntryModal<T extends object>({ title, form, submitLabel, o
     lock.current = true; setBusy(true); setError(undefined)
     try {
       await save(values)
-      await Promise.all(['horses', 'clients', 'boarding-contracts'].map(resource => invalidate({ resource, invalidates: ['all'] })))
-      onSaved(); void message.success('Запись сохранена')
+      await Promise.all(resources.map(resource => invalidate({ resource, invalidates: ['all'] })))
+      onSaved(); void message.success(successMessage)
     } catch (cause) {
       const failure = toHttpError(cause); setError(failure.message)
       if (failure.statusCode === 401) onError(failure)

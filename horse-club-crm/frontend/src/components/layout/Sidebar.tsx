@@ -37,7 +37,7 @@ const menuCategories = [
   { key: 'category-lessons', label: 'Занятия', icon: <CalendarOutlined />, resources: ['lessons', 'lesson-history'] },
   { key: 'category-clients', label: 'Клиенты и финансы', icon: <CreditCardOutlined />, resources: ['clients', 'memberships', 'pricing-plans', 'payments', 'cash-desk', 'financial-reports'] },
   { key: 'category-horses', label: 'Лошади и постой', icon: <HomeOutlined />, resources: ['horses', 'stall-map', 'vet', 'horse-health-logs', 'stalls', 'boarding-contracts'] },
-  { key: 'category-club', label: 'Клуб и команда', icon: <TeamOutlined />, resources: ['trainers', 'services', 'arenas'] },
+  { key: 'category-club', label: 'Клуб и команда', icon: <TeamOutlined />, resources: ['staff', 'trainers', 'services', 'arenas'] },
   { key: 'category-admin', label: 'Администрирование', icon: <SettingOutlined />, resources: ['users', 'settings'] },
 ] as const
 
