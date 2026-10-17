@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSelect } from '@refinedev/antd'
 import { useSearchParams } from 'react-router-dom'
-import { Alert, Button, DatePicker, Form, Input, List, Select, Space, Tag, Typography } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, List, Select, Space, Tabs, Tag, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import 'dayjs/locale/ru'
 import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
@@ -16,6 +16,7 @@ import { useStableList } from './useStableList'
 import { stablePagination } from './pagination'
 import { isHorseUuid } from './horseId'
 import { vetTypeForApi, vetTypes, type VetEvent, type VetType } from './types'
+import { VetRecordsJournal } from './vet-records'
 
 const typeOptions = Object.entries(vetTypes).map(([value, label]) => ({ value, label }))
 type VetValues = { horseId: string; type: VetType; eventDate: Dayjs; nextDueDate?: Dayjs; status: 'scheduled' | 'completed'; performedBy?: string; notes?: string }
@@ -49,7 +50,7 @@ export function VetEntry({ horseId, event, onClose, onSaved }: { horseId?: strin
   </StableEntryModal>
 }
 
-export function VetJournal({ horseId, scope = 'horse' }: { horseId?: string; scope?: 'horse' | 'all' }) {
+function LegacyVetJournal({ horseId, scope = 'horse' }: { horseId?: string; scope?: 'horse' | 'all' }) {
   const horseScoped = scope === 'horse'
   const validHorseId = isHorseUuid(horseId)
   const { permissions } = useRoleAccess()
@@ -107,4 +108,11 @@ export function VetJournal({ horseId, scope = 'horse' }: { horseId?: string; sco
 export function VetCalendarPage() {
   return <div className="stable-dashboard"><Typography.Title level={2}>Ветеринарный журнал</Typography.Title>
     <Typography.Paragraph>Ближайшие процедуры и просроченные назначения по всей конюшне.</Typography.Paragraph><VetJournal scope="all" /></div>
+}
+
+export function VetJournal(props: { horseId?: string; scope?: 'horse' | 'all' }) {
+  return <Tabs destroyOnHidden items={[
+    { key: 'records', label: 'Ветзаписи и паспорт', children: <VetRecordsJournal {...props} /> },
+    { key: 'calendar', label: 'Календарь назначений', children: <LegacyVetJournal {...props} /> },
+  ]} />
 }

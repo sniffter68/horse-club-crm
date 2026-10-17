@@ -26,6 +26,16 @@ function fixture({ horse = {}, client = {}, arena = {}, trainer = {}, bookings =
 }
 const failure = code => error => error.getStatus() === 409 && error.getResponse().code === code;
 
+test('health restrictions return 400 for individual and group assignments, including expired quarantine dates', async () => {
+  for (const healthStatus of ['QUARANTINE', 'TREATMENT', 'RETIRED']) {
+    for (const group of [false, true]) {
+      const { tx, input } = fixture({ horse: { healthStatus, quarantineUntil: new Date('2020-01-01') } });
+      if (group) input.participants.push({ clientId: 'client' });
+      await assert.rejects(rules.validate(tx, input), e => e.getStatus() === 400 && /запрещено/.test(e.message));
+    }
+  }
+});
+
 test('client DTO accepts nullable measured weight and rejects invalid measurements', async () => {
   const { plainToInstance } = require('class-transformer');
   const { validate } = require('class-validator');

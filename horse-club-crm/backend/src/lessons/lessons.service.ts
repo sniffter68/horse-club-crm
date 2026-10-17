@@ -665,7 +665,7 @@ export class LessonsService {
     const { open, close } = this.getWorkDayBounds(date, schedule);
     const horse = await client.horse.findUnique({
       where: { id: horseId },
-      select: { name: true, maxDailyMinutes: true, isUnavailable: true },
+      select: { name: true, maxDailyMinutes: true, isUnavailable: true, healthStatus: true },
     });
     if (!horse) {
       throw new NotFoundException('Лошадь не найдена');
@@ -687,6 +687,7 @@ export class LessonsService {
       return total + Math.ceil(Math.max(0, duration));
     }, 0);
 
+    if (additionalMinutes > 0 && horse.healthStatus && horse.healthStatus !== 'HEALTHY') throw new BadRequestException(`Лошадь «${horse.name}» на лечении, карантине или выбыла: тренировка запрещена`);
     if (additionalMinutes > 0 && horse.isUnavailable) throw new ConflictException(`Лошадь "${horse.name}" недоступна`);
     if (additionalMinutes > 0 && usedMinutes + additionalMinutes > horse.maxDailyMinutes) {
       throw new ConflictException(

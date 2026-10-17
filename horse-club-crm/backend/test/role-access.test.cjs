@@ -96,6 +96,7 @@ test('HTTP role settings enforce health, boarding and report permissions without
   const { RoleAccessGuard } = require('../dist/auth/role-access.guard');
   const { VetCalendarController } = require('../dist/boarding/boarding.controller');
   const { VetCalendarService } = require('../dist/boarding/vet-calendar.service');
+  const { VetRecordService } = require('../dist/boarding/vet-record.service');
   const { BoardingContractsController } = require('../dist/boarding-contracts/boarding-contracts.controller');
   const { BoardingContractsService } = require('../dist/boarding-contracts/boarding-contracts.service');
   const { SettingsController } = require('../dist/settings/settings.controller');
@@ -111,6 +112,7 @@ test('HTTP role settings enforce health, boarding and report permissions without
   const module = await Test.createTestingModule({ controllers: [VetCalendarController, BoardingContractsController, SettingsController, PaymentsController], providers: [RolesGuard, RoleAccessGuard,
     { provide: RoleAccessService, useValue: access }, { provide: SettingsService, useValue: {} },
     { provide: VetCalendarService, useValue: { list: async () => ({ data: [], total: 0 }), create: async dto => dto } },
+    { provide: VetRecordService, useValue: { summary: async () => ({ overdue: [], next14Days: [], next30Days: [] }) } },
     { provide: BoardingContractsService, useValue: { findAll: async () => ({ data: [], total: 0 }) } },
     { provide: PaymentsService, useValue: {} }, { provide: CashDeskService, useValue: { summary: async () => ({ totalRevenue: '100', operations: [] }) } },
   ] }).overrideGuard(JwtAuthGuard).useValue({ canActivate(context) {

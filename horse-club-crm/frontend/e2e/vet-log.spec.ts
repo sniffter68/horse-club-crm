@@ -32,6 +32,7 @@ async function openHorseProcedure(page: import('@playwright/test').Page) {
   await page.goto('/horses')
   await page.getByRole('button', { name: 'Валдай', exact: true }).click()
   await page.getByRole('tab', { name: 'Здоровье и ковка' }).click()
+  await page.getByRole('tab', { name: 'Календарь назначений' }).click()
   await page.getByRole('button', { name: 'Добавить процедуру' }).click()
 }
 
@@ -43,6 +44,7 @@ for (const invalidId of [undefined, null, '', 'invalid-id', 123, { id: horseId }
     await page.goto('/horses')
     await page.getByRole('button', { name: 'Валдай', exact: true }).click()
     await page.getByRole('tab', { name: 'Здоровье и ковка' }).click()
+  await page.getByRole('tab', { name: 'Календарь назначений' }).click()
     const section = page.getByRole('region', { name: 'Здоровье и ковка' })
     await expect(section.getByText('Журнал здоровья недоступен')).toBeVisible()
     await expect(section.getByRole('button', { name: 'Добавить процедуру' })).toHaveCount(0)
@@ -66,6 +68,7 @@ test('waits for the horse card to load and then sends its UUID', async ({ page }
   expect(requests).toEqual([])
   release()
   await page.getByRole('tab', { name: 'Здоровье и ковка' }).click()
+  await page.getByRole('tab', { name: 'Календарь назначений' }).click()
   await expect.poll(() => requests).toContain(horseId)
   expect(requests.every(id => id === horseId)).toBe(true)
 })
@@ -82,6 +85,7 @@ test('horse journal preserves the last type filter without an extra question mar
   await page.goto('/horses')
   await page.getByRole('button', { name: 'Валдай', exact: true }).click()
   await page.getByRole('tab', { name: 'Здоровье и ковка' }).click()
+  await page.getByRole('tab', { name: 'Календарь назначений' }).click()
   await page.getByRole('combobox', { name: 'Тип процедуры' }).focus()
   await page.keyboard.press('ArrowDown')
   await page.locator('.ant-select-dropdown:visible').getByTitle('Ковка', { exact: true }).click()
@@ -134,6 +138,7 @@ for (const [value, offset] of [['', 0], ['-5', 0], ['NaN', 0], ['Infinity', 0], 
       })
     }
     await page.goto(`/vet?page=${encodeURIComponent(value)}`)
+    await page.getByRole('tab', { name: 'Календарь назначений' }).click()
     await expect.poll(() => requests).toContain('upcoming')
     await expect(page.getByText('Не удалось загрузить журнал')).toHaveCount(0)
     // Changing period resets the page to the valid first page.

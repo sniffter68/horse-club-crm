@@ -112,7 +112,7 @@ export class HorsesService {
     return { ...dto,
       ...(daily !== undefined ? { maxDailyMinutes: daily, maxDailyWorkloadMinutes: daily } : {}),
       ...(rest !== undefined ? { minRestMinutes: rest, requiredRestMinutes: rest } : {}),
-      ...(status !== undefined ? { status, isUnavailable: status !== 'active' } : {}),
+      ...(status !== undefined ? { status, isUnavailable: status !== 'active', healthStatus: status === 'sick' ? 'TREATMENT' : status === 'quarantine' ? 'QUARANTINE' : 'HEALTHY', quarantineUntil: null } : {}),
       ...(dto.feedingNotes !== undefined ? { feedingNotes: dto.feedingNotes?.trim() || null } : {}),
     };
   }

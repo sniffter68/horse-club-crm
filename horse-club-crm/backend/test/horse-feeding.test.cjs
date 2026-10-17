@@ -7,9 +7,9 @@ test('horse physiology edits synchronize both API representations and reject con
   let data;
   const service = new HorsesService({ horse: { update: async args => { data = args.data; return { id: 'horse', ...data }; } } });
   await service.update('horse', { maxDailyMinutes: 90, minRestMinutes: 45, isUnavailable: false });
-  assert.deepEqual(data, { maxDailyMinutes: 90, maxDailyWorkloadMinutes: 90, minRestMinutes: 45, requiredRestMinutes: 45, isUnavailable: false, status: 'active' });
+  assert.deepEqual(data, { maxDailyMinutes: 90, maxDailyWorkloadMinutes: 90, minRestMinutes: 45, requiredRestMinutes: 45, isUnavailable: false, status: 'active', healthStatus: 'HEALTHY', quarantineUntil: null });
   await service.update('horse', { requiredRestMinutes: 60, status: 'sick' });
-  assert.deepEqual(data, { requiredRestMinutes: 60, minRestMinutes: 60, status: 'sick', isUnavailable: true });
+  assert.deepEqual(data, { requiredRestMinutes: 60, minRestMinutes: 60, status: 'sick', isUnavailable: true, healthStatus: 'TREATMENT', quarantineUntil: null });
   await assert.rejects(service.update('horse', { maxDailyMinutes: 90, maxDailyWorkloadMinutes: 120 }), error => error.getStatus() === 400);
 });
 

@@ -61,6 +61,8 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
 
 ## Flow ledger
 
+Ветеринария: `vet-records.tsx` использует общий `StableEntryModal`, `StableListState`, Ant Design Form/Select/DatePicker/Modal и `ResponsiveTable`. Ошибка записи сохраняет поля, повторное сохранение блокируется до завершения запроса, несохранённое закрытие подтверждается. После мутации обновляются журнал, сводка, карточки лошадей и предупреждения расписания. ADMIN/MANAGER управляют записями, ADMIN удаляет с подтверждением, TRAINER читает. Отдельная модальная веткарта загружает всю историю и печатается на А4 независимо от темы и пагинации; JSON скачивается локально. Старый календарь назначений сохраняется отдельной вкладкой. Контракт: `docs/veterinary.md`; проверки: `frontend/e2e/vet-records.spec.ts`, `backend/test/vet-records.test.cjs`.
+
 Карта денников: Ant Design Modal и общий `StableEntryModal`; сохранение закрывает карточку, обновляет карту и показывает общий toast. Ошибка сохраняет форму и выбор лошади. Несохранённые статус/заметки защищены подтверждением закрытия, заселение до их сохранения отключено. TRAINER получает просмотр и печать; ADMIN/MANAGER — управление, с учётом `boardingAccess`. Источник бизнес-правил: `docs/stall-map.md`, backend StallsService/guards; проверка: `frontend/e2e/stall-map.spec.ts`, `backend/test/stall-map.test.cjs`.
 
 | Operation | Trigger | Pending | Success destination | Success feedback | Failure recovery | Focus outcome | Source ref |

@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { BoardingBillingService, BoardingServicesService } from './boarding.service';
 import { VetCalendarService } from './vet-calendar.service';
+import { VetRecordService } from './vet-record.service';
 import { BoardingQueryDto, CompleteVetEventDto, CreateBoardingLogDto, CreateVetEventDto, VetQueryDto } from './boarding.dto';
 import { RequirePermission, RoleAccessGuard } from '../auth/role-access.guard';
 
@@ -24,9 +25,12 @@ export class BoardingServicesController {
 @ApiTags('Veterinary calendar') @ApiBearerAuth() @UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard) @RequirePermission('healthRead')
 @Controller('vet')
 export class VetCalendarController {
-  constructor(private readonly service: VetCalendarService) {}
+  constructor(private readonly service: VetCalendarService, private readonly records: VetRecordService) {}
   @Get('upcoming') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
-  upcoming(@Query() query: VetQueryDto) { return this.service.list(query, true); }
+  async upcoming(@Query() query: VetQueryDto) {
+    const [calendar, summary] = await Promise.all([this.service.list(query, true), this.records.summary()]);
+    return { ...calendar, ...summary };
+  }
   @Get('events') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
   list(@Query() query: VetQueryDto) { return this.service.list(query); }
   @Post('events') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER) @RequirePermission('healthWrite')

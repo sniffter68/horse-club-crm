@@ -65,6 +65,7 @@ export class BookingRulesService {
       if (!participant.horseId) continue;
       const horse = horses.find(h => h.id === participant.horseId);
       if (!horse) throw new BookingValidationError('RESOURCE_NOT_FOUND', 'Лошадь не найдена');
+      if (horse.healthStatus && horse.healthStatus !== 'HEALTHY') throw new BadRequestException(`Лошадь «${horse.name}» ${horse.healthStatus === 'QUARANTINE' ? 'на карантине' : horse.healthStatus === 'TREATMENT' ? 'на лечении' : 'выбыла'}: назначение на тренировку запрещено`);
       if (horse.status !== 'active' || horse.isUnavailable) throw new BookingValidationError(input.requireRiderWeight ? 'HORSE_NOT_ACTIVE' : 'HORSE_UNAVAILABLE', 'Лошадь недоступна для тренировок', { horseId: horse.id });
       if (input.requireRiderWeight && client.weightKg == null) {
         throw new BookingValidationError('RIDER_WEIGHT_REQUIRED', 'Укажите вес всадника в карточке клиента перед заменой лошади');

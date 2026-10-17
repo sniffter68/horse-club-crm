@@ -1,0 +1,29 @@
+.vet-passport-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.vet-passport-table th, .vet-passport-table td { border: 1px solid var(--crm-border); padding: 8px; text-align: left; vertical-align: top; overflow-wrap: anywhere; white-space: pre-wrap; }
+.vet-print-root { overflow-wrap: anywhere; }
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  body:has(.vet-print-root) { background: white !important; }
+  body:has(.vet-print-root) .ant-modal-root,
+  body:has(.vet-print-root) .ant-modal-root .ant-modal-wrap,
+  body:has(.vet-print-root) .ant-modal-root .ant-modal { opacity: 1 !important; transform: none !important; animation: none !important; transition: none !important; }
+  body:has(.vet-print-root) .ant-message,
+  body:has(.vet-print-root) .ant-notification,
+  body:has(.vet-print-root) .ant-tooltip,
+  body:has(.vet-print-root) .ant-select-dropdown,
+  body:has(.vet-print-root) .ant-picker-dropdown { display: none !important; }
+  body:has(.vet-print-root) > #root { display: none !important; }
+  body:has(.vet-print-root) .ant-modal-root:not(:has(.vet-print-root)) { display: none !important; }
+  body:has(.vet-print-root) .ant-modal-root .ant-modal-mask,
+  body:has(.vet-print-root) .ant-modal-root .ant-modal-header,
+  body:has(.vet-print-root) .ant-modal-root .ant-modal-footer,
+  body:has(.vet-print-root) .ant-modal-root .ant-modal-close { display: none !important; }
+  body:has(.vet-print-root) .ant-modal-root .ant-modal-wrap { position: static !important; overflow: visible !important; }
+  body:has(.vet-print-root) .ant-modal-root .ant-modal { top: 0 !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
+  body:has(.vet-print-root) .ant-modal-root .ant-modal-content,
+  body:has(.vet-print-root) .ant-modal-root .ant-modal-body { padding: 0 !important; box-shadow: none !important; max-height: none !important; overflow: visible !important; background: white !important; }
+  .vet-print-root, .vet-print-root * { color: black !important; background: white !important; }
+  .vet-passport-table th, .vet-passport-table td { border-color: black; }
+  .vet-passport-table tr { break-inside: avoid; }
+  .vet-passport-table thead { display: table-header-group; }
+}
