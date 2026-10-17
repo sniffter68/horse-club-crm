@@ -11,6 +11,7 @@ import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { CashDeskButton } from './CashDeskPaymentModal'
 import { cashTime, currency, operationService, periodRange, type CashOperation, type CashShift, type CashSummary } from './shared'
 import { personName } from '../cards/format'
+import { ExpenseHistory, ExpenseModal } from './expenses'
 
 export function CashDeskPage() {
   const { data: role, isLoading } = usePermissions({})
@@ -20,6 +21,8 @@ export function CashDeskPage() {
   return <CashDeskBook />
 }
 function CashDeskBook() {
+  const { data: role } = usePermissions({})
+  const [expenseOpen, setExpenseOpen] = useState(false)
   const [params, setParams] = useSearchParams()
   const period = params.get('period') || 'today'
   const from = params.get('from') || '', to = params.get('to') || ''
@@ -51,7 +54,7 @@ function CashDeskBook() {
         if (period === 'shift' && !active) { setSummary(undefined); return }
         if (period === 'custom' && (!from || !to)) { setSummary(undefined); return }
         const range = periodRange(period, from, to)
-        const { data } = await httpClient.get<CashSummary>(`${API_URL}/payments/summary`, { params: { ...range, ...(period === 'shift' && active ? { from: active.openedAt, shiftId: active.id } : {}), page, pageSize: 20 }, signal: controller.signal })
+        const { data } = await httpClient.get<CashSummary>(`${API_URL}/finance/summary`, { params: { ...range, ...(period === 'shift' && active ? { from: active.openedAt, shiftId: active.id } : {}), page, pageSize: 20 }, signal: controller.signal })
         if (!controller.signal.aborted) {
           if (page > 1 && data.operationsCount <= (page - 1) * 20) changeParams({ page: String(Math.max(1, Math.ceil(data.operationsCount / 20))) })
           else setSummary(data)
@@ -77,7 +80,7 @@ function CashDeskBook() {
     catch (cause) { setError(toHttpError(cause).message); throw cause }
   } })
   return <Space className="cash-desk-page" direction="vertical" size="large" style={{ width: '100%' }}>
-    <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}><div><Typography.Title level={2}>Касса</Typography.Title><Typography.Text type="secondary">Кассовая книга · время Москвы</Typography.Text></div><Space wrap><CashDeskButton /><Button onClick={() => setRefresh(value => value + 1)} loading={loading}>Обновить</Button></Space></Space>
+    <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}><div><Typography.Title level={2}>Касса</Typography.Title><Typography.Text type="secondary">Кассовая книга · время Москвы</Typography.Text></div><Space wrap><CashDeskButton /><Button type="primary" onClick={() => setExpenseOpen(true)}>Внести расход</Button><Button onClick={() => setRefresh(value => value + 1)} loading={loading}>Обновить</Button></Space></Space>
     <Card><Space wrap>
       <Tag>{shift ? `Смена открыта ${cashTime(shift.openedAt)}` : 'Нет открытой смены'}</Tag>
       {shift ? <><Typography.Text>Размен на начало: {currency(shift.startingCash)}</Typography.Text><Button onClick={closeShift}>Закрыть смену</Button></> : <Button onClick={() => { setShiftError(undefined); setOpening(true) }}>Открыть смену</Button>}
@@ -90,9 +93,18 @@ function CashDeskBook() {
     {period === 'shift' && !loading && !shift && <Alert type="info" message="Откройте смену, чтобы учитывать её платежи отдельно" />}
     {period === 'custom' && (!from || !to) && <Alert type="info" message="Выберите начало и конец периода" />}
     <Row gutter={[16, 16]}>{[
+      ['Остаток в кассе (наличные)', summary?.balanceCash],
+      ['Остаток на счете (безнал)', summary?.balanceCard],
+      ['Всего расходов за период', summary?.totalExpenses],
+    ].map(([title, value]) => <Col xs={24} md={8} key={title}><Card className="kpi-card"><Statistic title={title} value={error || !summary ? '—' : currency(value)} loading={loading} /></Card></Col>)}</Row>
+    <Typography.Text type="secondary">Остатки накопительно на конец периода; для текущей смены — движение средств этой смены без размена. Доходы и расходы ниже — за выбранный период.</Typography.Text>
+    <Row gutter={[16, 16]}>{[
       [period === 'shift' ? 'Наличные за смену' : 'Наличные за период', summary?.totalCash],
       [period === 'shift' ? 'Безналичные за смену' : 'Безналичные за период', summary?.totalCard],
       ['Итого выручка', summary?.totalRevenue],
+      ['Расходы наличными', summary?.totalExpensesCash],
+      ['Расходы безналичными', summary?.totalExpensesCard],
+      ['Доходы минус расходы за период', summary?.netTotal],
     ].map(([title, value]) => <Col xs={24} md={8} key={title}><Card className="kpi-card"><Statistic title={title} value={error || !summary ? '—' : currency(value)} loading={loading} /></Card></Col>)}</Row>
     <Card title="Кассовая книга" extra={<Typography.Text>{summary && !error ? `Операций: ${summary.operationsCount}` : ''}</Typography.Text>}>
       <ResponsiveTable<CashOperation> rowKey="id" dataSource={error ? [] : summary?.operations ?? []} loading={loading} scroll={{ x: 'max-content' }} locale={{ emptyText: 'За выбранный период платежей нет' }}
@@ -106,6 +118,8 @@ function CashDeskBook() {
           { key: 'cashier', title: 'Администратор', render: (_, row) => row.cashier?.email || 'Ранее внесённый платёж' },
         ]} />
     </Card>
+    {!(period === 'shift' && !shift) && !(period === 'custom' && (!from || !to)) && <ExpenseHistory key={`${period}:${from}:${to}`} {...periodRange(period, from, to)} {...(period === 'shift' && shift ? { from: shift.openedAt, shiftId: shift.id } : {})} refresh={refresh} admin={role === 'ADMIN'} />}
+    {expenseOpen && <ExpenseModal onClose={() => setExpenseOpen(false)} />}
     <Modal open={opening} title="Открыть смену" onCancel={() => { if (!shiftBusy) setOpening(false) }} maskClosable={false} okText="Открыть смену" cancelText="Отмена" confirmLoading={shiftBusy} onOk={() => form.submit()}>
       {shiftError && <Alert type="error" message={shiftError} />}
       <Form form={form} noValidate layout="vertical" initialValues={{ startingCash: 0 }} onFinish={openShift} disabled={shiftBusy}><Form.Item name="startingCash" label="Наличные на начало смены, ₽" rules={[{ required: true, type: 'number', min: 0, message: 'Введите сумму от нуля' }]}><InputNumber min={0} max={9999999999.99} precision={2} style={{ width: '100%' }} /></Form.Item></Form>

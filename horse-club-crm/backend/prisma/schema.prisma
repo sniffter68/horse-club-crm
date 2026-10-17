@@ -147,6 +147,8 @@ enum LeadRequestStatus {
 }
 
 model User {
+  expenses Expense[] @relation("ExpenseAuthor")
+  cancelledExpenses Expense[] @relation("ExpenseCanceller")
   trainerId    String? @unique @db.Uuid
   trainer      Trainer? @relation(fields: [trainerId], references: [id], onDelete: SetNull)
   horseChanges BookingHorseChange[]
@@ -536,6 +538,7 @@ model BoardingContract {
 }
 
 model CashShift {
+  expenses Expense[]
   id String @id @default(uuid()) @db.Uuid
   cashierId String @db.Uuid
   cashier User @relation(fields: [cashierId], references: [id], onDelete: Restrict)
@@ -545,6 +548,44 @@ model CashShift {
   notes String?
   payments Payment[]
   @@index([cashierId, openedAt])
+}
+
+enum ExpensePaymentMethod {
+  CASH
+  CARD
+}
+
+enum ExpenseCategory {
+  FEED
+  BEDDING
+  VET_FARRIER
+  AMMUNITION
+  MAINTENANCE
+  SALARY
+  OTHER
+}
+
+model Expense {
+  id String @id @default(uuid()) @db.Uuid
+  requestId String? @unique @db.Uuid
+  amount Decimal @db.Decimal(12, 2)
+  paymentMethod ExpensePaymentMethod
+  category ExpenseCategory
+  description String @db.VarChar(500)
+  date DateTime @default(now()) @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  createdById String @db.Uuid
+  createdBy User @relation("ExpenseAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+  receiptUrl String?
+  shiftId String? @db.Uuid
+  shift CashShift? @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  cancelledAt DateTime? @db.Timestamptz(6)
+  cancelledById String? @db.Uuid
+  cancelledBy User? @relation("ExpenseCanceller", fields: [cancelledById], references: [id], onDelete: Restrict)
+  @@index([cancelledAt, date])
+  @@index([paymentMethod, category, date])
+  @@index([createdById, date])
+  @@index([shiftId])
 }
 
 model Payment {

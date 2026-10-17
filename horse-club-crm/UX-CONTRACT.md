@@ -182,6 +182,12 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
 
 ## Cash desk
 
+- Expense owner: `frontend/src/pages/cash-desk/expenses.tsx`; API and financial semantics: `docs/expenses.md`, `backend/src/payments/finance.controller.ts` and migration `20261018090000_expenses`.
+- ADMIN/MANAGER create and read expenses; TRAINER cannot access expense APIs or their summary. Only ADMIN sees cancellation; the confirmation names the expense and explains the balance reversal. Cancellation retains the record and actor in the database.
+- Ant Form/InputNumber/Segmented/Select/DatePicker/Modal/App message and ResponsiveTable own the expense flow. Dates use the authored Russian calendar and Moscow conversion. Filters share the cash-book date range and persist method/category/page in URL state.
+- Cumulative cash/account balances are distinct from period income/expenses. Category/method filters narrow expense history only. Mutations refresh both balances and history; failures preserve the draft, uncertain retries reuse the operation key, and dirty close requires confirmation.
+- Evidence: `backend/test/expenses.test.cjs`, `backend/test/expenses.postgres.test.cjs`, `frontend/e2e/cash-desk.spec.ts`, `frontend/e2e/expenses.live.spec.ts`.
+
 - Owner: `frontend/src/pages/cash-desk`; reusable payment modal via `CashDeskProvider` in the private layout.
 - Sources: user cash-desk brief; `backend/src/payments/cash-desk.service.ts`, DTOs and migration `20261009120000_cash_desk`.
 - ADMIN/MANAGER receive payments and view the book; backend guards are authoritative. Cashier identity comes from the session.

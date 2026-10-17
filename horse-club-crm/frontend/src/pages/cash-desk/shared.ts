@@ -8,7 +8,7 @@ export interface CashOperation extends Payment {
   cashGiven: string | null; cashChange: string | null; cashierId: string | null
   cashier: { email: string } | null; service: { name: string; title: string } | null; serviceType: string | null; notes: string | null
 }
-export interface CashSummary { totalCash: string; totalCard: string; totalRevenue: string; totalUnspecified?: string; operationsCount: number; operations: CashOperation[] }
+export interface CashSummary { totalCash: string; totalCard: string; totalRevenue: string; totalUnspecified?: string; totalExpensesCash: string; totalExpensesCard: string; totalExpenses: string; balanceCash: string; balanceCard: string; balanceTotal: string; netTotal: string; operationsCount: number; operations: CashOperation[] }
 export function periodRange(period: string, from?: string, to?: string) {
   const now = DateTime.now().setZone('Europe/Moscow')
   if (period === 'custom' && from && to) return { from: DateTime.fromISO(from, { zone: 'Europe/Moscow' }).startOf('day').toISO(), to: DateTime.fromISO(to, { zone: 'Europe/Moscow' }).plus({ days: 1 }).startOf('day').toISO() }

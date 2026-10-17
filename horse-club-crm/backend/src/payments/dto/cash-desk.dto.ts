@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export class CashDeskPaymentDto {
@@ -16,8 +16,8 @@ export class CashDeskPaymentDto {
 export class CashSummaryQueryDto {
   @IsDateString() from!: string;
   @IsDateString() to!: string;
-  @IsOptional() @IsUUID() cashierId?: string;
-  @IsOptional() @IsUUID() shiftId?: string;
+  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID() cashierId?: string;
+  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID() shiftId?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize = 20;
 }
