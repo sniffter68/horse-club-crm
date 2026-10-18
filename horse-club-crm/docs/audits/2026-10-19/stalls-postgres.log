@@ -1,0 +1,5 @@
+
+Invalid `prisma.$executeRawUnsafe()` invocation:
+
+
+Raw query failed. Code: `42501`. Message: `ОШИБКА: нет прав для создания базы данных`

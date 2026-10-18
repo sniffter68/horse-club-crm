@@ -1,4 +1,4 @@
-import { test, expect, type Locator, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from './fixtures'
 test.use({ timezoneId: 'America/New_York' })
 
 const horse = { id: 'h1', name: 'Кролик', breed: '', riderLevel: '', maxDailyMinutes: 240, minRestMinutes: 15, isUnavailable: false }

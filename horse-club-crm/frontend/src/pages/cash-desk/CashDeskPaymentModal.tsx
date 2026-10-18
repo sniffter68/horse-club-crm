@@ -1,3 +1,4 @@
+import { usePermissions as useModules } from '../../modulePermissions'
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useInvalidate, usePermissions } from '@refinedev/core'
 import { Alert, App, Button, Form, Input, InputNumber, Modal, Segmented, Select, Space, Statistic } from 'antd'
@@ -13,8 +14,9 @@ type Values = { clientId: string; choice: string; amount: number; cashGiven?: nu
 const CashDeskContext = createContext<() => void>(() => {})
 export function CashDeskButton() {
   const open = useContext(CashDeskContext)
+  const modules = useModules()
   const { data: role } = usePermissions({})
-  return role === 'ADMIN' || role === 'MANAGER' ? <Button type="primary" aria-label="Принять платёж" icon={<PlusOutlined />} onClick={open}>Принять платёж</Button> : null
+  return modules.canWrite('CASHBOX') && (role === 'ADMIN' || role === 'MANAGER') ? <Button type="primary" aria-label="Принять платёж" icon={<PlusOutlined />} onClick={open}>Принять платёж</Button> : null
 }
 export function CashDeskProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)

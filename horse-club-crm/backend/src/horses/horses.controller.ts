@@ -23,7 +23,7 @@ export class HorsesController {
   constructor(private readonly horsesService: HorsesService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) res: Response): Promise<Horse[]> {
     const { data, total } = await this.horsesService.findAll(query);
     setRefineTotalHeaders(res, total);
@@ -31,7 +31,7 @@ export class HorsesController {
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<HorseDetailsResponse> {
     return this.horsesService.findOne(id);
   }

@@ -34,7 +34,8 @@ test('feeding API validates text and permissions and serves persisted notes', as
   let horse = { id: '8f7fb395-fbcc-46bb-82d9-5f84985e5c5c', name: 'Кролик', feedingNotes: null };
   const module = await Test.createTestingModule({ controllers: [HorsesController], providers: [RolesGuard,
     { provide: HorsesService, useValue: { update: async (_id, dto) => (horse = { ...horse, ...dto }), findOne: async () => horse } },
-  ] }).overrideGuard(JwtAuthGuard).useValue({ canActivate(context) {
+  ] }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
+    .overrideGuard(JwtAuthGuard).useValue({ canActivate(context) {
     const req = context.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return true;
   } }).compile();
   const app = module.createNestApplication();

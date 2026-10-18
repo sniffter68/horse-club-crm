@@ -4,6 +4,11 @@ const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
 
 async function main() {
+  const modules = ['SCHEDULE', 'STABLES', 'VETERINARY', 'CASHBOX', 'STAFF_PAYROLL'];
+  await prisma.clubModuleSettings.createMany({ data: modules.map(module => ({ module })), skipDuplicates: true });
+  await prisma.roleModulePermission.createMany({ data: ['ADMIN', 'MANAGER', 'TRAINER', 'STABLE_WORKER'].flatMap(role =>
+    modules.map(module => ({ role, module, accessLevel: role === 'ADMIN' || role === 'MANAGER' || role === 'TRAINER' && module === 'SCHEDULE'
+      ? 'FULL' : ['STABLES', 'VETERINARY'].includes(module) ? 'READ_ONLY' : 'HIDDEN' }))), skipDuplicates: true });
   if (await prisma.stall.count() === 0) {
     await prisma.stall.createMany({ data: Array.from({ length: 16 }, (_, index) => {
       const n = index + 1, summer = n > 12;

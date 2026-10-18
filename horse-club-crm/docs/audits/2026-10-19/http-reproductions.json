@@ -1,0 +1,21 @@
+[
+  {
+    "finding": "AUTH-01",
+    "description": "Inactive StaffProfile does not disable authentication",
+    "activeStaff": false,
+    "freshLoginStatus": 200,
+    "ownProfileStatus": 403
+  },
+  {
+    "check": "Foreign staff privacy",
+    "status": 403,
+    "result": "PASS"
+  },
+  {
+    "finding": "UPLOAD-01",
+    "description": "Trainer can publish an 8-byte PNG header; file is anonymously accessible",
+    "uploadStatus": 201,
+    "anonymousReadStatus": 200,
+    "syntheticFileDeleted": true
+  }
+]

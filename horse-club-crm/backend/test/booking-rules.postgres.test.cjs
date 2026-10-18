@@ -126,7 +126,8 @@ test('PostgreSQL booking rules, rollback, HTTP contract and concurrent triad wri
       const { RolesGuard } = require('../dist/auth/guards/roles.guard');
       const request = require('supertest');
       const module = await Test.createTestingModule({ controllers: [BookingsController], providers: [RolesGuard, { provide: BookingsService, useValue: service }, { provide: BookingLifecycleService, useValue: new BookingLifecycleService(p) }] })
-        .overrideGuard(JwtAuthGuard).useValue({ canActivate(ctx) { const req = ctx.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return true; } }).compile();
+        .overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
+    .overrideGuard(JwtAuthGuard).useValue({ canActivate(ctx) { const req = ctx.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return true; } }).compile();
       app = module.createNestApplication();
       app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true })); await app.init();
       const dto = await resources({ maxRiderWeight: 70 });

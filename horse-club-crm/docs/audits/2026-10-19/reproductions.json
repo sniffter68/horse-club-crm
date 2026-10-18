@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-19",
+  "syntheticOnly": true,
+  "results": [
+    {
+      "finding": "PAY-01",
+      "description": "Completed standalone Booking is ignored by payroll",
+      "completedBookings": 1,
+      "payrollLessons": 0,
+      "payrollAmount": "0"
+    },
+    {
+      "finding": "CASH-02",
+      "description": "Payout succeeds without receipts or starting cash",
+      "balanceCash": "-1000"
+    },
+    {
+      "finding": "PAY-02",
+      "description": "Rebinding trainer to another staff account allows paying the same Lesson twice",
+      "completedLessons": 1,
+      "salaryExpenses": 2,
+      "totalPaid": "2000"
+    },
+    {
+      "finding": "CASH-01",
+      "description": "Legacy API creates PAID receipts without author and hard-deletes them",
+      "paidRecordDeleted": true
+    },
+    {
+      "finding": "LAW-01",
+      "description": "99.9% salary deduction is accepted without reason/document",
+      "gross": 1000,
+      "deduction": 999,
+      "net": "1"
+    }
+  ]
+}

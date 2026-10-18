@@ -31,7 +31,7 @@ function useBoardingRefresh() {
 export function QuickBoardingActions({ context, contracts, currentContract, disabled = false }: {
   context: PlacementContext; contracts: ContractSummary[]; currentContract?: ContractSummary | null; disabled?: boolean
 }) {
-  const { canManage } = useCatalogPermissions()
+  const { canManage } = useCatalogPermissions('boarding-contracts')
   const refresh = useBoardingRefresh()
   const { mutate: onError } = useOnError()
   const { message } = App.useApp()

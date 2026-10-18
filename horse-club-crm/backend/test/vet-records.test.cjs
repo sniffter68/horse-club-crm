@@ -66,6 +66,7 @@ test('batch locks all horses before writes and rejects unsupported procedures; h
 test('HTTP RBAC allows trainer reads but prevents trainer writes and manager deletion, even with healthWrite enabled', async () => {
   const service = { list: async () => ({ data: [], total: 0 }), summary: async () => ({}), passport: async () => ({}), create: async d => d, update: async () => ({}), remove: async () => ({}), health: async () => ({}) };
   const module = await Test.createTestingModule({ controllers: [VetRecordController], providers: [RolesGuard, { provide: VetRecordService, useValue: service }] })
+    .overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
     .overrideGuard(JwtAuthGuard).useValue({ canActivate: c => { const req = c.switchToHttp().getRequest(); req.user = { id, role: req.headers['x-role'] }; return true; } })
     .overrideGuard(RoleAccessGuard).useValue({ canActivate: () => true }).compile();
   const app = module.createNestApplication(); app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));

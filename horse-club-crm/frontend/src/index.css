@@ -378,3 +378,7 @@ html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); borde
 .cash-desk-modal .ant-modal-body { max-height: calc(100dvh - 180px); overflow-y: auto; padding-right: 4px; }
 .cash-desk-modal .ant-modal-footer { margin-top: 16px; }
 @media (max-width: 767px) { .cash-desk-header { padding-top: 76px; padding-right: 24px; } }
+
+.module-permissions-table { width: 100%; border-collapse: collapse; }
+.module-permissions-table th, .module-permissions-table td { text-align: left; padding: 16px; border-bottom: 1px solid var(--crm-border); }
+.module-permissions-table caption { text-align: left; padding: 12px 16px; }

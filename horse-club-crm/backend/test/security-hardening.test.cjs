@@ -27,7 +27,8 @@ test('trainer cannot change lesson status through HTTP, manager can', async () =
   const module = await Test.createTestingModule({ imports: [CommonModule], controllers: [LessonsController], providers: [
     { provide: LessonsService, useValue: { updateLessonStatus: async () => { changes++; return {}; },
       findOne: async () => ({bookings:[{client:{name:'Test',medicalNotes:'secret'},payments:[{amount:10}]}]}) } }, RolesGuard,
-  ] }).overrideGuard(JwtAuthGuard).useValue({ canActivate(ctx) {
+  ] }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
+    .overrideGuard(JwtAuthGuard).useValue({ canActivate(ctx) {
     const req = ctx.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return true;
   } }).compile();
   const app = module.createNestApplication(); await app.init();
@@ -78,7 +79,8 @@ test('limiter blocks login floods and rejects cross-origin cookie writes', () =>
 test('browser login sets HttpOnly cookie and never exposes the JWT in JSON', async () => {
   const module=await Test.createTestingModule({controllers:[AuthController],providers:[
     {provide:AuthService,useValue:{login:async()=>({access_token:'private-jwt',user:{id:'a',email:'a@example.com',role:'ADMIN'}})}}
-  ]}).overrideGuard(JwtAuthGuard).useValue({canActivate:()=>true}).compile();
+  ]}).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
+    .overrideGuard(JwtAuthGuard).useValue({canActivate:()=>true}).compile();
   const app=module.createNestApplication();await app.init();
   try {
     const response=await request(app.getHttpServer()).post('/auth/login').send({}).expect(200);

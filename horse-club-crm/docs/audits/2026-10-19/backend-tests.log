@@ -1,0 +1,487 @@
+npm notice run test
+npm notice run tsc --noCheck && node --test test/*.test.cjs
+✔ arena edits synchronize capacity and availability for both booking APIs (3.3203ms)
+✔ arena list supports Refine pagination, search and sorting (1.3605ms)
+✔ arena creation normalizes its name and description (0.4946ms)
+✔ DTO rejects extra fields, invalid roles and numeric credentials (11.956ms)
+✔ login verifies bcrypt, signs short-lived versioned claims and does not expose the hash (1552.6187ms)
+✔ registration hashes passwords, rejects bcrypt truncation and maps duplicate users to 409 (801.3476ms)
+✔ JWT strategy rejects expired, forged and malformed tokens (11.2671ms)
+✔ roles deny missing users and wrong roles; method metadata overrides class metadata (0.5368ms)
+✔ JWT configuration fails closed without a sufficiently long secret (0.3377ms)
+✔ profile and VK updates preserve sessions; token version and role changes revoke them (0.3918ms)
+✔ monthly billing is idempotent for a contract and club-local month (7.9747ms)
+✔ vet overdue is based on club calendar date, completed remains completed (1.6619ms)
+✔ boarding contracts module imports authentication providers for its guards (1.3659ms)
+✔ club placement accepts omitted/null client, forces zero rate and creates no payments (16.8873ms)
+✔ club update preserves omitted client, supports explicit null, and cannot introduce a club rate (2.2561ms)
+✔ manual payments cannot be linked to club placement (4.2392ms)
+✔ boarding DTO accepts club placement and still validates private UUIDs and rates (50.0717ms)
+✔ active boarding contract is created in a serializable transaction (1.9594ms)
+✔ unavailable stall cannot be assigned to a boarding contract (0.441ms)
+✔ overlapping active contract for the same horse is rejected (0.3573ms)
+✔ contract end date must be after its start date (0.3316ms)
+✔ quick placement excludes active/suspended and future reservations but allows drafts and contracts ending at the start (1.3254ms)
+✔ quick release preserves rate/parties/payments, closes unavailable stalls and is idempotent (1.293ms)
+✔ quick release rejects draft without changing contract (0.508ms)
+✔ quick release rejects expired without changing contract (0.442ms)
+✔ quick release rejects future without changing contract (0.2573ms)
+✔ quick release rejects ended without changing contract (0.1656ms)
+✔ horse card includes current boarding even when more than twenty newer historical contracts exist (17.9517ms)
+✔ quick boarding HTTP endpoints validate dates and restrict changes to ADMIN/MANAGER (613.1694ms)
+﹣ PostgreSQL boarding finance and veterinary calendar (2.6709ms) # SKIP
+﹣ PostgreSQL lifecycle, journal bridge and concurrent financial outcomes (1.1979ms) # SKIP
+✔ cancellation boundary is inclusive at exactly 12 hours, with no rounding (1.5098ms)
+✔ fixed units and decimal deposits have separate billing denominations (0.8956ms)
+﹣ PostgreSQL booking rules, rollback, HTTP contract and concurrent triad writers (2.8017ms) # SKIP
+✔ health restrictions return 400 for individual and group assignments, including expired quarantine dates (28.5701ms)
+✔ client DTO accepts nullable measured weight and rejects invalid measurements (2562.1487ms)
+✔ successful booking validates and inserts inside a serializable interactive transaction after row locks (9.9905ms)
+✔ rejects rider weight, but accepts the exact horse limit and unknown weight (4.5198ms)
+✔ availability preview uses the same rest rules without acquiring reservation locks (1.3349ms)
+✔ rejects unavailable horses, trainers and arenas (2.2098ms)
+✔ daily workload accepts the exact limit and rejects one minute above it (1.7947ms)
+✔ rest accepts exactly 45 minutes and rejects a one-second deficit on either side (2.6211ms)
+✔ trainer overlap rejects, adjacent intervals pass (2.441ms)
+✔ arena uses simultaneous peak occupancy, not the total number of intersecting records (11.6855ms)
+✔ club day clips cross-midnight workload, including the following day (8.5011ms)
+✔ legacy lessons use current lesson times and group riders without counting copied bookings twice (0.9187ms)
+✔ serialization retry revalidates and returns a typed contention error after five attempts (0.4611ms)
+✔ invalid intervals and costs never start a transaction (0.5478ms)
+✔ horse replacement validates future scheduled booking and only writes horse and reason (1.3996ms)
+✔ horse replacement rejects unavailable horse and unknown rider weight without writes (0.8568ms)
+✔ legacy replacement excludes its lesson and validates the changed participant without duplicate horse assignments (0.6978ms)
+﹣ PostgreSQL cash desk atomicity, concurrency, shifts and aggregation (0.791ms) # SKIP
+✔ cash calculator uses exact kopecks, accepts exact payment and optional tender (2.5923ms)
+✔ cash calculator rejects insufficient, negative, nonfinite and fractional kopecks (1.3191ms)
+✔ summary counts cash as receipt amount, aggregates all noncash and exact totals (0.7925ms)
+✔ cash payment links receipt, cashier, shift and purchase in one transaction (6.0828ms)
+✔ payment settles existing pending charge and marks booking paid (0.9162ms)
+✔ rejects paid bookings, wrong client and unsupported cash tender (1.075ms)
+✔ fixed lessons are not credited twice; deposits credit exact payment (0.7084ms)
+✔ idempotent retry returns original payment; changed retry conflicts (0.6097ms)
+✔ ledger failure rejects entire transactional operation (0.3865ms)
+✔ summary applies paid/date/cashier filters and paginates operations without limiting totals (1.0461ms)
+✔ cash receipts cannot be edited or removed through legacy CRUD (1.1776ms)
+✔ legacy unspecified receipts remain in revenue without being classified as noncash (0.3463ms)
+✔ clients list returns the Refine slice and total headers (390.2461ms)
+✔ client medical notes are hidden from TRAINER and preserved for ADMIN (17.9247ms)
+✔ TRAINER cannot access ledger or membership summary in the client list (35.611ms)
+✔ ADMIN updates club schedule while TRAINER receives 403 (51.1878ms)
+✔ client list includes nearest active membership and returns an explicit empty balance (9.0744ms)
+✔ client ledger scopes all operations to client and paginates without excluding expired memberships (1.4437ms)
+✔ ledger rejects missing clients and restricts history to membership management roles (0.9892ms)
+﹣ PostgreSQL: resource and last-balance races (4.0418ms) # SKIP
+﹣ PostgreSQL expense idempotency, constraints, pagination, balances and audited cancellation (0.9158ms) # SKIP
+✔ expense DTO requires positive finite kopecks and nonblank description, validates category/method/receipt (6.3143ms)
+✔ expense query transforms numeric pagination and ignores empty string filters (1.0414ms)
+✔ Moscow business dates include the full final day; offsetless timestamps are rejected (8.796ms)
+✔ summary subtracts CASH/CARD expenses exactly and keeps cumulative balance independent of period and pagination (12.0109ms)
+✔ create attaches authenticated author, shift and amount in serializable transaction; retry returns same expense (1.7232ms)
+✔ cancel preserves financial record and actor, is idempotent and blocks MANAGER at service boundary (0.839ms)
+✔ HTTP permissions: TRAINER gets 403, MANAGER creates/reads but cannot delete, ADMIN cancels; JWT author cannot be spoofed (436.5049ms)
+✔ horse physiology edits synchronize both API representations and reject contradictory settings (3.1702ms)
+✔ feeding updates preserve line breaks, clear empty notes and do not modify unrelated horse fields (0.3489ms)
+✔ feeding API validates text and permissions and serves persisted notes (2998.0346ms)
+✔ health logs module imports authentication providers for its guards (2.6226ms)
+✔ health log list searches horse names and notes (3.2098ms)
+✔ health log creation trims notes and clears empty next date (0.5445ms)
+✔ replacement preview excludes rest and weight conflicts and performs no writes (7.7766ms)
+✔ group replacement repairs one rider even if another horse is sick, preserving capacity (0.7291ms)
+✔ group replacement rejects a horse already assigned to another rider (0.7641ms)
+✔ preview and replacement reject terminal bookings (0.4411ms)
+✔ problem feed filters future scheduled records of both sources, includes unavailable status and paginates (0.6909ms)
+﹣ PostgreSQL replacement race, rollback and profile/password auth versions (2.5528ms) # SKIP
+✔ daily workload counts each horse once per group lesson, returns idle horses and status, and uses club day bounds (8.664ms)
+✔ existing single-horse read still returns workload when a lowered limit is already exceeded (2.8962ms)
+✔ reschedule excludes itself from conflicts and workload and accepts exact daily limit without modifying bookings or ledger (4.1282ms)
+✔ reschedule rejects daily overload before mutation (2.2546ms)
+✔ reschedule rejects resource conflict before mutation (1.1892ms)
+✔ reschedule rejects finalized lesson before mutation (0.414ms)
+✔ reschedule rejects unavailable horse before mutation (1.8265ms)
+✔ reschedule rejects membership expired at new lesson end before mutation (0.8332ms)
+✔ workload is readable by trainers while transfers remain restricted to ADMIN/MANAGER (0.2316ms)
+✔ HTTP workload routing, DTO validation and transfer authorization match the frontend API (512.458ms)
+✔ conversion creates client, scheduled lesson/participant, pending charge and notifications in one transaction (26.0653ms)
+✔ existing client is reused by phone and receives the participant notification (17.7466ms)
+✔ trainer overlap rejects and rolls back client and lead (5.2519ms)
+✔ horse overlap rejects and rolls back client and lead (2.7663ms)
+✔ lead persistence failure rolls back lesson, client, payment and outbox (2.592ms)
+✔ ordinary client-only conversion remains supported without selecting a service (0.3408ms)
+✔ missing service and payer-only clients cannot be converted with a lesson (0.4211ms)
+✔ nested conversion payload validates fields and rejects arbitrary participants (67.5925ms)
+✔ public valid lead creates a pending request without creating a client (433.0363ms)
+✔ landing DTO saves direction and notes and queues exactly one site card only to the configured admin chat (19.2446ms)
+✔ landing accepts optional direction and missing VK configuration without losing the lead (11.3193ms)
+✔ landing without direction sends a readable fallback (13.1907ms)
+✔ production same-origin browser request returns 503 while disabled and 201 with a DB lead and VK queue record once enabled (31.7735ms)
+✔ lead rejects missing phone (7.6366ms)
+✔ lead rejects missing name (9.5506ms)
+✔ lead rejects empty name (10.0496ms)
+✔ lead rejects invalid phone (7.5093ms)
+✔ lead rejects numeric name (7.2243ms)
+✔ lead rejects invalid email (7.3103ms)
+✔ lead rejects invalid service (9.2615ms)
+✔ lead rejects unknown field (9.1757ms)
+✔ lead rejects missing consent (6.3407ms)
+✔ lead rejects false consent (13.7482ms)
+✔ lead rejects invalid consent version (7.7926ms)
+✔ lead rejects invalid source (5.8222ms)
+✔ lead rejects invalid direction (6.8036ms)
+✔ lead rejects overlong notes (6.9893ms)
+✔ repeat submission cannot overwrite an existing request by knowing its phone (13.5352ms)
+✔ lead rejects a stale consent version (6.4561ms)
+✔ consent configuration undefined accepts only current version 2026-09-19 (6.7519ms)
+✔ consent configuration "" accepts only current version 2026-09-19 (7.3817ms)
+✔ consent configuration "   " accepts only current version 2026-09-19 (8.2857ms)
+✔ consent configuration "2026-09-19" accepts only current version 2026-09-19 (7.8352ms)
+✔ consent configuration "  2026-09-19  " accepts only current version 2026-09-19 (7.7669ms)
+✔ consent configuration "  2026-10-10  " accepts only current version 2026-10-10 (9.5509ms)
+✔ consent configuration "2026-10-10" accepts only current version 2026-09-19 (6.9195ms)
+✔ administrator acceptance creates a client and closes the request (1.0702ms)
+✔ unknown service leaves no client or request (6.5343ms)
+✔ BigInt JSON conversion preserves nested VK ids, dates and decimal prices (0.8488ms)
+✔ POST normalizes a masked landing phone and deduplicates canonical resubmission (10.9914ms)
+[Nest] 5488  - 19.10.2026, 01:13:53   ERROR [LeadsService] Object(6) {
+  event: 'lead_vk_notification_queue_failed',
+  leadId: '22222222-2222-4222-8222-222222222222',
+  source: 'LANDING',
+  message: 'Не удалось поставить уведомление VK в очередь. Заявка сохранена; повторная отправка восстановит уведомление.',
+  errorType: 'Error',
+  errorCode: undefined
+}
+✔ queue failure keeps the saved lead and successful HTTP response (26.8393ms)
+✔ a browser lead is delivered to the admin conversation and marked sent only after VK succeeds (7.5613ms)
+✔ missing or invalid admin chat undefined produces a diagnostic warning and can recover (0.8695ms)
+✔ missing or invalid admin chat "" produces a diagnostic warning and can recover (0.4559ms)
+✔ missing or invalid admin chat "invalid" produces a diagnostic warning and can recover (0.3253ms)
+✔ missing or invalid admin chat "0" produces a diagnostic warning and can recover (0.3364ms)
+✔ missing or invalid admin chat "-1" produces a diagnostic warning and can recover (0.4531ms)
+✔ missing or invalid admin chat "9007199254740992" produces a diagnostic warning and can recover (0.3804ms)
+✔ missing community token warns that VK delivery is disabled (0.6071ms)
+✔ a queue insertion failure logs the affected lead without failing its creation (0.6259ms)
+✔ production public-leads flag controls acceptance (15.1242ms)
+✔ lesson history applies server pagination and relation filters (4.1349ms)
+✔ blocks a mathematically overlapping trainer interval (1.3103ms)
+✔ blocks a mathematically overlapping horse interval (0.4265ms)
+✔ blocks a mathematically overlapping arena interval (0.4283ms)
+✔ CANCELLED lessons do not block the same slot and touching intervals are allowed (0.3002ms)
+✔ excludeLessonId omits the edited lesson from conflict detection (0.187ms)
+✔ create uses service duration and adds a pending payment for a booking without membership (5.0895ms)
+✔ creates one group lesson with separate riders, horses, memberships and payments (2.9834ms)
+✔ adds a later rider to the matching scheduled lesson instead of reporting a trainer conflict (2.6013ms)
+✔ rejects duplicate clients and horses inside one group lesson (0.7464ms)
+✔ creation rejects an unavailable arena (0.544ms)
+✔ creation retries P2034 and list query uses interval intersection filters (3.5562ms)
+✔ rejects lessons on the configured club day off (18.8164ms)
+✔ rejects lessons outside club working hours (1.3167ms)
+✔ rejects an exact horse daily workload overflow with the required message (1.1265ms)
+✔ returns horse workload values for the booking progress bar (1.1893ms)
+✔ COMPLETED and NO_SHOW debit every distinct linked membership (1.3352ms)
+✔ COMPLETED automatically links and debits an active client membership (1.4998ms)
+✔ automatic membership selection rejects an already paid cash booking (0.596ms)
+✔ CANCELLED refunds only memberships with DEBIT and without REFUND (0.4101ms)
+✔ debit atomically decrements once and writes one DEBIT (4.2062ms)
+✔ debit rejects empty, exhausted and expired memberships (0.621ms)
+✔ refund requires a DEBIT and cannot be applied twice (0.6288ms)
+✔ markAttendance is idempotent for attended, NO_SHOW and CANCELLED outcomes (0.8894ms)
+✔ composite P2002 becomes 409 and is never retried as P2034 (1.0278ms)
+✔ payments module imports authentication providers for its guards (0.6889ms)
+✔ boarding payment derives client and monthly rate without fiscal integrations (0.6211ms)
+✔ payment cannot reference a booking and boarding contract simultaneously (0.6472ms)
+✔ manual payment requires a client and positive amount (0.1661ms)
+✔ pricing plan creation normalizes its name (1.2987ms)
+✔ membership issue uses selected pricing plan values (1.3156ms)
+✔ public content is anonymous, filtered, ordered and restricted to presentation fields (313.8082ms)
+✔ all catalog create/update DTOs accept publication fields, validate photos and support clearing (2566.5683ms)
+✔ landing build and backend resolve the same consent for undefined (1.8722ms)
+✔ landing build and backend resolve the same consent for "" (1.3933ms)
+✔ landing build and backend resolve the same consent for "  " (0.3778ms)
+✔ landing build and backend resolve the same consent for "2026-09-19" (0.3429ms)
+✔ landing build and backend resolve the same consent for "  2026-10-10  " (0.3467ms)
+✔ landing builder sets the same-origin API fallback and rejects invalid consent configuration (0.7322ms)
+✔ deployment public-lead preflight checks the resolved container flag "true" (155.3514ms)
+✔ deployment public-lead preflight checks the resolved container flag "false" (200.2788ms)
+✔ deployment public-lead preflight checks the resolved container flag undefined (158.2866ms)
+✔ deployment public-lead preflight checks the resolved container flag "TRUE" (198.8548ms)
+✔ deployment public-lead preflight checks the resolved container flag " true " (159.2185ms)
+✔ deployment preflight rejects malformed Compose JSON without leaking its input (159.1419ms)
+﹣ migration preserves legacy relations, physiological settings and missing resources (1.2331ms) # SKIP
+﹣ migration preserves membership units, timestamps and original operations, projecting known owners once (0.3447ms) # SKIP
+﹣ new core resources support required defaults, unique trainer contacts and exact decimal memberships (0.186ms) # SKIP
+﹣ standalone bookings require the complete triad, valid intervals and real foreign keys (0.1534ms) # SKIP
+﹣ membership and physiological constraints reject invalid new records (0.1435ms) # SKIP
+﹣ scheduled triad indexes have status predicates and ledger foreign keys protect journal history (0.1253ms) # SKIP
+✔ assigned TRAINER replaces a horse and records their account ID, group=false (5.6324ms)
+✔ TRAINER is forbidden on a colleague's lesson including availability/history, group=false (2.6175ms)
+✔ assigned TRAINER replaces a horse and records their account ID, group=true (0.6492ms)
+✔ TRAINER is forbidden on a colleague's lesson including availability/history, group=true (4.8087ms)
+✔ ADMIN replaces a horse in any lesson (0.5465ms)
+✔ MANAGER replaces a horse in any lesson (0.4079ms)
+✔ revoking the own-lesson permission prevents replacement and writes no history (0.4761ms)
+✔ current database binding overrides a stale trainerId from the session (0.3769ms)
+✔ unbound trainer may match their account UUID, never another trainer (0.4634ms)
+✔ audit failure rolls back the horse change (0.6668ms)
+✔ role configuration cannot grant TRAINER all-lesson access or editing without reading (0.7725ms)
+✔ permission DTO rejects string booleans even with production implicit conversion enabled (61.7689ms)
+✔ HTTP role settings enforce health, boarding and report permissions without granting financial writes (594.2935ms)
+✔ trainer response sanitization hides forbidden nested health/boarding records and keeps report data only when granted (8.9421ms)
+✔ HTTP RBAC: own trainer succeeds, colleague is 403, administrator/manager succeed and impersonation is rejected (97.7523ms)
+✔ trainer cannot change lesson status through HTTP, manager can (279.3302ms)
+✔ logout revokes copied tokens and deleted users cannot authenticate (2.0991ms)
+✔ trainer redaction covers nested arrays while preserving admin data and dates (1.1765ms)
+✔ limiter blocks login floods and rejects cross-origin cookie writes (1.0132ms)
+✔ browser login sets HttpOnly cookie and never exposes the JWT in JSON (27.2176ms)
+✔ production public leads are disabled by default for both landing and VK (1.0507ms)
+✔ foreign or forbidden membership is rejected before booking mutation (1.6485ms)
+✔ real HTTP cookie authentication, CSRF rejection and logout revocation (301.2323ms)
+✔ retries Prisma serialization and raw SQLSTATE, not uniqueness or validation (1.0841ms)
+﹣ PostgreSQL payroll: actual lessons, rollback after expense insertion, concurrent retries, privacy and cash/card balances (1.0855ms) # SKIP
+✔ staff DTO validates shifts, batch limits, kopecks, rates and payout methods (10.9162ms)
+✔ query converts numbers, empty strings become undefined, invalid pagination is rejected (0.785ms)
+✔ business days include the entire Moscow end date and reject invalid/reversed/oversize ranges (8.3275ms)
+✔ precise decimal formula, group fixed rate once per lesson, additive percentage and adjustment (3.4586ms)
+✔ trainer is scoped to own profiles and shifts, foreign identifiers are forbidden including when profile is missing (6.1489ms)
+✔ invalid shift range, future completion, paid shift modification and manager deletion are rejected (1.609ms)
+✔ HTTP RBAC and validation: trainers read only, managers cannot delete, authors cannot be spoofed (353.146ms)
+﹣ PostgreSQL stall seed, relocation races, database invariants and rollback (0.7963ms) # SKIP
+✔ assignment, relocation and eviction keep one physical placement (2.4255ms)
+✔ assignment returns symmetric stallion/mare warnings without blocking (0.7605ms)
+✔ neighbors include opposite stall, exclude diagonal, other buildings, geldings and unknown sex (1.1733ms)
+✔ occupied, unavailable and missing destinations preserve the old placement (2.5603ms)
+✔ failed final write rolls relocation back; serialization conflicts retry (1.3101ms)
+✔ stall HTTP API validates assignment and restricts mutations to ADMIN/MANAGER (440.6501ms)
+✔ stalls module imports authentication providers for its guards (0.757ms)
+✔ stall list supports Refine pagination, search and sorting (1.1698ms)
+✔ stall creation normalizes its name and description (0.4113ms)
+✔ only administrators can bind accounts, and a binding change revokes the existing session (3.5722ms)
+✔ binding rejects non-trainer accounts, missing trainers, missing input and duplicate trainer bindings (1.3373ms)
+▶ authenticated image upload validates files, persists unique names and serves public images
+  ✔ requires a valid session before accepting the multipart body (50.6867ms)
+  ✔ rejects missing, empty, wrong MIME, disguised and oversized files (154.336ms)
+  ✔ cookie sessions retain same-origin CSRF protection (32.6432ms)
+  ✔ preserves bytes, chooses extension by MIME and uses unique UUIDs (1673.9914ms)
+✔ authenticated image upload validates files, persists unique names and serves public images (2001.8808ms)
+✔ admin creation hashes the password and returns no passwordHash (536.9086ms)
+✔ membership issue creates balance and initial CREDIT operation atomically (1.8066ms)
+﹣ PostgreSQL vet CRUD, superseded reminders, atomic batch, passport and health status (1.0149ms) # SKIP
+✔ vet DTO validates every procedure, rejects invalid values and normalizes blank query parameters (11.6875ms)
+✔ due dates use Moscow calendar days at the UTC boundary and default intervals preserve local time (5.4669ms)
+✔ create stores author and Moscow dates; explicit null disables reminders; edit preserves or recalculates deadlines (4.9402ms)
+✔ batch locks all horses before writes and rejects unsupported procedures; health updates synchronize availability (1.4829ms)
+✔ HTTP RBAC allows trainer reads but prevents trainer writes and manager deletion, even with healthWrite enabled (345.9159ms)
+✔ ordinary messages from guest produce no automatic replies or profile lookups (5.5969ms)
+✔ ordinary messages from client produce no automatic replies or profile lookups (0.5858ms)
+✔ ordinary messages from trainer produce no automatic replies or profile lookups (0.4902ms)
+✔ explicit command still replies: ["guest","Начать",null] (1.1259ms)
+✔ explicit command still replies: ["guest","",{"command":"start"}] (0.3681ms)
+✔ explicit command still replies: ["guest","",{"command":"about"}] (0.7721ms)
+✔ explicit command still replies: ["guest","",{"command":"guide"}] (0.4108ms)
+✔ explicit command still replies: ["guest","",{"command":"первичная заявка"}] (0.4053ms)
+✔ explicit command still replies: ["guest","Первичная заявка",null] (4.5072ms)
+✔ explicit command still replies: ["guest","Привязать профиль",null] (0.9434ms)
+✔ explicit command still replies: ["guest","/start 1234",null] (0.3859ms)
+✔ explicit command still replies: ["client","",{"command":"balance"}] (4.3631ms)
+✔ explicit command still replies: ["client","",{"command":"bookings"}] (0.7271ms)
+✔ explicit command still replies: ["trainer","",{"command":"today"}] (4.3865ms)
+[Nest] 16652  - 19.10.2026, 01:13:55     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'notification-id',
+  key: 'help:42:e4ab97732dd192d9fdd5a9cb0bebe23652530d60667e33a0d4b2d0c6dd8cde13:77',
+  peerId: '77'
+}
+[Nest] 16652  - 19.10.2026, 01:13:55     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'notification-id',
+  key: 'help:42:e4ab97732dd192d9fdd5a9cb0bebe23652530d60667e33a0d4b2d0c6dd8cde13:77',
+  peerId: '77'
+}
+[Nest] 16652  - 19.10.2026, 01:13:55     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'notification-id',
+  key: 'help:42:e4ab97732dd192d9fdd5a9cb0bebe23652530d60667e33a0d4b2d0c6dd8cde13:77',
+  peerId: '77'
+}
+[Nest] 16652  - 19.10.2026, 01:13:55     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'notification-id',
+  key: 'help:42:e4ab97732dd192d9fdd5a9cb0bebe23652530d60667e33a0d4b2d0c6dd8cde13:77',
+  peerId: '77'
+}
+[Nest] 16652  - 19.10.2026, 01:13:55     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'notification-id',
+  key: 'help:42:e4ab97732dd192d9fdd5a9cb0bebe23652530d60667e33a0d4b2d0c6dd8cde13:77',
+  peerId: '77'
+}
+✔ main reply keyboard has the requested three rows and stable payloads (6.4082ms)
+✔ club card accepts ℹ️ О клубе for unlinked guests (3.233ms)
+✔ club card accepts О клубе for unlinked guests (1.6157ms)
+✔ club card accepts   КОНТАКТЫ   for unlinked guests (1.4648ms)
+✔ guide accepts 📖 Памятка всадника for unlinked guests (0.8658ms)
+✔ guide accepts Памятка всадника for unlinked guests (0.6739ms)
+✔ guide accepts памятка for unlinked guests (0.4861ms)
+✔ club details and guide can be changed through environment without editing command handlers (1.9487ms)
+✔ administrator request accepts 💬 Связаться с администратором, records it and sends confirmation (10.5613ms)
+✔ administrator request accepts Связаться с администратором, records it and sends confirmation (1.6281ms)
+✔ administrator request accepts администратор, records it and sends confirmation (1.1759ms)
+✔ administrator request accepts позвать администратора, records it and sends confirmation (3.6866ms)
+✔ administrator request accepts помощь, records it and sends confirmation (1.0397ms)
+✔ administrator card includes a community dialog link or profile fallback for group "228514574" (1.004ms)
+✔ administrator card includes a community dialog link or profile fallback for group "-228514574" (1.0416ms)
+✔ administrator card includes a community dialog link or profile fallback for group "  -228514574  " (2.2416ms)
+✔ administrator card includes a community dialog link or profile fallback for group undefined (0.8272ms)
+✔ administrator card includes a community dialog link or profile fallback for group "" (1.0741ms)
+✔ administrator card includes a community dialog link or profile fallback for group "invalid" (1.0604ms)
+✔ administrator card includes a community dialog link or profile fallback for group "0" (0.7039ms)
+✔ administrator card includes a community dialog link or profile fallback for group "9007199254740992" (0.5273ms)
+✔ help payload uses only the configured recipient and deduplicates repeated callback delivery (0.9843ms)
+✔ help can use the configured fallback recipient without an ADMIN VK account (0.551ms)
+✔ help confirms without service card for admin peer undefined (0.4504ms)
+✔ help confirms without service card for admin peer 42 (0.2952ms)
+✔ help confirms without service card for admin peer invalid (0.299ms)
+✔ help confirms without service card for admin peer -1 (0.4956ms)
+✔ help confirms even with database failure ({"fail":true}) (0.6212ms)
+✔ help confirms even with database failure ({"fail":true,"profileFail":true}) (0.4446ms)
+✔ existing client commands accept emoji button labels: 📅 Мои тренировки (0.5818ms)
+✔ existing client commands accept emoji button labels: 💳 Мой баланс (0.4782ms)
+✔ greeting includes the expanded guest keyboard (0.5518ms)
+✔ balance shows plan names, custom titles and a clean fallback without UUIDs or expiry times (13.9443ms)
+✔ balance uses Russian lesson plurals and supports keyboard payloads (17.8918ms)
+✔ no active memberships has a clear empty response and the main menu (1.8922ms)
+✔ training card includes localized date, weekday, horse, trainer and arena (2.8462ms)
+✔ training cards handle an unassigned horse and missing arena (8.9827ms)
+✔ empty upcoming trainings has a clear response and the main menu (0.9829ms)
+✔ club timezone changes both the training calendar date and the expiry date (2.2156ms)
+✔ balance keeps ten-item pagination and next-page keyboard (10.7369ms)
+✔ bookings keeps ten-item pagination and next-page keyboard (6.0933ms)
+[Nest] 25848  - 19.10.2026, 01:13:55    WARN [VkBotService] Не удалось получить имя пользователя VK
+[Nest] 25848  - 19.10.2026, 01:13:56    WARN [VkNotifications] Object(8) {
+  message: 'Не удалось отправить VK-уведомление для userId: 42',
+  event: 'vk_notification_failed',
+  notificationId: 'lesson:lesson:created:trainer:42',
+  key: 'lesson:lesson:created:trainer:42',
+  peerId: '42',
+  attemptCount: 1,
+  errorCode: undefined,
+  errorMessage: 'VK unavailable'
+}
+[Nest] 25848  - 19.10.2026, 01:13:56    WARN [VkNotifications] Object(8) {
+  message: 'Не удалось отправить VK-уведомление для userId: 43',
+  event: 'vk_notification_failed',
+  notificationId: 'lesson:lesson:created:client:43',
+  key: 'lesson:lesson:created:client:43',
+  peerId: '43',
+  attemptCount: 1,
+  errorCode: undefined,
+  errorMessage: 'VK unavailable'
+}
+[Nest] 25848  - 19.10.2026, 01:13:56     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'lesson:lesson:created:trainer:42',
+  key: 'lesson:lesson:created:trainer:42',
+  peerId: '42'
+}
+[Nest] 25848  - 19.10.2026, 01:13:56     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'lesson:lesson:created:client:43',
+  key: 'lesson:lesson:created:client:43',
+  peerId: '43'
+}
+✔ normalizes Russian national and international phone numbers (10.9999ms)
+✔ links CLIENT by normalized phone and single-use administrator code (12.7138ms)
+✔ links TRAINER by normalized phone and single-use administrator code (8.8537ms)
+✔ client balance query is limited to the linked owner and active memberships (10.9857ms)
+✔ unlinked visitor is offered supported VK keyboard and a lead form (1.8027ms)
+✔ VK lead requires a separately recorded current consent (2.7276ms)
+✔ inline attendance invokes billing with authenticated trainer context (1.118ms)
+✔ client cannot invoke trainer inline action (0.4776ms)
+✔ today uses club day bounds and includes lessons without bookings (3.0825ms)
+✔ ledger denies another trainer before making changes (1.0416ms)
+✔ new lead notification is queued using a stable deduplication key (1.8657ms)
+✔ new lead targets only ADMIN VK recipients, deduplicates delivery and names the service (1.554ms)
+✔ creation, repeated transfers and cancellation enqueue trainer and linked clients after successful mutations (15.6451ms)
+✔ group additions notify the trainer and newly added clients without notifying existing clients again (3.6455ms)
+✔ failed lesson transaction leaves no notification and transport failure cannot undo a committed booking (15.6134ms)
+✔ /start code requests phone verification; linked /start greets the client (2.3452ms)
+✔ short-code guesses are limited and expired/foreign phone codes never bind (1.4629ms)
+✔ unlink clears the profile, revokes issued codes and drops pending personal pushes atomically (0.4754ms)
+✔ VK management endpoints validate input and enforce ADMIN/MANAGER permissions (2115.9346ms)
+✔ administrator recipient configuration rejects non-admin users and revokes pending leads and help (0.6977ms)
+✔ personalized welcome handles text and button payload: ["Начать",null] (4.6513ms)
+✔ personalized welcome handles text and button payload: ["  НАЧАТЬ  ",null] (0.6819ms)
+✔ personalized welcome handles text and button payload: ["","{\"command\":\"начать\"}"] (0.6012ms)
+✔ personalized welcome handles text and button payload: ["Кнопка","{\"command\":\"Начать\"}"] (0.4507ms)
+✔ personalized welcome handles text and button payload: ["Начать","{invalid"] (5.5598ms)
+✔ personalized welcome handles text and button payload: ["Начать","{\"command\":\"start\"}"] (1.036ms)
+✔ welcome falls back without a usable VK name: [] (0.5877ms)
+✔ welcome falls back without a usable VK name: undefined (0.5911ms)
+✔ welcome falls back without a usable VK name: [{}] (0.4012ms)
+✔ welcome falls back without a usable VK name: [{"first_name":""}] (0.3859ms)
+✔ welcome falls back without a usable VK name: [{"first_name":"  "}] (0.3965ms)
+✔ welcome falls back without a usable VK name: [{"first_name":null}] (0.2614ms)
+✔ VK failure is logged and does not prevent the welcome reply (0.6467ms)
+✔ cache shares concurrent lookups, expires and isolates users (0.5678ms)
+✔ cache evicts older entries at its size limit (39.3246ms)
+✔ group messages are ignored before fetching a VK profile (0.4877ms)
+✔ confirmation returns plain confirmation code without Bearer (268.8604ms)
+✔ header secret is accepted (7.1209ms)
+✔ rejects invalid callback {"secret":"wrong"} (6.9039ms)
+✔ rejects invalid callback {"secret":null} (6.9003ms)
+✔ rejects invalid callback {"group_id":456} (9.7013ms)
+✔ /start binding command returns personalized role greeting through the callback (7.8706ms)
+✔ message routes by BigInt vkUserId and repeats use stable random_id (11.8711ms)
+✔ group chat does not disclose client identity (7.0215ms)
+✔ malformed message is rejected (6.9365ms)
+✔ missing secret configuration fails closed (6.0234ms)
+✔ confirmation is plain text without group, token or matching secret (259.2865ms)
+✔ missing confirmation code reports configuration failure (12.1391ms)
+✔ rejects non-confirmation secret undefined (8.4528ms)
+✔ rejects non-confirmation secret null (9.6291ms)
+✔ rejects non-confirmation secret "" (7.8045ms)
+✔ rejects non-confirmation secret "wrong" (7.1ms)
+✔ rejects non-confirmation secret 123 (11.7881ms)
+✔ unknown events return ok with valid secret and with optional secret unset (13.951ms)
+✔ Начать greets directly without a database lookup (5.7197ms)
+✔ start greets directly without a database lookup (6.3477ms)
+✔ ordinary messages are acknowledged without replying or failing (14.7703ms)
+✔ acknowledges message while processing is still pending (5.1881ms)
+✔ VK transport failure is caught and later callbacks still work (11.6998ms)
+✔ malformed messages are contained after acknowledgement (5.3603ms)
+✔ messages without event_id work and use the message id for repeat protection (14.5413ms)
+✔ community token configures bot and notification transport with API 5.199 (1.2753ms)
+✔ 24-hour window includes both boundaries and excludes cancelled, completed and attended bookings (3.5601ms)
+✔ group lesson uses its current time, trainer and location and sends private client reminders only (0.7015ms)
+✔ message uses club timezone, personal first name and readable missing resource fallbacks (0.5663ms)
+✔ queued and sent reminders survive repeated ticks and worker restarts without duplicate sends (0.656ms)
+✔ rescheduled booking receives a new reminder for its new start time (0.5196ms)
+✔ missing or invalid VK recipients log warnings while other clients are queued (0.4515ms)
+✔ one queue failure does not prevent the other client reminder and can be retried (0.5084ms)
+✔ database outage is contained and the running guard is released for the next tick (0.3214ms)
+✔ overlapping checks do not start a second database scan (0.2188ms)
+✔ blocked VK delivery logs a warning, leaves the reminder unsent and sends the other reminder (1.8441ms)
+✔ pending reminder is discarded without sending when training is cancelled (0.5217ms)
+✔ pending reminder is discarded without sending when training is rescheduled (0.3702ms)
+✔ pending reminder is discarded without sending when training is unlinked (0.2907ms)
+✔ pending reminder is discarded without sending when training is started (0.3126ms)
+✔ pending reminder is discarded without sending when training is deleted (0.2717ms)
+✔ reminders module is wired into the bot and schedules immediate and ten-minute checks with cleanup (0.4418ms)
+[Nest] 15000  - 19.10.2026, 01:13:56     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'lesson:1:created:client:42',
+  key: 'lesson:1:created:client:42',
+  peerId: '42'
+}
+✔ training confirmation sends full trainer card and private individual client cards, idempotently (8.2862ms)
+✔ notification time uses CLUB_TIME_ZONE across midnight (1.3072ms)
+✔ missing VK IDs skip recipients, while missing phone, horse and notes have readable fallbacks (2.3114ms)
+✔ standalone scheduled booking queues trainer and client cards in its transaction without exposing profiles in API result (2.4595ms)
+✔ VK 901 is logged with recipient and code, retries persist, and another recipient still receives confirmation (3.69ms)
+ℹ tests 399
+ℹ suites 0
+ℹ pass 383
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 16
+ℹ todo 0
+ℹ duration_ms 8779.4755

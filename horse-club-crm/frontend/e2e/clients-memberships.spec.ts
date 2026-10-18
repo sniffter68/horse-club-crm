@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 
 const client = { id: 'client-a', name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова',
   phone: '+79991234567', isRider: true, isPayer: true, preferences: '', createdAt: '2026-10-01T10:00:00Z',

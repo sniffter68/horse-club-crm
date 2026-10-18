@@ -119,7 +119,7 @@ function ParticipantEditor({ index, form, clients, horses, participants, service
 export function SchedulePage() {
   const screens = Grid.useBreakpoint()
   const compactLayout = !screens.md
-  const { canManage } = useCatalogPermissions()
+  const { canManage } = useCatalogPermissions('schedule')
   const { message } = App.useApp()
   const { mutate: onError } = useOnError()
   const errorHandler = useRef(onError)

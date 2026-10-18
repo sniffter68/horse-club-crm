@@ -109,13 +109,14 @@ test('HTTP role settings enforce health, boarding and report permissions without
     findUnique: async () => policy,
     upsert: async ({ update }) => { policy = { ...update }; return policy; },
   } });
-  const module = await Test.createTestingModule({ controllers: [VetCalendarController, BoardingContractsController, SettingsController, PaymentsController], providers: [RolesGuard, RoleAccessGuard,
+  const module = await Test.createTestingModule({ controllers: [VetCalendarController, BoardingContractsController, SettingsController, PaymentsController], providers: [RolesGuard, RoleAccessGuard, { provide: require('../dist/settings/module-access.service').ModuleAccessService, useValue: { forRole: async () => ['SCHEDULE', 'STABLES', 'VETERINARY', 'CASHBOX', 'STAFF_PAYROLL'].map(module => ({ module, isEnabled: true, accessLevel: 'FULL' })) } },
     { provide: RoleAccessService, useValue: access }, { provide: SettingsService, useValue: {} },
     { provide: VetCalendarService, useValue: { list: async () => ({ data: [], total: 0 }), create: async dto => dto } },
     { provide: VetRecordService, useValue: { summary: async () => ({ overdue: [], next14Days: [], next30Days: [] }) } },
     { provide: BoardingContractsService, useValue: { findAll: async () => ({ data: [], total: 0 }) } },
     { provide: PaymentsService, useValue: {} }, { provide: CashDeskService, useValue: { summary: async () => ({ totalRevenue: '100', operations: [] }) } },
-  ] }).overrideGuard(JwtAuthGuard).useValue({ canActivate(context) {
+  ] }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
+    .overrideGuard(JwtAuthGuard).useValue({ canActivate(context) {
     const req = context.switchToHttp().getRequest(); req.user = req.headers['x-test-session'] === 'admin' ? admin : trainer; return true;
   } }).compile();
   const app = module.createNestApplication();
@@ -160,6 +161,7 @@ test('HTTP RBAC: own trainer succeeds, colleague is 403, administrator/manager s
   // Test-only session adapter. Production uses the JWT strategy's database identity.
   const module = await Test.createTestingModule({ controllers: [BookingsController], providers: [RolesGuard,
     { provide: BookingsService, useValue: f.service }, { provide: BookingLifecycleService, useValue: {} }] })
+    .overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
     .overrideGuard(JwtAuthGuard).useValue({ canActivate(context) {
       const req = context.switchToHttp().getRequest(); req.user = actors[req.headers['x-test-session']];
       if (req.user?.id === ids.other) req.user = { ...req.user, trainerId: ids.other };

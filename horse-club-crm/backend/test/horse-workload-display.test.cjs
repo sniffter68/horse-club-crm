@@ -109,7 +109,8 @@ test('HTTP workload routing, DTO validation and transfer authorization match the
       getDailyHorseWorkload: async (date, excluded) => { calls.push([date, excluded]); return [{ horseId: id, horseName: 'Валдай', currentWorkloadMinutes: 60, maxDailyWorkloadMinutes: 120, status: 'AVAILABLE' }]; },
       rescheduleLesson: async (...args) => { calls.push(args); return { id }; },
     } }],
-  }).overrideGuard(JwtAuthGuard).useValue({ canActivate(ctx) {
+  }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
+    .overrideGuard(JwtAuthGuard).useValue({ canActivate(ctx) {
     const req = ctx.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return true;
   } }).compile();
   const app = module.createNestApplication();

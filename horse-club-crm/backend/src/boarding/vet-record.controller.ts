@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
@@ -10,8 +11,9 @@ import { BatchVetRecordDto, CreateVetRecordDto, HorseHealthDto, UpdateVetRecordD
 import { VetRecordService } from './vet-record.service';
 
 @ApiTags('Veterinary records') @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard) @RequirePermission('healthRead')
-@Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER) @Controller('vet')
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard, RoleAccessGuard) @RequirePermission('healthRead')
+@Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER) @RequireModule('VETERINARY')
+@Controller('vet')
 export class VetRecordController {
   constructor(private readonly service: VetRecordService) {}
   @Get('records') list(@Query() query: VetRecordQueryDto) { return this.service.list(query); }

@@ -80,6 +80,7 @@ before(async () => {
     providers: [
       ClientsService,
       SettingsService,
+      { provide: require('../dist/settings/module-access.service').ModuleAccessService, useValue: { forRole: async () => ['SCHEDULE', 'STABLES', 'VETERINARY', 'CASHBOX', 'STAFF_PAYROLL'].map(module => ({ module, isEnabled: true, accessLevel: 'FULL' })) } },
       { provide: require('../dist/auth/role-access.service').RoleAccessService, useValue: {
         permissions: async role => require('../dist/auth/role-access').defaultRolePermissions(role),
       } },
@@ -88,6 +89,7 @@ before(async () => {
       { provide: PrismaService, useValue: prisma },
     ],
   })
+    .overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
     .overrideGuard(JwtAuthGuard)
     .useValue(testAuthGuard)
     .compile();

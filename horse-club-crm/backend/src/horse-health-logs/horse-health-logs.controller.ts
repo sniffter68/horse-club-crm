@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
@@ -14,14 +15,15 @@ import { RequirePermission, RoleAccessGuard } from '../auth/role-access.guard';
 
 @ApiTags('Horse health logs')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard, RoleAccessGuard)
 @RequirePermission('healthRead')
+@RequireModule('VETERINARY')
 @Controller('horse-health-logs')
 export class HorseHealthLogsController {
   constructor(private readonly service: HorseHealthLogsService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) response: Response): Promise<HorseHealthLogWithHorse[]> {
     const { data, total } = await this.service.findAll(query);
     setRefineTotalHeaders(response, total);
@@ -29,20 +31,20 @@ export class HorseHealthLogsController {
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<HorseHealthLogWithHorse> {
     return this.service.findOne(id);
   }
 
   @Post()
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   @RequirePermission('healthWrite')
   create(@Body() dto: CreateHorseHealthLogDto): Promise<HorseHealthLogWithHorse> {
     return this.service.create(dto);
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   @RequirePermission('healthWrite')
   update(
     @Param('id', new ParseUUIDPipe()) id: string,

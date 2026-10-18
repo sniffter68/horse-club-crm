@@ -1,3 +1,4 @@
+import { ModulesSettings } from './Modules'
 import { useEffect, useRef, useState } from 'react'
 import { useOnError, usePermissions } from '@refinedev/core'
 import { Alert, App, Button, Card, Form, Select, Space, Spin, Tabs, TimePicker, Typography } from 'antd'
@@ -19,7 +20,7 @@ export function SettingsPage() {
   const { data: role } = usePermissions<Role>({})
   return <Tabs items={[
     { key: 'schedule', label: 'Режим работы', children: <ClubScheduleSettings /> },
-    ...(role === 'ADMIN' ? [{ key: 'roles', label: 'Роли и доступ', children: <RoleAccessPage /> }] : []),
+    ...(role === 'ADMIN' ? [{ key: 'modules', label: 'Модули и права доступа', children: <ModulesSettings /> }, { key: 'roles', label: 'Роли и доступ', children: <RoleAccessPage /> }] : []),
   ]} />
 }
 

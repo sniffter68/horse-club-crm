@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
@@ -15,14 +16,15 @@ import { StallsService, type StallWithContracts } from './stalls.service';
 
 @ApiTags('Stalls')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard, RoleAccessGuard)
 @RequirePermission('boardingAccess')
+@RequireModule('STABLES')
 @Controller('stalls')
 export class StallsController {
   constructor(private readonly service: StallsService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) response: Response): Promise<StallWithContracts[]> {
     const { data, total } = await this.service.findAll(query);
     setRefineTotalHeaders(response, total);
@@ -30,7 +32,7 @@ export class StallsController {
   }
 
   @Get('map')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   map() { return this.service.map(); }
 
   @Get('assignment-horses')
@@ -44,7 +46,7 @@ export class StallsController {
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<StallWithContracts> {
     return this.service.findOne(id);
   }

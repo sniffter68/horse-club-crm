@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixtures'
 import { DateTime } from 'luxon'
 const horseId = '3b241101-e2bb-4255-8caf-4136c566a962'
 const horse = { id: horseId, name: 'Валдай', healthStatus: 'HEALTHY', status: 'active', healthLogs: [], boardingContracts: [], bookings: [] }

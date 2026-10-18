@@ -94,6 +94,7 @@ export function DashboardPage() {
   const updatingIdsRef = useRef<Set<string>>(new Set())
   const knownLeadIdsRef = useRef<Set<string> | undefined>(undefined)
   const loadingSummaryRef = useRef(false)
+  const summaryRequestId = useRef(0)
 
   const reportError = useCallback((cause: unknown) => {
     const failure = toHttpError(cause)
@@ -102,7 +103,8 @@ export function DashboardPage() {
   }, [])
 
   const loadSummary = useCallback(async ({ signal, silent = false }: LoadSummaryOptions = {}) => {
-    if (loadingSummaryRef.current) return
+    if (loadingSummaryRef.current && silent) return
+    const requestId = ++summaryRequestId.current
     loadingSummaryRef.current = true
     if (!silent) {
       setLoading(true)
@@ -110,7 +112,7 @@ export function DashboardPage() {
     }
     try {
       const response = await httpClient.get<DashboardSummary>(`${API_URL}/dashboard/summary`, { signal })
-      if (!signal?.aborted) {
+      if (!signal?.aborted && requestId === summaryRequestId.current) {
         const nextLeadIds = new Set(response.data.leadRequests.map(lead => lead.id))
         const knownLeadIds = knownLeadIdsRef.current
         if (knownLeadIds) {
@@ -130,7 +132,7 @@ export function DashboardPage() {
         setError(undefined)
       }
     } catch (cause) {
-      if (!signal?.aborted) {
+      if (!signal?.aborted && requestId === summaryRequestId.current) {
         if (silent) {
           const failure = toHttpError(cause)
           if (failure.statusCode === 401) onErrorRef.current(failure)
@@ -139,8 +141,10 @@ export function DashboardPage() {
         }
       }
     } finally {
-      if (!signal?.aborted) setLoading(false)
-      loadingSummaryRef.current = false
+      if (requestId === summaryRequestId.current) {
+        if (!signal?.aborted) setLoading(false)
+        loadingSummaryRef.current = false
+      }
     }
   }, [notification, reportError])
 

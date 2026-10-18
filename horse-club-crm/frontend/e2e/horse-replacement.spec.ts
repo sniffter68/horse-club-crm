@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 
 const horse = { id: 'h1', name: 'Валдай', status: 'sick', isUnavailable: true, maxRiderWeight: 85, maxDailyMinutes: 120, minRestMinutes: 45 }
 const free = { ...horse, id: 'h2', name: 'Буран', status: 'active', isUnavailable: false }

@@ -280,7 +280,8 @@ test('VK management endpoints validate input and enforce ADMIN/MANAGER permissio
     { provide: VkLinkService, useValue: { issue: async (...args) => { calls.push(args); return { code: '0123' }; },
       unlink: async (...args) => { calls.push(args); return { success: true }; } } },
     { provide: UsersService, useValue: { setVkRecipient: async (...args) => { calls.push(args); return { vkUserId: args[1] }; } } },
-  ] }).overrideGuard(JwtAuthGuard).useValue({ canActivate(context) {
+  ] }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
+    .overrideGuard(JwtAuthGuard).useValue({ canActivate(context) {
     const req = context.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return Boolean(req.user.role);
   } }).compile();
   const app = module.createNestApplication();

@@ -1,0 +1,331 @@
+npm notice run build
+npm notice run tsc
+src/auth/auth.service.ts(70,68): error TS18046: 'error' is of type 'unknown'.
+src/auth/role-access.service.ts(12,28): error TS2339: Property 'roleAccess' does not exist on type 'TransactionClient'.
+src/boarding-contracts/boarding-contracts.service.ts(52,12): error TS2339: Property 'horse' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/boarding-contracts/boarding-contracts.service.ts(55,12): error TS2339: Property 'stall' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/boarding-contracts/boarding-contracts.service.ts(57,38): error TS7031: Binding element 'boardingContracts' implicitly has an 'any' type.
+src/boarding-contracts/boarding-contracts.service.ts(63,32): error TS2339: Property 'boardingContract' does not exist on type 'TransactionClient'.
+src/boarding-contracts/boarding-contracts.service.ts(71,17): error TS2339: Property 'boardingContract' does not exist on type 'TransactionClient'.
+src/boarding-contracts/boarding-contracts.service.ts(120,19): error TS2339: Property 'boardingContract' does not exist on type 'TransactionClient'.
+src/boarding-contracts/boarding-contracts.service.ts(144,34): error TS2339: Property 'boardingContract' does not exist on type 'TransactionClient'.
+src/boarding-contracts/boarding-contracts.service.ts(158,19): error TS2339: Property 'boardingContract' does not exist on type 'TransactionClient'.
+src/boarding-contracts/boarding-contracts.service.ts(192,26): error TS2339: Property 'client' does not exist on type 'TransactionClient'.
+src/boarding-contracts/boarding-contracts.service.ts(193,10): error TS2339: Property 'horse' does not exist on type 'TransactionClient'.
+src/boarding-contracts/boarding-contracts.service.ts(195,14): error TS2339: Property 'stall' does not exist on type 'TransactionClient'.
+src/boarding-contracts/boarding-contracts.service.ts(210,36): error TS2339: Property 'boardingContract' does not exist on type 'TransactionClient'.
+src/boarding-contracts/boarding-contracts.service.ts(213,38): error TS2339: Property 'boardingContract' does not exist on type 'TransactionClient'.
+src/boarding/boarding.service.ts(13,118): error TS18046: 'error' is of type 'unknown'.
+src/boarding/boarding.service.ts(52,18): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/boarding/boarding.service.ts(53,35): error TS2339: Property 'boardingContract' does not exist on type 'TransactionClient'.
+src/boarding/boarding.service.ts(56,22): error TS2339: Property 'ledgerTransaction' does not exist on type 'TransactionClient'.
+src/boarding/boarding.service.ts(57,18): error TS2339: Property 'ledgerTransaction' does not exist on type 'TransactionClient'.
+src/boarding/boarding.service.ts(73,16): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/boarding/boarding.service.ts(74,33): error TS2339: Property 'boardingDailyLog' does not exist on type 'TransactionClient'.
+src/boarding/boarding.service.ts(82,16): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/boarding/boarding.service.ts(83,30): error TS2339: Property 'horse' does not exist on type 'TransactionClient'.
+src/boarding/boarding.service.ts(87,33): error TS2339: Property 'boardingContract' does not exist on type 'TransactionClient'.
+src/boarding/boarding.service.ts(90,28): error TS2339: Property 'boardingDailyLog' does not exist on type 'TransactionClient'.
+src/boarding/boarding.service.ts(92,16): error TS2339: Property 'ledgerTransaction' does not exist on type 'TransactionClient'.
+src/boarding/vet-calendar.service.ts(25,29): error TS7006: Parameter 'event' implicitly has an 'any' type.
+src/boarding/vet-calendar.service.ts(33,30): error TS2339: Property 'vetEvent' does not exist on type 'TransactionClient'.
+src/boarding/vet-calendar.service.ts(41,32): error TS2339: Property 'vetEvent' does not exist on type 'TransactionClient'.
+src/boarding/vet-calendar.service.ts(44,16): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/boarding/vet-calendar.service.ts(45,32): error TS2339: Property 'vetEvent' does not exist on type 'TransactionClient'.
+src/boarding/vet-calendar.service.ts(50,30): error TS2339: Property 'vetEvent' does not exist on type 'TransactionClient'.
+src/boarding/vet-calendar.service.ts(61,14): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/boarding/vet-calendar.service.ts(62,19): error TS2339: Property 'horse' does not exist on type 'TransactionClient'.
+src/boarding/vet-calendar.service.ts(65,37): error TS2339: Property 'vetEvent' does not exist on type 'TransactionClient'.
+src/boarding/vet-record.service.ts(37,29): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/boarding/vet-record.service.ts(50,16): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/boarding/vet-record.service.ts(51,21): error TS2339: Property 'horse' does not exist on type 'TransactionClient'.
+src/boarding/vet-record.service.ts(57,17): error TS2339: Property 'vetRecord' does not exist on type 'TransactionClient'.
+src/boarding/vet-record.service.ts(66,61): error TS2339: Property 'vetRecord' does not exist on type 'TransactionClient'.
+src/boarding/vet-record.service.ts(73,32): error TS2339: Property 'vetRecord' does not exist on type 'TransactionClient'.
+src/boarding/vet-record.service.ts(76,17): error TS2339: Property 'vetRecord' does not exist on type 'TransactionClient'.
+src/boarding/vet-record.service.ts(81,82): error TS18046: 'error' is of type 'unknown'.
+src/boarding/vet-record.service.ts(91,17): error TS2339: Property 'horse' does not exist on type 'TransactionClient'.
+src/boarding/vet-record.service.ts(102,36): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/boarding/vet-record.service.ts(102,62): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/boarding/vet-record.service.ts(102,65): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/boarding/vet-record.service.ts(103,36): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/boarding/vet-record.service.ts(104,54): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/boarding/vet-record.service.ts(105,38): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/bookings/booking-lifecycle.service.ts(22,36): error TS2339: Property 'booking' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(27,41): error TS2339: Property '$queryRaw' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(28,41): error TS2339: Property '$queryRaw' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(29,20): error TS2339: Property '$queryRaw' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(30,20): error TS2339: Property '$queryRaw' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(37,50): error TS2339: Property '$queryRaw' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(41,41): error TS2339: Property 'membership' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(52,20): error TS2339: Property '$queryRaw' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(55,38): error TS2339: Property '$queryRaw' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(61,26): error TS2339: Property 'payment' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(66,22): error TS2339: Property 'membership' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(69,22): error TS2339: Property 'ledgerTransaction' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(74,22): error TS2339: Property 'payment' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(77,22): error TS2339: Property 'membership' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(79,21): error TS2339: Property 'booking' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/booking-lifecycle.service.ts(88,70): error TS18046: 'error' is of type 'unknown'.
+src/bookings/booking-lifecycle.service.ts(100,14): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/bookings/booking-lifecycle.service.ts(101,14): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/bookings/booking-lifecycle.service.ts(102,15): error TS2339: Property 'membership' does not exist on type 'TransactionClient'.
+src/bookings/booking-rules.service.ts(48,29): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/bookings/booking-rules.service.ts(49,43): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/bookings/booking-rules.service.ts(50,16): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/bookings/booking-rules.service.ts(51,44): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/bookings/booking-rules.service.ts(54,30): error TS2339: Property 'trainer' does not exist on type 'TransactionClient'.
+src/bookings/booking-rules.service.ts(57,38): error TS2339: Property 'arena' does not exist on type 'TransactionClient'.
+src/bookings/booking-rules.service.ts(60,29): error TS2339: Property 'horse' does not exist on type 'TransactionClient'.
+src/bookings/booking-rules.service.ts(61,30): error TS2339: Property 'client' does not exist on type 'TransactionClient'.
+src/bookings/booking-rules.service.ts(63,35): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/bookings/booking-rules.service.ts(66,33): error TS7006: Parameter 'h' implicitly has an 'any' type.
+src/bookings/booking-rules.service.ts(77,46): error TS7006: Parameter 'h' implicitly has an 'any' type.
+src/bookings/booking-rules.service.ts(113,29): error TS2339: Property 'booking' does not exist on type 'TransactionClient'.
+src/bookings/booking-rules.service.ts(118,30): error TS2339: Property 'lesson' does not exist on type 'TransactionClient'.
+src/bookings/booking-rules.service.ts(124,21): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/bookings/booking-rules.service.ts(125,22): error TS7006: Parameter 'l' implicitly has an 'any' type.
+src/bookings/booking-rules.service.ts(125,115): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/bookings/bookings.service.ts(40,40): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/bookings/bookings.service.ts(46,18): error TS2339: Property 'roleAccess' does not exist on type 'TransactionClient'.
+src/bookings/bookings.service.ts(49,58): error TS2339: Property 'user' does not exist on type 'TransactionClient'.
+src/bookings/bookings.service.ts(55,30): error TS2339: Property 'booking' does not exist on type 'TransactionClient'.
+src/bookings/bookings.service.ts(64,31): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/bookings/bookings.service.ts(75,32): error TS2339: Property 'booking' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(78,31): error TS2339: Property 'horse' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(98,37): error TS2339: Property 'booking' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(101,36): error TS2339: Property 'booking' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(102,20): error TS2339: Property 'bookingHorseChange' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(116,32): error TS2339: Property 'booking' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(119,17): error TS2339: Property 'bookingHorseChange' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(144,38): error TS2339: Property 'booking' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(149,22): error TS2339: Property '$queryRaw' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(150,41): error TS2339: Property 'membership' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(158,29): error TS2339: Property 'booking' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(159,36): error TS2339: Property 'booking' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(209,31): error TS2339: Property 'horse' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(210,31): error TS2339: Property 'arena' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(211,31): error TS2339: Property 'booking' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(213,32): error TS2339: Property 'lesson' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/bookings/bookings.service.ts(216,23): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/bookings/bookings.service.ts(217,24): error TS7006: Parameter 'l' implicitly has an 'any' type.
+src/bookings/bookings.service.ts(217,73): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/bookings/bookings.service.ts(219,66): error TS7006: Parameter 'h' implicitly has an 'any' type.
+src/bookings/bookings.service.ts(223,38): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/clients/clients.service.ts(127,32): error TS7031: Binding element 'memberships' implicitly has an 'any' type.
+src/clients/clients.service.ts(149,29): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/clients/clients.service.ts(166,44): error TS7006: Parameter 'membership' implicitly has an 'any' type.
+src/common/prisma-errors.ts(6,9): error TS18046: 'error' is of type 'unknown'.
+src/common/prisma-errors.ts(7,9): error TS18046: 'error' is of type 'unknown'.
+src/common/prisma-errors.ts(8,9): error TS18046: 'error' is of type 'unknown'.
+src/dashboard/dashboard.service.ts(191,53): error TS7006: Parameter 'lesson' implicitly has an 'any' type.
+src/dashboard/dashboard.service.ts(193,10): error TS7006: Parameter 'booking' implicitly has an 'any' type.
+src/dashboard/dashboard.service.ts(202,66): error TS7006: Parameter 'horse' implicitly has an 'any' type.
+src/dashboard/dashboard.service.ts(204,35): error TS7031: Binding element 'lesson' implicitly has an 'any' type.
+src/dashboard/dashboard.service.ts(208,11): error TS18046: 'total' is of type 'unknown'.
+src/dashboard/dashboard.service.ts(210,25): error TS18046: 'lesson' is of type 'unknown'.
+src/dashboard/dashboard.service.ts(210,52): error TS18046: 'lesson' is of type 'unknown'.
+src/dashboard/dashboard.service.ts(221,57): error TS18046: 'usedMinutes' is of type 'unknown'.
+src/dashboard/dashboard.service.ts(224,27): error TS18046: 'usedMinutes' is of type 'unknown'.
+src/dashboard/dashboard.service.ts(225,15): error TS18046: 'usedMinutes' is of type 'unknown'.
+src/horses/horses.service.ts(87,125): error TS7006: Parameter 'contract' implicitly has an 'any' type.
+src/leads/leads.service.ts(25,38): error TS2339: Property 'service' does not exist on type 'TransactionClient'.
+src/leads/leads.service.ts(28,32): error TS2339: Property 'leadRequest' does not exist on type 'TransactionClient'.
+src/leads/leads.service.ts(34,20): error TS2339: Property 'leadRequest' does not exist on type 'TransactionClient'.
+src/leads/leads.service.ts(54,62): error TS7006: Parameter 'line' implicitly has an 'any' type.
+src/leads/leads.service.ts(70,29): error TS2339: Property 'leadRequest' does not exist on type 'TransactionClient'.
+src/leads/leads.service.ts(77,33): error TS2339: Property 'client' does not exist on type 'TransactionClient'.
+src/leads/leads.service.ts(90,20): error TS2339: Property 'client' does not exist on type 'TransactionClient'.
+src/leads/leads.service.ts(91,20): error TS2339: Property 'client' does not exist on type 'TransactionClient'.
+src/leads/leads.service.ts(100,16): error TS2339: Property 'leadRequest' does not exist on type 'TransactionClient'.
+src/leads/leads.service.ts(122,46): error TS2339: Property 'service' does not exist on type 'TransactionClient'.
+src/leads/leads.service.ts(142,113): error TS18046: 'error' is of type 'unknown'.
+src/lessons/lessons.service.ts(50,45): error TS2344: Type '"lesson"' does not satisfy the constraint 'never'.
+src/lessons/lessons.service.ts(52,29): error TS2344: Type '"clubSchedule" | "horse" | "lesson"' does not satisfy the constraint 'never'.
+  Type '"clubSchedule"' is not assignable to type 'never'.
+src/lessons/lessons.service.ts(157,57): error TS7006: Parameter 'booking' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(158,34): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.
+src/lessons/lessons.service.ts(158,56): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.
+src/lessons/lessons.service.ts(161,23): error TS7006: Parameter 'horse' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(176,31): error TS2339: Property 'lesson' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(180,51): error TS2741: Property 'clubSchedule' is missing in type 'TransactionClient' but required in type 'Pick<WorkloadReader, "clubSchedule">'.
+src/lessons/lessons.service.ts(187,56): error TS7006: Parameter 'booking' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(187,92): error TS7006: Parameter 'id' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(189,48): error TS2345: Argument of type 'TransactionClient' is not assignable to parameter of type 'LessonReader'.
+src/lessons/lessons.service.ts(191,47): error TS2345: Argument of type 'TransactionClient' is not assignable to parameter of type 'WorkloadReader'.
+src/lessons/lessons.service.ts(193,32): error TS2339: Property 'lesson' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(229,32): error TS2339: Property 'service' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(244,32): error TS2339: Property 'arena' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(270,37): error TS2339: Property 'membership' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(279,51): error TS2741: Property 'clubSchedule' is missing in type 'TransactionClient' but required in type 'Pick<WorkloadReader, "clubSchedule">'.
+src/lessons/lessons.service.ts(282,20): error TS2339: Property 'lesson' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(305,42): error TS7006: Parameter 'booking' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(308,42): error TS7006: Parameter 'booking' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(315,9): error TS2345: Argument of type 'TransactionClient' is not assignable to parameter of type 'LessonReader'.
+src/lessons/lessons.service.ts(325,11): error TS2345: Argument of type 'TransactionClient' is not assignable to parameter of type 'WorkloadReader'.
+src/lessons/lessons.service.ts(354,34): error TS2339: Property 'lesson' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(363,32): error TS2339: Property 'lesson' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(474,31): error TS2339: Property 'lesson' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(492,19): error TS2339: Property 'lesson' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(514,39): error TS2339: Property 'membership' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(525,22): error TS2339: Property 'booking' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(529,35): error TS2339: Property 'payment' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(531,22): error TS2339: Property 'payment' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(544,20): error TS7006: Parameter 'operation' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(545,17): error TS7006: Parameter 'operation' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(549,20): error TS7006: Parameter 'operation' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(550,17): error TS7006: Parameter 'operation' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(585,32): error TS2339: Property 'lesson' does not exist on type 'TransactionClient'.
+src/lessons/lessons.service.ts(597,57): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(598,57): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(631,29): error TS18046: 'client.lesson' is of type 'unknown'.
+src/lessons/lessons.service.ts(646,25): error TS7006: Parameter 'lesson' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(649,25): error TS7006: Parameter 'lesson' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(649,58): error TS7006: Parameter 'booking' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(652,36): error TS7006: Parameter 'lesson' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(666,25): error TS18046: 'client.horse' is of type 'unknown'.
+src/lessons/lessons.service.ts(674,27): error TS18046: 'client.lesson' is of type 'unknown'.
+src/lessons/lessons.service.ts(684,41): error TS7006: Parameter 'total' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(684,48): error TS7006: Parameter 'lesson' implicitly has an 'any' type.
+src/lessons/lessons.service.ts(709,28): error TS18046: 'client.clubSchedule' is of type 'unknown'.
+src/memberships/membership-ledger.service.ts(106,32): error TS2339: Property 'booking' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(135,16): error TS2339: Property 'booking' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(184,33): error TS2339: Property 'membershipOp' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(195,33): error TS2339: Property 'membership' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(216,29): error TS2339: Property 'membership' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(228,14): error TS2339: Property 'membershipOp' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(251,33): error TS2339: Property 'membership' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(259,33): error TS2339: Property 'membershipOp' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(272,34): error TS2339: Property 'membershipOp' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(283,14): error TS2339: Property 'membership' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(287,14): error TS2339: Property 'membershipOp' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(304,14): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(312,27): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/memberships/membership-ledger.service.ts(365,7): error TS18046: 'error' is of type 'unknown'.
+src/memberships/membership-ledger.service.ts(370,20): error TS18046: 'error' is of type 'unknown'.
+src/memberships/memberships.service.ts(56,37): error TS7006: Parameter 'membership' implicitly has an 'any' type.
+src/payments/cash-desk.service.ts(23,119): error TS18046: 'error' is of type 'unknown'.
+src/payments/cash-desk.service.ts(35,16): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(36,33): error TS2339: Property 'payment' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(47,21): error TS2339: Property 'client' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(48,38): error TS2339: Property 'service' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(51,34): error TS2339: Property 'booking' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(53,40): error TS2339: Property 'payment' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(55,39): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/payments/cash-desk.service.ts(56,31): error TS2339: Property 'payment' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(59,37): error TS2339: Property 'membership' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(62,31): error TS2339: Property 'payment' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(64,24): error TS2339: Property 'payment' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(66,20): error TS2339: Property 'membership' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(68,20): error TS2339: Property 'membership' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(73,30): error TS2339: Property 'cashShift' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(82,20): error TS2339: Property 'payment' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(83,20): error TS2339: Property 'payment' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(84,16): error TS2339: Property 'ledgerTransaction' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(90,18): error TS2339: Property 'booking' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(91,18): error TS2339: Property 'payment' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(105,31): error TS2339: Property 'payment' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/payments/cash-desk.service.ts(106,35): error TS2339: Property 'payment' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/payments/cash-desk.service.ts(114,16): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(115,20): error TS2339: Property 'cashShift' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(116,17): error TS2339: Property 'cashShift' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(121,30): error TS2339: Property 'cashShift' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(123,17): error TS2339: Property 'cashShift' does not exist on type 'TransactionClient'.
+src/payments/cash-desk.service.ts(129,26): error TS2339: Property 'booking' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/payments/cash-desk.service.ts(130,29): error TS2339: Property 'membership' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/payments/finance.service.ts(43,18): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/payments/finance.service.ts(44,35): error TS2339: Property 'expense' does not exist on type 'TransactionClient'.
+src/payments/finance.service.ts(54,30): error TS2339: Property 'cashShift' does not exist on type 'TransactionClient'.
+src/payments/finance.service.ts(55,17): error TS2339: Property 'expense' does not exist on type 'TransactionClient'.
+src/payments/finance.service.ts(66,22): error TS2339: Property 'expense' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/payments/finance.service.ts(67,23): error TS2339: Property 'expense' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/payments/finance.service.ts(73,33): error TS2339: Property 'expense' does not exist on type 'TransactionClient'.
+src/payments/finance.service.ts(76,54): error TS2339: Property 'payrollCalculation' does not exist on type 'TransactionClient'.
+src/payments/finance.service.ts(79,17): error TS2339: Property 'expense' does not exist on type 'TransactionClient'.
+src/payments/finance.service.ts(92,37): error TS2339: Property 'payment' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/payments/finance.service.ts(93,38): error TS2339: Property 'expense' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/payments/finance.service.ts(94,40): error TS2339: Property 'payment' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/payments/finance.service.ts(95,41): error TS2339: Property 'expense' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/payments/finance.service.ts(99,35): error TS2339: Property 'payment' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/settings/module-access.service.ts(23,32): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/settings/module-access.service.ts(25,26): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/settings/module-access.service.ts(33,80): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/settings/module-access.service.ts(35,74): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/staff/staff.service.ts(40,70): error TS18046: 'error' is of type 'unknown'.
+src/staff/staff.service.ts(47,26): error TS2339: Property 'staffProfile' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(55,31): error TS2339: Property 'staffProfile' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/staff/staff.service.ts(55,212): error TS2339: Property 'staffProfile' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/staff/staff.service.ts(68,23): error TS2339: Property 'staffProfile' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(69,19): error TS2339: Property 'staffProfile' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(71,36): error TS2339: Property 'user' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(72,17): error TS2339: Property 'staffProfile' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(81,31): error TS2339: Property 'workShift' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/staff/staff.service.ts(81,207): error TS2339: Property 'workShift' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/staff/staff.service.ts(85,18): error TS2339: Property 'payrollCalculation' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(93,30): error TS2339: Property 'staffProfile' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(96,16): error TS2339: Property 'workShift' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(105,30): error TS2339: Property 'workShift' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(108,27): error TS2339: Property 'workShift' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(111,17): error TS2339: Property 'workShift' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(116,28): error TS2339: Property 'workShift' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(118,53): error TS2339: Property 'lesson' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(127,30): error TS2339: Property 'staffProfile' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/staff/staff.service.ts(130,32): error TS2339: Property 'payrollCalculation' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/staff/staff.service.ts(131,34): error TS2339: Property 'payrollCalculation' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/staff/staff.service.ts(134,38): error TS2339: Property 'staffProfile' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/staff/staff.service.ts(142,33): error TS2339: Property 'payrollCalculation' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(144,30): error TS2339: Property 'staffProfile' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(148,17): error TS2339: Property 'payrollCalculation' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(154,28): error TS2339: Property 'payrollCalculation' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(156,16): error TS2339: Property '$queryRaw' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(167,30): error TS2339: Property 'cashShift' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(168,32): error TS2339: Property 'expense' does not exist on type 'TransactionClient'.
+src/staff/staff.service.ts(170,17): error TS2339: Property 'payrollCalculation' does not exist on type 'TransactionClient'.
+src/stalls/stalls.service.ts(60,36): error TS7006: Parameter 'stall' implicitly has an 'any' type.
+src/stalls/stalls.service.ts(66,23): error TS7006: Parameter 'stall' implicitly has an 'any' type.
+src/stalls/stalls.service.ts(75,30): error TS2339: Property 'stall' does not exist on type 'TransactionClient'.
+src/stalls/stalls.service.ts(78,18): error TS2339: Property 'stall' does not exist on type 'TransactionClient'.
+src/stalls/stalls.service.ts(80,37): error TS2339: Property 'horse' does not exist on type 'TransactionClient'.
+src/stalls/stalls.service.ts(83,21): error TS2339: Property 'horse' does not exist on type 'TransactionClient'.
+src/stalls/stalls.service.ts(87,16): error TS2339: Property 'stall' does not exist on type 'TransactionClient'.
+src/stalls/stalls.service.ts(88,16): error TS2339: Property 'stall' does not exist on type 'TransactionClient'.
+src/stalls/stalls.service.ts(89,16): error TS2339: Property 'horse' does not exist on type 'TransactionClient'.
+src/stalls/stalls.service.ts(98,98): error TS18046: 'error' is of type 'unknown'.
+src/stalls/stalls.service.ts(127,34): error TS2339: Property 'stall' does not exist on type 'TransactionClient'.
+src/stalls/stalls.service.ts(132,18): error TS2339: Property 'stall' does not exist on type 'TransactionClient'.
+src/users/users.service.ts(21,31): error TS2339: Property 'user' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/users/users.service.ts(23,36): error TS2339: Property 'trainer' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/users/users.service.ts(24,19): error TS2339: Property 'user' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/users/users.service.ts(27,68): error TS18046: 'error' is of type 'unknown'.
+src/users/users.service.ts(35,31): error TS2339: Property 'user' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/users/users.service.ts(38,20): error TS2339: Property 'vkNotification' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/users/users.service.ts(42,19): error TS2339: Property 'user' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/users/users.service.ts(45,68): error TS18046: 'error' is of type 'unknown'.
+src/users/users.service.ts(69,68): error TS18046: 'error' is of type 'unknown'.
+src/vk-bot/vk-bot.service.ts(178,45): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/vk-bot/vk-bot.service.ts(187,48): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/vk-bot/vk-bot.service.ts(187,80): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/vk-bot/vk-delivery.module.ts(11,12): error TS2339: Property 'vkNotification' does not exist on type 'TransactionClient'.
+src/vk-bot/vk-delivery.module.ts(22,27): error TS2339: Property 'user' does not exist on type 'TransactionClient'.
+src/vk-bot/vk-delivery.module.ts(23,45): error TS7006: Parameter 'admin' implicitly has an 'any' type.
+src/vk-bot/vk-delivery.module.ts(26,92): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'bigint'.
+src/vk-bot/vk-link.service.ts(26,20): error TS2339: Property 'vkLinkCode' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(27,20): error TS2339: Property 'vkLinkCode' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(33,98): error TS18046: 'error' is of type 'unknown'.
+src/vk-bot/vk-link.service.ts(41,51): error TS2339: Property 'client' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(41,99): error TS2339: Property 'trainer' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(43,39): error TS2339: Property 'client' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(44,21): error TS2339: Property 'trainer' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(45,16): error TS2339: Property 'vkLinkCode' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(46,37): error TS2339: Property 'vkNotification' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(59,30): error TS2339: Property 'vkLinkCode' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(64,12): error TS2339: Property 'client' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(64,75): error TS2339: Property 'trainer' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(69,57): error TS2339: Property 'client' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(69,121): error TS2339: Property 'trainer' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(71,45): error TS2339: Property 'client' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(72,21): error TS2339: Property 'trainer' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-link.service.ts(73,16): error TS2339: Property 'vkLinkCode' does not exist on type 'Omit<PrismaClient<PrismaClientOptions, never, $Extensions.DefaultArgs>, runtime.ITXClientDenyList>'.
+src/vk-bot/vk-reminders.module.ts(44,43): error TS7006: Parameter 'booking' implicitly has an 'any' type.
+src/vk-bot/vk-reminders.module.ts(57,44): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/vk-bot/vk-reminders.module.ts(59,43): error TS7006: Parameter 'row' implicitly has an 'any' type.

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixtures'
 
 async function setup(page: Page, role = 'ADMIN') {
   await page.clock.setFixedTime(new Date('2026-10-09T09:00:00Z'))

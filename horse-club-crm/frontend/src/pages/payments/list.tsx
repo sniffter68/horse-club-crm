@@ -1,3 +1,4 @@
+import { usePermissions } from '../../modulePermissions'
 import { useState } from 'react'
 import { useUpdate, type HttpError } from '@refinedev/core'
 import { List, useTable } from '@refinedev/antd'
@@ -19,6 +20,8 @@ function source(payment: Payment): string {
 }
 
 export function PaymentList() {
+  const { canWrite } = usePermissions()
+  const writable = canWrite('CASHBOX')
   const [updatingId, setUpdatingId] = useState<string>()
   const [selectedId, setSelectedId] = useState<string>()
   const { mutate: update } = useUpdate()
@@ -36,6 +39,7 @@ export function PaymentList() {
   }
 
   return <>
+    {!writable && <Alert type="info" showIcon message="Доступно только для просмотра" />}
     <List title="Платежи" canCreate={false}>
       <Alert type="info" showIcon message="Простой внутренний учёт"
         description="Начисления создаются автоматически. Нажмите «Оплачено», когда деньги получены. Кассовые чеки и бухгалтерия ведутся отдельно."
@@ -54,8 +58,8 @@ export function PaymentList() {
         { key: 'status', dataIndex: 'status', title: 'Оплата', sorter: true, render: (_: PaymentStatus, record) => <Space>
           <Tag color={colors[record.status]}>{statuses[record.status]}</Tag>
           {record.cashierId ? <Tag>Проведено в кассе</Tag> : record.status === 'PAID'
-            ? <Button size="small" loading={updatingId === record.id} onClick={() => setPaid(record, false)}>Снять отметку</Button>
-            : <Button type="primary" size="small" loading={updatingId === record.id} onClick={() => setPaid(record, true)}>Оплачено</Button>}
+            ? <Button disabled={!writable} size="small" loading={updatingId === record.id} onClick={() => setPaid(record, false)}>Снять отметку</Button>
+            : <Button disabled={!writable} type="primary" size="small" loading={updatingId === record.id} onClick={() => setPaid(record, true)}>Оплачено</Button>}
         </Space> },
         { key: 'paidAt', dataIndex: 'paidAt', title: 'Дата оплаты', sorter: true, render: dateTime },
       ]} />

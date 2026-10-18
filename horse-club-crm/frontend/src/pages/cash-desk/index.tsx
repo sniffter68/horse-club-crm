@@ -1,3 +1,4 @@
+import { usePermissions as useModules } from '../../modulePermissions'
 import { useEffect, useState } from 'react'
 import { usePermissions } from '@refinedev/core'
 import { useSearchParams } from 'react-router-dom'
@@ -21,6 +22,8 @@ export function CashDeskPage() {
   return <CashDeskBook />
 }
 function CashDeskBook() {
+  const { canWrite } = useModules()
+  const writable = canWrite('CASHBOX')
   const { data: role } = usePermissions({})
   const [expenseOpen, setExpenseOpen] = useState(false)
   const [params, setParams] = useSearchParams()
@@ -80,10 +83,11 @@ function CashDeskBook() {
     catch (cause) { setError(toHttpError(cause).message); throw cause }
   } })
   return <Space className="cash-desk-page" direction="vertical" size="large" style={{ width: '100%' }}>
-    <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}><div><Typography.Title level={2}>Касса</Typography.Title><Typography.Text type="secondary">Кассовая книга · время Москвы</Typography.Text></div><Space wrap><CashDeskButton /><Button type="primary" onClick={() => setExpenseOpen(true)}>Внести расход</Button><Button onClick={() => setRefresh(value => value + 1)} loading={loading}>Обновить</Button></Space></Space>
+    {!writable && <Alert type="info" showIcon message="Доступно только для просмотра" />}
+    <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}><div><Typography.Title level={2}>Касса</Typography.Title><Typography.Text type="secondary">Кассовая книга · время Москвы</Typography.Text></div><Space wrap><CashDeskButton /><Button type="primary" disabled={!writable} onClick={() => setExpenseOpen(true)}>Внести расход</Button><Button onClick={() => setRefresh(value => value + 1)} loading={loading}>Обновить</Button></Space></Space>
     <Card><Space wrap>
       <Tag>{shift ? `Смена открыта ${cashTime(shift.openedAt)}` : 'Нет открытой смены'}</Tag>
-      {shift ? <><Typography.Text>Размен на начало: {currency(shift.startingCash)}</Typography.Text><Button onClick={closeShift}>Закрыть смену</Button></> : <Button onClick={() => { setShiftError(undefined); setOpening(true) }}>Открыть смену</Button>}
+      {shift ? <><Typography.Text>Размен на начало: {currency(shift.startingCash)}</Typography.Text><Button disabled={!writable} onClick={closeShift}>Закрыть смену</Button></> : <Button disabled={!writable} onClick={() => { setShiftError(undefined); setOpening(true) }}>Открыть смену</Button>}
     </Space></Card>
     <Space className="cash-desk-filters" wrap><Segmented value={period} onChange={value => changeParams({ period: String(value), page: '1' })} options={[{ value: 'today', label: 'Сегодня' }, { value: 'shift', label: 'Текущая смена' }, { value: 'yesterday', label: 'Вчера' }, { value: 'week', label: 'Текущая неделя' }, { value: 'month', label: 'Текущий месяц' }, { value: 'custom', label: 'Выбрать даты' }]} />
       {period === 'custom' && <DatePicker.RangePicker locale={ruDatePicker} aria-label="Период кассовой книги" format="DD.MM.YYYY" value={from && to ? [dayjs(from), dayjs(to)] : null} onChange={values => changeParams({ from: values?.[0]?.format('YYYY-MM-DD') || '', to: values?.[1]?.format('YYYY-MM-DD') || '', page: '1' })} />}
@@ -118,7 +122,7 @@ function CashDeskBook() {
           { key: 'cashier', title: 'Администратор', render: (_, row) => row.cashier?.email || 'Ранее внесённый платёж' },
         ]} />
     </Card>
-    {!(period === 'shift' && !shift) && !(period === 'custom' && (!from || !to)) && <ExpenseHistory key={`${period}:${from}:${to}`} {...periodRange(period, from, to)} {...(period === 'shift' && shift ? { from: shift.openedAt, shiftId: shift.id } : {})} refresh={refresh} admin={role === 'ADMIN'} />}
+    {!(period === 'shift' && !shift) && !(period === 'custom' && (!from || !to)) && <ExpenseHistory key={`${period}:${from}:${to}`} {...periodRange(period, from, to)} {...(period === 'shift' && shift ? { from: shift.openedAt, shiftId: shift.id } : {})} refresh={refresh} admin={writable && role === 'ADMIN'} />}
     {expenseOpen && <ExpenseModal onClose={() => setExpenseOpen(false)} />}
     <Modal open={opening} title="Открыть смену" onCancel={() => { if (!shiftBusy) setOpening(false) }} maskClosable={false} okText="Открыть смену" cancelText="Отмена" confirmLoading={shiftBusy} onOk={() => form.submit()}>
       {shiftError && <Alert type="error" message={shiftError} />}

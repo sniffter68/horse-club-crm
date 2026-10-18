@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 const uploadedPhoto = '/uploads/65ecf169-6c22-4e89-8baf-ddc3399da7ad.png'
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAE0lEQVR4nGMs8rFkgAEmOAsvBwAxewD/Xm6DKwAAAABJRU5ErkJggg==', 'base64')

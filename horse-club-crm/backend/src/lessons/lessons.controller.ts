@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import {
   Body,
   Controller,
@@ -31,7 +32,8 @@ import { LessonsService } from './lessons.service';
 
 @ApiTags('Lessons')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
+@RequireModule('SCHEDULE')
 @Controller('lessons')
 export class LessonsController {
   constructor(private readonly lessonsService: LessonsService) {}

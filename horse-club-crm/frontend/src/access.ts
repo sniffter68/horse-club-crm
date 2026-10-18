@@ -1,3 +1,4 @@
+import { usePermissions as useModules } from './modulePermissions'
 import { useCallback, useEffect } from 'react'
 import { useCustom, usePermissions, type HttpError } from '@refinedev/core'
 import type { Role } from './authStorage'
@@ -16,6 +17,7 @@ export function mayReplaceHorse(role: Role | undefined, snapshot: AccessSnapshot
     && trainerId === (snapshot.trainerId ?? snapshot.userId)
 }
 export function useRoleAccess() {
+  const modules = useModules()
   const { data: role } = usePermissions<Role>({})
   const { query } = useCustom<AccessSnapshot, HttpError>({ url: `${API_URL}/settings/access/me`, method: 'get', errorNotification: false,
     queryOptions: { enabled: role === 'TRAINER', staleTime: 15_000, retry: false, refetchOnWindowFocus: true } })
@@ -26,7 +28,8 @@ export function useRoleAccess() {
     return () => window.removeEventListener('role-access-changed', refresh)
   }, [refetch, role])
   const snapshot = query.isError ? undefined : query.data?.data
-  const permissions = role === 'ADMIN' || role === 'MANAGER' ? fullAccess : snapshot && snapshot.role === role ? snapshot.permissions : noAccess
-  const canReplaceHorse = useCallback((trainerId?: string) => mayReplaceHorse(role, snapshot, trainerId), [role, snapshot])
-  return { role, permissions, canReplaceHorse, loading: role === 'TRAINER' && query.isLoading, error: query.error, refresh: refetch }
+  const base = role === 'STABLE_WORKER' ? { ...noAccess, healthRead: true, boardingAccess: true } : role === 'ADMIN' || role === 'MANAGER' ? fullAccess : snapshot && snapshot.role === role ? snapshot.permissions : noAccess
+  const permissions = { ...base, healthRead: base.healthRead && modules.canRead('VETERINARY'), healthWrite: base.healthWrite && modules.canWrite('VETERINARY'), financeRead: base.financeRead && modules.canRead('CASHBOX'), boardingAccess: base.boardingAccess && modules.canRead('STABLES') }
+  const canReplaceHorse = useCallback((trainerId?: string) => modules.canWrite('SCHEDULE') && mayReplaceHorse(role, snapshot, trainerId), [role, snapshot, modules])
+  return { role, permissions, canReplaceHorse, loading: modules.loading || role === 'TRAINER' && query.isLoading, error: query.error, refresh: refetch }
 }

@@ -65,7 +65,14 @@ export function ExpenseHistory({ from, to, shiftId, refresh, admin }: { from?: s
   const [error, setError] = useState<string>()
   const [revision, setRevision] = useState(0)
   const { modal, message } = App.useApp()
-  const update = (key: string, value?: string) => setParams(current => { const next = new URLSearchParams(current); if (value) next.set(key, value); else next.delete(key); if (key !== 'expensePage') next.set('expensePage', '1'); return next })
+  const update = (key: string, value?: string) => {
+    // Sequential filter changes can precede React's next render. Read the latest
+    // committed URL so the second filter does not restore the first one's old value.
+    const next = new URLSearchParams(window.location.search)
+    if (value) next.set(key, value); else next.delete(key)
+    if (key !== 'expensePage') next.set('expensePage', '1')
+    setParams(next)
+  }
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true); setError(undefined)

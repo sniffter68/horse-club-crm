@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
@@ -10,7 +11,8 @@ import { LessonsService } from './lessons.service';
 
 @ApiTags('Horses')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
+@RequireModule('SCHEDULE')
 @Controller('horses')
 export class HorseWorkloadController {
   constructor(private readonly lessonsService: LessonsService) {}

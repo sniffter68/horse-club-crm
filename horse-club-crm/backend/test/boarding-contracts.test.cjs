@@ -230,7 +230,8 @@ test('quick boarding HTTP endpoints validate dates and restrict changes to ADMIN
       availability: async value => { calls.push(value); return { horses: [], stalls: [] }; },
       terminate: async value => { calls.push(value); return { id: value, status: 'TERMINATED' }; },
     } },
-  ] }).overrideGuard(JwtAuthGuard).useValue({ canActivate(context) {
+  ] }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
+    .overrideGuard(JwtAuthGuard).useValue({ canActivate(context) {
     const req = context.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return true;
   } }).compile();
   const app = module.createNestApplication();

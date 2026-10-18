@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
@@ -10,8 +11,9 @@ import { FinanceService } from './finance.service';
 
 @ApiTags('Finance')
 @ApiBearerAuth()
+@RequireModule('CASHBOX')
 @Controller('finance')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.MANAGER)
 export class FinanceController {
   constructor(private readonly service: FinanceService) {}

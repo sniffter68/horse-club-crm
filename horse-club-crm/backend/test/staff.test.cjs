@@ -74,7 +74,8 @@ test('HTTP RBAC and validation: trainers read only, managers cannot delete, auth
   const module = await Test.createTestingModule({ controllers: [StaffController, PayrollController], providers: [RolesGuard, { provide: StaffService, useValue: {
     profiles: async () => ({ data: [], total: 0 }), shifts: async () => ({ data: [], total: 0 }), calculate: async () => ({ data: [], total: 0 }),
     createShifts: async (dto, user) => { received = user.id; return { count: 1 }; }, changeShift: async () => ({}), payout: async () => ({}),
-  } }] }).overrideGuard(JwtAuthGuard).useValue({ canActivate: context => { context.switchToHttp().getRequest().user = { ...admin, role }; return true; } }).compile();
+  } }] }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
+    .overrideGuard(JwtAuthGuard).useValue({ canActivate: context => { context.switchToHttp().getRequest().user = { ...admin, role }; return true; } }).compile();
   const app = module.createNestApplication(); app.setGlobalPrefix('api'); app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true })); await app.init();
   try {
     const server = app.getHttpServer();

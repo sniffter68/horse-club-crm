@@ -1,0 +1,111 @@
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "horse_club_db", schema "expense_check_1792361714238" at "127.0.0.1:5432"
+
+29 migrations found in prisma/migrations
+
+Applying migration `20260906225212_add_membership_op_composite_unique`
+Applying migration `20260906230133_add_lesson_relations_and_booking_client`
+Applying migration `20260906231217_add_club_schedule_and_horse_workload`
+Applying migration `20260906232505_add_catalog_fields_and_schedule_updated_at`
+Applying migration `20260908030000_catalog_details`
+Applying migration `20260908040000_leads_vk`
+Applying migration `20260908050000_vk_scenarios`
+Applying migration `20260909000000_add_membership_plans`
+Applying migration `20260915090000_group_lessons_and_modules`
+Applying migration `20260915170000_automatic_payment_charges`
+Applying migration `20260915170100_backfill_boarding_charges`
+Applying migration `20260916090000_pending_lead_requests`
+Applying migration `20260916110000_lead_client_on_delete_set_null`
+Applying migration `20260917090000_multiple_days_off`
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+Applying migration `20260919120000_record_lead_consent`
+Applying migration `20261008120000_admin_vk_notifications`
+For more information, see: https://pris.ly/prisma-config
+Applying migration `20261008180000_club_boarding_feeding`
+Applying migration `20261008200000_init_resource_triad_and_boarding`
+Applying migration `20261008220000_booking_rules_rider_weight`
+Applying migration `20261009010000_booking_lifecycle_ledger`
+Applying migration `20261009020000_boarding_and_vet`
+Applying migration `20261009120000_cash_desk`
+Applying migration `20261009160000_session_and_horse_replacement`
+Applying migration `20261013000000_public_landing_content`
+Applying migration `20261015190000_role_access_and_horse_history`
+Applying migration `20261016090000_stall_map`
+Applying migration `20261018090000_expenses`
+Applying migration `20261018120000_vet_records`
+Applying migration `20261018150000_staff_payroll`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260906225212_add_membership_op_composite_unique/
+    └─ migration.sql
+  └─ 20260906230133_add_lesson_relations_and_booking_client/
+    └─ migration.sql
+  └─ 20260906231217_add_club_schedule_and_horse_workload/
+    └─ migration.sql
+  └─ 20260906232505_add_catalog_fields_and_schedule_updated_at/
+    └─ migration.sql
+  └─ 20260908030000_catalog_details/
+    └─ migration.sql
+  └─ 20260908040000_leads_vk/
+    └─ migration.sql
+  └─ 20260908050000_vk_scenarios/
+    └─ migration.sql
+  └─ 20260909000000_add_membership_plans/
+    └─ migration.sql
+  └─ 20260915090000_group_lessons_and_modules/
+    └─ migration.sql
+  └─ 20260915170000_automatic_payment_charges/
+    └─ migration.sql
+  └─ 20260915170100_backfill_boarding_charges/
+    └─ migration.sql
+  └─ 20260916090000_pending_lead_requests/
+    └─ migration.sql
+  └─ 20260916110000_lead_client_on_delete_set_null/
+    └─ migration.sql
+  └─ 20260917090000_multiple_days_off/
+    └─ migration.sql
+
+Environment variables loaded from .env
+  └─ 20260919120000_record_lead_consent/
+    └─ migration.sql
+  └─ 20261008120000_admin_vk_notifications/
+    └─ migration.sql
+  └─ 20261008180000_club_boarding_feeding/
+    └─ migration.sql
+  └─ 20261008200000_init_resource_triad_and_boarding/
+    └─ migration.sql
+  └─ 20261008220000_booking_rules_rider_weight/
+    └─ migration.sql
+  └─ 20261009010000_booking_lifecycle_ledger/
+    └─ migration.sql
+  └─ 20261009020000_boarding_and_vet/
+    └─ migration.sql
+  └─ 20261009120000_cash_desk/
+    └─ migration.sql
+  └─ 20261009160000_session_and_horse_replacement/
+    └─ migration.sql
+  └─ 20261013000000_public_landing_content/
+    └─ migration.sql
+  └─ 20261015190000_role_access_and_horse_history/
+    └─ migration.sql
+  └─ 20261016090000_stall_map/
+    └─ migration.sql
+  └─ 20261018090000_expenses/
+    └─ migration.sql
+  └─ 20261018120000_vet_records/
+    └─ migration.sql
+  └─ 20261018150000_staff_payroll/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+✔ PostgreSQL expense idempotency, constraints, pagination, balances and audited cancellation (202.5113ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 475.266

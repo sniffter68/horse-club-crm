@@ -61,7 +61,7 @@ function VetPassport({ horseId, onClose }: { horseId: string; onClose: () => voi
 
 export function VetRecordsJournal({ horseId, scope = 'horse' }: { horseId?: string; scope?: 'horse' | 'all' }) {
   const { role, permissions } = useRoleAccess()
-  const manage = role === 'ADMIN' || role === 'MANAGER'
+  const manage = permissions.healthWrite && (role === 'ADMIN' || role === 'MANAGER')
   const enabled = permissions.healthRead && (scope === 'all' || isHorseUuid(horseId))
   const [search, setSearch] = useSearchParams()
   const [localPage, setLocalPage] = useState(1)
@@ -93,7 +93,7 @@ export function VetRecordsJournal({ horseId, scope = 'horse' }: { horseId?: stri
   const remove = (r: VetRecord) => modal.confirm({ title: `Удалить «${r.title}»?`, content: 'Запись будет удалена из ветеринарной карты.', okText: 'Удалить', cancelText: 'Отмена', okButtonProps: { danger: true },
     onOk: async () => { setDeleting(true); setDeleteError(undefined); try { await httpClient.delete(`${API_URL}/vet/records/${r.id}`); refresh(); void message.success('Ветзапись удалена') }
       catch (error) { const failure = toHttpError(error); setDeleteError(failure.message); throw error } finally { setDeleting(false) } } })
-  const actions = (r: VetRecord) => <Space wrap>{manage && <><Button size="small" onClick={() => setEditor(r)}>Редактировать</Button><Button size="small" onClick={() => setHealth(r.horse)}>Здоровье</Button></>}{role === 'ADMIN' && <Button size="small" danger disabled={deleting} onClick={() => remove(r)}>Удалить</Button>}</Space>
+  const actions = (r: VetRecord) => <Space wrap>{manage && <><Button size="small" onClick={() => setEditor(r)}>Редактировать</Button><Button size="small" onClick={() => setHealth(r.horse)}>Здоровье</Button></>}{manage && role === 'ADMIN' && <Button size="small" danger disabled={deleting} onClick={() => remove(r)}>Удалить</Button>}</Space>
   const document = (r: VetRecord) => r.documentUrl && /^https?:\/\//i.test(r.documentUrl) ? <a href={r.documentUrl} target="_blank" rel="noopener noreferrer">Акт / скан</a> : '—'
   const procedure = (r: VetRecord) => <><strong>{r.title}</strong><div>{recordTypes[r.type]}</div><div>{r.medication}</div>{r.notes && <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{r.notes}</Typography.Paragraph>}{r.cost != null && <div>{r.cost} ₽</div>}</>
   return <section aria-label="Ветзаписи" className="stable-section">

@@ -82,7 +82,8 @@ test('HTTP permissions: TRAINER gets 403, MANAGER creates/reads but cannot delet
   const userId = randomUUID(), id = randomUUID();
   const module = await Test.createTestingModule({ controllers: [FinanceController], providers: [RolesGuard, { provide: FinanceService, useValue: {
     create: async (dto, author) => { receivedAuthor = author; return { id, ...dto }; }, list: async () => ({ data: [], total: 0 }), summary: async () => ({}), cancel: async () => ({ id }),
-  } }] }).overrideGuard(JwtAuthGuard).useValue({ canActivate: context => { context.switchToHttp().getRequest().user = { id: userId, role }; return true; } }).compile();
+  } }] }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
+    .overrideGuard(JwtAuthGuard).useValue({ canActivate: context => { context.switchToHttp().getRequest().user = { id: userId, role }; return true; } }).compile();
   const app = module.createNestApplication(); app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
   await app.init();

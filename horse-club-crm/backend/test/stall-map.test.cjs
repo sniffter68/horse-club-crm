@@ -95,6 +95,7 @@ test('failed final write rolls relocation back; serialization conflicts retry', 
 test('stall HTTP API validates assignment and restricts mutations to ADMIN/MANAGER', async () => {
   const { service } = fixture();
   const module = await Test.createTestingModule({ controllers: [StallsController], providers: [RolesGuard, { provide: StallsService, useValue: service }] })
+    .overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
     .overrideGuard(JwtAuthGuard).useValue({ canActivate(context) { const req = context.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return true; } })
     .overrideGuard(RoleAccessGuard).useValue({ canActivate: () => true }).compile();
   const app = module.createNestApplication();

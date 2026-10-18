@@ -43,7 +43,7 @@ export class StaffService {
     }
   }
   private async scope(tx: Prisma.TransactionClient, user: AuthUser, staffId?: string) {
-    if (user.role !== Role.TRAINER) return staffId;
+    if (user.role === Role.ADMIN || user.role === Role.MANAGER) return staffId;
     const own = await tx.staffProfile.findUnique({ where: { userId: user.id }, select: { id: true } });
     if (staffId && staffId !== own?.id) throw new ForbiddenException('Чужие начисления и график недоступны');
     return own?.id ?? '00000000-0000-0000-0000-000000000000';

@@ -20,7 +20,7 @@ export function StallMap() {
   const [error, setError] = useState<string>()
   const [selectedId, setSelectedId] = useState<string>()
   const [printId, setPrintId] = useState<string>()
-  const { canManage } = useCatalogPermissions()
+  const { canManage } = useCatalogPermissions('stalls')
   const { mutate: onError } = useOnError()
   const [params, setParams] = useSearchParams()
   const zone = params.get('zone') ?? 'ALL'

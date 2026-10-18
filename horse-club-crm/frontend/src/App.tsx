@@ -1,3 +1,4 @@
+import { PermissionsProvider, ModuleGuard } from './permissions'
 import { CashDeskPage } from './pages/cash-desk'
 import { StaffPage } from './pages/staff'
 import { CashDeskProvider, CashDeskButton } from './pages/cash-desk/CashDeskPaymentModal'
@@ -88,6 +89,7 @@ function LoadingPage() {
 function DashboardRoute() {
   const { data: role, isLoading } = usePermissions<Role>({})
   if (isLoading) return <LoadingPage />
+  if (role === 'STABLE_WORKER') return <Navigate to="/stable" replace />
   if (role === 'TRAINER') return <Navigate to="/schedule" replace />
   return <DashboardPage />
 }
@@ -177,7 +179,7 @@ export default function App() {
             options={{ syncWithLocation: true, disableTelemetry: true }}>
             <Routes>
               <Route element={<Authenticated key="private" fallback={<CatchAllNavigate to="/login" />} loading={<LoadingPage />}>
-                <CashDeskProvider><ThemedLayoutV2 Header={() => <div className="cash-desk-header"><CashDeskButton /></div>} Sider={() => <Sidebar darkMode={darkMode} onToggleTheme={toggleTheme} />} Title={(props) => <ThemedTitleV2 {...props} text="Horse CRM" />}><Outlet /></ThemedLayoutV2></CashDeskProvider>
+                <PermissionsProvider><CashDeskProvider><ThemedLayoutV2 Header={() => <div className="cash-desk-header"><CashDeskButton /></div>} Sider={() => <Sidebar darkMode={darkMode} onToggleTheme={toggleTheme} />} Title={(props) => <ThemedTitleV2 {...props} text="Horse CRM" />}><ModuleGuard><Outlet /></ModuleGuard></ThemedLayoutV2></CashDeskProvider></PermissionsProvider>
               </Authenticated>}>
                 <Route index element={<DashboardRoute />} />
                 {catalogs.map(({ name, ListPage, CreatePage, EditPage }) => (

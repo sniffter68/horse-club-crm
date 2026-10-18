@@ -1,4 +1,4 @@
-﻿import { test, expect, type Page } from '@playwright/test'
+﻿import { test, expect, type Page } from './fixtures'
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))

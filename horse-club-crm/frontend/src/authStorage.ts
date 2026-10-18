@@ -1,8 +1,8 @@
-export type Role = 'ADMIN' | 'MANAGER' | 'TRAINER'
+export type Role = 'ADMIN' | 'MANAGER' | 'TRAINER' | 'STABLE_WORKER'
 export interface Identity { email: string; role: Role }
 const keys = { token: 'horsecrm.access_token', role: 'horsecrm.role', email: 'horsecrm.email' }
 export function isRole(value: unknown): value is Role {
-  return value === 'ADMIN' || value === 'MANAGER' || value === 'TRAINER'
+  return value === 'ADMIN' || value === 'MANAGER' || value === 'TRAINER' || value === 'STABLE_WORKER'
 }
 export function getToken(): string | null {
   const value = localStorage.getItem(keys.token)

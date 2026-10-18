@@ -1,0 +1,1156 @@
+npm notice run test
+npm notice run tsc --noCheck && node --test test/*.test.cjs
+✔ arena edits synchronize capacity and availability for both booking APIs (3.0448ms)
+✔ arena list supports Refine pagination, search and sorting (0.5381ms)
+✔ arena creation normalizes its name and description (0.3252ms)
+✔ DTO rejects extra fields, invalid roles and numeric credentials (8.4141ms)
+✔ login verifies bcrypt, signs short-lived versioned claims and does not expose the hash (1480.75ms)
+✔ registration hashes passwords, rejects bcrypt truncation and maps duplicate users to 409 (758.1805ms)
+✔ JWT strategy rejects expired, forged and malformed tokens (10.0748ms)
+✔ roles deny missing users and wrong roles; method metadata overrides class metadata (0.8146ms)
+✔ JWT configuration fails closed without a sufficiently long secret (0.4642ms)
+✔ profile and VK updates preserve sessions; token version and role changes revoke them (0.5455ms)
+node:internal/modules/cjs/loader:1572
+  throw err;
+  ^
+
+Error: Cannot find module './runtime/library.js'
+Require stack:
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\@prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\test\boarding-billing.test.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1568:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1122:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1146:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1173:12)
+    at Module._load (node:internal/modules/cjs/loader:1345:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.require (node:internal/modules/cjs/loader:1689:12)
+    at require (node:internal/modules/helpers:191:16)
+    at Object.<anonymous> (C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js:30:5)
+    at Module._compile (node:internal/modules/cjs/loader:1944:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\index.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\@prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\test\\boarding-billing.test.cjs'
+  ]
+}
+
+Node.js v26.4.0
+✖ test\boarding-billing.test.cjs (206.4908ms)
+✔ boarding contracts module imports authentication providers for its guards (1.1071ms)
+✔ club placement accepts omitted/null client, forces zero rate and creates no payments (1.4566ms)
+✔ club update preserves omitted client, supports explicit null, and cannot introduce a club rate (0.6709ms)
+✔ manual payments cannot be linked to club placement (4.4756ms)
+✔ boarding DTO accepts club placement and still validates private UUIDs and rates (31.1364ms)
+✔ active boarding contract is created in a serializable transaction (2.0768ms)
+✔ unavailable stall cannot be assigned to a boarding contract (0.5745ms)
+✔ overlapping active contract for the same horse is rejected (0.5718ms)
+✔ contract end date must be after its start date (0.496ms)
+✔ quick placement excludes active/suspended and future reservations but allows drafts and contracts ending at the start (1.8133ms)
+✔ quick release preserves rate/parties/payments, closes unavailable stalls and is idempotent (1.0894ms)
+✔ quick release rejects draft without changing contract (0.4825ms)
+✔ quick release rejects expired without changing contract (0.2715ms)
+✔ quick release rejects future without changing contract (0.194ms)
+✔ quick release rejects ended without changing contract (0.1963ms)
+✔ horse card includes current boarding even when more than twenty newer historical contracts exist (5.3701ms)
+✖ quick boarding HTTP endpoints validate dates and restrict changes to ADMIN/MANAGER (189.3814ms)
+node:internal/modules/cjs/loader:1572
+  throw err;
+  ^
+
+Error: Cannot find module './runtime/library.js'
+Require stack:
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\@prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\test\boarding-vet.postgres.test.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1568:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1122:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1146:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1173:12)
+    at Module._load (node:internal/modules/cjs/loader:1345:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.require (node:internal/modules/cjs/loader:1689:12)
+    at require (node:internal/modules/helpers:191:16)
+    at Object.<anonymous> (C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js:30:5)
+    at Module._compile (node:internal/modules/cjs/loader:1944:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\index.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\@prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\test\\boarding-vet.postgres.test.cjs'
+  ]
+}
+
+Node.js v26.4.0
+✖ test\boarding-vet.postgres.test.cjs (194.7925ms)
+node:internal/modules/cjs/loader:1572
+  throw err;
+  ^
+
+Error: Cannot find module './runtime/library.js'
+Require stack:
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\@prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\test\booking-lifecycle.postgres.test.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1568:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1122:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1146:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1173:12)
+    at Module._load (node:internal/modules/cjs/loader:1345:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.require (node:internal/modules/cjs/loader:1689:12)
+    at require (node:internal/modules/helpers:191:16)
+    at Object.<anonymous> (C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js:30:5)
+    at Module._compile (node:internal/modules/cjs/loader:1944:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\index.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\@prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\test\\booking-lifecycle.postgres.test.cjs'
+  ]
+}
+
+Node.js v26.4.0
+✖ test\booking-lifecycle.postgres.test.cjs (154.8889ms)
+node:internal/modules/cjs/loader:1572
+  throw err;
+  ^
+
+Error: Cannot find module './runtime/library.js'
+Require stack:
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\@prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\test\booking-lifecycle.test.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1568:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1122:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1146:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1173:12)
+    at Module._load (node:internal/modules/cjs/loader:1345:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.require (node:internal/modules/cjs/loader:1689:12)
+    at require (node:internal/modules/helpers:191:16)
+    at Object.<anonymous> (C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js:30:5)
+    at Module._compile (node:internal/modules/cjs/loader:1944:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\index.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\@prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\test\\booking-lifecycle.test.cjs'
+  ]
+}
+
+Node.js v26.4.0
+✖ test\booking-lifecycle.test.cjs (185.267ms)
+node:internal/modules/cjs/loader:1572
+  throw err;
+  ^
+
+Error: Cannot find module './runtime/library.js'
+Require stack:
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\@prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\test\booking-rules.postgres.test.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1568:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1122:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1146:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1173:12)
+    at Module._load (node:internal/modules/cjs/loader:1345:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.require (node:internal/modules/cjs/loader:1689:12)
+    at require (node:internal/modules/helpers:191:16)
+    at Object.<anonymous> (C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js:30:5)
+    at Module._compile (node:internal/modules/cjs/loader:1944:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\index.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\@prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\test\\booking-rules.postgres.test.cjs'
+  ]
+}
+
+Node.js v26.4.0
+✖ test\booking-rules.postgres.test.cjs (186.4736ms)
+✔ health restrictions return 400 for individual and group assignments, including expired quarantine dates (9.5117ms)
+✔ client DTO accepts nullable measured weight and rejects invalid measurements (3315.9177ms)
+✔ successful booking validates and inserts inside a serializable interactive transaction after row locks (4.9085ms)
+✔ rejects rider weight, but accepts the exact horse limit and unknown weight (2.0301ms)
+✔ availability preview uses the same rest rules without acquiring reservation locks (2.6358ms)
+✔ rejects unavailable horses, trainers and arenas (1.2788ms)
+✔ daily workload accepts the exact limit and rejects one minute above it (1.114ms)
+✔ rest accepts exactly 45 minutes and rejects a one-second deficit on either side (1.5657ms)
+✔ trainer overlap rejects, adjacent intervals pass (1.4032ms)
+✔ arena uses simultaneous peak occupancy, not the total number of intersecting records (1.3007ms)
+✔ club day clips cross-midnight workload, including the following day (0.8871ms)
+✔ legacy lessons use current lesson times and group riders without counting copied bookings twice (0.5185ms)
+✔ serialization retry revalidates and returns a typed contention error after five attempts (0.3751ms)
+✔ invalid intervals and costs never start a transaction (0.3928ms)
+✔ horse replacement validates future scheduled booking and only writes horse and reason (2.1007ms)
+✔ horse replacement rejects unavailable horse and unknown rider weight without writes (1.88ms)
+✔ legacy replacement excludes its lesson and validates the changed participant without duplicate horse assignments (0.7138ms)
+node:internal/modules/cjs/loader:1572
+  throw err;
+  ^
+
+Error: Cannot find module './runtime/library.js'
+Require stack:
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\@prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\test\cash-desk.postgres.test.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1568:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1122:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1146:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1173:12)
+    at Module._load (node:internal/modules/cjs/loader:1345:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.require (node:internal/modules/cjs/loader:1689:12)
+    at require (node:internal/modules/helpers:191:16)
+    at Object.<anonymous> (C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js:30:5)
+    at Module._compile (node:internal/modules/cjs/loader:1944:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\index.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\@prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\test\\cash-desk.postgres.test.cjs'
+  ]
+}
+
+Node.js v26.4.0
+✖ test\cash-desk.postgres.test.cjs (176.1858ms)
+node:internal/modules/cjs/loader:1572
+  throw err;
+  ^
+
+Error: Cannot find module './runtime/library.js'
+Require stack:
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\@prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\test\cash-desk.test.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1568:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1122:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1146:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1173:12)
+    at Module._load (node:internal/modules/cjs/loader:1345:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.require (node:internal/modules/cjs/loader:1689:12)
+    at require (node:internal/modules/helpers:191:16)
+    at Object.<anonymous> (C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js:30:5)
+    at Module._compile (node:internal/modules/cjs/loader:1944:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\index.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\@prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\test\\cash-desk.test.cjs'
+  ]
+}
+
+Node.js v26.4.0
+✖ test\cash-desk.test.cjs (177.9113ms)
+✖ clients list returns the Refine slice and total headers (12.9318ms)
+✖ client medical notes are hidden from TRAINER and preserved for ADMIN (0.1319ms)
+✖ TRAINER cannot access ledger or membership summary in the client list (0.0503ms)
+✖ ADMIN updates club schedule while TRAINER receives 403 (0.0459ms)
+node:internal/modules/cjs/loader:1572
+  throw err;
+  ^
+
+Error: Cannot find module './runtime/library.js'
+Require stack:
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\@prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\test\client-membership-display.test.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1568:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1122:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1146:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1173:12)
+    at Module._load (node:internal/modules/cjs/loader:1345:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.require (node:internal/modules/cjs/loader:1689:12)
+    at require (node:internal/modules/helpers:191:16)
+    at Object.<anonymous> (C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js:30:5)
+    at Module._compile (node:internal/modules/cjs/loader:1944:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\index.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\@prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\test\\client-membership-display.test.cjs'
+  ]
+}
+
+Node.js v26.4.0
+✖ test\client-membership-display.test.cjs (167.2197ms)
+﹣ PostgreSQL: resource and last-balance races (3.4047ms) # SKIP
+node:internal/modules/cjs/loader:1572
+  throw err;
+  ^
+
+Error: Cannot find module './runtime/library.js'
+Require stack:
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\@prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\test\expenses.postgres.test.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1568:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1122:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1146:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1173:12)
+    at Module._load (node:internal/modules/cjs/loader:1345:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.require (node:internal/modules/cjs/loader:1689:12)
+    at require (node:internal/modules/helpers:191:16)
+    at Object.<anonymous> (C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js:30:5)
+    at Module._compile (node:internal/modules/cjs/loader:1944:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\index.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\@prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\test\\expenses.postgres.test.cjs'
+  ]
+}
+
+Node.js v26.4.0
+✖ test\expenses.postgres.test.cjs (153.5449ms)
+✔ expense DTO requires positive finite kopecks and nonblank description, validates category/method/receipt (8.8536ms)
+✔ expense query transforms numeric pagination and ignores empty string filters (1.0545ms)
+✔ Moscow business dates include the full final day; offsetless timestamps are rejected (6.4161ms)
+✔ summary subtracts CASH/CARD expenses exactly and keeps cumulative balance independent of period and pagination (3.2282ms)
+✔ create attaches authenticated author, shift and amount in serializable transaction; retry returns same expense (1.4051ms)
+✔ cancel preserves financial record and actor, is idempotent and blocks MANAGER at service boundary (0.6088ms)
+✖ HTTP permissions: TRAINER gets 403, MANAGER creates/reads but cannot delete, ADMIN cancels; JWT author cannot be spoofed (14.4882ms)
+✔ horse physiology edits synchronize both API representations and reject contradictory settings (2.2259ms)
+✔ feeding updates preserve line breaks, clear empty notes and do not modify unrelated horse fields (0.3693ms)
+✔ feeding API validates text and permissions and serves persisted notes (7297.4114ms)
+✔ health logs module imports authentication providers for its guards (1.0305ms)
+✔ health log list searches horse names and notes (1.2155ms)
+✔ health log creation trims notes and clears empty next date (0.3136ms)
+✔ replacement preview excludes rest and weight conflicts and performs no writes (4.3222ms)
+✔ group replacement repairs one rider even if another horse is sick, preserving capacity (0.7456ms)
+✔ group replacement rejects a horse already assigned to another rider (0.7646ms)
+✔ preview and replacement reject terminal bookings (0.4854ms)
+✔ problem feed filters future scheduled records of both sources, includes unavailable status and paginates (0.644ms)
+node:internal/modules/cjs/loader:1572
+  throw err;
+  ^
+
+Error: Cannot find module './runtime/library.js'
+Require stack:
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\@prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\test\horse-replacement.postgres.test.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1568:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1122:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1146:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1173:12)
+    at Module._load (node:internal/modules/cjs/loader:1345:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.require (node:internal/modules/cjs/loader:1689:12)
+    at require (node:internal/modules/helpers:191:16)
+    at Object.<anonymous> (C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js:30:5)
+    at Module._compile (node:internal/modules/cjs/loader:1944:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\index.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\@prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\test\\horse-replacement.postgres.test.cjs'
+  ]
+}
+
+Node.js v26.4.0
+✖ test\horse-replacement.postgres.test.cjs (118.9765ms)
+✔ daily workload counts each horse once per group lesson, returns idle horses and status, and uses club day bounds (8.4625ms)
+✔ existing single-horse read still returns workload when a lowered limit is already exceeded (3.7412ms)
+✔ reschedule excludes itself from conflicts and workload and accepts exact daily limit without modifying bookings or ledger (3.5423ms)
+✔ reschedule rejects daily overload before mutation (1.7859ms)
+✔ reschedule rejects resource conflict before mutation (0.9362ms)
+✔ reschedule rejects finalized lesson before mutation (0.3537ms)
+✔ reschedule rejects unavailable horse before mutation (1.63ms)
+✔ reschedule rejects membership expired at new lesson end before mutation (1.2199ms)
+✔ workload is readable by trainers while transfers remain restricted to ADMIN/MANAGER (0.2629ms)
+✖ HTTP workload routing, DTO validation and transfer authorization match the frontend API (186.6713ms)
+✔ conversion creates client, scheduled lesson/participant, pending charge and notifications in one transaction (32.8956ms)
+✔ existing client is reused by phone and receives the participant notification (5.2964ms)
+✔ trainer overlap rejects and rolls back client and lead (4.0972ms)
+✔ horse overlap rejects and rolls back client and lead (2.1306ms)
+✔ lead persistence failure rolls back lesson, client, payment and outbox (3.4369ms)
+✔ ordinary client-only conversion remains supported without selecting a service (0.3998ms)
+✔ missing service and payer-only clients cannot be converted with a lesson (0.5389ms)
+✔ nested conversion payload validates fields and rejects arbitrary participants (31.3534ms)
+✔ public valid lead creates a pending request without creating a client (3308.6466ms)
+✔ landing DTO saves direction and notes and queues exactly one site card only to the configured admin chat (23.8936ms)
+✔ landing accepts optional direction and missing VK configuration without losing the lead (7.7824ms)
+✔ landing without direction sends a readable fallback (8.0713ms)
+✔ production same-origin browser request returns 503 while disabled and 201 with a DB lead and VK queue record once enabled (31.2751ms)
+✔ lead rejects missing phone (8.4182ms)
+✔ lead rejects missing name (9.6509ms)
+✔ lead rejects empty name (10.13ms)
+✔ lead rejects invalid phone (8.4512ms)
+✔ lead rejects numeric name (7.6075ms)
+✔ lead rejects invalid email (6.7083ms)
+✔ lead rejects invalid service (7.4331ms)
+✔ lead rejects unknown field (6.3048ms)
+✔ lead rejects missing consent (6.9499ms)
+✔ lead rejects false consent (7.3582ms)
+✔ lead rejects invalid consent version (10.4374ms)
+✔ lead rejects invalid source (7.6418ms)
+✔ lead rejects invalid direction (6.7894ms)
+✔ lead rejects overlong notes (8.5289ms)
+✔ repeat submission cannot overwrite an existing request by knowing its phone (14.8239ms)
+✔ lead rejects a stale consent version (6.5983ms)
+✔ consent configuration undefined accepts only current version 2026-09-19 (7.5691ms)
+✔ consent configuration "" accepts only current version 2026-09-19 (7.389ms)
+✔ consent configuration "   " accepts only current version 2026-09-19 (7.1654ms)
+✔ consent configuration "2026-09-19" accepts only current version 2026-09-19 (7.0702ms)
+✔ consent configuration "  2026-09-19  " accepts only current version 2026-09-19 (6.3234ms)
+✔ consent configuration "  2026-10-10  " accepts only current version 2026-10-10 (6.4075ms)
+✔ consent configuration "2026-10-10" accepts only current version 2026-09-19 (6.735ms)
+✔ administrator acceptance creates a client and closes the request (1.3396ms)
+✔ unknown service leaves no client or request (6.5226ms)
+✔ BigInt JSON conversion preserves nested VK ids, dates and decimal prices (0.9203ms)
+✔ POST normalizes a masked landing phone and deduplicates canonical resubmission (12.6816ms)
+[Nest] 44568  - 19.10.2026, 01:20:10   ERROR [LeadsService] Object(6) {
+  event: 'lead_vk_notification_queue_failed',
+  leadId: '22222222-2222-4222-8222-222222222222',
+  source: 'LANDING',
+  message: 'Не удалось поставить уведомление VK в очередь. Заявка сохранена; повторная отправка восстановит уведомление.',
+  errorType: 'Error',
+  errorCode: undefined
+}
+✔ queue failure keeps the saved lead and successful HTTP response (18.3763ms)
+✔ a browser lead is delivered to the admin conversation and marked sent only after VK succeeds (7.0308ms)
+✔ missing or invalid admin chat undefined produces a diagnostic warning and can recover (0.7759ms)
+✔ missing or invalid admin chat "" produces a diagnostic warning and can recover (0.2788ms)
+✔ missing or invalid admin chat "invalid" produces a diagnostic warning and can recover (0.2354ms)
+✔ missing or invalid admin chat "0" produces a diagnostic warning and can recover (0.6206ms)
+✔ missing or invalid admin chat "-1" produces a diagnostic warning and can recover (0.4971ms)
+✔ missing or invalid admin chat "9007199254740992" produces a diagnostic warning and can recover (0.363ms)
+✔ missing community token warns that VK delivery is disabled (0.4976ms)
+✔ a queue insertion failure logs the affected lead without failing its creation (0.4693ms)
+✔ production public-leads flag controls acceptance (13.3241ms)
+✔ lesson history applies server pagination and relation filters (3.7586ms)
+✔ blocks a mathematically overlapping trainer interval (1.1141ms)
+✔ blocks a mathematically overlapping horse interval (0.3862ms)
+✔ blocks a mathematically overlapping arena interval (0.3435ms)
+✔ CANCELLED lessons do not block the same slot and touching intervals are allowed (0.3079ms)
+✔ excludeLessonId omits the edited lesson from conflict detection (0.2131ms)
+✔ create uses service duration and adds a pending payment for a booking without membership (4.9476ms)
+✔ creates one group lesson with separate riders, horses, memberships and payments (3.4599ms)
+✔ adds a later rider to the matching scheduled lesson instead of reporting a trainer conflict (10.7257ms)
+✔ rejects duplicate clients and horses inside one group lesson (1.2982ms)
+✔ creation rejects an unavailable arena (0.552ms)
+✔ creation retries P2034 and list query uses interval intersection filters (1.8742ms)
+✔ rejects lessons on the configured club day off (4.73ms)
+✔ rejects lessons outside club working hours (1.404ms)
+✔ rejects an exact horse daily workload overflow with the required message (2.1094ms)
+✔ returns horse workload values for the booking progress bar (3.0305ms)
+✔ COMPLETED and NO_SHOW debit every distinct linked membership (1.219ms)
+✔ COMPLETED automatically links and debits an active client membership (10.6781ms)
+✔ automatic membership selection rejects an already paid cash booking (1.3004ms)
+✔ CANCELLED refunds only memberships with DEBIT and without REFUND (1.9786ms)
+node:internal/modules/cjs/loader:1572
+  throw err;
+  ^
+
+Error: Cannot find module './runtime/library.js'
+Require stack:
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\@prisma\client\default.js
+- C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\test\membership-ledger.test.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1568:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1122:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1146:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1173:12)
+    at Module._load (node:internal/modules/cjs/loader:1345:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.require (node:internal/modules/cjs/loader:1689:12)
+    at require (node:internal/modules/helpers:191:16)
+    at Object.<anonymous> (C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\backend\node_modules\.prisma\client\index.js:30:5)
+    at Module._compile (node:internal/modules/cjs/loader:1944:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\index.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\.prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\node_modules\\@prisma\\client\\default.js',
+    'C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\test\\membership-ledger.test.cjs'
+  ]
+}
+
+Node.js v26.4.0
+✖ test\membership-ledger.test.cjs (86.313ms)
+✔ payments module imports authentication providers for its guards (1.0627ms)
+✔ boarding payment derives client and monthly rate without fiscal integrations (0.5286ms)
+✔ payment cannot reference a booking and boarding contract simultaneously (0.7695ms)
+✔ manual payment requires a client and positive amount (0.25ms)
+✔ pricing plan creation normalizes its name (1.6644ms)
+✔ membership issue uses selected pricing plan values (1.7574ms)
+✔ public content is anonymous, filtered, ordered and restricted to presentation fields (3560.5177ms)
+✔ all catalog create/update DTOs accept publication fields, validate photos and support clearing (1034.308ms)
+✔ landing build and backend resolve the same consent for undefined (1.0614ms)
+✔ landing build and backend resolve the same consent for "" (1.4946ms)
+✔ landing build and backend resolve the same consent for "  " (0.3678ms)
+✔ landing build and backend resolve the same consent for "2026-09-19" (0.3697ms)
+✔ landing build and backend resolve the same consent for "  2026-10-10  " (0.7748ms)
+✔ landing builder sets the same-origin API fallback and rejects invalid consent configuration (0.5459ms)
+✔ deployment public-lead preflight checks the resolved container flag "true" (165.56ms)
+✔ deployment public-lead preflight checks the resolved container flag "false" (100.7468ms)
+✔ deployment public-lead preflight checks the resolved container flag undefined (116.8885ms)
+✔ deployment public-lead preflight checks the resolved container flag "TRUE" (123.7084ms)
+✔ deployment public-lead preflight checks the resolved container flag " true " (107.2914ms)
+✔ deployment preflight rejects malformed Compose JSON without leaking its input (93.1246ms)
+﹣ migration preserves legacy relations, physiological settings and missing resources (0.9844ms) # SKIP
+﹣ migration preserves membership units, timestamps and original operations, projecting known owners once (0.217ms) # SKIP
+﹣ new core resources support required defaults, unique trainer contacts and exact decimal memberships (0.1302ms) # SKIP
+﹣ standalone bookings require the complete triad, valid intervals and real foreign keys (0.143ms) # SKIP
+﹣ membership and physiological constraints reject invalid new records (0.1297ms) # SKIP
+﹣ scheduled triad indexes have status predicates and ledger foreign keys protect journal history (0.1071ms) # SKIP
+✔ assigned TRAINER replaces a horse and records their account ID, group=false (4.5724ms)
+✔ TRAINER is forbidden on a colleague's lesson including availability/history, group=false (2.1673ms)
+✔ assigned TRAINER replaces a horse and records their account ID, group=true (4.2306ms)
+✔ TRAINER is forbidden on a colleague's lesson including availability/history, group=true (1.3105ms)
+✔ ADMIN replaces a horse in any lesson (3.5048ms)
+✔ MANAGER replaces a horse in any lesson (0.3131ms)
+✔ revoking the own-lesson permission prevents replacement and writes no history (0.4445ms)
+✔ current database binding overrides a stale trainerId from the session (0.2685ms)
+✔ unbound trainer may match their account UUID, never another trainer (0.5887ms)
+✔ audit failure rolls back the horse change (0.5863ms)
+✔ role configuration cannot grant TRAINER all-lesson access or editing without reading (0.6415ms)
+✔ permission DTO rejects string booleans even with production implicit conversion enabled (25.4181ms)
+✖ HTTP role settings enforce health, boarding and report permissions without granting financial writes (71.1902ms)
+✔ trainer response sanitization hides forbidden nested health/boarding records and keeps report data only when granted (7.0523ms)
+✖ HTTP RBAC: own trainer succeeds, colleague is 403, administrator/manager succeed and impersonation is rejected (3.7807ms)
+✖ trainer cannot change lesson status through HTTP, manager can (17.379ms)
+✔ logout revokes copied tokens and deleted users cannot authenticate (1.6032ms)
+✔ trainer redaction covers nested arrays while preserving admin data and dates (2.5512ms)
+✔ limiter blocks login floods and rejects cross-origin cookie writes (0.8789ms)
+✔ browser login sets HttpOnly cookie and never exposes the JWT in JSON (2029.4184ms)
+✔ production public leads are disabled by default for both landing and VK (0.9539ms)
+✔ foreign or forbidden membership is rejected before booking mutation (1.3875ms)
+✔ real HTTP cookie authentication, CSRF rejection and logout revocation (320.6541ms)
+✔ retries Prisma serialization and raw SQLSTATE, not uniqueness or validation (0.7794ms)
+﹣ PostgreSQL payroll: actual lessons, rollback after expense insertion, concurrent retries, privacy and cash/card balances (0.8019ms) # SKIP
+✔ staff DTO validates shifts, batch limits, kopecks, rates and payout methods (12.2119ms)
+✔ query converts numbers, empty strings become undefined, invalid pagination is rejected (1.233ms)
+✔ business days include the entire Moscow end date and reject invalid/reversed/oversize ranges (7.3762ms)
+✔ precise decimal formula, group fixed rate once per lesson, additive percentage and adjustment (1.4526ms)
+✔ trainer is scoped to own profiles and shifts, foreign identifiers are forbidden including when profile is missing (2.9455ms)
+✔ invalid shift range, future completion, paid shift modification and manager deletion are rejected (1.5094ms)
+✖ HTTP RBAC and validation: trainers read only, managers cannot delete, authors cannot be spoofed (13.5346ms)
+﹣ PostgreSQL stall seed, relocation races, database invariants and rollback (0.6282ms) # SKIP
+✔ assignment, relocation and eviction keep one physical placement (2.0764ms)
+✔ assignment returns symmetric stallion/mare warnings without blocking (0.7647ms)
+✔ neighbors include opposite stall, exclude diagonal, other buildings, geldings and unknown sex (1.0777ms)
+✔ occupied, unavailable and missing destinations preserve the old placement (3.449ms)
+✔ failed final write rolls relocation back; serialization conflicts retry (0.9188ms)
+✖ stall HTTP API validates assignment and restricts mutations to ADMIN/MANAGER (15.3591ms)
+✔ stalls module imports authentication providers for its guards (0.8081ms)
+✔ stall list supports Refine pagination, search and sorting (1.3497ms)
+✔ stall creation normalizes its name and description (0.5288ms)
+✔ only administrators can bind accounts, and a binding change revokes the existing session (4.6533ms)
+✔ binding rejects non-trainer accounts, missing trainers, missing input and duplicate trainer bindings (1.0292ms)
+▶ authenticated image upload validates files, persists unique names and serves public images
+  ✔ requires a valid session before accepting the multipart body (58.0167ms)
+  ✔ rejects missing, empty, wrong MIME, disguised and oversized files (126.7606ms)
+  ✔ cookie sessions retain same-origin CSRF protection (24.6152ms)
+  ✔ preserves bytes, chooses extension by MIME and uses unique UUIDs (75.8852ms)
+✔ authenticated image upload validates files, persists unique names and serves public images (357.6782ms)
+✔ admin creation hashes the password and returns no passwordHash (499.6219ms)
+✔ membership issue creates balance and initial CREDIT operation atomically (1.7339ms)
+﹣ PostgreSQL vet CRUD, superseded reminders, atomic batch, passport and health status (0.7763ms) # SKIP
+✔ vet DTO validates every procedure, rejects invalid values and normalizes blank query parameters (11.9826ms)
+✔ due dates use Moscow calendar days at the UTC boundary and default intervals preserve local time (10.4778ms)
+✔ create stores author and Moscow dates; explicit null disables reminders; edit preserves or recalculates deadlines (4.7012ms)
+✔ batch locks all horses before writes and rejects unsupported procedures; health updates synchronize availability (1.6922ms)
+✖ HTTP RBAC allows trainer reads but prevents trainer writes and manager deletion, even with healthWrite enabled (20.5359ms)
+✔ ordinary messages from guest produce no automatic replies or profile lookups (5.9013ms)
+✔ ordinary messages from client produce no automatic replies or profile lookups (0.4428ms)
+✔ ordinary messages from trainer produce no automatic replies or profile lookups (0.3491ms)
+✔ explicit command still replies: ["guest","Начать",null] (1.0511ms)
+✔ explicit command still replies: ["guest","",{"command":"start"}] (0.3315ms)
+✔ explicit command still replies: ["guest","",{"command":"about"}] (0.6683ms)
+✔ explicit command still replies: ["guest","",{"command":"guide"}] (0.315ms)
+✔ explicit command still replies: ["guest","",{"command":"первичная заявка"}] (0.3286ms)
+✔ explicit command still replies: ["guest","Первичная заявка",null] (0.6775ms)
+✔ explicit command still replies: ["guest","Привязать профиль",null] (0.2352ms)
+✔ explicit command still replies: ["guest","/start 1234",null] (0.1192ms)
+✔ explicit command still replies: ["client","",{"command":"balance"}] (0.3054ms)
+✔ explicit command still replies: ["client","",{"command":"bookings"}] (0.1679ms)
+✔ explicit command still replies: ["trainer","",{"command":"today"}] (4.1004ms)
+[Nest] 44088  - 19.10.2026, 01:20:09     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'notification-id',
+  key: 'help:42:e4ab97732dd192d9fdd5a9cb0bebe23652530d60667e33a0d4b2d0c6dd8cde13:77',
+  peerId: '77'
+}
+[Nest] 44088  - 19.10.2026, 01:20:09     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'notification-id',
+  key: 'help:42:e4ab97732dd192d9fdd5a9cb0bebe23652530d60667e33a0d4b2d0c6dd8cde13:77',
+  peerId: '77'
+}
+[Nest] 44088  - 19.10.2026, 01:20:09     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'notification-id',
+  key: 'help:42:e4ab97732dd192d9fdd5a9cb0bebe23652530d60667e33a0d4b2d0c6dd8cde13:77',
+  peerId: '77'
+}
+[Nest] 44088  - 19.10.2026, 01:20:09     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'notification-id',
+  key: 'help:42:e4ab97732dd192d9fdd5a9cb0bebe23652530d60667e33a0d4b2d0c6dd8cde13:77',
+  peerId: '77'
+}
+[Nest] 44088  - 19.10.2026, 01:20:09     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'notification-id',
+  key: 'help:42:e4ab97732dd192d9fdd5a9cb0bebe23652530d60667e33a0d4b2d0c6dd8cde13:77',
+  peerId: '77'
+}
+✔ main reply keyboard has the requested three rows and stable payloads (5.6347ms)
+✔ club card accepts ℹ️ О клубе for unlinked guests (2.8032ms)
+✔ club card accepts О клубе for unlinked guests (1.0455ms)
+✔ club card accepts   КОНТАКТЫ   for unlinked guests (0.4815ms)
+✔ guide accepts 📖 Памятка всадника for unlinked guests (0.481ms)
+✔ guide accepts Памятка всадника for unlinked guests (0.4499ms)
+✔ guide accepts памятка for unlinked guests (0.2914ms)
+✔ club details and guide can be changed through environment without editing command handlers (1.0409ms)
+✔ administrator request accepts 💬 Связаться с администратором, records it and sends confirmation (8.7736ms)
+✔ administrator request accepts Связаться с администратором, records it and sends confirmation (1.7891ms)
+✔ administrator request accepts администратор, records it and sends confirmation (1.3517ms)
+✔ administrator request accepts позвать администратора, records it and sends confirmation (1.7313ms)
+✔ administrator request accepts помощь, records it and sends confirmation (1.373ms)
+✔ administrator card includes a community dialog link or profile fallback for group "228514574" (1.0802ms)
+✔ administrator card includes a community dialog link or profile fallback for group "-228514574" (0.9467ms)
+✔ administrator card includes a community dialog link or profile fallback for group "  -228514574  " (3.2329ms)
+✔ administrator card includes a community dialog link or profile fallback for group undefined (1.89ms)
+✔ administrator card includes a community dialog link or profile fallback for group "" (1.0461ms)
+✔ administrator card includes a community dialog link or profile fallback for group "invalid" (1.1043ms)
+✔ administrator card includes a community dialog link or profile fallback for group "0" (0.5733ms)
+✔ administrator card includes a community dialog link or profile fallback for group "9007199254740992" (0.457ms)
+✔ help payload uses only the configured recipient and deduplicates repeated callback delivery (0.4943ms)
+✔ help can use the configured fallback recipient without an ADMIN VK account (0.3931ms)
+✔ help confirms without service card for admin peer undefined (0.3628ms)
+✔ help confirms without service card for admin peer 42 (0.2024ms)
+✔ help confirms without service card for admin peer invalid (0.1374ms)
+✔ help confirms without service card for admin peer -1 (0.3784ms)
+✔ help confirms even with database failure ({"fail":true}) (0.5217ms)
+✔ help confirms even with database failure ({"fail":true,"profileFail":true}) (0.3014ms)
+✔ existing client commands accept emoji button labels: 📅 Мои тренировки (0.4721ms)
+✔ existing client commands accept emoji button labels: 💳 Мой баланс (0.8088ms)
+✔ greeting includes the expanded guest keyboard (0.7498ms)
+✔ balance shows plan names, custom titles and a clean fallback without UUIDs or expiry times (12.0416ms)
+✔ balance uses Russian lesson plurals and supports keyboard payloads (1.6815ms)
+✔ no active memberships has a clear empty response and the main menu (0.6888ms)
+✔ training card includes localized date, weekday, horse, trainer and arena (3.2534ms)
+✔ training cards handle an unassigned horse and missing arena (1.1614ms)
+✔ empty upcoming trainings has a clear response and the main menu (0.6974ms)
+✔ club timezone changes both the training calendar date and the expiry date (1.8269ms)
+✔ balance keeps ten-item pagination and next-page keyboard (1.4281ms)
+✔ bookings keeps ten-item pagination and next-page keyboard (1.3127ms)
+[Nest] 45636  - 19.10.2026, 01:20:10    WARN [VkBotService] Не удалось получить имя пользователя VK
+[Nest] 45636  - 19.10.2026, 01:20:10    WARN [VkNotifications] Object(8) {
+  message: 'Не удалось отправить VK-уведомление для userId: 42',
+  event: 'vk_notification_failed',
+  notificationId: 'lesson:lesson:created:trainer:42',
+  key: 'lesson:lesson:created:trainer:42',
+  peerId: '42',
+  attemptCount: 1,
+  errorCode: undefined,
+  errorMessage: 'VK unavailable'
+}
+[Nest] 45636  - 19.10.2026, 01:20:10    WARN [VkNotifications] Object(8) {
+  message: 'Не удалось отправить VK-уведомление для userId: 43',
+  event: 'vk_notification_failed',
+  notificationId: 'lesson:lesson:created:client:43',
+  key: 'lesson:lesson:created:client:43',
+  peerId: '43',
+  attemptCount: 1,
+  errorCode: undefined,
+  errorMessage: 'VK unavailable'
+}
+[Nest] 45636  - 19.10.2026, 01:20:10     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'lesson:lesson:created:trainer:42',
+  key: 'lesson:lesson:created:trainer:42',
+  peerId: '42'
+}
+[Nest] 45636  - 19.10.2026, 01:20:10     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'lesson:lesson:created:client:43',
+  key: 'lesson:lesson:created:client:43',
+  peerId: '43'
+}
+✔ normalizes Russian national and international phone numbers (6.1748ms)
+✔ links CLIENT by normalized phone and single-use administrator code (5.7521ms)
+✔ links TRAINER by normalized phone and single-use administrator code (1.3727ms)
+✔ client balance query is limited to the linked owner and active memberships (6.3265ms)
+✔ unlinked visitor is offered supported VK keyboard and a lead form (2.1167ms)
+✔ VK lead requires a separately recorded current consent (2.3794ms)
+✔ inline attendance invokes billing with authenticated trainer context (1.0847ms)
+✔ client cannot invoke trainer inline action (0.52ms)
+✔ today uses club day bounds and includes lessons without bookings (3.5126ms)
+✔ ledger denies another trainer before making changes (1.0459ms)
+✔ new lead notification is queued using a stable deduplication key (0.844ms)
+✔ new lead targets only ADMIN VK recipients, deduplicates delivery and names the service (1.9159ms)
+✔ creation, repeated transfers and cancellation enqueue trainer and linked clients after successful mutations (14.3739ms)
+✔ group additions notify the trainer and newly added clients without notifying existing clients again (2.212ms)
+✔ failed lesson transaction leaves no notification and transport failure cannot undo a committed booking (5.4322ms)
+✔ /start code requests phone verification; linked /start greets the client (0.7738ms)
+✔ short-code guesses are limited and expired/foreign phone codes never bind (1.4692ms)
+✔ unlink clears the profile, revokes issued codes and drops pending personal pushes atomically (0.3743ms)
+✔ VK management endpoints validate input and enforce ADMIN/MANAGER permissions (1023.8486ms)
+✔ administrator recipient configuration rejects non-admin users and revokes pending leads and help (0.4901ms)
+✔ personalized welcome handles text and button payload: ["Начать",null] (4.7289ms)
+✔ personalized welcome handles text and button payload: ["  НАЧАТЬ  ",null] (0.6807ms)
+✔ personalized welcome handles text and button payload: ["","{\"command\":\"начать\"}"] (0.615ms)
+✔ personalized welcome handles text and button payload: ["Кнопка","{\"command\":\"Начать\"}"] (0.3434ms)
+✔ personalized welcome handles text and button payload: ["Начать","{invalid"] (0.3901ms)
+✔ personalized welcome handles text and button payload: ["Начать","{\"command\":\"start\"}"] (0.3112ms)
+✔ welcome falls back without a usable VK name: [] (0.3308ms)
+✔ welcome falls back without a usable VK name: undefined (0.5758ms)
+✔ welcome falls back without a usable VK name: [{}] (0.4517ms)
+✔ welcome falls back without a usable VK name: [{"first_name":""}] (0.3697ms)
+✔ welcome falls back without a usable VK name: [{"first_name":"  "}] (0.221ms)
+✔ welcome falls back without a usable VK name: [{"first_name":null}] (0.1641ms)
+✔ VK failure is logged and does not prevent the welcome reply (0.3445ms)
+✔ cache shares concurrent lookups, expires and isolates users (0.3184ms)
+✔ cache evicts older entries at its size limit (26.82ms)
+✔ group messages are ignored before fetching a VK profile (0.286ms)
+✔ confirmation returns plain confirmation code without Bearer (138.1428ms)
+✔ header secret is accepted (6.1504ms)
+✔ rejects invalid callback {"secret":"wrong"} (7.0343ms)
+✔ rejects invalid callback {"secret":null} (7.074ms)
+✔ rejects invalid callback {"group_id":456} (5.4279ms)
+✔ /start binding command returns personalized role greeting through the callback (5.6527ms)
+✔ message routes by BigInt vkUserId and repeats use stable random_id (11.2501ms)
+✔ group chat does not disclose client identity (5.522ms)
+✔ malformed message is rejected (5.7681ms)
+✔ missing secret configuration fails closed (7.5491ms)
+✔ confirmation is plain text without group, token or matching secret (143.3127ms)
+✔ missing confirmation code reports configuration failure (8.3582ms)
+✔ rejects non-confirmation secret undefined (5.7494ms)
+✔ rejects non-confirmation secret null (7.6759ms)
+✔ rejects non-confirmation secret "" (5.6857ms)
+✔ rejects non-confirmation secret "wrong" (5.4403ms)
+✔ rejects non-confirmation secret 123 (5.3553ms)
+✔ unknown events return ok with valid secret and with optional secret unset (12.6056ms)
+✔ Начать greets directly without a database lookup (6.565ms)
+✔ start greets directly without a database lookup (5.1931ms)
+✔ ordinary messages are acknowledged without replying or failing (12.6946ms)
+✔ acknowledges message while processing is still pending (3.4411ms)
+✔ VK transport failure is caught and later callbacks still work (6.1565ms)
+✔ malformed messages are contained after acknowledgement (4.0829ms)
+✔ messages without event_id work and use the message id for repeat protection (10.4243ms)
+✔ community token configures bot and notification transport with API 5.199 (0.8329ms)
+✔ 24-hour window includes both boundaries and excludes cancelled, completed and attended bookings (3.0038ms)
+✔ group lesson uses its current time, trainer and location and sends private client reminders only (0.7787ms)
+✔ message uses club timezone, personal first name and readable missing resource fallbacks (0.5961ms)
+✔ queued and sent reminders survive repeated ticks and worker restarts without duplicate sends (0.733ms)
+✔ rescheduled booking receives a new reminder for its new start time (0.4951ms)
+✔ missing or invalid VK recipients log warnings while other clients are queued (0.4267ms)
+✔ one queue failure does not prevent the other client reminder and can be retried (0.4694ms)
+✔ database outage is contained and the running guard is released for the next tick (0.2993ms)
+✔ overlapping checks do not start a second database scan (0.1533ms)
+✔ blocked VK delivery logs a warning, leaves the reminder unsent and sends the other reminder (1.4105ms)
+✔ pending reminder is discarded without sending when training is cancelled (0.9524ms)
+✔ pending reminder is discarded without sending when training is rescheduled (0.4842ms)
+✔ pending reminder is discarded without sending when training is unlinked (0.2892ms)
+✔ pending reminder is discarded without sending when training is started (0.3423ms)
+✔ pending reminder is discarded without sending when training is deleted (0.2832ms)
+✔ reminders module is wired into the bot and schedules immediate and ten-minute checks with cleanup (0.5089ms)
+[Nest] 45320  - 19.10.2026, 01:20:10     LOG [VkNotifications] Object(4) {
+  event: 'vk_notification_sent',
+  notificationId: 'lesson:1:created:client:42',
+  key: 'lesson:1:created:client:42',
+  peerId: '42'
+}
+✔ training confirmation sends full trainer card and private individual client cards, idempotently (5.6218ms)
+✔ notification time uses CLUB_TIME_ZONE across midnight (1.9323ms)
+✔ missing VK IDs skip recipients, while missing phone, horse and notes have readable fallbacks (1.9069ms)
+✔ standalone scheduled booking queues trainer and client cards in its transaction without exposing profiles in API result (1.9252ms)
+✔ VK 901 is logged with recipient and code, retries persist, and another recipient still receives confirmation (4.1704ms)
+ℹ tests 380
+ℹ suites 0
+ℹ pass 346
+ℹ fail 24
+ℹ cancelled 0
+ℹ skipped 10
+ℹ todo 0
+ℹ duration_ms 15232.4311
+
+✖ failing tests:
+
+test at test\boarding-billing.test.cjs:1:1
+✖ test\boarding-billing.test.cjs (206.4908ms)
+  'test failed'
+
+test at test\boarding-contracts.test.cjs:217:1
+✖ quick boarding HTTP endpoints validate dates and restrict changes to ADMIN/MANAGER (189.3814ms)
+  Error: Nest can't resolve dependencies of the ModuleAccessGuard (Reflector, ?). Please make sure that the argument ModuleAccessService at index [1] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 1)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadInjectable (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:102:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:81:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfInjectables (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:80:9)
+
+test at test\boarding-vet.postgres.test.cjs:1:1
+✖ test\boarding-vet.postgres.test.cjs (194.7925ms)
+  'test failed'
+
+test at test\booking-lifecycle.postgres.test.cjs:1:1
+✖ test\booking-lifecycle.postgres.test.cjs (154.8889ms)
+  'test failed'
+
+test at test\booking-lifecycle.test.cjs:1:1
+✖ test\booking-lifecycle.test.cjs (185.267ms)
+  'test failed'
+
+test at test\booking-rules.postgres.test.cjs:1:1
+✖ test\booking-rules.postgres.test.cjs (186.4736ms)
+  'test failed'
+
+test at test\cash-desk.postgres.test.cjs:1:1
+✖ test\cash-desk.postgres.test.cjs (176.1858ms)
+  'test failed'
+
+test at test\cash-desk.test.cjs:1:1
+✖ test\cash-desk.test.cjs (177.9113ms)
+  'test failed'
+
+test at test\catalogs-and-settings.test.cjs:110:1
+✖ clients list returns the Refine slice and total headers (12.9318ms)
+  Error: Nest can't resolve dependencies of the SettingsController (SettingsService, RoleAccessService, ?). Please make sure that the argument ModuleAccessService at index [2] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 2)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadController (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:97:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:69:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfControllers (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:68:9)
+
+test at test\catalogs-and-settings.test.cjs:121:1
+✖ client medical notes are hidden from TRAINER and preserved for ADMIN (0.1319ms)
+  Error: Nest can't resolve dependencies of the SettingsController (SettingsService, RoleAccessService, ?). Please make sure that the argument ModuleAccessService at index [2] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 2)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadController (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:97:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:69:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfControllers (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:68:9)
+
+test at test\catalogs-and-settings.test.cjs:137:1
+✖ TRAINER cannot access ledger or membership summary in the client list (0.0503ms)
+  Error: Nest can't resolve dependencies of the SettingsController (SettingsService, RoleAccessService, ?). Please make sure that the argument ModuleAccessService at index [2] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 2)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadController (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:97:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:69:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfControllers (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:68:9)
+
+test at test\catalogs-and-settings.test.cjs:145:1
+✖ ADMIN updates club schedule while TRAINER receives 403 (0.0459ms)
+  Error: Nest can't resolve dependencies of the SettingsController (SettingsService, RoleAccessService, ?). Please make sure that the argument ModuleAccessService at index [2] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 2)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadController (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:97:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:69:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfControllers (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:68:9)
+
+test at test\client-membership-display.test.cjs:1:1
+✖ test\client-membership-display.test.cjs (167.2197ms)
+  'test failed'
+
+test at test\expenses.postgres.test.cjs:1:1
+✖ test\expenses.postgres.test.cjs (153.5449ms)
+  'test failed'
+
+test at test\expenses.test.cjs:80:1
+✖ HTTP permissions: TRAINER gets 403, MANAGER creates/reads but cannot delete, ADMIN cancels; JWT author cannot be spoofed (14.4882ms)
+  Error: Nest can't resolve dependencies of the ModuleAccessGuard (Reflector, ?). Please make sure that the argument ModuleAccessService at index [1] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 1)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadInjectable (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:102:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:81:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfInjectables (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:80:9)
+
+test at test\horse-replacement.postgres.test.cjs:1:1
+✖ test\horse-replacement.postgres.test.cjs (118.9765ms)
+  'test failed'
+
+test at test\horse-workload-display.test.cjs:95:1
+✖ HTTP workload routing, DTO validation and transfer authorization match the frontend API (186.6713ms)
+  Error: Nest can't resolve dependencies of the ModuleAccessGuard (Reflector, ?). Please make sure that the argument ModuleAccessService at index [1] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 1)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadInjectable (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:102:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:81:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfInjectables (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:80:9)
+
+test at test\membership-ledger.test.cjs:1:1
+✖ test\membership-ledger.test.cjs (86.313ms)
+  'test failed'
+
+test at test\role-access.test.cjs:95:1
+✖ HTTP role settings enforce health, boarding and report permissions without granting financial writes (71.1902ms)
+  Error: Nest can't resolve dependencies of the ModuleAccessGuard (Reflector, ?). Please make sure that the argument ModuleAccessService at index [1] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 1)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadInjectable (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:102:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:81:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfInjectables (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:80:9)
+
+test at test\role-access.test.cjs:157:1
+✖ HTTP RBAC: own trainer succeeds, colleague is 403, administrator/manager succeed and impersonation is rejected (3.7807ms)
+  Error: Nest can't resolve dependencies of the ModuleAccessGuard (Reflector, ?). Please make sure that the argument ModuleAccessService at index [1] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 1)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadInjectable (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:102:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:81:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfInjectables (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:80:9)
+
+test at test\security-hardening.test.cjs:25:1
+✖ trainer cannot change lesson status through HTTP, manager can (17.379ms)
+  Error: Nest can't resolve dependencies of the ModuleAccessGuard (Reflector, ?). Please make sure that the argument ModuleAccessService at index [1] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 1)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadInjectable (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:102:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:81:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfInjectables (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:80:9)
+
+test at test\staff.test.cjs:72:1
+✖ HTTP RBAC and validation: trainers read only, managers cannot delete, authors cannot be spoofed (13.5346ms)
+  Error: Nest can't resolve dependencies of the ModuleAccessGuard (Reflector, ?). Please make sure that the argument ModuleAccessService at index [1] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 1)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadInjectable (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:102:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:81:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfInjectables (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:80:9)
+
+test at test\stall-map.test.cjs:95:1
+✖ stall HTTP API validates assignment and restricts mutations to ADMIN/MANAGER (15.3591ms)
+  Error: Nest can't resolve dependencies of the ModuleAccessGuard (Reflector, ?). Please make sure that the argument ModuleAccessService at index [1] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 1)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadInjectable (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:102:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:81:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfInjectables (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:80:9)
+
+test at test\vet-records.test.cjs:66:1
+✖ HTTP RBAC allows trainer reads but prevents trainer writes and manager deletion, even with healthWrite enabled (20.5359ms)
+  Error: Nest can't resolve dependencies of the ModuleAccessGuard (Reflector, ?). Please make sure that the argument ModuleAccessService at index [1] is available in the RootTestModule module.
+  
+  Potential solutions:
+  - Is RootTestModule a valid NestJS module?
+  - If ModuleAccessService is a provider, is it part of the current RootTestModule?
+  - If ModuleAccessService is exported from a separate @Module, is that module imported within RootTestModule?
+    @Module({
+      imports: [ /* the Module containing ModuleAccessService */ ]
+    })
+  
+  For more common dependency resolution issues, see: https://docs.nestjs.com/faq/common-errors
+      at TestingInjector.lookupComponentInParentModules (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:313:19)
+      at async TestingInjector.resolveComponentWrapper (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/testing/testing-injector.js:16:45)
+      at async resolveParam (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:149:38)
+      at async Promise.all (index 1)
+      at async TestingInjector.resolveConstructorParams (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:181:27)
+      at async TestingInjector.loadInstance (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:75:13)
+      at async TestingInjector.loadInjectable (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/injector.js:102:9)
+      at async file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:81:13
+      at async Promise.all (index 1)
+      at async TestingInstanceLoader.createInstancesOfInjectables (file:///C:/Users/%D0%92%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D0%B9/Desktop/HorseCRM2026/horse-club-crm/backend/node_modules/@nestjs/core/injector/instance-loader.js:80:9)

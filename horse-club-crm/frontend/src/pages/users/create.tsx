@@ -13,7 +13,7 @@ export function UserCreate() {
     <Form<UserValues> noValidate {...formProps} layout="vertical">
       <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email' }]}><Input /></Form.Item>
       <Form.Item name="password" label="Пароль" rules={[{ required: true, min: 12, message: 'Минимум 12 символов' }]}><Input.Password autoComplete="new-password" /></Form.Item>
-      <Form.Item name="role" label="Роль" rules={[{ required: true }]}><Select options={['ADMIN', 'MANAGER', 'TRAINER'].map(value => ({ value, label: value }))} /></Form.Item>
+      <Form.Item name="role" label="Роль" rules={[{ required: true }]}><Select options={['ADMIN', 'MANAGER', 'TRAINER', 'STABLE_WORKER'].map(value => ({ value, label: value }))} /></Form.Item>
     </Form>
   </Create>
 }

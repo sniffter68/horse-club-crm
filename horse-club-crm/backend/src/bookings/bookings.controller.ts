@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { ReplaceHorseDto } from './dto/replace-horse.dto';
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
@@ -17,8 +18,9 @@ import type { AuthUser } from '../auth/auth.types';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
+@RequireModule('SCHEDULE')
 @Controller('bookings')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
 export class BookingsController {
   constructor(private readonly bookings: BookingsService, private readonly lifecycle: BookingLifecycleService) {}
   @Get('horse-issues')

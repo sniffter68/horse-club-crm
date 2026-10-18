@@ -28,7 +28,7 @@ function AddService({ horseId, onClose, onSaved }: { horseId: string; onClose: (
 }
 
 export function HorseBoardingExpenses({ horseId, privateBoarding }: { horseId: string; privateBoarding: boolean }) {
-  const { canManage } = useCatalogPermissions()
+  const { canManage } = useCatalogPermissions('boarding')
   const [page, setPage] = useState(1)
   const [adding, setAdding] = useState(false)
   const [range, setRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)

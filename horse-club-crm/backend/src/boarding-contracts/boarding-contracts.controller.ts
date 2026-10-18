@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
@@ -15,14 +16,15 @@ import { RequirePermission, RoleAccessGuard } from '../auth/role-access.guard';
 
 @ApiTags('Boarding contracts')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard, RoleAccessGuard)
 @RequirePermission('boardingAccess')
+@RequireModule('STABLES')
 @Controller('boarding-contracts')
 export class BoardingContractsController {
   constructor(private readonly service: BoardingContractsService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) response: Response): Promise<BoardingContractWithRelations[]> {
     const { data, total } = await this.service.findAll(query);
     setRefineTotalHeaders(response, total);
@@ -42,7 +44,7 @@ export class BoardingContractsController {
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<BoardingContractWithRelations> {
     return this.service.findOne(id);
   }

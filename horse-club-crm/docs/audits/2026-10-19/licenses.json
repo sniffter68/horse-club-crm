@@ -1,0 +1,22 @@
+{
+  "backend": {
+    "productionPackages": 210,
+    "missingLicense": [
+      "node_modules/busboy",
+      "node_modules/passport-strategy",
+      "node_modules/pause",
+      "node_modules/streamsearch"
+    ],
+    "copyleft": []
+  },
+  "frontend": {
+    "productionPackages": 238,
+    "missingLicense": [],
+    "copyleft": []
+  },
+  "landing": {
+    "productionPackages": 11,
+    "missingLicense": [],
+    "copyleft": []
+  }
+}

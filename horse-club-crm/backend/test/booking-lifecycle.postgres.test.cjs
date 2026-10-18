@@ -171,7 +171,8 @@ test('PostgreSQL lifecycle, journal bridge and concurrent financial outcomes', {
       const request = require('supertest');
       const module = await Test.createTestingModule({ controllers: [BookingsController], providers: [RolesGuard,
         { provide: BookingsService, useValue: {} }, { provide: BookingLifecycleService, useValue: lifecycle }] })
-        .overrideGuard(JwtAuthGuard).useValue({ canActivate(ctx) { const req = ctx.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return true; } }).compile();
+        .overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
+    .overrideGuard(JwtAuthGuard).useValue({ canActivate(ctx) { const req = ctx.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return true; } }).compile();
       app = module.createNestApplication(); app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true })); await app.init();
       const f = await fixture({ hours: 13 });
       for (const action of ['complete', 'cancel', 'no-show']) await request(app.getHttpServer()).patch(`/bookings/${f.booking.id}/${action}`).set('x-role', 'TRAINER').send({}).expect(403);

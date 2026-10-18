@@ -1,0 +1,18 @@
+[
+  {
+    "Path": "C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\src\\staff\\staff.service.ts",
+    "Hash": "4666B404F7F4121A2A4EFCE8F71BC2D754BA778EDF324745C08C87DE55C827C7"
+  },
+  {
+    "Path": "C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\src\\users\\users.service.ts",
+    "Hash": "C77C31DFBC918A2FB5CCAF8E18EDE53C42383EB4C15E617344E224BB34E65908"
+  },
+  {
+    "Path": "C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\src\\payments\\payments.service.ts",
+    "Hash": "121A9807E76A61BC6F44BDED0A3BEDC0607D868D06E7E8406F4404AFC52533DD"
+  },
+  {
+    "Path": "C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\backend\\src\\payments\\finance.service.ts",
+    "Hash": "AC941D38A2A70EA3A2611764ABD56A60B4866B36519ABF2C6352471F4F4D568A"
+  }
+]

@@ -7,8 +7,8 @@ export interface RolePermissions {
   healthRead: boolean; healthWrite: boolean; financeRead: boolean; boardingAccess: boolean;
 }
 export const defaultRolePermissions = (role: Role): RolePermissions => ({
-  horseReplaceOwn: true, horseReplaceAny: role !== 'TRAINER', healthRead: true,
-  healthWrite: role !== 'TRAINER', financeRead: role !== 'TRAINER', boardingAccess: true,
+  horseReplaceOwn: role !== 'STABLE_WORKER', horseReplaceAny: (role === 'ADMIN' || role === 'MANAGER'), healthRead: true,
+  healthWrite: (role === 'ADMIN' || role === 'MANAGER'), financeRead: (role === 'ADMIN' || role === 'MANAGER'), boardingAccess: true,
 });
 export function assertHorseReplacement(user: AuthUser, trainerId: string, permissions: RolePermissions) {
   if (!user) throw new ForbiddenException('Недостаточно прав для замены лошади');

@@ -11,6 +11,37 @@ enum Role {
   ADMIN
   MANAGER
   TRAINER
+  STABLE_WORKER
+}
+
+enum SystemModule {
+  SCHEDULE
+  STABLES
+  VETERINARY
+  CASHBOX
+  STAFF_PAYROLL
+}
+
+enum AccessLevel {
+  FULL
+  READ_ONLY
+  HIDDEN
+}
+
+model ClubModuleSettings {
+  id        String       @id @default(uuid()) @db.Uuid
+  module    SystemModule @unique
+  isEnabled Boolean      @default(true)
+  updatedAt DateTime     @updatedAt
+}
+
+model RoleModulePermission {
+  id          String       @id @default(uuid()) @db.Uuid
+  role        Role
+  module      SystemModule
+  accessLevel AccessLevel  @default(HIDDEN)
+
+  @@unique([role, module])
 }
 
 enum HorseSex {

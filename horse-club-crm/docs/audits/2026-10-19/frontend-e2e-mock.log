@@ -1,0 +1,16 @@
+npm notice run frontend@0.0.0 test:e2e:mock
+npm notice run playwright test --project=mock
+
+Running 160 tests using 1 worker
+
+(node:44844) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x    1 [mock] › e2e\cash-desk.spec.ts:56:34 › expense 1500 reduces cash balance, filters and admin cancellation at 1440px (6.0s)
+(node:46896) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x    2 [mock] › e2e\cash-desk.spec.ts:56:34 › expense 1500 reduces cash balance, filters and admin cancellation at 390px (6.1s)
+(node:44120) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x    3 [mock] › e2e\cash-desk.spec.ts:99:1 › expense failure preserves payload for retry; manager cannot delete (20.1s)
+(node:45508) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)

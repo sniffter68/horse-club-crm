@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { CashDeskService } from './cash-desk.service';
 import { CashDeskPaymentDto, CashSummaryQueryDto, OpenCashShiftDto } from './dto/cash-desk.dto';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
@@ -16,8 +17,9 @@ import { RequirePermission, RoleAccessGuard } from '../auth/role-access.guard';
 
 @ApiTags('Payments')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard, RoleAccessGuard)
 @Roles(Role.ADMIN, Role.MANAGER)
+@RequireModule('CASHBOX')
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly service: PaymentsService, private readonly cashDesk: CashDeskService) {}

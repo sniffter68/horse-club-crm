@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
@@ -10,8 +11,8 @@ import { VetRecordService } from './vet-record.service';
 import { BoardingQueryDto, CompleteVetEventDto, CreateBoardingLogDto, CreateVetEventDto, VetQueryDto } from './boarding.dto';
 import { RequirePermission, RoleAccessGuard } from '../auth/role-access.guard';
 
-@ApiTags('Boarding') @ApiBearerAuth() @UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard) @RequirePermission('boardingAccess')
-@Roles(Role.ADMIN, Role.MANAGER) @Controller('boarding')
+@ApiTags('Boarding') @ApiBearerAuth() @UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard, RoleAccessGuard) @RequirePermission('boardingAccess')
+@Roles(Role.ADMIN, Role.MANAGER) @RequireModule('STABLES') @Controller('boarding')
 export class BoardingServicesController {
   constructor(private readonly service: BoardingServicesService, private readonly billing: BoardingBillingService) {}
   @Post('logs') create(@Body() dto: CreateBoardingLogDto, @Req() request: { user: { sub?: string; userId?: string; email?: string } }) {
@@ -22,19 +23,19 @@ export class BoardingServicesController {
   @Post('billing/monthly') @Roles(Role.ADMIN) bill() { return this.billing.triggerMonthlyBoardingBilling(); }
 }
 
-@ApiTags('Veterinary calendar') @ApiBearerAuth() @UseGuards(JwtAuthGuard, RolesGuard, RoleAccessGuard) @RequirePermission('healthRead')
-@Controller('vet')
+@ApiTags('Veterinary calendar') @ApiBearerAuth() @UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard, RoleAccessGuard) @RequirePermission('healthRead')
+@RequireModule('VETERINARY') @Controller('vet')
 export class VetCalendarController {
   constructor(private readonly service: VetCalendarService, private readonly records: VetRecordService) {}
-  @Get('upcoming') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Get('upcoming') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   async upcoming(@Query() query: VetQueryDto) {
     const [calendar, summary] = await Promise.all([this.service.list(query, true), this.records.summary()]);
     return { ...calendar, ...summary };
   }
-  @Get('events') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  @Get('events') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
   list(@Query() query: VetQueryDto) { return this.service.list(query); }
-  @Post('events') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER) @RequirePermission('healthWrite')
+  @Post('events') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER) @RequirePermission('healthWrite')
   create(@Body() dto: CreateVetEventDto) { return this.service.create(dto); }
-  @Patch('events/:id/complete') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER) @RequirePermission('healthWrite')
+  @Patch('events/:id/complete') @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER) @RequirePermission('healthWrite')
   complete(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CompleteVetEventDto) { return this.service.complete(id, dto); }
 }

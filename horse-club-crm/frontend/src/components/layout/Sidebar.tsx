@@ -1,3 +1,4 @@
+import { usePermissions as useModules, moduleForResource } from '../../modulePermissions'
 import { useState } from 'react'
 import { useLogout, useMenu, usePermissions, type TreeMenuItem } from '@refinedev/core'
 import type { Role } from '../../authStorage'
@@ -64,14 +65,16 @@ export function Sidebar({ darkMode, onToggleTheme }: { darkMode: boolean; onTogg
   const { mutate: logout, isPending } = useLogout()
   const { data: role } = usePermissions<Role>({})
   const { permissions } = useRoleAccess()
+  const modules = useModules()
   const visibleMenuItems = menuItems.filter(item =>
+    (!moduleForResource(item.name) || modules.canRead(moduleForResource(item.name)!)) &&
     (item.name !== 'settings' || role === 'ADMIN' || role === 'MANAGER') &&
     (item.name !== 'users' || role === 'ADMIN') &&
     (item.name !== 'memberships' || role !== 'TRAINER') &&
     (item.name !== 'pricing-plans' || role !== 'TRAINER') &&
     (item.name !== 'cash-desk' || role === 'ADMIN' || role === 'MANAGER') &&
     (item.name !== 'payments' || role !== 'TRAINER') &&
-    (item.name !== 'dashboard' || role !== 'TRAINER') &&
+    (item.name !== 'dashboard' || role === 'ADMIN' || role === 'MANAGER') &&
     (!['vet', 'horse-health-logs'].includes(item.name) || permissions.healthRead) &&
     (!['stalls', 'stall-map', 'boarding-contracts'].includes(item.name) || permissions.boardingAccess) &&
     (item.name !== 'financial-reports' || permissions.financeRead),

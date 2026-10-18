@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule, PersonalModuleAccess } from '../auth/module-access.guard';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -7,8 +8,9 @@ import type { AuthUser } from '../auth/auth.types';
 import { CreateShiftDto, PayoutDto, PayrollQueryDto, SavePayrollDto, ShiftQueryDto, StaffProfileDto, UpdateShiftDto, UpdateStaffProfileDto } from './staff.dto';
 import { StaffService } from './staff.service';
 
+@RequireModule('STAFF_PAYROLL')
 @Controller('staff')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
 export class StaffController {
   constructor(private readonly service: StaffService) {}
@@ -28,11 +30,14 @@ export class StaffController {
   deleteShift(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: AuthUser }) { return this.service.changeShift(id, null, req.user); }
 }
 
+@RequireModule('STAFF_PAYROLL')
 @Controller('payroll')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
 export class PayrollController {
   constructor(private readonly service: StaffService) {}
+  @Get('me') @Roles(Role.TRAINER, Role.STABLE_WORKER) @PersonalModuleAccess()
+  mine(@Query() query: PayrollQueryDto, @Req() req: { user: AuthUser }) { return this.service.calculate(query, req.user); }
   @Get('calculate') calculate(@Query() query: PayrollQueryDto, @Req() req: { user: AuthUser }) { return this.service.calculate(query, req.user); }
   @Post('calculations') @Roles(Role.ADMIN, Role.MANAGER)
   save(@Body() dto: SavePayrollDto, @Req() req: { user: AuthUser }) { return this.service.savePayroll(dto, req.user); }

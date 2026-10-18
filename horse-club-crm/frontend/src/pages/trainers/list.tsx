@@ -4,15 +4,17 @@ import { useCatalogPermissions } from '../catalogs/permissions'
 import type { TableColumnsType } from 'antd'
 import { CatalogList } from '../catalogs/shared'
 import type { Trainer } from '../catalogs/types'
+import { usePermissions } from '../../modulePermissions'
 
 export function TrainerList() {
   const { canManage } = useCatalogPermissions()
+  const { canRead } = usePermissions()
   const columns: TableColumnsType<Trainer> = [
     { key: 'name', dataIndex: 'name', title: 'ФИО', sorter: true },
     { key: 'vk', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name} kind="TRAINER" vkUserId={row.vkUserId} /> },
     { key: 'qualification', dataIndex: 'qualification', title: 'Квалификация', width: 260 },
     { key: 'maxDailyLoad', dataIndex: 'maxDailyLoad', title: 'Дневная нагрузка, мин', sorter: true },
   ]
-  if (canManage) columns.push({ key: 'baseRate', dataIndex: 'baseRate', title: 'Базовая ставка', sorter: true, render: money })
+  if (canManage && canRead('STAFF_PAYROLL')) columns.push({ key: 'baseRate', dataIndex: 'baseRate', title: 'Базовая ставка', sorter: true, render: money })
   return <CatalogList<Trainer> resource="trainers" title="Тренеры" columns={columns} />
 }

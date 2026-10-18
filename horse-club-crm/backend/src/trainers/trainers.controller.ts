@@ -16,10 +16,12 @@ import { setRefineTotalHeaders } from '../common/refine';
 import { CreateTrainerDto } from './dto/create-trainer.dto';
 import { UpdateTrainerDto } from './dto/update-trainer.dto';
 import { TrainersService } from './trainers.service';
+import { ModuleAccessGuard, RequireModuleForFields } from '../auth/module-access.guard';
 
 @ApiTags('Trainers')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
+@RequireModuleForFields('STAFF_PAYROLL', ['baseRate'])
 @UseInterceptors(SanitizeRbacInterceptor)
 @SanitizeTrainerFields('baseRate')
 @Controller('trainers')

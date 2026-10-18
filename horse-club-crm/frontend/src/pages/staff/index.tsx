@@ -1,3 +1,4 @@
+import { usePermissions as useModules } from '../../modulePermissions'
 import { useEffect, useRef, useState } from 'react'
 import { usePermissions, useOnError } from '@refinedev/core'
 import { Alert, App, Button, Card, DatePicker, Empty, Grid, Pagination, Space, Spin, Tabs, Tag, Typography } from 'antd'
@@ -17,7 +18,8 @@ const validDate = (value: string | null, fallback: string) => value && /^\d{4}-\
 
 export function StaffPage() {
   const { data: role, isLoading: roleLoading } = usePermissions<Role>({})
-  const canManage = role === 'ADMIN' || role === 'MANAGER'
+  const modules = useModules()
+  const canManage = modules.canWrite('STAFF_PAYROLL') && (role === 'ADMIN' || role === 'MANAGER')
   const { modal, message } = App.useApp()
   const { mutate: authError } = useOnError()
   const screens = Grid.useBreakpoint()

@@ -1,4 +1,4 @@
-import { test, expect, type Locator, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from './fixtures'
 
 const horse = { id: 'h1', name: 'Валдай', maxDailyMinutes: 120, isUnavailable: false }
 const client = { id: 'c1', name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова' }

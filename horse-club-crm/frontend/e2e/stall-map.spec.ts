@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixtures'
 const horse = { id: 'h1', name: 'Буран', sex: 'STALLION', birthYear: 2016, status: 'active', ownerType: 'private',
   feedingNotes: 'Утро: овёс 1 кг\nДень: морковь\nВечер: овёс 1 кг\nСено: 8 кг\nПодкормки: соль',
   owner: { name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567' } }
