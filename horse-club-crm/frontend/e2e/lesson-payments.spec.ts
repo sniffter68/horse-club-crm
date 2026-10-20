@@ -156,3 +156,49 @@ test('completion retains payment choice on error and fully prepaid lessons need 
   await expect(dialog).not.toBeVisible()
   expect(state.receipts).toHaveLength(0)
 })
+
+for (const width of [1440, 1024, 768]) test(`calendar cards contain only time and trainer at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 1000 })
+  const state = await setup(page, 500)
+  const longName = 'Мария Александровна Оченьдлиннаяфамилия Тренера'
+  state.lesson!.trainer = { ...trainer, fullName: longName }
+  state.lesson!.endTime = '2026-10-20T09:30:00Z'
+  await page.route('**/api/lessons?*', route => route.fulfill({ json: [state.lesson, { ...state.lesson, id: id(40), startTime: state.lesson!.endTime, endTime: '2026-10-20T10:00:00Z' }] }))
+  await page.goto('/schedule')
+  const event = page.locator('.fc-event').first()
+  await expect(event.locator('.schedule-event-content > div')).toHaveText(['12:00 - 12:30', longName])
+  await expect(event.locator('.ant-tag, .horse-workload-badge')).toHaveCount(0)
+  await expect(event).toHaveAttribute('title', new RegExp(`${longName}.*Анна Орлова.*Без лошади.*Предоплата`))
+  expect(await event.evaluate(el => {
+    const content = el.querySelector('.schedule-event-content')!
+    const trainer = el.querySelector('.schedule-event-trainer')!
+    const outer = el.getBoundingClientRect(), inner = content.getBoundingClientRect(), line = trainer.getBoundingClientRect()
+    return inner.left >= outer.left && inner.right <= outer.right && inner.bottom <= outer.bottom
+      && line.bottom <= outer.bottom
+      && getComputedStyle(el).overflow === 'hidden' && getComputedStyle(trainer).textOverflow === 'ellipsis'
+      && getComputedStyle(trainer).whiteSpace === 'nowrap'
+  })).toBe(true)
+  const first = await event.boundingBox(), next = await page.locator('.fc-event').nth(1).boundingBox()
+  expect(first!.y + first!.height).toBeLessThanOrEqual(next!.y)
+  await page.screenshot({ path: `test-results/calendar-compact-${width}.png`, fullPage: true, animations: 'disabled' })
+  await event.focus()
+  await event.press('Enter')
+  const detail = page.getByRole('dialog', { name: 'Карточка занятия' })
+  await expect(detail).toContainText(client.name)
+  await expect(detail).toContainText(service.title)
+  await expect(detail).toContainText(longName)
+  await expect(detail).toContainText('Предоплата')
+  await expect(detail.getByRole('button', { name: 'Отметить присутствие' })).toBeVisible()
+})
+
+test('calendar shows a compact excursion label or a fallback for a missing trainer', async ({ page }) => {
+  const state = await setup(page, 0)
+  state.lesson!.trainer = { ...trainer, name: '' }
+  state.lesson!.pricePerPerson = 500
+  state.lesson!.participantsCount = 20
+  await page.goto('/schedule')
+  await expect(page.locator('.schedule-event-trainer')).toHaveText('Экскурсия (20 чел.)')
+  state.lesson!.pricePerPerson = null
+  await page.reload()
+  await expect(page.locator('.schedule-event-trainer')).toHaveText('Без тренера')
+})

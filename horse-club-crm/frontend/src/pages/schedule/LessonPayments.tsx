@@ -4,8 +4,7 @@ import { Alert, App, Button, Descriptions, Form, InputNumber, Modal, Radio, Spac
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { usePermissions } from '../../modulePermissions'
 import type { Lesson, LessonMoney } from './types'
-
-const rubles = (value: number | string | null | undefined) => `${Number(value ?? 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽`
+import { lessonBalance, rubles } from './lessonPaymentSummary'
 
 export function LessonGroupSummary({ lesson }: { lesson: LessonMoney }) {
   if (lesson.pricePerPerson == null) return null
@@ -15,13 +14,6 @@ export function LessonGroupSummary({ lesson }: { lesson: LessonMoney }) {
 export function LessonGroupBadge({ lesson }: { lesson: LessonMoney }) {
   return lesson.pricePerPerson != null || (lesson.participantsCount ?? 1) > 1 ? <Tag color="blue">👥 {lesson.participantsCount ?? 1} чел.</Tag> : null
 }
-function lessonBalance(lesson: LessonMoney) {
-  const cost = Number(lesson.cost ?? lesson.bookings?.filter(b => !b.membership && !b.membershipId).reduce((sum, b) => sum + Number(b.costAmount ?? lesson.service?.price ?? 0), 0) ?? 0)
-  const prepayment = Number(lesson.prepaymentAmount ?? 0)
-  const paid = Math.max(prepayment + Number(lesson.finalPaymentAmount ?? 0), lesson.bookings?.reduce((sum, b) => sum + (b.payments?.filter(p => p.status === 'PAID').reduce((v, p) => v + Number(p.amount), 0) ?? 0), 0) ?? 0)
-  return { cost, prepayment, remaining: Math.max(0, Math.round((cost - paid) * 100) / 100) }
-}
-
 export function LessonPaymentBadge({ lesson }: { lesson: LessonMoney }) {
   if (!lesson.bookings?.some(b => !b.membership && !b.membershipId)) return null
   const { cost, prepayment, remaining } = lessonBalance(lesson)

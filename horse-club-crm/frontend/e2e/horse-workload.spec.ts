@@ -37,8 +37,8 @@ test.beforeEach(async ({ page }) => {
 })
 
 async function selectOption(page: Page, modal: Locator, label: string, text: string) {
-  await modal.getByLabel(label, { exact: true }).click()
-  await page.getByTitle(text, { exact: true }).last().click()
+  await modal.getByLabel(label, { exact: true }).last().click()
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: text }).last().click()
 }
 
 async function openBooking(page: Page) {
@@ -66,12 +66,16 @@ for (const width of [1280, 320, 768]) {
     await page.screenshot({ path: `test-results/horse-overload-${width}.png`, animations: 'disabled' })
     await modal.getByLabel('Длительность, мин', { exact: true }).fill('60')
     await expect(save).toBeEnabled()
-    await modal.getByRole('button', { name: 'Close', exact: true }).click()
+    await modal.getByRole('button', { name: 'Закрыть шторку', exact: true }).click()
     await page.getByRole('button', { name: 'Нагрузка лошадей', exact: true }).click()
     const panel = page.getByRole('dialog', { name: 'Нагрузка лошадей · 08.10.2026' })
     await expect(panel.getByText('60 / 120 мин', { exact: true })).toBeVisible()
     await panel.getByRole('button', { name: 'Close', exact: true }).click()
-    await expect(page.locator('.fc-event .horse-workload-badge').first()).toHaveText('60 / 120 мин')
+    await expect(page.locator('.fc-event .horse-workload-badge')).toHaveCount(0)
+    await page.locator('.fc-event').first().click()
+    const detail = page.getByRole('dialog', { name: 'Карточка занятия' })
+    await expect(detail.locator('.horse-workload-badge').first()).toHaveText('60 / 120 мин')
+    await detail.getByRole('button', { name: 'Close', exact: true }).click()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   })
 }
@@ -115,7 +119,7 @@ test('API failure blocks selected horses, supports retry and empty daily state',
   fail = false
   await modal.getByRole('button', { name: 'Повторить проверку', exact: true }).click()
   await expect(modal.getByText('Доступно: 20 из 120 мин')).toBeVisible()
-  await modal.getByRole('button', { name: 'Close', exact: true }).click()
+  await modal.getByRole('button', { name: 'Закрыть шторку', exact: true }).click()
   await page.route('**/api/horses/workload?*', route => route.fulfill({ json: [] }))
   await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { date: '2026-10-08', horseWorkloads: [], arenaOccupancy: [] } }))
   await page.getByRole('button', { name: 'Нагрузка лошадей', exact: true }).click()

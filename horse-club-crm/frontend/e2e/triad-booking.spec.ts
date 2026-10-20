@@ -57,7 +57,7 @@ test('creates a real triad payload, preserves precision and refreshes the calend
   await modal.getByLabel('Стоимость, ₽', { exact: true }).fill('1500.50')
   await modal.getByRole('button', { name: 'Создать бронирование', exact: true }).click()
   await expect(modal).toHaveCount(0)
-  await expect(page.locator('.fc-event').filter({ hasText: 'Валдай' })).toBeVisible()
+  await expect(page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') })).toBeVisible()
 })
 for (const [code, field] of [['HORSE_OVERLOADED', 'Лошадь'], ['HORSE_REST_VIOLATION', 'Лошадь'], ['RIDER_WEIGHT_EXCEEDED', 'Лошадь'], ['TRAINER_BUSY', 'Тренер'], ['ARENA_FULL', 'Локация']]) {
   test(`409 ${code} preserves form and highlights ${field}`, async ({ page }) => {
@@ -85,7 +85,7 @@ test('resource groupings show riders, arena capacity and the 45-minute rest buff
   for (const label of ['По тренерам', 'По лошадям', 'По локациям']) {
     await grouping.focus(); await page.keyboard.press('ArrowDown'); await page.getByTitle(label, { exact: true }).click()
     await expect(page.getByRole('region', { name: 'Расписание по ресурсам' })).toBeVisible()
-    await expect(page.locator('.resource-booking').filter({ hasText: 'Анна Орлова' })).toBeVisible()
+    await expect(page.locator('.resource-booking').filter({ has: page.locator('[title*="Анна Орлова"]') })).toBeVisible()
     if (label === 'По лошадям') { await expect(page.getByText('Отдых 45 мин', { exact: true })).toBeVisible(); await expect(page.getByText('60 / 120 мин', { exact: true })).toBeVisible() }
     if (label === 'По локациям') await expect(page.getByText('Пик за день: 2 / 6 всадников')).toBeVisible()
   }
@@ -95,7 +95,7 @@ test('edits a scheduled booking through PATCH, excluding its own reservation fro
   let excluded = false
   await page.route('**/api/bookings/availability?*', route => { excluded ||= new URL(route.request().url()).searchParams.get('excludeBookingId') === 'booking1'; return route.fulfill({ json: { date: '2026-10-09', horseWorkloads: [], arenaOccupancy: [] } }) })
   await page.route('**/api/bookings/booking1', route => { expect(route.request().method()).toBe('PATCH'); return route.fulfill({ json: booking }) })
-  await page.goto('/schedule'); await page.locator('.fc-event').filter({ hasText: 'Валдай' }).click()
+  await page.goto('/schedule'); await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   await page.getByRole('button', { name: 'Редактировать бронирование' }).click()
   const modal = page.getByRole('dialog', { name: 'Редактирование бронирования' })
   await modal.getByLabel('Стоимость, ₽', { exact: true }).fill('2000')
@@ -151,7 +151,7 @@ test('trainer reads resource schedule without mutation controls', async ({ page 
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
   await page.goto('/schedule')
   await expect(page.getByRole('button', { name: 'Новое бронирование' })).toHaveCount(0)
-  await page.locator('.fc-event').filter({ hasText: 'Валдай' }).click()
+  await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   await expect(page.getByRole('dialog', { name: 'Карточка бронирования' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Редактировать бронирование' })).toHaveCount(0)
   for (const name of ['Завершить', 'Неявка (No-show)', 'Отменить']) await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
@@ -164,14 +164,14 @@ for (const [action, label, confirmation, status, statusLabel] of [
   let current = booking
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [current], headers: { 'x-total-count': '1' } }))
   await page.route(`**/api/bookings/booking1/${action}`, route => { expect(route.request().method()).toBe('PATCH'); current = { ...booking, status }; return route.fulfill({ json: current }) })
-  await page.goto('/schedule'); await page.locator('.fc-event').filter({ hasText: 'Валдай' }).click()
+  await page.goto('/schedule'); await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   const detail = page.getByRole('dialog', { name: 'Карточка бронирования' })
   await detail.getByRole('button', { name: label, exact: true }).click()
   await expect(page.getByText(/С абонемента на занятия спишется 1 занятие/)).toBeVisible()
   await page.getByRole('button', { name: confirmation, exact: true }).click()
   await expect(detail).not.toBeVisible()
-  await expect(page.locator('.fc-event').filter({ hasText: statusLabel })).toBeVisible()
-  await page.locator('.fc-event').filter({ hasText: 'Валдай' }).click()
+  await expect(page.locator('.fc-event').first()).toHaveAttribute('title', new RegExp(statusLabel))
+  await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   await expect(detail.getByRole('button', { name: 'Завершить', exact: true })).toHaveCount(0)
   await expect(detail.getByRole('button', { name: 'Редактировать бронирование' })).toBeDisabled()
 })
@@ -181,12 +181,12 @@ for (const kind of ['penalty', 'free', 'club']) test(`cancellation ${kind} expla
   let payload: unknown
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
   await page.route('**/api/bookings/booking1/cancel', route => { payload = route.request().postDataJSON(); return route.fulfill({ json: { ...booking, status: kind === 'club' ? 'cancelled_club' : kind === 'free' ? 'cancelled_client' : 'penalty_cancellation' } }) })
-  await page.goto('/schedule'); await page.locator('.fc-event').filter({ hasText: 'Валдай' }).click()
+  await page.goto('/schedule'); await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   await page.getByRole('dialog', { name: 'Карточка бронирования' }).getByRole('button', { name: 'Отменить', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Отмена бронирования' })
   if (kind === 'club') {
     const initiator = modal.getByRole('combobox', { name: 'Инициатор отмены' })
-    await initiator.focus(); await initiator.press('ArrowDown'); await page.getByTitle('Клуб', { exact: true }).click()
+    await initiator.focus(); await initiator.press('ArrowDown'); await initiator.press('ArrowDown'); await initiator.press('Enter')
     await expect(modal.getByText(/Привязанный абонемент продлится на 7 дней/)).toBeVisible()
   }
   if (kind === 'penalty') await expect(modal.getByRole('alert').filter({ hasText: 'менее 12 часов' })).toBeVisible()
@@ -203,7 +203,7 @@ test('billing conflict keeps details open and permits an idempotent retry', asyn
   await page.route('**/api/bookings/booking1/complete', route => route.fulfill(++calls === 1
     ? { status: 409, json: { code: 'MEMBERSHIP_INSUFFICIENT', message: 'Недостаточно занятий или средств на абонементе' } }
     : { json: { ...booking, status: 'completed' } }))
-  await page.goto('/schedule'); await page.locator('.fc-event').filter({ hasText: 'Валдай' }).click()
+  await page.goto('/schedule'); await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   const detail = page.getByRole('dialog', { name: 'Карточка бронирования' })
   for (let attempt = 0; attempt < 2; attempt++) {
     await detail.getByRole('button', { name: 'Завершить', exact: true }).click()
@@ -217,7 +217,7 @@ test('mobile cancellation validates reason and retains it on API failure', async
   await page.setViewportSize({ width: 320, height: 900 })
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
   await page.route('**/api/bookings/booking1/cancel', route => route.fulfill({ status: 409, json: { message: 'Недостаточно занятий или средств на абонементе' } }))
-  await page.goto('/schedule'); await page.locator('.fc-event').filter({ hasText: 'Валдай' }).click()
+  await page.goto('/schedule'); await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   await page.getByRole('dialog', { name: 'Карточка бронирования' }).getByRole('button', { name: 'Отменить', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Отмена бронирования' })
   await modal.getByRole('button', { name: 'Подтвердить отмену' }).click()
@@ -235,7 +235,7 @@ test('pending billing prevents closing, editing and duplicate status requests', 
   const gate = new Promise<void>(done => { resolve = done })
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
   await page.route('**/api/bookings/booking1/complete', async route => { calls++; await gate; await route.fulfill({ json: { ...booking, status: 'completed' } }) })
-  await page.goto('/schedule'); await page.locator('.fc-event').filter({ hasText: 'Валдай' }).click()
+  await page.goto('/schedule'); await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   const detail = page.getByRole('dialog', { name: 'Карточка бронирования' })
   await detail.getByRole('button', { name: 'Завершить', exact: true }).click()
   await page.getByRole('button', { name: 'Завершить и списать' }).click()
@@ -282,7 +282,7 @@ for (const width of [1280, 375]) {
     await expect(dialog.getByLabel('Причина замены')).toHaveValue('Хромота')
     await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click()
     await expect(dialog).not.toBeVisible()
-    await expect(page.locator('.fc-event').filter({ hasText: 'Буран' }).first()).toBeVisible()
+    await expect(page.locator('.fc-event').filter({ has: page.locator('[title*="Буран"]') }).first()).toBeVisible()
     expect(attempts).toBe(2)
   })
 }

@@ -3,10 +3,11 @@ import { DateTime } from 'luxon'
 import type { Arena, Horse, Trainer } from '../catalogs/types'
 import type { ClubSchedule, DailyHorseWorkload } from './types'
 import { CLUB_TIME_ZONE, toInstant } from './time'
-import { entryStatusLabel, peakOccupancy, type ScheduleEntry, type TriadValues } from './triad'
+import { ScheduleEventContent } from './ScheduleEventContent'
+import { eventSummary } from './scheduleEventPresentation'
+import { peakOccupancy, type ScheduleEntry, type TriadValues } from './triad'
 
 export type ResourceGrouping = 'calendar' | 'trainers' | 'horses' | 'arenas'
-const clock = (value: string) => DateTime.fromISO(value, { zone: CLUB_TIME_ZONE }).toFormat('HH:mm')
 export function ResourceSchedule({ grouping, date, schedule, entries, trainers, horses, arenas, workloads, occupancy, canManage, onBook, onOpen }: {
   grouping: Exclude<ResourceGrouping, 'calendar'>; date: string; schedule: ClubSchedule; entries: ScheduleEntry[];
   trainers: Trainer[]; horses: Horse[]; arenas: Arena[]; workloads: DailyHorseWorkload[];
@@ -14,7 +15,7 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
   canManage: boolean; onBook: (values: Partial<TriadValues>) => void; onOpen: (entry: ScheduleEntry) => void;
 }) {
   const start = +new Date(toInstant(`${date}T${schedule.openTime}`)), end = +new Date(toInstant(`${date}T${schedule.closeTime}`))
-  const scale = 3 // px per minute: 30-minute cards retain room for horse, trainer and rider.
+  const scale = 3 // px per minute; preserve the resource timeline scale.
   const height = (end - start) / 60000 * scale
   const resources = grouping === 'trainers' ? trainers.map(t => ({ id: t.id, name: t.fullName || t.name })) : grouping === 'horses' ? horses : arenas
   const slots = Array.from({ length: Math.ceil((end - start) / 1800000) }, (_, i) => start + i * 1800000)
@@ -57,13 +58,11 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
                   ...(grouping === 'trainers' ? { trainerId: resource.id } : grouping === 'horses' ? { horseId: resource.id } : { arenaId: resource.id }) })} />)}
               {rests.map(rest => <div key={rest.id} className="resource-rest" style={{ top: (Math.max(start, rest.from) - start) / 60000 * scale, height: (Math.min(end, rest.to) - Math.max(start, rest.from)) / 60000 * scale }} title={`Отдых ${rest.rest} мин, до ${DateTime.fromMillis(rest.to, { zone: CLUB_TIME_ZONE }).toFormat('HH:mm')}`}><span>Отдых {rest.rest} мин</span></div>)}
               {placed.map(({ entry, lane }) => {
-                const text = `${clock(entry.startTime)}–${clock(entry.endTime)} · ${entry.horses.map(h => h.name).join(', ') || 'Без лошади'} · ${entry.trainerName} · ${entry.riders.join(', ') || 'Нет участников'} · ${entry.discipline} · ${entryStatusLabel(entry)}`
+                const text = eventSummary(entry)
                 return <Tooltip key={entry.id} title={text} trigger={['hover', 'focus']}><button type="button" className={`resource-booking ${entry.completed ? 'resource-booking--completed' : !entry.active ? 'resource-booking--cancelled' : ''}`}
-                  style={{ top: (Math.max(start, +new Date(entry.startTime)) - start) / 60000 * scale + 2, height: Math.max(28, (Math.min(end, +new Date(entry.endTime)) - Math.max(start, +new Date(entry.startTime))) / 60000 * scale - 4), left: `${lane / lanes * 100}%`, width: `calc(${100 / lanes}% - 4px)` }}
+                  style={{ top: (Math.max(start, +new Date(entry.startTime)) - start) / 60000 * scale + 2, height: Math.max(0, (Math.min(end, +new Date(entry.endTime)) - Math.max(start, +new Date(entry.startTime))) / 60000 * scale - 4), left: `${lane / lanes * 100}%`, width: `calc(${100 / lanes}% - 4px)` }}
                   aria-label={text} onClick={() => onOpen(entry)}>
-                  <b>{clock(entry.startTime)}–{clock(entry.endTime)}</b><strong>{entry.horses.map(h => h.name).join(', ') || 'Без лошади'}</strong>
-                  <span>{entry.trainerName} · {entry.riders.join(', ') || 'Нет участников'}</span><span>{entry.discipline}</span><small>{entryStatusLabel(entry)}</small>
-                  {entry.participantsCount != null && <span>👥 {entry.participantsCount} чел.</span>}
+                  <ScheduleEventContent entry={entry} />
                 </button></Tooltip>
               })}
             </div>

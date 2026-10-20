@@ -1,3 +1,5 @@
+import { ScheduleEventContent } from './ScheduleEventContent'
+import { eventSummary } from './scheduleEventPresentation'
 import { isPerPersonService } from './groupPricing'
 import { EntryOverlay } from '../../components/EntryOverlay'
 import { LessonGroupBadge, LessonGroupSummary, CompleteLessonModal, LessonPaymentBadge, LessonPriceFields } from './LessonPayments'
@@ -29,7 +31,6 @@ import { useTriadAvailability } from './useTriadAvailability'
 import { BookingLifecycleActions } from './BookingLifecycleActions'
 import { catalog } from '../catalogs/loadCatalog'
 const membershipDate = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeZone: CLUB_TIME_ZONE })
-const lessonHorses = (lesson: Lesson) => [...new Set(lesson.bookings.map(booking => booking.horse?.name).filter((name): name is string => Boolean(name)))]
 
 function ParticipantEditor({ index, form, horses, participants, service, durationMinutes, workloads, workloadLoading, readOnly, canRemove, onRemove, report }: {
   index: number
@@ -298,7 +299,7 @@ export function SchedulePage() {
     setDetail(undefined)
     setEditingLesson(lesson)
     form.resetFields()
-    form.setFieldsValue({ serviceId: lesson.service.id, trainerId: lesson.trainer.id, arenaId: lesson.arena?.id,
+    form.setFieldsValue({ serviceId: lesson.service.id, trainerId: lesson.trainer?.id, arenaId: lesson.arena?.id,
       startTime: toLocalInput(new Date(lesson.startTime)), durationMinutes: Math.round((new Date(lesson.endTime).getTime() - new Date(lesson.startTime).getTime()) / 60000),
       participants: lesson.bookings.map(booking => ({ clientId: booking.client.id, horseId: booking.horse?.id, membershipId: booking.membership?.id })) })
     setError(undefined)
@@ -362,30 +363,19 @@ export function SchedulePage() {
         headerToolbar={compactLayout ? { left: 'prev,next', center: 'title', right: 'today' } : { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' }}
         buttonText={{ today: 'Сегодня', week: 'Неделя', day: 'День' }} firstDay={1} allDaySlot={false} nowIndicator height="auto"
         slotMinTime={schedule.openTime} slotMaxTime={schedule.closeTime} hiddenDays={schedule.daysOfWeekOff}
-        selectable={canManage && ready} selectMirror selectOverlap={false} eventDisplay="block"
+        selectable={canManage && ready} selectMirror selectOverlap={false} slotEventOverlap={false} eventMinHeight={0} eventDisplay="block"
         datesSet={({ start, end, view }) => {
           setRange(previous => previous?.from === start.toISOString() && previous.to === end.toISOString() ? previous : { from: start.toISOString(), to: end.toISOString() })
           setWorkloadDate(toLocalInput(view.calendar.getDate()).slice(0, 10))
         }}
         select={({ start, end, view }) => { openBooking(start, Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000))); view.calendar.unselect() }}
-        events={[
-          ...lessons.map(lesson => ({ id: lesson.id, title: `${lesson.service.title || lesson.service.name} · ${lesson.trainer.name}${lessonHorses(lesson).length ? ` · ${lessonHorses(lesson).join(', ')}` : ''}`, start: lesson.startTime, end: lesson.endTime, backgroundColor: statuses[lesson.status].event, borderColor: statuses[lesson.status].event, textColor: '#FFFFFF' })),
-          ...triadBookings.map(booking => ({ id: `triad:${booking.id}`, title: `${booking.horse.name} · ${personName(booking.client)} · ${disciplines[booking.serviceType]}`, start: booking.startTime, end: booking.endTime,
-            backgroundColor: booking.status === 'completed' ? '#3E5F48' : booking.status === 'scheduled' ? '#724C39' : '#8C6527', borderColor: 'transparent', textColor: '#FFFFFF' })),
-        ]}
-        eventContent={({ event, timeText }) => {
-          if (event.id.startsWith('triad:')) {
-            const booking = triadBookings.find(b => `triad:${b.id}` === event.id)
-            return booking ? <div className="schedule-event-content"><strong>{timeText} · {booking.horse.name}</strong><div>{booking.trainer.fullName || booking.trainer.name} · {personName(booking.client)}</div><div>{disciplines[booking.serviceType]} · {bookingStatusLabels[booking.status]}</div></div> : null
-          }
-          const lesson = lessons.find(item => item.id === event.id)
-          if (!lesson) return null
-          const date = toLocalInput(new Date(lesson.startTime)).slice(0, 10)
-          return <div className="schedule-event-content"><strong>{timeText}</strong><div>{lesson.service.title || lesson.service.name} · {lesson.trainer.name}</div><div>{lesson.bookings.map(b => personName(b.client)).join(', ')} · {statuses[lesson.status].label}</div><LessonGroupBadge lesson={lesson} /><LessonPaymentBadge lesson={lesson} />
-            {lesson.bookings.filter(booking => booking.horse).map(booking => <div key={booking.id} className="schedule-event-horse">
-              <span>{booking.horse?.name}</span><HorseWorkloadBadge date={date} workload={dayWorkloads.byDate[date]?.find(row => row.horseId === booking.horse?.id)} />
-            </div>)}
-          </div>
+        events={entries.map(entry => ({ id: entry.source === 'booking' ? `triad:${entry.id}` : entry.id,
+          title: eventSummary(entry), start: entry.startTime, end: entry.endTime,
+          backgroundColor: entry.source === 'lesson' ? statuses[entry.status as Status].event : entry.completed ? '#3E5F48' : entry.active ? '#724C39' : '#8C6527',
+          borderColor: 'transparent', textColor: '#FFFFFF' }))}
+        eventContent={({ event }) => {
+          const entry = entries.find(item => (item.source === 'booking' ? `triad:${item.id}` : item.id) === event.id)
+          return entry ? <ScheduleEventContent entry={entry} /> : null
         }}
         eventClick={({ event }) => { if (event.id.startsWith('triad:')) { setTriadDetail(triadBookings.find(b => `triad:${b.id}` === event.id)); return } setError(undefined); const lesson = lessons.find(lesson => lesson.id === event.id); setDetail(lesson); if (lesson) setWorkloadDate(toLocalInput(new Date(lesson.startTime)).slice(0, 10)) }} />}
       </div>
@@ -459,13 +449,13 @@ export function SchedulePage() {
           { key: 'service', label: 'Услуга', children: detail.service.title || detail.service.name },
           { key: 'start', label: 'Начало', children: formatTime(detail.startTime) },
           { key: 'end', label: 'Окончание', children: formatTime(detail.endTime) },
-          { key: 'trainer', label: 'Тренер', children: detail.trainer.name },
+          { key: 'trainer', label: 'Тренер', children: detail.trainer?.fullName || detail.trainer?.name || 'Без тренера' },
           { key: 'arena', label: 'Манеж', children: detail.arena?.name || 'Не указан' },
           { key: 'clients', label: 'Участники', children: detail.bookings.length ? <Space direction="vertical" size={4}>{detail.bookings.map(booking => <Space key={booking.id} wrap>
             <span>{personName(booking.client)}</span>
             <Tag>{booking.horse?.name || 'Без лошади'}</Tag>
             <HorseWorkloadBadge date={toLocalInput(new Date(detail.startTime)).slice(0, 10)} workload={dayWorkloads.byDate[toLocalInput(new Date(detail.startTime)).slice(0, 10)]?.find(row => row.horseId === booking.horse?.id)} />
-            {detail.status === 'SCHEDULED' && new Date(detail.startTime) > new Date() && <ReplaceHorseAction
+            {detail.trainer && detail.status === 'SCHEDULED' && new Date(detail.startTime) > new Date() && <ReplaceHorseAction
               bookingId={booking.id} trainerId={detail.trainer.id} horseId={booking.horse?.id} startTime={detail.startTime} endTime={detail.endTime} horses={horses}
               disabled={saving || !ready} report={report} onBusyChange={busy => { savingRef.current = busy; setSaving(busy) }}
               onSaved={() => { setDetail(undefined); setRevision(value => value + 1) }} />}
