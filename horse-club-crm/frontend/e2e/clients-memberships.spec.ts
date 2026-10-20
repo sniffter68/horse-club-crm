@@ -21,7 +21,8 @@ test.beforeEach(async ({ page }) => {
 const saleClientId = '00000000-0000-4000-8000-000000000021'
 const saleServiceId = '00000000-0000-4000-8000-000000000022'
 async function setupSale(page: Page) {
-  const state = { posts: [] as Record<string, unknown>[], receipts: [] as Record<string, unknown>[], fail: false, disabled: false }
+  const state = { posts: [] as Record<string, unknown>[], receipts: [] as Record<string, unknown>[], fail: false, disabled: false,
+    failure: null as null | { status: number; json: Record<string, unknown> } }
   await page.route('**/api/clients?*', route => route.fulfill({ json: [{ ...client, id: saleClientId }], headers: { 'x-total-count': '1' } }))
   await page.route('**/api/pricing-plans?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   await page.route('**/api/services?*', route => route.fulfill({ json: [{ id: saleServiceId, title: 'Выездка', price: '1250.15', allowMembership: true }], headers: { 'x-total-count': '1' } }))
@@ -29,6 +30,7 @@ async function setupSale(page: Page) {
     if (route.request().method() !== 'POST') return route.fulfill({ json: [], headers: { 'x-total-count': '0' } })
     const payload = route.request().postDataJSON()
     state.posts.push(payload)
+    if (state.failure) return route.fulfill(state.failure)
     if (state.fail) return route.fulfill({ status: 500, json: { message: 'Ответ сервера потерян' } })
     if (!state.disabled && !state.receipts.some(row => row.requestId === payload.requestId)) state.receipts.push({ ...payload, id: 'receipt', amount: payload.totalPrice, method: payload.paymentMethod, paidAt: new Date().toISOString(),
       client: { name: 'Анна Орлова' }, service: { title: 'Выездка' }, cashier: { email: 'qa@example.com' } })
@@ -97,6 +99,36 @@ test('membership sale uncertain retry keeps the same payload and operation key',
   expect(state.posts).toHaveLength(2)
   expect(state.posts[0]).toEqual(state.posts[1])
   expect(state.receipts).toHaveLength(1)
+})
+
+for (const status of [400, 503]) test(`membership sale ${status} after confirmed rollback preserves editable draft and uses a new key`, async ({ page }) => {
+  const state = await setupSale(page)
+  const drawer = await fillSale(page)
+  const message = status === 400 ? 'Укажите корректную стоимость' : 'База данных не обновлена. Администратору нужно применить миграции и перезапустить сервер.'
+  state.failure = { status, json: { message, details: { rollbackConfirmed: true } } }
+  await drawer.getByRole('button', { name: 'Создать абонемент', exact: true }).click()
+  await expect(drawer.getByRole('alert').first()).toHaveText(message)
+  await expect(drawer.getByRole('combobox', { name: 'Услуга', exact: true })).toBeEnabled()
+  await expect(drawer.getByRole('spinbutton', { name: 'Итоговая стоимость к оплате (₽)', exact: true })).toHaveValue('10001.20')
+  state.failure = null
+  await drawer.getByRole('button', { name: 'Создать абонемент', exact: true }).click()
+  await expect(page).toHaveURL(/\/memberships$/)
+  expect(state.posts[0].requestId).not.toEqual(state.posts[1].requestId)
+  expect(state.receipts).toHaveLength(1)
+})
+
+test('membership sale generic 500 explains uncertain outcome and keeps safe retry', async ({ page }) => {
+  const state = await setupSale(page)
+  const drawer = await fillSale(page)
+  state.failure = { status: 500, json: { message: 'Internal server error' } }
+  await drawer.getByRole('button', { name: 'Создать абонемент', exact: true }).click()
+  await expect(drawer.getByRole('alert').first()).toContainText('Сервер не смог завершить оформление абонемента.')
+  await expect(drawer.getByRole('alert').first()).toContainText('Результат операции пока неизвестен')
+  await expect(drawer.getByRole('combobox', { name: 'Услуга', exact: true })).toBeDisabled()
+  state.failure = null
+  await drawer.getByRole('button', { name: 'Повторить продажу', exact: true }).click()
+  await expect(page).toHaveURL(/\/memberships$/)
+  expect(state.posts[0].requestId).toEqual(state.posts[1].requestId)
 })
 
 test('membership sale with cashbox disabled explains absence of a cash receipt', async ({ page }) => {

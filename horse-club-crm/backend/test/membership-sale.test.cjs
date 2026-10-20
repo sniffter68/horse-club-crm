@@ -15,6 +15,7 @@ const sale = { clientId: '00000000-0000-4000-8000-000000000002', serviceId: '000
 function fixture(options = {}) {
   let committed = { memberships: [], payments: [], ledger: [] };
   let calls = 0;
+  const errors = [];
   // Only transaction delegates may write; a failed callback discards all staged data.
   const prisma = { $transaction: async (work, config) => {
     assert.equal(config.isolationLevel, 'Serializable'); calls++;
@@ -29,7 +30,14 @@ function fixture(options = {}) {
       pricingPlan: { findUnique: async () => null },
       membership: {
         findUnique: async ({ where }) => staged.memberships.find(row => row.saleRequestId === where.saleRequestId),
-        create: async ({ data }) => { const row = { ...data, id: 'membership', client: { id: sale.clientId }, pricingPlan: null }; staged.memberships.push(row); return row; },
+        create: async ({ data }) => {
+          const row = { ...data, id: 'membership', client: { id: sale.clientId }, pricingPlan: null };
+          staged.memberships.push(row);
+          // Simulate the database's AFTER INSERT trigger, including its unique source.
+          if (options.creditError) throw new Error('credit projection unavailable');
+          staged.ledger.push({ sourceMembershipOpId: data.operations.create.id, membershipId: row.id, amount: data.totalLessons });
+          return row;
+        },
       },
       cashShift: { findFirst: async () => ({ id: 'shift' }) },
       payment: { create: async ({ data }) => {
@@ -37,6 +45,8 @@ function fixture(options = {}) {
         const row = { ...data, id: 'receipt' }; staged.payments.push(row); return row;
       } },
       ledgerTransaction: { create: async ({ data }) => {
+        if (staged.ledger.some(row => data.sourceMembershipOpId && row.sourceMembershipOpId === data.sourceMembershipOpId))
+          throw new Prisma.PrismaClientKnownRequestError('Duplicate trigger projection', { code: 'P2002', clientVersion: '6.19.3', meta: { target: ['sourceMembershipOpId'] } });
         if (options.ledgerError && data.cashDeskPaymentId || options.creditError && data.sourceMembershipOpId) throw new Error('ledger unavailable');
         staged.ledger.push(data); return data;
       } },
@@ -45,7 +55,9 @@ function fixture(options = {}) {
     committed = staged;
     return result;
   } };
-  return { service: new MembershipsService(prisma), state: () => committed, calls: () => calls };
+  const service = new MembershipsService(prisma);
+  service.logger.error = (...args) => errors.push(args);
+  return { service, state: () => committed, calls: () => calls, errors };
 }
 
 for (const method of ['CASH', 'CARD']) test(`sale atomically posts discounted ${method} receipt and linked ledger`, async () => {
@@ -74,9 +86,31 @@ for (const method of ['CASH', 'CARD']) test(`sale atomically posts discounted ${
 });
 
 for (const failure of ['paymentError', 'ledgerError', 'creditError']) test(`${failure} rolls back membership, receipt and journal`, async () => {
-  const f = fixture({ [failure]: true });
-  await assert.rejects(f.service.create(sale, actor), /unavailable/);
+  const options = { [failure]: true };
+  const f = fixture(options);
+  await assert.rejects(f.service.create(sale, actor), error => error.getStatus() === 503);
   assert.deepEqual(f.state(), { memberships: [], payments: [], ledger: [] });
+  assert.equal(f.errors.length, 1);
+  assert.ok(f.errors[0][0].stage);
+  assert.match(f.errors[0][1], /unavailable/);
+  // A rollback did not reserve the operation key.
+  options[failure] = false;
+  await f.service.create(sale, actor);
+  assert.equal(f.state().memberships.length, 1);
+  assert.equal(f.state().payments.length, 1);
+});
+
+for (const [code, status] of [['P2002', 409], ['P2003', 409], ['P2025', 409], ['P2021', 503], ['P2022', 503]]) test(`${code} reports a known rollback without generic 500 or blind retries`, async () => {
+  const failure = new Prisma.PrismaClientKnownRequestError('sale persistence failed', { code, clientVersion: '6.19.3', meta: { target: ['sourceMembershipOpId'] } });
+  const f = fixture({ transientError: failure, alwaysFail: true });
+  await assert.rejects(f.service.create(sale, actor), error => {
+    assert.equal(error.getStatus(), status);
+    assert.equal(error.getResponse().details.rollbackConfirmed, true);
+    return true;
+  });
+  assert.equal(f.calls(), 1);
+  assert.equal(f.errors[0][0].prismaCode, code);
+  assert.equal(f.errors[0][0].requestId, sale.requestId);
 });
 
 test('disabled cashbox issues membership without any cash record', async () => {
@@ -106,7 +140,7 @@ test('same request returns original sale; changed payload is rejected', async ()
 });
 
 for (const code of ['P2034', 'P2002']) test(`${code} retries safely within the bounded transaction loop`, async () => {
-  const failure = new Prisma.PrismaClientKnownRequestError('concurrent sale', { code, clientVersion: '6.19.3' });
+  const failure = new Prisma.PrismaClientKnownRequestError('concurrent sale', { code, clientVersion: '6.19.3', meta: { target: ['saleRequestId'] } });
   const f = fixture({ transientError: failure });
   await f.service.create(sale, actor);
   assert.equal(f.calls(), 2);

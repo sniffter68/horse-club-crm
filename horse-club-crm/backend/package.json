@@ -12,6 +12,7 @@
     "start:dev": "concurrently --kill-others --names types,server \"tsc --watch --preserveWatchOutput\" \"node --env-file=.env --watch dist/main.js\"",
     "test": "tsc --noCheck && node --test test/*.test.cjs",
     "test:unit": "npm run test",
+    "test:memberships:postgres": "npm run build && node test/run-membership-sale-postgres.cjs",
     "test:staff:postgres": "npm run build && node test/run-staff-postgres.cjs",
     "test:expenses:postgres": "npm run build && node test/run-expenses-postgres.cjs",
     "test:stalls:postgres": "npm run build && node test/run-stall-postgres.cjs"

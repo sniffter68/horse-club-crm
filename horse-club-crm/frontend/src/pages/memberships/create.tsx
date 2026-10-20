@@ -71,9 +71,10 @@ export function MembershipCreate() {
       navigate('/memberships')
     } catch (cause) {
       const failure = toHttpError(cause)
-      const unknown = failure.statusCode === 0 || failure.statusCode >= 500
+      const unknown = failure.details?.rollbackConfirmed !== true && (failure.statusCode === 0 || failure.statusCode >= 500)
       setUncertain(unknown)
-      setError(unknown ? `${failure.message} Повторите продажу: повторная оплата не создаётся.` : failure.message)
+      const detail = failure.message === 'Internal server error' ? 'Сервер не смог завершить оформление абонемента.' : failure.message
+      setError(unknown ? `${detail} Результат операции пока неизвестен. Повторите продажу в этой форме с тем же ключом.` : detail)
       if (!unknown) pending.current = null
     } finally { submitting.current = false; setBusy(false) }
   }
