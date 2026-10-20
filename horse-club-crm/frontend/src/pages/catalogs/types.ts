@@ -17,6 +17,7 @@ export interface HorseValues extends PublicationValues {
   name: string; breed?: string; riderLevel?: string; maxDailyMinutes: number; minRestMinutes: number; isUnavailable: boolean;
 }
 export interface Horse extends Omit<HorseValues, 'breed' | 'riderLevel'> { id: string; breed: string | null; riderLevel: string | null;
+  healthStatus?: 'HEALTHY' | 'TREATMENT' | 'QUARANTINE' | 'RETIRED';
   status?: 'active' | 'rest' | 'sick' | 'quarantine'; maxRiderWeight?: number; maxDailyWorkloadMinutes?: number; requiredRestMinutes?: number }
 export interface RelationPayment {
   id: string; amount: string | number; status: 'PENDING' | 'PAID' | 'REFUNDED' | 'CANCELLED';

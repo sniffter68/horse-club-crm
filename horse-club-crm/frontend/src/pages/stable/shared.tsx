@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { useInvalidate, useOnError } from '@refinedev/core'
-import { Alert, App, Button, Empty, Form, Modal, Pagination, Space, Spin, type FormInstance } from 'antd'
+import { Alert, App, Button, Empty, Form, Pagination, Space, Spin, type FormInstance } from 'antd'
+import { EntryOverlay } from '../../components/EntryOverlay'
 import { toHttpError } from '../../httpClient'
 export function StableListState({ loading, error, total, page, onPage, refresh, children }: {
   loading: boolean; error?: string; total: number; page: number; onPage: (page: number) => void; refresh: () => void; children: ReactNode
@@ -13,10 +14,10 @@ export function StableListState({ loading, error, total, page, onPage, refresh, 
         <Pagination current={page} total={total} pageSize={20} showSizeChanger={false} onChange={onPage} simple /></>}
   </>
 }
-export function StableEntryModal<T extends object>({ title, form, submitLabel, onClose, onSaved, save, children, resources = ['horses', 'clients', 'boarding-contracts'], successMessage = 'Запись сохранена' }: {
+export function StableEntryModal<T extends object>({ title, form, submitLabel, submitDisabled, onClose, onSaved, save, children, resources = ['horses', 'clients', 'boarding-contracts'], variant = 'modal', successMessage = 'Запись сохранена' }: {
   title: string; form: FormInstance<T>; submitLabel: string; onClose: () => void; onSaved: () => void;
   save: (values: T) => Promise<unknown>; children: ReactNode
-  resources?: string[]; successMessage?: string
+  variant?: 'modal' | 'drawer'; submitDisabled?: boolean; resources?: string[]; successMessage?: string
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -42,12 +43,12 @@ export function StableEntryModal<T extends object>({ title, form, submitLabel, o
       if (failure.statusCode === 401) onError(failure)
     } finally { lock.current = false; setBusy(false) }
   }
-  return <Modal open title={title} className="stable-entry-modal" width={520} onCancel={close}
+  return <EntryOverlay variant={variant} open title={title} className="stable-entry-modal" width={520} onCancel={close}
     maskClosable={!busy} keyboard={!busy} closable={!busy} footer={<Space wrap>
       <Button onClick={close} disabled={busy}>Закрыть</Button>
-      <Button type="primary" loading={busy} onClick={() => form.submit()}>{submitLabel}</Button>
+      <Button type="primary" loading={busy} disabled={submitDisabled || busy} onClick={() => form.submit()}>{submitLabel}</Button>
     </Space>}>
-    <Form form={form} layout="vertical" noValidate disabled={busy} onFinish={submit} scrollToFirstError>{children}</Form>
+    <Form form={form} layout="vertical" noValidate disabled={busy} onFinish={submit} scrollToFirstError={{ focus: true }}>{children}</Form>
     {error && <Alert type="error" showIcon message="Запись не сохранена" description={error} />}
-  </Modal>
+  </EntryOverlay>
 }

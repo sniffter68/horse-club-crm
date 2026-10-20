@@ -1,5 +1,6 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import type { AuthUser } from '../auth/auth.types';
 import { Role } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -16,7 +17,7 @@ export class DashboardController {
   @Get('summary')
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOkResponse({ description: 'Оперативная сводка за текущий рабочий день.' })
-  getSummary(): Promise<DashboardSummary> {
-    return this.dashboardService.getSummary();
+  getSummary(@Req() req: { user: AuthUser }): Promise<DashboardSummary> {
+    return this.dashboardService.getSummary(req.user.role);
   }
 }

@@ -1,6 +1,7 @@
+import { EntryOverlay } from '../../components/EntryOverlay'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Segmented, Select, Space, Tag, Typography } from 'antd'
+import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Segmented, Select, Space, Tag, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
 import { DateTime } from 'luxon'
@@ -13,7 +14,7 @@ const categoryOptions = Object.entries(expenseCategories).map(([value, label]) =
 type Expense = { id: string; amount: string; date: string; category: keyof typeof expenseCategories; description: string; paymentMethod: 'CASH' | 'CARD'; createdBy: { email: string } }
 type Values = { amount: number; paymentMethod: 'CASH' | 'CARD'; category: keyof typeof expenseCategories; description: string; date: Dayjs }
 
-export function ExpenseModal({ onClose }: { onClose: () => void }) {
+export function ExpenseModal({ onClose, variant = 'modal' }: { onClose: () => void; variant?: 'modal' | 'drawer' }) {
   const [form] = Form.useForm<Values>()
   const { modal, message } = App.useApp()
   const [busy, setBusy] = useState(false)
@@ -44,7 +45,7 @@ export function ExpenseModal({ onClose }: { onClose: () => void }) {
       if (failure.statusCode && failure.statusCode < 500) { submitted.current = null; setLocked(false) }
     } finally { pending.current = false; setBusy(false) }
   }
-  return <Modal open title="Внесение расхода" onCancel={close} maskClosable={false} okText="Внести расход" cancelText="Отмена" confirmLoading={busy} onOk={() => form.submit()}>
+  return <EntryOverlay variant={variant} open title="Внесение расхода" onCancel={close} maskClosable={false} okText="Внести расход" cancelText="Отмена" confirmLoading={busy} onOk={() => form.submit()}>
     {error && <Alert type="error" role="alert" showIcon message={error} description={locked ? 'Повторите отправку: расход с тем же ключом операции будет учтён один раз.' : undefined} />}
     <Form form={form} layout="vertical" noValidate disabled={busy || locked} initialValues={{ paymentMethod: 'CASH', date: dayjs(DateTime.now().setZone('Europe/Moscow').toISODate()) }} onFinish={save} scrollToFirstError>
       <Form.Item name="amount" label="Сумма (руб.)" rules={[{ required: true, type: 'number', min: 0.01, max: 9999999999.99, message: 'Введите положительную сумму' }]}><InputNumber aria-label="Сумма (руб.)" autoFocus min={0.01} max={9999999999.99} precision={2} style={{ width: '100%' }} /></Form.Item>
@@ -53,7 +54,7 @@ export function ExpenseModal({ onClose }: { onClose: () => void }) {
       <Form.Item name="description" label="На что потрачено" rules={[{ required: true, whitespace: true, message: 'Опишите, на что потрачены деньги' }]}><Input.TextArea aria-label="На что потрачено" maxLength={500} autoSize={{ minRows: 3, maxRows: 6 }} style={{ resize: 'none' }} /></Form.Item>
       <Form.Item name="date" label="Дата расхода" rules={[{ required: true, message: 'Выберите дату расхода' }]}><DatePicker aria-label="Дата расхода" locale={ruDatePicker} format="DD.MM.YYYY" disabledDate={date => date.format('YYYY-MM-DD') > DateTime.now().setZone('Europe/Moscow').toISODate()!} /></Form.Item>
     </Form>
-  </Modal>
+  </EntryOverlay>
 }
 
 export function ExpenseHistory({ from, to, shiftId, refresh, admin }: { from?: string | null; to?: string | null; shiftId?: string; refresh: number; admin: boolean }) {

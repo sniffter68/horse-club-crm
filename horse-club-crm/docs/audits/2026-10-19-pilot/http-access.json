@@ -1,0 +1,92 @@
+[
+  {
+    "role": "admin",
+    "endpoint": "/api/settings/my-permissions",
+    "status": 200
+  },
+  {
+    "role": "admin",
+    "endpoint": "/api/vet/records",
+    "status": 200
+  },
+  {
+    "role": "admin",
+    "endpoint": "/api/stalls/map",
+    "status": 200
+  },
+  {
+    "role": "admin",
+    "endpoint": "/api/staff",
+    "status": 403
+  },
+  {
+    "role": "admin",
+    "endpoint": "/api/finance/summary?from=2026-10-19&to=2026-10-19",
+    "status": 200
+  },
+  {
+    "role": "admin",
+    "endpoint": "/api/horses/workload?date=2026-10-20",
+    "status": 200
+  },
+  {
+    "role": "manager",
+    "endpoint": "/api/settings/my-permissions",
+    "status": 200
+  },
+  {
+    "role": "manager",
+    "endpoint": "/api/vet/records",
+    "status": 200
+  },
+  {
+    "role": "manager",
+    "endpoint": "/api/stalls/map",
+    "status": 200
+  },
+  {
+    "role": "manager",
+    "endpoint": "/api/staff",
+    "status": 403
+  },
+  {
+    "role": "manager",
+    "endpoint": "/api/finance/summary?from=2026-10-19&to=2026-10-19",
+    "status": 200
+  },
+  {
+    "role": "manager",
+    "endpoint": "/api/horses/workload?date=2026-10-20",
+    "status": 200
+  },
+  {
+    "role": "trainer",
+    "endpoint": "/api/settings/my-permissions",
+    "status": 200
+  },
+  {
+    "role": "trainer",
+    "endpoint": "/api/vet/records",
+    "status": 200
+  },
+  {
+    "role": "trainer",
+    "endpoint": "/api/stalls/map",
+    "status": 200
+  },
+  {
+    "role": "trainer",
+    "endpoint": "/api/staff",
+    "status": 403
+  },
+  {
+    "role": "trainer",
+    "endpoint": "/api/finance/summary?from=2026-10-19&to=2026-10-19",
+    "status": 403
+  },
+  {
+    "role": "trainer",
+    "endpoint": "/api/horses/workload?date=2026-10-20",
+    "status": 200
+  }
+]

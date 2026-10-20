@@ -1,0 +1,107 @@
+// Disposable local schema, synthetic data only. Optional server for manual UI audit.
+require('reflect-metadata');
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const { randomUUID } = require('node:crypto');
+const { spawn, spawnSync } = require('node:child_process');
+const { PrismaClient } = require('@prisma/client');
+const { DateTime } = require('luxon');
+const bcrypt = require('bcrypt');
+const root = path.join(__dirname, '..');
+const output = path.join(root, '../docs/audits/2026-10-19-pilot');
+const settings = require('node:util').parseEnv(fs.readFileSync(path.join(root, '.env'), 'utf8').replace(/^\uFEFF/, ''));
+const source = new URL(settings.DATABASE_URL);
+assert.ok(['localhost', '127.0.0.1'].includes(source.hostname));
+source.port = process.env.AUDIT_DB_PORT || '5432';
+const schema = `audit_pilot_${Date.now()}`;
+assert.match(schema, /^audit_pilot_\d+$/);
+const target = new URL(source); target.searchParams.set('schema', schema);
+const env = { ...process.env, ...settings, DATABASE_URL: target.href, JWT_SECRET: 'isolated-pilot-audit-only-secret-32-bytes', NODE_ENV: 'test', PORT: '3000', PUBLIC_LEADS_ENABLED: 'false' };
+for (const key of Object.keys(env)) if (key.startsWith('VK_')) delete env[key];
+const adminDb = new PrismaClient({ datasources: { db: { url: source.href } } });
+const p = new PrismaClient({ datasources: { db: { url: target.href } } });
+const { CashDeskService } = require('../dist/payments/cash-desk.service');
+const { FinanceService } = require('../dist/payments/finance.service');
+const { PaymentsService } = require('../dist/payments/payments.service');
+const { BookingRulesService } = require('../dist/bookings/booking-rules.service');
+const { BookingsService } = require('../dist/bookings/bookings.service');
+const { BookingLifecycleService } = require('../dist/bookings/booking-lifecycle.service');
+const { LessonsService } = require('../dist/lessons/lessons.service');
+const { VetRecordService } = require('../dist/boarding/vet-record.service');
+const { StallsService } = require('../dist/stalls/stalls.service');
+let child, created = false, stopping = false;
+async function cleanup() {
+  if (stopping) return; stopping = true;
+  if (child && child.exitCode === null) { child.kill(); await new Promise(r => child.once('exit', r)); }
+  await p.$disconnect();
+  if (created) await adminDb.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);
+  await adminDb.$disconnect();
+}
+(async () => {
+  await adminDb.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`); created = true;
+  const migration = spawnSync(process.execPath, ['node_modules/prisma/build/index.js', 'migrate', 'deploy'], { cwd: root, env, encoding: 'utf8', windowsHide: true });
+  assert.equal(migration.status, 0, 'Disposable schema migration failed');
+  const passwordHash = await bcrypt.hash('audit-test-password', 10);
+  const admin = await p.user.create({ data: { email: 'pilot-admin@test.local', role: 'ADMIN', passwordHash } });
+  const trainer = await p.trainer.create({ data: { name: 'Тренер пилота' } });
+  await p.user.create({ data: { email: 'pilot-trainer@test.local', role: 'TRAINER', passwordHash, trainerId: trainer.id } });
+  await p.user.create({ data: { email: 'pilot-manager@test.local', role: 'MANAGER', passwordHash } });
+  await p.clubSchedule.create({ data: { id: 1, openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } });
+  await p.clubModuleSettings.upsert({ where: { module: 'STAFF_PAYROLL' }, create: { module: 'STAFF_PAYROLL', isEnabled: false }, update: { isEnabled: false } });
+  const client = await p.client.create({ data: { name: 'Клиент пилота', weightKg: 65 } });
+  const horse = await p.horse.create({ data: { name: 'Пилот — Буран', sex: 'STALLION', maxDailyWorkloadMinutes: 120, maxDailyMinutes: 120 } });
+  const mare = await p.horse.create({ data: { name: 'Пилот — Звезда', sex: 'MARE' } });
+  const arena = await p.arena.create({ data: { name: 'Манеж пилота', maxRidersCapacity: 3 } });
+  await p.service.create({ data: { name: 'Тренировка пилота', durationMinutes: 60, price: 1000 } });
+  const cash = new CashDeskService(p), finance = new FinanceService(p), payments = new PaymentsService(p);
+  const shift = await cash.openShift({ startingCash: 5000 }, admin.id);
+  const receipt = { clientId: client.id, amount: 2000, method: 'CASH', cashGiven: 2000, requestId: randomUUID() };
+  const first = await cash.pay(receipt, admin.id);
+  const retry = await cash.pay(receipt, admin.id); assert.equal(retry.id, first.id);
+  await finance.create({ category: 'OTHER', amount: 500, paymentMethod: 'CASH', description: 'Тестовый расход', requestId: randomUUID() }, admin.id);
+  const today = DateTime.now().setZone('Europe/Moscow').toISODate();
+  const sum = await finance.summary({ from: today, to: today, shiftId: shift.id, page: 1, pageSize: 20 });
+  assert.equal(sum.balanceCash.toString(), '1500');
+  const results = [{ id: 'CASH-START', startingCash: 5000, receipts: 2000, expenses: 500, expectedPhysicalCash: 6500, reportedBalanceCash: sum.balanceCash.toString(), duplicateReceiptPrevented: true }];
+  const legacy = await payments.create({ clientId: client.id, amount: 123, method: 'CASH', status: 'PAID' });
+  await payments.remove(legacy.id);
+  results.push({ id: 'CASH-DELETE', paidLegacyRecordDeleted: await p.payment.count({ where: { id: legacy.id } }) === 0 });
+  const bookings = new BookingsService(p, new BookingRulesService());
+  const start = DateTime.now().setZone('Europe/Moscow').startOf('day').plus({ days: 1, hours: 10 });
+  const dto = { trainerId: trainer.id, clientId: client.id, horseId: horse.id, arenaId: arena.id, serviceType: 'dressage', costAmount: 1000, startTime: start.toISO(), endTime: start.plus({ hours: 1 }).toISO() };
+  const booking = await bookings.createBooking(dto);
+  let conflict;
+  try { await bookings.createBooking(dto); } catch (e) { conflict = e.getResponse(); }
+  assert.ok(conflict);
+  const oldLoad = (await new LessonsService(p, {}).getDailyHorseWorkload(start.toISODate())).find(h => h.horseId === horse.id);
+  const availability = await bookings.availability({ from: start.startOf('day').toISO(), to: start.endOf('day').toISO() });
+  results.push({ id: 'LOAD-SOURCES', standaloneBookingMinutes: 60, legacyWorkload: oldLoad, availabilityWorkloads: availability.horseWorkloads, overlappingBookingRejected: conflict });
+  await cash.pay({ clientId: client.id, bookingId: booking.id, amount: 1000, method: 'CASH', cashGiven: 1000, requestId: randomUUID() }, admin.id);
+  let completion;
+  try { await new BookingLifecycleService(p).transition(booking.id, 'complete'); } catch (e) { completion = e.getResponse(); }
+  assert.ok(completion);
+  results.push({ id: 'CASH-COMPLETE', paidBookingCompletionError: completion, persistedStatus: (await p.booking.findUnique({ where: { id: booking.id } })).status });
+  const vet = new VetRecordService(p);
+  await vet.create({ horseId: mare.id, type: 'EXAMINATION', title: 'Тестовый осмотр', specialist: 'Врач пилота', performedAt: new Date().toISOString(), notes: 'Искусственная запись для проверки' }, admin.id);
+  await vet.health(mare.id, { healthStatus: 'QUARANTINE', quarantineUntil: start.plus({ days: 2 }).toISODate() });
+  let quarantine;
+  try { await bookings.createBooking({ ...dto, horseId: mare.id, startTime: start.plus({ hours: 3 }).toISO(), endTime: start.plus({ hours: 4 }).toISO() }); } catch (e) { quarantine = e.getResponse(); }
+  assert.ok(quarantine);
+  results.push({ id: 'VET-LOCK', quarantinedBookingRejected: quarantine });
+  const stalls = new StallsService(p);
+  const s1 = await p.stall.findFirstOrThrow({ where: { zone: 'MAIN', side: 'LEFT', position: 1 } });
+  const s2 = await p.stall.findFirstOrThrow({ where: { zone: 'MAIN', side: 'LEFT', position: 2 } });
+  await stalls.assign(s1.id, horse.id); await stalls.assign(s2.id, mare.id);
+  const map = await stalls.map();
+  assert.ok(map.find(s => s.id === s1.id).warnings.length);
+  results.push({ id: 'STALL-WARNING', neighboringStallionMareWarnings: map.map(s => ({ name: s.name, warnings: s.warnings })) });
+  fs.writeFileSync(path.join(output, 'reproductions.json'), JSON.stringify(results, null, 2));
+  console.log(JSON.stringify(results, null, 2));
+  if (process.env.AUDIT_SERVE !== '1') { await cleanup(); return; }
+  child = spawn(process.execPath, ['dist/main.js'], { cwd: root, env, stdio: 'ignore', windowsHide: true });
+  child.once('exit', () => { if (!stopping) void cleanup(); });
+  console.log('PILOT_AUDIT_SERVER localhost:3000; send stop to clean disposable schema');
+  process.stdin.resume(); process.stdin.on('data', b => { if (b.toString().includes('stop')) void cleanup().then(() => process.exit(0)); });
+  process.once('SIGINT', () => void cleanup().then(() => process.exit(0)));
+})().catch(async e => { console.error(e.name, e.message.replaceAll(source.href, '[database]').replaceAll(target.href, '[test database]')); await cleanup(); process.exitCode = 1; });

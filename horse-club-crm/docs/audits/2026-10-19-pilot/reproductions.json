@@ -1,0 +1,152 @@
+[
+  {
+    "id": "CASH-START",
+    "startingCash": 5000,
+    "receipts": 2000,
+    "expenses": 500,
+    "expectedPhysicalCash": 6500,
+    "reportedBalanceCash": "1500",
+    "duplicateReceiptPrevented": true
+  },
+  {
+    "id": "CASH-DELETE",
+    "paidLegacyRecordDeleted": true
+  },
+  {
+    "id": "LOAD-SOURCES",
+    "standaloneBookingMinutes": 60,
+    "legacyWorkload": {
+      "horseId": "2581b7e8-a185-4b08-ad41-8bc5dca19ce1",
+      "horseName": "Пилот — Буран",
+      "currentWorkloadMinutes": 0,
+      "maxDailyWorkloadMinutes": 120,
+      "status": "AVAILABLE"
+    },
+    "availabilityWorkloads": [
+      {
+        "horseId": "2581b7e8-a185-4b08-ad41-8bc5dca19ce1",
+        "horseName": "Пилот — Буран",
+        "currentWorkloadMinutes": 60,
+        "maxDailyWorkloadMinutes": 120,
+        "status": "AVAILABLE"
+      },
+      {
+        "horseId": "f6991d30-0e6d-49ae-bf7b-04f6c33d22b1",
+        "horseName": "Пилот — Звезда",
+        "currentWorkloadMinutes": 0,
+        "maxDailyWorkloadMinutes": 120,
+        "status": "AVAILABLE"
+      }
+    ],
+    "overlappingBookingRejected": {
+      "statusCode": 409,
+      "error": "BookingValidationError",
+      "code": "HORSE_REST_VIOLATION",
+      "message": "Лошади требуется отдых не менее 45 минут между тренировками",
+      "details": {
+        "horseId": "2581b7e8-a185-4b08-ad41-8bc5dca19ce1",
+        "requiredRestMinutes": 45
+      }
+    }
+  },
+  {
+    "id": "CASH-COMPLETE",
+    "paidBookingCompletionError": {
+      "statusCode": 409,
+      "error": "BookingValidationError",
+      "code": "BOOKING_STATE_CONFLICT",
+      "message": "Тренировка уже оплачена деньгами. Согласуйте способ оплаты перед списанием абонемента",
+      "details": {}
+    },
+    "persistedStatus": "scheduled"
+  },
+  {
+    "id": "VET-LOCK",
+    "quarantinedBookingRejected": {
+      "message": "Лошадь «Пилот — Звезда» на карантине: назначение на тренировку запрещено",
+      "error": "Bad Request",
+      "statusCode": 400
+    }
+  },
+  {
+    "id": "STALL-WARNING",
+    "neighboringStallionMareWarnings": [
+      {
+        "name": "Денник 1",
+        "warnings": [
+          {
+            "neighborId": "00000000-0000-4000-8000-000000000003",
+            "neighborNumber": "3",
+            "message": "Внимание: нежелательное соседство (Жеребец рядом с кобылой)"
+          }
+        ]
+      },
+      {
+        "name": "Денник 2",
+        "warnings": []
+      },
+      {
+        "name": "Денник 3",
+        "warnings": [
+          {
+            "neighborId": "00000000-0000-4000-8000-000000000001",
+            "neighborNumber": "1",
+            "message": "Внимание: нежелательное соседство (Жеребец рядом с кобылой)"
+          }
+        ]
+      },
+      {
+        "name": "Денник 4",
+        "warnings": []
+      },
+      {
+        "name": "Денник 5",
+        "warnings": []
+      },
+      {
+        "name": "Денник 6",
+        "warnings": []
+      },
+      {
+        "name": "Денник 7",
+        "warnings": []
+      },
+      {
+        "name": "Денник 8",
+        "warnings": []
+      },
+      {
+        "name": "Денник 9",
+        "warnings": []
+      },
+      {
+        "name": "Денник 10",
+        "warnings": []
+      },
+      {
+        "name": "Денник 11",
+        "warnings": []
+      },
+      {
+        "name": "Денник 12",
+        "warnings": []
+      },
+      {
+        "name": "Летник 1",
+        "warnings": []
+      },
+      {
+        "name": "Летник 2",
+        "warnings": []
+      },
+      {
+        "name": "Летник 3",
+        "warnings": []
+      },
+      {
+        "name": "Летник 4",
+        "warnings": []
+      }
+    ]
+  }
+]

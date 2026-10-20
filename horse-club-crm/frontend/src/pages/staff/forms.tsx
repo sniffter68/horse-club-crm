@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Alert, Button, DatePicker, Form, Input, InputNumber, Select, Switch, TimePicker, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
@@ -36,14 +36,15 @@ export function ProfileModal({ staff, onClose, onSaved }: { staff?: Staff; onClo
   </StableEntryModal>
 }
 
-export function ShiftModal({ staff, shift, selectedDate, onClose, onSaved, onDelete }: { staff: Staff[]; shift?: Shift; selectedDate: string; onClose: () => void; onSaved: () => void; onDelete?: (shift: Shift) => void }) {
+export function ShiftModal({ variant = 'modal', leading, staff, shift, selectedDate, onClose, onSaved, onDelete }: { variant?: 'modal' | 'drawer'; leading?: ReactNode; staff: Staff[]; shift?: Shift; selectedDate: string; onClose: () => void; onSaved: () => void; onDelete?: (shift: Shift) => void }) {
   const [form] = Form.useForm<{ staffId: string; dates: Dayjs[]; times: [Dayjs, Dayjs]; status: ShiftStatus; notes?: string }>()
-  return <StableEntryModal title={shift ? 'Изменить смену' : 'Запланировать смену'} form={form} submitLabel={shift ? 'Сохранить смену' : 'Запланировать смену'} resources={['staff']} onClose={onClose} onSaved={onSaved}
+  return <StableEntryModal variant={variant} title={shift ? 'Изменить смену' : 'Запланировать смену'} form={form} submitLabel={shift ? 'Сохранить смену' : 'Запланировать смену'} resources={['staff']} onClose={onClose} onSaved={onSaved}
     save={values => {
       const payload = { startTime: values.times[0].format('HH:mm'), endTime: values.times[1].format('HH:mm'), notes: values.notes }
       if (payload.startTime >= payload.endTime) return Promise.reject(new Error('Окончание смены должно быть позже начала в тот же день'))
       return shift ? httpClient.patch(`${API_URL}/staff/shifts/${shift.id}`, { ...payload, status: values.status }) : httpClient.post(`${API_URL}/staff/shifts`, { ...payload, staffId: values.staffId, dates: values.dates.map(date => date.format('YYYY-MM-DD')) })
     }}>
+    {leading}
     {!shift && <><Form.Item name="staffId" label="Сотрудник" initialValue={staff.find(row => row.isActive)?.id} rules={required}><Select aria-label="Сотрудник" options={staff.filter(row => row.isActive).map(row => ({ value: row.id, label: row.fullName }))} /></Form.Item>
       <Form.Item name="dates" label="Даты смен (до 31 даты)" initialValue={[dayjs(selectedDate)]} rules={[...required, { validator: (_, dates: Dayjs[]) => dates?.length > 31 ? Promise.reject(new Error('Выберите не более 31 даты')) : Promise.resolve() }]}><DatePicker multiple locale={ruDatePicker} format="DD.MM.YYYY" style={{ width: '100%' }} /></Form.Item></>}
     <Form.Item name="times" label="Время смены (Москва)" initialValue={[dayjs(`2000-01-01T${shift?.startTime ?? '08:00'}`), dayjs(`2000-01-01T${shift?.endTime ?? '20:00'}`)]} rules={required}><TimePicker.RangePicker locale={ruDatePicker} placeholder={['Начало', 'Окончание']} format="HH:mm" /></Form.Item>

@@ -382,3 +382,32 @@ html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); borde
 .module-permissions-table { width: 100%; border-collapse: collapse; }
 .module-permissions-table th, .module-permissions-table td { text-align: left; padding: 16px; border-bottom: 1px solid var(--crm-border); }
 .module-permissions-table caption { text-align: left; padding: 12px 16px; }
+
+.dashboard-quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.entry-drawer { --crm-paper: #241e1c; --crm-ink: #faf7f2; --crm-border: rgb(255 255 255 / 16%); --crm-hairline: rgb(255 255 255 / 8%); --crm-alabaster: #181311; color: var(--crm-ink); }
+.entry-drawer .ant-drawer-title, .entry-drawer .ant-drawer-close { color: var(--crm-ink); }
+.entry-drawer .ant-typography { color: #c8bcb5; }
+.entry-drawer .ant-btn-primary { border-color: #80695d; }
+.dashboard-quick-actions .ant-btn { height: auto; min-height: 48px; white-space: normal; justify-content: flex-start; text-align: left; padding: 12px 16px; }
+.dashboard-quick-actions .quick-action-success { color: var(--crm-status-completed-text, #3E5F48); background: color-mix(in srgb, #3E5F48 9%, var(--crm-paper)); }
+.dashboard-quick-actions .quick-action-warning { color: var(--crm-status-warning-text, #8C6527); background: color-mix(in srgb, #8C6527 9%, var(--crm-paper)); }
+.dashboard-quick-actions .quick-action-info { color: #36627b; background: color-mix(in srgb, #36627b 9%, var(--crm-paper)); }
+.dashboard-quick-actions .quick-action-vet { color: #76518a; background: color-mix(in srgb, #76518a 9%, var(--crm-paper)); }
+.dashboard-day-card { height: 100%; border-radius: 16px; }
+.dashboard-day-card--lessons { background: color-mix(in srgb, var(--crm-saddle) 5%, var(--crm-paper)); }
+.dashboard-day-card--cash { background: color-mix(in srgb, #3E5F48 6%, var(--crm-paper)); }
+.dashboard-day-card--horses { background: color-mix(in srgb, #8C6527 6%, var(--crm-paper)); }
+.dashboard-day-card--staff { background: color-mix(in srgb, #76518a 5%, var(--crm-paper)); }
+.dashboard-day-card .ant-statistic-content { font-family: Georgia, serif; font-variant-numeric: tabular-nums; }
+.dashboard-on-duty { max-height: 160px; overflow-y: auto; scrollbar-gutter: stable; }
+.dashboard-on-duty > div + div { margin-top: 8px; }
+.dashboard-timeline-item { display: flex; align-items: center; gap: 16px; }
+.dashboard-timeline-time { border-left: 3px solid var(--crm-saddle); padding-left: 12px; flex-shrink: 0; }
+.dashboard-timeline-time small { display: block; opacity: .7; }
+.dashboard-timeline-details { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .dashboard-quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .dashboard-quick-actions .ant-btn { padding: 10px; font-size: 12px; }
+  .dashboard-timeline-item { flex-wrap: wrap; gap: 12px; }
+}
+html[data-theme='dark'] .dashboard-quick-actions .ant-btn-default { color: var(--crm-ink); }

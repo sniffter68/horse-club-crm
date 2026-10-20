@@ -1,8 +1,9 @@
-import { CashDeskButton } from '../cash-desk/CashDeskPaymentModal'
+import { OperationalDashboard, type OperationalSummary } from './OperationalDashboard'
+import { usePermissions } from '../../modulePermissions'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOnError } from '@refinedev/core'
 import type { ColumnsType } from 'antd/es/table'
-import { Alert, App, Button, Card, Col, Grid, List, Progress, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
+import { Alert, App, Button, Card, Col, Grid, List, Progress, Row, Space, Table, Tag, Typography } from 'antd'
 import { Link } from 'react-router-dom'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { PendingLeads, type PendingLead } from './PendingLeads'
@@ -43,7 +44,7 @@ interface HorseWorkload {
   loadPercent: number
 }
 
-interface DashboardSummary {
+interface DashboardSummary extends OperationalSummary {
   generatedAt: string
   workDay: { date: string; openAt: string; closeAt: string; timeZone: string }
   alerts: DashboardAlert[]
@@ -80,6 +81,7 @@ function workloadColor(percent: number): string {
 }
 
 export function DashboardPage() {
+  const modules = usePermissions()
   const screens = Grid.useBreakpoint()
   const isMobile = !screens.md
   const { message, notification } = App.useApp()
@@ -159,11 +161,14 @@ export function DashboardPage() {
     }
     const intervalId = window.setInterval(refreshWhenVisible, DASHBOARD_REFRESH_INTERVAL_MS)
     window.addEventListener('focus', refreshWhenVisible)
+    const refreshAfterPayment = () => { void loadSummary() }
+    window.addEventListener('cash-desk-paid', refreshAfterPayment)
     document.addEventListener('visibilitychange', refreshWhenVisible)
     return () => {
       controller.abort()
       window.clearInterval(intervalId)
       window.removeEventListener('focus', refreshWhenVisible)
+      window.removeEventListener('cash-desk-paid', refreshAfterPayment)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
   }, [loadSummary])
@@ -178,6 +183,7 @@ export function DashboardPage() {
         `${API_URL}/lessons/${lessonId}/status`,
         { status },
       )
+      void loadSummary()
       const now = Date.now()
       const membershipsMadeInactive = new Set(
         response.data.bookings
@@ -209,7 +215,7 @@ export function DashboardPage() {
         return next
       })
     }
-  }, [message, reportError])
+  }, [message, reportError, loadSummary])
 
   const removeProcessedLead = useCallback((leadId: string) => {
     setSummary(current => current ? {
@@ -261,10 +267,10 @@ export function DashboardPage() {
       width: 230,
       render: (_, row) => {
         const updating = updatingIds.has(row.id)
-        return <Space wrap>
+        return modules.canWrite('SCHEDULE') ? <Space wrap>
           <Button type="primary" loading={updating} disabled={updating} onClick={() => void updateStatus(row.id, 'COMPLETED')}>Был</Button>
           <Button danger loading={updating} disabled={updating} onClick={() => void updateStatus(row.id, 'NO_SHOW')}>Не явился</Button>
-        </Space>
+        </Space> : null
       },
     },
   ]
@@ -275,35 +281,20 @@ export function DashboardPage() {
         <Typography.Title level={2} style={{ marginBottom: 0 }}>Главная панель</Typography.Title>
         {summary && <Space direction="vertical" size={0}>
           <Typography.Text type="secondary">Рабочий день: {formatTime(summary.workDay.openAt)}–{formatTime(summary.workDay.closeAt)}</Typography.Text>
-          <Typography.Text type="secondary">Автообновление каждые 15 секунд · обновлено {new Date(summary.generatedAt).toLocaleTimeString('ru-RU')}</Typography.Text>
+          <Typography.Text type="secondary">Автообновление каждые 15 секунд · обновлено {new Date(summary.generatedAt).toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow' })}</Typography.Text>
         </Space>}
       </div>
-      <Space wrap><CashDeskButton /><Button className="dashboard-refresh" onClick={() => void loadSummary()} loading={loading}>Обновить</Button></Space>
+      <Space wrap><Button className="dashboard-refresh" onClick={() => void loadSummary()} loading={loading}>Обновить</Button></Space>
     </Space>
 
     {error && <Alert type="error" showIcon message="Не удалось загрузить сводку" description={error} />}
 
-    <Row gutter={[16, 16]}>
-      <Col xs={24} sm={12} lg={8}>
-        <Link className="dashboard-kpi-link" to="/schedule" aria-label="Открыть расписание">
-          <Card hoverable className="kpi-card"><Statistic title="Тренировки сегодня" value={summary?.kpi.lessonsCompleted ?? 0} suffix={`/ ${summary?.kpi.lessonsTotal ?? 0}`} loading={loading && !summary} /></Card>
-        </Link>
-      </Col>
-      <Col xs={24} sm={12} lg={8}>
-        <a className="dashboard-kpi-link" href="#pending-leads" aria-label="Открыть новые заявки">
-          <Card hoverable className="kpi-card"><Statistic title="Необработанные заявки" value={summary?.kpi.newLeads ?? 0} loading={loading && !summary} /></Card>
-        </a>
-      </Col>
-      <Col xs={24} sm={12} lg={8}>
-        <Link className="dashboard-kpi-link" to="/memberships" aria-label="Открыть абонементы">
-          <Card hoverable className="kpi-card"><Statistic title="Активные абонементы" value={summary?.kpi.activeMemberships ?? 0} loading={loading && !summary} /></Card>
-        </Link>
-      </Col>
-    </Row>
+    <OperationalDashboard summary={summary} loading={loading && !summary} refresh={() => void loadSummary()}
+      complete={id => void updateStatus(id, 'COMPLETED')} updatingIds={updatingIds} />
 
     <PendingLeads leads={summary?.leadRequests ?? []} loading={loading && !summary} onProcessed={removeProcessedLead} />
 
-    <Card title={<Space><Link to="/schedule">Требуют внимания</Link>{summary && <Tag color={summary.alerts.length ? 'error' : 'success'}>{summary.alerts.length}</Tag>}</Space>}>
+    {modules.canRead('SCHEDULE') && <Card title={<Space><Link to="/schedule">Требуют внимания</Link>{summary && <Tag color={summary.alerts.length ? 'error' : 'success'}>{summary.alerts.length}</Tag>}</Space>}>
       {isMobile ? <List<DashboardAlert>
         loading={loading && !summary}
         dataSource={summary?.alerts ?? []}
@@ -320,10 +311,10 @@ export function DashboardPage() {
                   <Link to={`/trainers/edit/${row.trainer.id}`}><Typography.Text type="secondary">{row.trainer.name}</Typography.Text></Link>
                 </div>
                 {renderBookings(row)}
-                <div className="dashboard-alert-actions">
+                {modules.canWrite('SCHEDULE') && <div className="dashboard-alert-actions">
                   <Button type="primary" size="large" loading={updating} disabled={updating} onClick={() => void updateStatus(row.id, 'COMPLETED')}>Был</Button>
                   <Button danger size="large" loading={updating} disabled={updating} onClick={() => void updateStatus(row.id, 'NO_SHOW')}>Не явился</Button>
-                </div>
+                </div>}
               </Space>
             </Card>
           </List.Item>
@@ -337,9 +328,9 @@ export function DashboardPage() {
           scroll={{ x: 850 }}
           locale={{ emptyText: 'Занятий без отметки нет' }}
         />}
-    </Card>
+    </Card>}
 
-    <Card title={<Link to="/horses">Загрузка лошадей на сегодня</Link>} loading={loading && !summary}>
+    {modules.canRead('SCHEDULE') && modules.canRead('STABLES') && <Card title={<Link to="/horses">Загрузка лошадей на сегодня</Link>} loading={loading && !summary}>
       <Row gutter={[16, 16]}>
         {(summary?.horseWorkloads ?? []).map(horse => <Col key={horse.horseId} xs={24} md={12} xl={8}>
           <Card size="small" title={<Link to={`/horses/edit/${horse.horseId}`}>{horse.horseName}</Link>} extra={<Link to={`/horses/edit/${horse.horseId}`}>Открыть</Link>}>
@@ -364,6 +355,6 @@ export function DashboardPage() {
           <Typography.Text type="secondary">Нет активных лошадей</Typography.Text>
         </Col>}
       </Row>
-    </Card>
+    </Card>}
   </Space>
 }

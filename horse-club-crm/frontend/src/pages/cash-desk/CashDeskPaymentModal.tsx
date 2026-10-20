@@ -1,7 +1,8 @@
+import { EntryOverlay } from '../../components/EntryOverlay'
 import { usePermissions as useModules } from '../../modulePermissions'
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useInvalidate, usePermissions } from '@refinedev/core'
-import { Alert, App, Button, Form, Input, InputNumber, Modal, Segmented, Select, Space, Statistic } from 'antd'
+import { Alert, App, Button, Form, Input, InputNumber, Segmented, Select, Space, Statistic } from 'antd'
 import { PlusOutlined, UserAddOutlined } from '@ant-design/icons'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { currency, cashTime } from './shared'
@@ -26,7 +27,7 @@ export function CashDeskProvider({ children }: { children: ReactNode }) {
     {open && <CashDeskPaymentModal key={revision} onClose={() => setOpen(false)} />}
   </CashDeskContext.Provider>
 }
-export function CashDeskPaymentModal({ onClose }: { onClose: () => void }) {
+export function CashDeskPaymentModal({ onClose, variant = 'modal' }: { onClose: () => void; variant?: 'modal' | 'drawer' }) {
   const [form] = Form.useForm<Values>()
   const { message, modal } = App.useApp()
   const invalidate = useInvalidate()
@@ -136,7 +137,7 @@ export function CashDeskPaymentModal({ onClose }: { onClose: () => void }) {
       if (failure.statusCode > 0 && failure.statusCode < 500) { submitted.current = null; setLocked(false) }
     } finally { pending.current = false; setBusy(false) }
   }
-  return <><Modal className="cash-desk-modal" forceRender open={!quickCreate} title="Принять оплату / Касса" onCancel={close} maskClosable={false} width={600}
+  return <><EntryOverlay variant={variant} className="cash-desk-modal" forceRender open={!quickCreate} title="Принять оплату / Касса" onCancel={close} maskClosable={false} width={600}
     focusTriggerAfterClose={!quickCreate} afterOpenChange={visible => {
       if (visible && restoreFocus.current) { restoreFocus.current = false; form.scrollToField('amount', { focus: true }) }
     }}
@@ -168,7 +169,7 @@ export function CashDeskPaymentModal({ onClose }: { onClose: () => void }) {
       </> : <Form.Item name="nonCash" label="Вид безналичной оплаты"><Select options={[{ label: 'Банковский терминал', value: 'CARD_TERMINAL' }, { label: 'СБП', value: 'SBP' }, { label: 'Перевод', value: 'TRANSFER' }]} /></Form.Item>}
       <Form.Item name="notes" label="Комментарий"><Input.TextArea rows={2} maxLength={500} style={{ resize: 'none' }} /></Form.Item>
     </Form>
-  </Modal>
+  </EntryOverlay>
     {quickCreate && <QuickCreateClientModal initialQuery={search} onCreated={clientCreated} onCancel={returnToPayment} />}
   </>
 }

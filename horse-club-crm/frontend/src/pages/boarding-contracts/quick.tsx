@@ -1,3 +1,4 @@
+import { EntryOverlay } from '../../components/EntryOverlay'
 import { useEffect, useRef, useState } from 'react'
 import { useInvalidate, useOnError } from '@refinedev/core'
 import { useSelect } from '@refinedev/antd'
@@ -9,7 +10,7 @@ import type { Client } from '../catalogs/types'
 import { personName } from '../cards/format'
 import { CLUB_TIME_ZONE, toInstant, toLocalInput } from '../schedule/time'
 
-type PlacementContext = { kind: 'HORSE' | 'STALL'; id: string; name: string; isUnavailable?: boolean; ownerClientId?: string | null }
+type PlacementContext = { kind: 'HORSE' | 'STALL' | 'DASHBOARD'; id: string; name: string; isUnavailable?: boolean; ownerClientId?: string | null }
 type ContractSummary = { id: string; status: string; startsAt: string; endsAt: string | null; stall?: { name: string } | null; horse?: { name: string } }
 type Choice = { id: string; name: string; ownerClientId?: string | null }
 type Availability = { horses: Choice[]; stalls: Choice[] }
@@ -74,7 +75,7 @@ export function QuickBoardingActions({ context, contracts, currentContract, disa
   </div>
 }
 
-function QuickPlacement({ context, onClose }: { context: PlacementContext; onClose: () => void }) {
+export function QuickPlacement({ context, onClose, variant = 'modal', onSaved }: { context: PlacementContext; onClose: () => void; variant?: 'modal' | 'drawer'; onSaved?: () => void }) {
   const [clubHorse, setClubHorse] = useState(!context.ownerClientId)
   const [open, setOpen] = useState(true)
   const [ready, setReady] = useState(false)
@@ -86,7 +87,7 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
   const [busy, setBusy] = useState(false)
   const lock = useRef(false)
   const [error, setError] = useState<string>()
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const { mutate: onError } = useOnError()
   const refresh = useBoardingRefresh()
   const { selectProps: clients, query: clientsQuery } = useSelect<Client>({ resource: 'clients', optionLabel: personName, optionValue: 'id',
@@ -137,6 +138,7 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
       void message.success('Лошадь заселена в денник')
       setOpen(false)
       await refresh()
+      onSaved?.()
     } catch (cause) {
       const failure = toHttpError(cause)
       setError(failure.message)
@@ -145,14 +147,19 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
     } finally { lock.current = false; setBusy(false) }
   }
   const choices = (items: Choice[] = []) => items.map(item => ({ value: item.id, label: item.name }))
-  return <Modal open={open} afterOpenChange={setReady} afterClose={onClose} className="quick-boarding-dialog" title={`Быстрое заселение · ${context.name}`} onCancel={() => setOpen(false)} width={520}
+  const close = () => {
+    if (lock.current) return
+    if (variant === 'drawer' && form.isFieldsTouched()) modal.confirm({ title: 'Закрыть без сохранения?', content: 'Введённые данные будут потеряны.', okText: 'Закрыть', cancelText: 'Продолжить заполнение', onOk: () => setOpen(false) })
+    else setOpen(false)
+  }
+  return <EntryOverlay variant={variant} open={open} afterOpenChange={setReady} afterClose={onClose} className="quick-boarding-dialog" title={`Быстрое заселение · ${context.name}`} onCancel={close} width={520}
     onOk={() => form.submit()} okText={context.kind === 'HORSE' ? 'Заселить' : 'Подтвердить'} cancelText="Отмена"
     okButtonProps={{ disabled: blocked, className: 'quick-boarding-primary' }} confirmLoading={busy}
     cancelButtonProps={{ disabled: busy }} closable={!busy} maskClosable={!busy} keyboard={!busy}>
     <div className="quick-boarding-form">
       <Typography.Paragraph type="secondary">Постой без даты окончания. Часовой пояс: {CLUB_TIME_ZONE}.</Typography.Paragraph>
       <Form form={form} layout="vertical" noValidate disabled={busy || !ready} onFinish={submit}
-        initialValues={{ startsAt: initialStart, monthlyRate: 0, clientId: context.ownerClientId ?? undefined, ...(context.kind === 'HORSE' ? { horseId: context.id } : { stallId: context.id }) }}>
+        initialValues={{ startsAt: initialStart, monthlyRate: 0, clientId: context.ownerClientId ?? undefined, ...(context.kind === 'HORSE' ? { horseId: context.id } : context.kind === 'STALL' ? { stallId: context.id } : {}) }}>
         <FormField name="startsAt" label="Дата начала" rules={[{ required: true, message: 'Укажите дату начала' }, { validator: async (_rule, value: Dayjs | undefined) => {
           if (value) toInstant(value.format('YYYY-MM-DDTHH:mm'))
         } }]}>
@@ -197,5 +204,5 @@ function QuickPlacement({ context, onClose }: { context: PlacementContext; onClo
       </Form>
       {error && <Alert type="error" showIcon message="Не удалось заселить лошадь" description={error} />}
     </div>
-  </Modal>
+  </EntryOverlay>
 }

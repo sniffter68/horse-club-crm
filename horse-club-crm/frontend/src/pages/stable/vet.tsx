@@ -22,12 +22,12 @@ const typeOptions = Object.entries(vetTypes).map(([value, label]) => ({ value, l
 type VetValues = { horseId: string; type: VetType; eventDate: Dayjs; nextDueDate?: Dayjs; status: 'scheduled' | 'completed'; performedBy?: string; notes?: string }
 const instant = (date: Dayjs) => toInstant(`${date.format('YYYY-MM-DD')}T12:00`)
 
-export function VetEntry({ horseId, event, onClose, onSaved }: { horseId?: string; event?: VetEvent; onClose: () => void; onSaved: () => void }) {
+export function VetEntry({ variant = 'modal', horseId, event, onClose, onSaved }: { variant?: 'modal' | 'drawer'; horseId?: string; event?: VetEvent; onClose: () => void; onSaved: () => void }) {
   const [form] = Form.useForm<VetValues>()
   const { selectProps } = useSelect<Horse>({ resource: 'horses', optionLabel: 'name', optionValue: 'id', pagination: { pageSize: 100 },
     queryOptions: { enabled: !horseId && !event, retry: false } })
   const today = dayjs(DateTime.now().setZone(CLUB_TIME_ZONE).toISODate())
-  return <StableEntryModal title={event ? `Выполнить: ${vetTypes[event.type]} · ${event.horse.name}` : 'Новая вет-процедура'} form={form}
+  return <StableEntryModal variant={variant} title={event ? `Выполнить: ${vetTypes[event.type]} · ${event.horse.name}` : 'Новая вет-процедура'} form={form}
     submitLabel={event ? 'Отметить выполнение' : 'Сохранить процедуру'} onClose={onClose} onSaved={onSaved}
     save={values => {
       const details = { nextDueDate: values.nextDueDate ? instant(values.nextDueDate) : undefined, performedBy: values.performedBy, notes: values.notes }
