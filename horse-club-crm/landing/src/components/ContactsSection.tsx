@@ -67,7 +67,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
   return (
     <section
       id="contacts"
-      className="relative overflow-hidden bg-[#241E1C] px-6 py-28 text-white sm:px-10 lg:px-16"
+      className="relative overflow-hidden bg-[#241E1C] px-6 py-10 md:py-16 text-white sm:px-10 lg:px-16"
     >
       {/* Декоративное теплое свечение сзади */}
       <div
@@ -77,7 +77,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
 
       <div className="relative mx-auto max-w-7xl">
         {/* Верхний заголовок секции */}
-        <div className="mb-16 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+        <div className="mb-6 md:mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
           <div>
             <span className="text-xs font-semibold uppercase tracking-[0.25em] text-[#A6988E]">
               Связь и бронирование

@@ -26,14 +26,14 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
   if (!currentService) return <></>;
 
   return (
-    <section id="services" className="relative overflow-hidden bg-[#241E1C] px-4 py-20 text-white sm:px-10 sm:py-28 lg:px-16">
+    <section id="services" className="relative overflow-hidden bg-[#241E1C] px-4 py-10 md:py-16 text-white sm:px-10 lg:px-16">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -bottom-32 -left-32 h-[500px] w-[500px] rounded-full bg-[#724C39]/20 blur-3xl"
       />
 
       <div className="relative mx-auto max-w-7xl">
-        <div className="mb-10 flex flex-col items-start justify-between gap-3 sm:mb-14 sm:flex-row sm:items-center">
+        <div className="mb-6 md:mb-8 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <h2 className="font-serif text-4xl sm:text-6xl font-normal tracking-tight text-[#E4DAD0]">
             Услуги
           </h2>

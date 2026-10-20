@@ -58,7 +58,7 @@ export function ClubStandardsSection(): ReactElement {
   return (
     <section
       id="about"
-      className="relative overflow-hidden bg-[#FAF7F2] px-6 py-28 text-[#3A2F2B] sm:px-10 lg:px-16 border-t border-black/5"
+      className="relative overflow-hidden bg-[#FAF7F2] px-6 py-10 md:py-16 text-[#3A2F2B] sm:px-10 lg:px-16 border-t border-black/5"
     >
       {/* Декоративный теплый фон */}
       <div
@@ -83,7 +83,7 @@ export function ClubStandardsSection(): ReactElement {
         </div>
 
         {/* Сетка стандартов */}
-        <div className="mt-16 grid grid-cols-1 gap-8 md:grid-cols-2">
+        <div className="mt-6 md:mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
           {standards.map((item, index) => (
             <motion.div
               key={item.number}
@@ -131,7 +131,7 @@ export function ClubStandardsSection(): ReactElement {
         </div>
 
         {/* Нижняя инфо-плашка с цитатой клуба */}
-        <div className="mt-12 rounded-[2.2rem] border border-black/5 bg-[#E4DAD0]/50 p-8 sm:p-10 backdrop-blur-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-[#E4DAD0]/50 p-8 sm:p-10 backdrop-blur-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="max-w-2xl">
             <h4 className="font-serif text-xl sm:text-2xl font-normal text-[#3A2F2B]">
               «Лошадь — не спортивный инвентарь, а равноправный партнер»

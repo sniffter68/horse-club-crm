@@ -37,7 +37,7 @@ export function HeroSection(): ReactElement {
     <section
       ref={containerRef}
       id="hero"
-      className="relative flex min-h-screen w-full max-w-full flex-col justify-between overflow-hidden bg-[#E4DAD0] px-4 pb-6 pt-24 sm:px-10 sm:pb-8 sm:pt-28 lg:px-16"
+      className="relative flex min-h-[85svh] w-full max-w-full flex-col justify-between overflow-hidden bg-[#E4DAD0] px-4 pb-4 pt-24 sm:px-10 sm:pb-6 lg:px-16"
     >
       {/* Декоративное мягкое свечение фона */}
       <div

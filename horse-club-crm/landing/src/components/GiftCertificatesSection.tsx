@@ -21,7 +21,7 @@ export function GiftCertificatesSection(): ReactElement {
     <section
       id="gift-certificates"
       aria-labelledby="gift-certificates-heading"
-      className="relative overflow-hidden border-t border-black/5 bg-luxury-bg px-6 py-28 text-luxury-dark sm:px-10 lg:px-16"
+      className="relative overflow-hidden border-t border-black/5 bg-luxury-bg px-6 py-10 md:py-16 text-luxury-dark sm:px-10 lg:px-16"
     >
       <div className="relative mx-auto max-w-7xl">
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
@@ -33,7 +33,7 @@ export function GiftCertificatesSection(): ReactElement {
           </p>
         </div>
 
-        <ul role="list" className="mt-16 grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <ul role="list" className="mt-6 md:mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
           {benefits.map(benefit => (
             <li key={benefit.title} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md sm:p-12">
               <h3 className="mt-2 font-serif text-2xl font-normal leading-snug text-luxury-dark sm:text-3xl">{benefit.title}</h3>
@@ -42,7 +42,7 @@ export function GiftCertificatesSection(): ReactElement {
           ))}
         </ul>
 
-        <div className="mt-12 text-center">
+        <div className="mt-6 md:mt-8 text-center">
           <a
             href="#booking-form"
             onClick={event => { event.preventDefault(); scrollToBooking(); }}

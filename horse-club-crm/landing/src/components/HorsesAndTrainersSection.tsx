@@ -101,7 +101,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
   };
 
   return (
-    <section id="horses-trainers" className="relative overflow-hidden bg-[#E4DAD0] px-6 py-28 sm:px-10 lg:px-16">
+    <section id="horses-trainers" className="relative overflow-hidden bg-[#E4DAD0] px-6 py-10 md:py-16 sm:px-10 lg:px-16">
       <div className="mx-auto max-w-7xl">
         {/* Заголовок и переключатель */}
         <div className="flex flex-col items-start justify-between gap-8 sm:flex-row sm:items-end">
@@ -148,7 +148,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.45 }}
-              className="mt-14 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3"
+              className="mt-6 md:mt-8 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3"
             >
               {horsesData.map((horse) => (
                 <button
@@ -202,7 +202,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.45 }}
-              className="mt-14 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3"
+              className="mt-6 md:mt-8 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3"
             >
               {trainersData.map((trainer) => (
                 <button

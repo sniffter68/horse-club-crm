@@ -31,7 +31,7 @@ export function FirstLessonSection(): ReactElement {
     <section
       id="first-lesson"
       aria-labelledby="first-lesson-heading"
-      className="relative overflow-hidden border-t border-black/5 bg-luxury-card px-6 py-28 text-luxury-dark sm:px-10 lg:px-16"
+      className="relative overflow-hidden border-t border-black/5 bg-luxury-card px-6 py-10 md:py-16 text-luxury-dark sm:px-10 lg:px-16"
     >
       <div className="relative mx-auto max-w-7xl">
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
@@ -43,7 +43,7 @@ export function FirstLessonSection(): ReactElement {
           </p>
         </div>
 
-        <ol role="list" className="mt-16 grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <ol role="list" className="mt-6 md:mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
           {steps.map(step => (
             <li key={step.number} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md sm:p-12">
               <div className="flex items-center justify-between gap-4">
@@ -58,7 +58,7 @@ export function FirstLessonSection(): ReactElement {
           ))}
         </ol>
 
-        <div className="mt-12 rounded-[2.2rem] border border-black/5 bg-luxury-bg/50 p-8 backdrop-blur-sm sm:p-10">
+        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-luxury-bg/50 p-8 backdrop-blur-sm sm:p-10">
           <h3 className="font-serif text-xl font-normal text-luxury-dark sm:text-2xl">Как подготовиться к визиту</h3>
           <dl className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
             {preparation.map(item => (
@@ -70,7 +70,7 @@ export function FirstLessonSection(): ReactElement {
           </dl>
         </div>
 
-        <div className="mt-12 text-center">
+        <div className="mt-6 md:mt-8 text-center">
           <a
             href="#booking-form"
             onClick={event => { event.preventDefault(); scrollToBooking(); }}
