@@ -12,7 +12,11 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => { localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.role', 'ADMIN'); localStorage.setItem('horsecrm.email', 'qa@example.com') })
   await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } }))
   for (const [resource, data] of Object.entries({ clients: [client, { ...client, id: 'c2', name: 'Борис', firstName: 'Борис', lastName: '', weightKg: '95' }], horses: [horse, { ...horse, id: 'h2', name: 'Буран', maxRiderWeight: 110 }], trainers: [trainer], arenas: [arena], services: [] })) {
-    await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: data, headers: { 'x-total-count': String(data.length) } }))
+    await page.route(`**/api/${resource}?*`, route => {
+      const q = new URL(route.request().url()).searchParams.get('q')?.toLocaleLowerCase('ru')
+      const rows = resource === 'clients' && q ? data.filter(row => row.name.toLocaleLowerCase('ru').includes(q)) : data
+      return route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } })
+    })
   }
   await page.route('**/api/clients/c*', route => route.fulfill({ json: { ...client, memberships: [{ id: 'm1', type: 'fixed_lessons', title: 'Клубный', totalLessons: 8, remainedLessons: 5, validUntil: '2099-01-01', initialUnits: '8', remainingUnits: '7' }, { id: 'm2', type: 'deposit', title: 'Депозит', totalLessons: 0, remainedLessons: 0, validUntil: '2020-01-01', validTo: '2099-01-01', remainingUnits: '2500.50', initialUnits: '5000' }] } }))
   await page.route('**/api/lessons?*', route => route.fulfill({ json: [] }))

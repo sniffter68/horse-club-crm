@@ -1,3 +1,4 @@
+import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { Create, useForm, useSelect } from '@refinedev/antd'
 import type { BaseRecord, HttpError } from '@refinedev/core'
 import { Alert, DatePicker, Descriptions, Form, Input, InputNumber, Select } from 'antd'
@@ -29,12 +30,6 @@ export function MembershipCreate() {
     action: 'create',
     redirect: 'list',
   })
-  const { selectProps: clientSelectProps } = useSelect({
-    resource: 'clients',
-    optionLabel: client => String(client.name ?? ''),
-    optionValue: client => String(client.id ?? ''),
-    pagination: { mode: 'server', pageSize: 100 },
-  })
   const { query: plansQuery } = useSelect<Plan>({
     resource: 'pricing-plans',
     optionLabel: plan => plan.name,
@@ -64,7 +59,7 @@ export function MembershipCreate() {
           })}
     >
       <Form.Item name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}>
-        <Select {...clientSelectProps} showSearch optionFilterProp="label" placeholder="Выберите клиента" />
+        <ClientSelectWithCreate showSearch optionFilterProp="label" placeholder="Выберите клиента" />
       </Form.Item>
 
       <Form.Item name="pricingPlanId" label="Тариф" extra="Выберите готовый тариф или оставьте поле пустым для ручной выдачи.">

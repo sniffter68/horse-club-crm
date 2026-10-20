@@ -7,6 +7,8 @@ import { parseRefineQuery } from '../common/refine';
 import type { PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateClientDto } from './dto/create-client.dto';
+import type { ClientQueryDto } from './dto/client-query.dto';
+import type { QuickCreateClientDto } from './dto/quick-create-client.dto';
 import type { UpdateClientDto } from './dto/update-client.dto';
 
 const paymentSummarySelect = {
@@ -97,7 +99,7 @@ export class ClientsService {
     }
   }
 
-  async findAll(query: RefineQueryDto): Promise<PaginatedResult<ClientListResponse>> {
+  async findAll(query: ClientQueryDto): Promise<PaginatedResult<ClientListResponse>> {
     const now = new Date();
     const options = parseRefineQuery(query, ['id', 'name', 'phone', 'email', 'firstName', 'lastName', 'createdAt'], 'name');
     const where: Prisma.ClientWhereInput = options.search
@@ -109,6 +111,7 @@ export class ClientsService {
           ],
         }
       : {};
+    if (query.clientType) where.clientType = query.clientType;
     const orderBy = { [options.sort]: options.order } as Prisma.ClientOrderByWithRelationInput;
     const [total, data] = await this.prisma.$transaction([
       this.prisma.client.count({ where }),
@@ -168,6 +171,22 @@ export class ClientsService {
         isActive: membership.remainedLessons > 0 && membership.validUntil >= now,
       })),
     };
+  }
+
+  async quickCreate(dto: QuickCreateClientDto): Promise<Client> {
+    const name = dto.name.trim().replace(/\s+/g, ' ');
+    if (!name) throw new BadRequestException('Введите имя клиента');
+    return this.create({ name, phone: dto.phone?.trim() || undefined,
+      clientType: dto.isOneTime ? 'ONE_TIME' : 'REGULAR', preferences: dto.note,
+      riderLevel: dto.isOneTime ? undefined : dto.riderLevel });
+  }
+
+  async convertToRegular(id: string): Promise<Client> {
+    try {
+      return await this.prisma.client.update({ where: { id }, data: { clientType: 'REGULAR' } });
+    } catch (error: unknown) {
+      return rethrowCatalogMutation(error, 'Клиент');
+    }
   }
 
   async create(dto: CreateClientDto): Promise<Client> {

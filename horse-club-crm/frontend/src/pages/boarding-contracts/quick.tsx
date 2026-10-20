@@ -1,13 +1,11 @@
+import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { EntryOverlay } from '../../components/EntryOverlay'
 import { useEffect, useRef, useState } from 'react'
 import { useInvalidate, useOnError } from '@refinedev/core'
-import { useSelect } from '@refinedev/antd'
 import { Alert, App, Button, Checkbox, DatePicker, Empty, Form, InputNumber, Modal, Select as EntitySelect, Skeleton, Space, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { useCatalogPermissions } from '../catalogs/permissions'
-import type { Client } from '../catalogs/types'
-import { personName } from '../cards/format'
 import { CLUB_TIME_ZONE, toInstant, toLocalInput } from '../schedule/time'
 
 type PlacementContext = { kind: 'HORSE' | 'STALL' | 'DASHBOARD'; id: string; name: string; isUnavailable?: boolean; ownerClientId?: string | null }
@@ -90,11 +88,6 @@ export function QuickPlacement({ context, onClose, variant = 'modal', onSaved }:
   const { message, modal } = App.useApp()
   const { mutate: onError } = useOnError()
   const refresh = useBoardingRefresh()
-  const { selectProps: clients, query: clientsQuery } = useSelect<Client>({ resource: 'clients', optionLabel: personName, optionValue: 'id',
-    pagination: { mode: 'server', pageSize: 100 }, debounce: 300,
-    onSearch: value => [{ field: 'q', operator: 'contains', value: value.trim() }],
-    queryOptions: { retry: false, enabled: !clubHorse }, errorNotification: false,
-  })
   let instant = ''
   try { if (selectedStart?.isValid()) instant = toInstant(selectedStart.format('YYYY-MM-DDTHH:mm')) } catch { /* Form validation explains invalid local times. */ }
   const key = `${instant}:${revision}`
@@ -121,8 +114,8 @@ export function QuickPlacement({ context, onClose, variant = 'modal', onSaved }:
   const stallId = Form.useWatch<string>('stallId', form) ?? (context.kind === 'STALL' ? context.id : undefined)
   const eligible = Boolean(data && (!horseId || data.horses.some(item => item.id === horseId)) && (!stallId || data.stalls.some(item => item.id === stallId)))
   const blocked = !ready || !instant || !data || !data.horses.length || !data.stalls.length || !eligible || busy
-    || (!clubHorse && (clientsQuery.isFetching || Boolean(clientsQuery.error)))
-  const reload = () => { setRevision(value => value + 1); void clientsQuery.refetch() }
+
+  const reload = () => { setRevision(value => value + 1) }
   const submit = async (values: PlacementValues) => {
     if (blocked || lock.current) return
     lock.current = true
@@ -168,8 +161,8 @@ export function QuickPlacement({ context, onClose, variant = 'modal', onSaved }:
             getPopupContainer={popupContainer} onChange={value => setSelectedStart(value)} style={{ width: '100%' }} />
         </FormField>
         {!data && !loadError && instant && <Skeleton active paragraph={{ rows: 1 }} title={false} />}
-        {(loadError || (!clubHorse && clientsQuery.error)) && <Space direction="vertical" className="quick-boarding-feedback">
-          <Alert type="error" showIcon message="Не удалось загрузить варианты заселения" description={loadError || clientsQuery.error?.message} />
+        {loadError && <Space direction="vertical" className="quick-boarding-feedback">
+          <Alert type="error" showIcon message="Не удалось загрузить варианты заселения" description={loadError} />
           <Button onClick={reload}>Повторить загрузку</Button>
         </Space>}
         {data && !eligible && <Alert type="warning" showIcon message="Выбранная лошадь или денник уже заняты на этот период. Выберите другой вариант или дату." />}
@@ -193,8 +186,7 @@ export function QuickPlacement({ context, onClose, variant = 'modal', onSaved }:
         <FormField><Checkbox checked={clubHorse} onChange={event => setClubHorse(event.target.checked)}>Лошадь клуба</Checkbox></FormField>
         {clubHorse ? <Typography.Paragraph type="secondary">Клубное размещение без начисления оплаты.</Typography.Paragraph> : <>
         <FormField name="clientId" label="Владелец / клиент" rules={[{ required: true, message: 'Выберите владельца или клиента' }]}>
-          <EntitySelect {...clients} aria-label="Владелец / клиент" getPopupContainer={popupContainer} showSearch filterOption={false} placeholder="Найдите клиента по имени или телефону"
-            notFoundContent={clientsQuery.isFetching ? 'Поиск…' : 'Клиенты не найдены'} />
+          <ClientSelectWithCreate aria-label="Владелец / клиент" getPopupContainer={popupContainer} showSearch filterOption={false} placeholder="Найдите клиента по имени или телефону" />
         </FormField>
         <FormField name="monthlyRate" label="Стоимость в месяц, ₽" extra="0 ₽ — постой без начисления оплаты."
           rules={[{ required: true, message: 'Укажите стоимость' }, { type: 'number', min: 0, max: 9999999999.99, message: 'Укажите неотрицательную стоимость' }]}>

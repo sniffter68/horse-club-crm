@@ -57,6 +57,20 @@ describe('Authentication', () => {
   })
 })
 describe('Data provider', () => {
+  it('sends and clears client type filters without weakening other resource contracts', async () => {
+    httpClient.defaults.adapter = async config => {
+      expect(new URL(config.url ?? '', 'http://localhost').searchParams.get('clientType')).toBe('ONE_TIME')
+      return response(config, [])
+    }
+    await dataProvider.getList({ resource: 'clients', filters: [{ field: 'clientType', operator: 'eq', value: 'ONE_TIME' }] })
+    httpClient.defaults.adapter = async config => {
+      expect(new URL(config.url ?? '', 'http://localhost').searchParams.has('clientType')).toBe(false)
+      return response(config, [])
+    }
+    await dataProvider.getList({ resource: 'clients', filters: [{ field: 'clientType', operator: 'eq', value: undefined }] })
+    await expect(dataProvider.getList({ resource: 'clients', filters: [{ field: 'clientType', operator: 'eq', value: 'WRONG' }] })).rejects.toThrow()
+    await expect(dataProvider.getList({ resource: 'horses', filters: [{ field: 'clientType', operator: 'eq', value: 'ONE_TIME' }] })).rejects.toThrow()
+  })
   it('maps pagination, sorting and Unicode search to the backend contract', async () => {
     saveSession('first', identity)
     httpClient.defaults.adapter = async (config) => {

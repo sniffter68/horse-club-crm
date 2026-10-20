@@ -22,7 +22,61 @@ test('issue membership opens the existing form with the correct client selected'
   await page.goto('/clients')
   await page.getByRole('link', { name: '+ Выдать абонемент' }).click()
   await expect(page).toHaveURL(/\/memberships\/new\?clientId=client-b/)
-  await expect(page.locator('.ant-select-selection-item').first()).toHaveText('Борис Иванов')
+  await expect(page.locator('.ant-select-selection-item').first()).toHaveText('Борис Иванов · +79991234567')
+})
+
+test('client type filter and conversion preserve the client record', async ({ page }) => {
+  const id = '00000000-0000-4000-8000-000000000011'
+  let clientType = 'ONE_TIME'
+  const filters: Array<string | null> = []
+  await page.route('**/api/clients?*', route => {
+    const type = new URL(route.request().url()).searchParams.get('clientType')
+    filters.push(type)
+    const rows = !type || type === clientType ? [{ ...client, id, clientType }] : []
+    return route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } })
+  })
+  await page.route(`**/api/clients/${id}/convert-to-regular`, route => {
+    expect(route.request().method()).toBe('PATCH')
+    clientType = 'REGULAR'
+    return route.fulfill({ json: { ...client, id, clientType } })
+  })
+  await page.goto('/clients')
+  await expect(page.getByText('Разовый', { exact: true })).toBeVisible()
+  await page.getByRole('combobox', { name: 'Тип клиента' }).focus()
+  await page.getByRole('combobox', { name: 'Тип клиента' }).press('ArrowDown')
+  await page.locator('.ant-select-dropdown:visible').getByText('Разовые', { exact: true }).click()
+  await expect.poll(() => filters.at(-1)).toBe('ONE_TIME')
+  await page.getByRole('button', { name: 'Сделать постоянным', exact: true }).click()
+  await expect(page.getByText('Разовый', { exact: true })).not.toBeVisible()
+  await page.getByRole('combobox', { name: 'Тип клиента' }).focus()
+  await page.getByRole('combobox', { name: 'Тип клиента' }).press('ArrowDown')
+  await page.locator('.ant-select-dropdown:visible').getByText('Постоянные', { exact: true }).click()
+  await expect.poll(() => filters.at(-1)).toBe('REGULAR')
+  await expect(page.getByRole('button', { name: 'Анна Орлова', exact: true })).toBeVisible()
+})
+
+test('creates and selects a regular rider with an optional level inside membership sale', async ({ page }) => {
+  await page.route('**/api/pricing-plans?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
+  const posts: Record<string, unknown>[] = []
+  await page.route('**/api/clients/quick', route => {
+    const payload = route.request().postDataJSON()
+    posts.push(payload)
+    return route.fulfill({ status: 201, json: { id: '00000000-0000-4000-8000-000000000012', ...payload, clientType: 'REGULAR' } })
+  })
+  await page.goto('/memberships/new')
+  await page.getByRole('combobox', { name: 'Клиент', exact: true }).fill('Новый всадник')
+  await page.getByRole('button', { name: '+ Постоянный клиент', exact: true }).click()
+  const create = page.getByRole('dialog', { name: 'Постоянный клиент', exact: true })
+  await expect(create.getByRole('textbox', { name: 'ФИО', exact: true })).toHaveValue('Новый всадник')
+  await expect(create).not.toHaveClass(/ant-zoom-(enter|appear)/)
+  const level = create.getByRole('combobox', { name: /Уровень всадника/ })
+  await level.focus(); await level.press('ArrowDown')
+  await expect(page.locator('.ant-select-dropdown:visible').getByText('Начинающий', { exact: true })).toBeVisible()
+  await level.press('Enter')
+  await create.getByRole('button', { name: 'Создать и выбрать', exact: true }).click()
+  await expect(create).not.toBeVisible()
+  await expect(page.locator('.ant-select-selection-item').first()).toContainText('Новый всадник')
+  expect(posts).toEqual([{ name: 'Новый всадник', isOneTime: false, riderLevel: 'BEGINNER' }])
 })
 
 test('canonical ledger renders a signed decimal deposit charge with a standalone training', async ({ page }) => {

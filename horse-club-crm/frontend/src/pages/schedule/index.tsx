@@ -1,3 +1,4 @@
+import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { ReplaceHorseAction } from './ReplaceHorseAction'
 import { HorseIssues } from './HorseIssues'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -26,7 +27,7 @@ import { catalog } from '../catalogs/loadCatalog'
 const membershipDate = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeZone: CLUB_TIME_ZONE })
 const lessonHorses = (lesson: Lesson) => [...new Set(lesson.bookings.map(booking => booking.horse?.name).filter((name): name is string => Boolean(name)))]
 
-function ParticipantEditor({ index, form, clients, horses, participants, service, durationMinutes, workloads, workloadLoading, readOnly, canRemove, onRemove, report }: {
+function ParticipantEditor({ index, form, horses, participants, service, durationMinutes, workloads, workloadLoading, readOnly, canRemove, onRemove, report }: {
   index: number
   form: FormInstance<BookingValues>
   clients: Client[]
@@ -88,9 +89,7 @@ function ParticipantEditor({ index, form, clients, horses, participants, service
 
   return <Card size="small" title={`Участник ${index + 1}`} extra={<Button danger type="link" disabled={!canRemove} onClick={onRemove}>Удалить</Button>}>
     <Form.Item name={[index, 'clientId']} label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}>
-      <Select disabled={readOnly} showSearch optionFilterProp="label" options={clients.map(row => ({
-        value: row.id, label: personName(row), disabled: row.id !== selectedClient && selectedClientIds.includes(row.id),
-      }))} />
+      <ClientSelectWithCreate disabled={readOnly} excludedIds={selectedClientIds as string[]} />
     </Form.Item>
     {service?.allowMembership && !readOnly && <Form.Item name={[index, 'membershipId']} label="Абонемент" extra="Активный абонемент с ближайшим сроком окончания выбирается автоматически.">
       <Select allowClear loading={membershipsLoading} placeholder={memberships.length ? 'Выберите абонемент' : 'Активных абонементов нет'} options={memberships.map(membership => ({

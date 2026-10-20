@@ -1,6 +1,7 @@
 export interface PublicationValues { isPublic?: boolean; imageUrl?: string | null; description?: string | null; role?: string | null; order?: number }
 export interface ClientValues {
-  name?: string; firstName: string; lastName?: string; phone: string; email?: string | null;
+  clientType?: 'REGULAR' | 'ONE_TIME'; riderLevel?: string | null;
+  name?: string; firstName: string; lastName?: string; phone?: string; email?: string | null;
   isRider: boolean; isPayer: boolean; preferences?: string; medicalNotes?: string;
 }
 export interface Client extends Omit<ClientValues, 'phone' | 'preferences' | 'medicalNotes'> {

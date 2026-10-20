@@ -289,7 +289,14 @@ model Horse {
   @@index([status])
 }
 
+enum ClientType {
+  REGULAR
+  ONE_TIME
+}
+
 model Client {
+  clientType ClientType @default(REGULAR)
+  riderLevel String?
   boardingBalance Decimal @default(0) @db.Decimal(14, 2)
   boardingDailyLogs BoardingDailyLog[]
   weightKg          Decimal?           @db.Decimal(5, 2)

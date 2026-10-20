@@ -1,3 +1,5 @@
+import { ClientQueryDto } from './dto/client-query.dto';
+import { QuickCreateClientDto } from './dto/quick-create-client.dto';
 import {
   Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query,
   Res, UseGuards, UseInterceptors,
@@ -28,7 +30,7 @@ export class ClientsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
-  async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) res: Response): Promise<ClientListResponse[]> {
+  async findAll(@Query() query: ClientQueryDto, @Res({ passthrough: true }) res: Response): Promise<ClientListResponse[]> {
     const { data, total } = await this.clientsService.findAll(query);
     setRefineTotalHeaders(res, total);
     return data;
@@ -47,6 +49,18 @@ export class ClientsController {
     const { data, total } = await this.clientsService.findLedger(id, query);
     setRefineTotalHeaders(res, total);
     return data;
+  }
+
+  @Post('quick')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  quickCreate(@Body() dto: QuickCreateClientDto): Promise<Client> {
+    return this.clientsService.quickCreate(dto);
+  }
+
+  @Patch(':id/convert-to-regular')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  convertToRegular(@Param('id', new ParseUUIDPipe()) id: string): Promise<Client> {
+    return this.clientsService.convertToRegular(id);
   }
 
   @Post()

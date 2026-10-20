@@ -57,6 +57,37 @@ async function lesson(page: Page) {
   return drawer
 }
 
+for (const width of [1440, 390]) test(`creates a guest inside lesson drawer and retains lesson fields at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  await setup(page)
+  const posts: unknown[] = []
+  await page.route('**/api/clients/quick', route => {
+    posts.push(route.request().postDataJSON())
+    return route.fulfill({ status: 201, json: { id: 'new-guest', name: 'Гость клуба', clientType: 'ONE_TIME', phone: null } })
+  })
+  let saved: Record<string, unknown> | undefined
+  await page.route('**/api/lessons', route => {
+    saved = route.request().postDataJSON()
+    return route.fulfill({ status: 201, json: { id: 'new-lesson' } })
+  })
+  await page.goto('/')
+  const drawer = await lesson(page)
+  const client = drawer.getByRole('combobox', { name: 'Клиент', exact: true })
+  await client.fill('Гость клуба')
+  await page.getByRole('button', { name: '⚡ Разовый гость', exact: true }).click()
+  const create = page.getByRole('dialog', { name: 'Разовый гость', exact: true })
+  await expect(create.getByRole('textbox', { name: 'Имя', exact: true })).toHaveValue('Гость клуба')
+  await create.getByRole('button', { name: 'Создать и выбрать', exact: true }).click()
+  await expect(create).not.toBeVisible()
+  await expect(drawer).toContainText('Гость клуба')
+  await expect(drawer).toContainText('Разовый')
+  await expect(drawer).toContainText('Выездка')
+  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await expect(drawer).not.toBeVisible()
+  expect(posts).toEqual([{ name: 'Гость клуба', isOneTime: true }])
+  expect(saved).toMatchObject({ clientId: 'new-guest', horseId: 'horse', trainerId: 'trainer', serviceId: 'service' })
+})
+
 test('admin quick actions create a lesson in a right drawer and refresh the day counter', async ({ page }) => {
   const state = await setup(page)
   await page.goto('/')

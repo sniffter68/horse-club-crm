@@ -1,0 +1,2 @@
+CREATE TYPE "ClientType" AS ENUM ('REGULAR', 'ONE_TIME');
+ALTER TABLE "Client" ADD COLUMN "clientType" "ClientType" NOT NULL DEFAULT 'REGULAR', ADD COLUMN "riderLevel" TEXT;

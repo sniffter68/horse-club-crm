@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { VkProfileLink } from '../../components/VkProfileLink'
-import { useOne, type HttpError } from '@refinedev/core'
-import { Alert, Button, Descriptions, Empty, List, Modal, Progress, Skeleton, Space, Tag, Typography } from 'antd'
+import { useInvalidate, useOne, type HttpError } from '@refinedev/core'
+import { Alert, App, Button, Descriptions, Empty, List, Modal, Progress, Skeleton, Space, Tag, Typography } from 'antd'
+import { OneTimeBadge } from '../../components/ClientSelectWithCreate'
+import { API_URL, httpClient, toHttpError } from '../../httpClient'
+import { isUuid } from '../../uuid'
 import { CatalogList } from '../catalogs/shared'
 import { money } from '../catalogs/format'
 import type { Client, RelationBooking, RelationPayment } from '../catalogs/types'
@@ -32,6 +35,24 @@ type ClientDetails = Client & {
 
 const dateFormatter = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeZone: 'Europe/Moscow' })
 
+function ConvertClient({ client }: { client: Client }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const invalidate = useInvalidate()
+  const { message } = App.useApp()
+  return <Space direction="vertical"><Button size="small" loading={busy} onClick={async () => {
+    if (busy) return
+    if (!isUuid(client.id)) { setError('Некорректный идентификатор клиента. Обновите список.'); return }
+    setBusy(true); setError(undefined)
+    try {
+      await httpClient.patch(`${API_URL}/clients/${client.id}/convert-to-regular`)
+      await invalidate({ resource: 'clients', invalidates: ['all'] })
+      void message.success('Клиент стал постоянным')
+    } catch (cause) { setError(toHttpError(cause).message) }
+    finally { setBusy(false) }
+  }}>Сделать постоянным</Button>{error && <Alert type="error" role="alert" message={error} />}</Space>
+}
+
 export function ClientList() {
   const [now] = useState(() => Date.now())
   const { canManage } = useCatalogPermissions()
@@ -45,7 +66,7 @@ export function ClientList() {
 
   return <>
     <CatalogList<ClientRow> resource="clients" title="Клиенты"
-      extraActions={row => <Button size="small" onClick={() => setLedgerClient(row)}>История баланса</Button>} columns={[
+      extraActions={row => <><Button size="small" onClick={() => setLedgerClient(row)}>История баланса</Button>{row.clientType === 'ONE_TIME' && <ConvertClient client={row} />}</>} columns={[
       {
         key: 'name',
         title: 'Клиент',
@@ -54,6 +75,7 @@ export function ClientList() {
           {[row.firstName, row.lastName].filter(Boolean).join(' ') || row.name || 'Без имени'}
         </Button>,
       },
+      { key: 'clientType', title: 'Тип', render: (_: unknown, row) => row.clientType === 'ONE_TIME' ? <OneTimeBadge /> : 'Постоянный' },
       { key: 'phone', dataIndex: 'phone', title: 'Телефон', sorter: true, render: (value: string | null) => <span className="data-mono">{value || '—'}</span> },
       { key: 'vk', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name || row.firstName} kind="CLIENT" vkUserId={row.vkUserId} /> },
       { key: 'membership', title: 'Абонемент', hidden: !canManage, width: 300, render: (_: unknown, row) => <MembershipBalance membership={row.membership} clientId={row.id} /> },
@@ -75,6 +97,7 @@ export function ClientList() {
             status: new Date(active.validUntil).getTime() - now <= 7 * 86_400_000 ? 'EXPIRING' : 'ACTIVE' } : null
         })()} />}
         {canManage && <Button onClick={() => setLedgerClient(client)}>История баланса</Button>}
+        {client.clientType === 'ONE_TIME' && <Space><OneTimeBadge />{canManage && <ConvertClient client={client} />}</Space>}
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'name', label: 'ФИО', span: 2, children: <span className="client-name">{[client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || '—'}</span> },
           { key: 'phone', label: 'Телефон', children: client.phone ? <a className="data-mono" href={`tel:${client.phone}`}>{client.phone}</a> : '—' },

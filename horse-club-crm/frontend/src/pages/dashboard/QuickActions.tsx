@@ -1,5 +1,5 @@
+import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { useCallback, useEffect, useState } from 'react'
-import { useSelect } from '@refinedev/antd'
 import { Alert, Button, DatePicker, Form, InputNumber, Select, Spin, Typography } from 'antd'
 import { CalendarOutlined, ClockCircleOutlined, HomeOutlined, MedicineBoxOutlined, MinusOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -29,9 +29,6 @@ function LessonDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   const [failure, setFailure] = useState<string>()
   const report = useCallback((cause: unknown) => setFailure(toHttpError(cause).message), [])
   const catalogs = useLeadLessonCatalogs(true, revision, report)
-  const { selectProps, query } = useSelect({ resource: 'clients', optionLabel: 'name', optionValue: 'id',
-    pagination: { mode: 'server', pageSize: 50 }, debounce: 300,
-    onSearch: value => [{ field: 'q', operator: 'contains', value }], queryOptions: { retry: false } })
   const start = Form.useWatch('startTime', form) as Dayjs | undefined
   const duration = Form.useWatch('durationMinutes', form) as number | undefined
   const horseId = Form.useWatch('horseId', form) as string | undefined
@@ -49,7 +46,7 @@ function LessonDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     return !load || load.status !== 'AVAILABLE' || load.currentWorkloadMinutes + (duration ?? 0) > load.maxDailyWorkloadMinutes
       || Boolean(horse?.healthStatus && horse.healthStatus !== 'HEALTHY')
   }
-  const unavailable = catalogs.loading || catalogs.error || query.isError || availability.loading || availability.error || !availability.data || !from || (horseId && blockedHorse(horseId))
+  const unavailable = catalogs.loading || catalogs.error || availability.loading || availability.error || !availability.data || !from || (horseId && blockedHorse(horseId))
   const required = [{ required: true, message: 'Заполните поле' }]
   return <StableEntryModal variant="drawer" title="Записать на тренировку" form={form} submitLabel="Записать на тренировку" submitDisabled={Boolean(unavailable)}
     resources={['lessons', 'bookings', 'horses']} successMessage="Тренировка назначена" onClose={onClose} onSaved={onSaved}
@@ -58,9 +55,9 @@ function LessonDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
       await httpClient.post(`${API_URL}/lessons`, { ...values, startTime: toInstant(values.startTime.format('YYYY-MM-DDTHH:mm')) })
     }}>
     <Typography.Paragraph type="secondary">Время Москвы. Проверяем здоровье, дневную нагрузку и занятость ресурсов.</Typography.Paragraph>
-    {(failure || catalogs.error || availability.error || query.isError) && <Alert type="error" showIcon message={failure || catalogs.error || availability.error || 'Не удалось загрузить клиентов'}
-      action={<Button onClick={() => { retry(n => n + 1); void query.refetch() }}>Повторить</Button>} />}
-    <Form.Item name="clientId" label="Клиент" rules={required}><Select onInputKeyDown={stopPopupEscape} {...selectProps} aria-label="Клиент" showSearch allowClear placeholder="Имя или телефон" /></Form.Item>
+    {(failure || catalogs.error || availability.error) && <Alert type="error" showIcon message={failure || catalogs.error || availability.error || 'Не удалось загрузить клиентов'}
+      action={<Button onClick={() => { retry(n => n + 1) }}>Повторить</Button>} />}
+    <Form.Item name="clientId" label="Клиент" rules={required}><ClientSelectWithCreate aria-label="Клиент" showSearch allowClear placeholder="Имя или телефон" /></Form.Item>
     <Form.Item name="startTime" label="Дата и время (Москва)" initialValue={dayjs(DateTime.now().setZone('Europe/Moscow').startOf('hour').plus({ hours: 1 }).toFormat("yyyy-MM-dd'T'HH:mm"))} rules={required}>
       <DatePicker onKeyDown={stopPopupEscape} locale={ruDatePicker} classNames={{ popup: { root: 'triad-date-popup' } }} showTime={{ format: 'HH:mm' }} format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
     </Form.Item>

@@ -1,3 +1,4 @@
+import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Spin, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -26,6 +27,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
   const [failure, setFailure] = useState<string>()
   const [revision, setRevision] = useState(0)
   const [clientRevision, setClientRevision] = useState(0)
+  const [loadedClient, setLoadedClient] = useState<Client>()
   const lock = useRef(false)
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
@@ -44,7 +46,10 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
       setMembershipState({ clientId, rows: [], loading: true })
       try {
         const response = await httpClient.get<ClientWithMemberships>(`${API_URL}/clients/${clientId}`, { signal: controller.signal })
-        if (!controller.signal.aborted) setMembershipState({ clientId, rows: response.data.memberships, loading: false })
+        if (!controller.signal.aborted) {
+          setLoadedClient(response.data)
+          setMembershipState({ clientId, rows: response.data.memberships, loading: false })
+        }
       } catch (cause) {
         if (controller.signal.aborted) return
         const error = toHttpError(cause)
@@ -57,7 +62,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
   let from: string | undefined, to: string | undefined
   try { if (startTime && endTime) { from = toInstant(startTime); to = toInstant(endTime); if (from >= to) { from = undefined; to = undefined } } } catch { /* Inline date validation owns malformed intervals. */ }
   const availability = useTriadAvailability(from, to, revision, report, booking?.id)
-  const client = clients.find(c => c.id === clientId)
+  const client = loadedClient?.id === clientId ? loadedClient : clients.find(c => c.id === clientId)
   const horse = horses.find(h => h.id === horseId)
   const weight = client?.weightKg == null ? undefined : Number(client.weightKg)
   const overweight = Boolean(horse && weight !== undefined && weight > (horse.maxRiderWeight ?? 85))
@@ -99,8 +104,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
       onFinish={save} onFinishFailed={({ errorFields }) => { if (errorFields[0]) form.scrollToField(errorFields[0].name, { focus: true, block: 'center' }) }}
       onValuesChange={() => { setDirty(true); setFailure(undefined); form.setFields((['horseId', 'trainerId', 'arenaId', 'membershipId'] as const).map(name => ({ name, errors: [] }))) }}>
       <Form.Item name="clientId" label="Клиент" rules={[required]}>
-        <Select onInputKeyDown={stopPopupEscape} id="triad_clientId" aria-label="Клиент" showSearch autoFocus optionFilterProp="label" allowClear placeholder="Имя или телефон" onChange={() => form.setFieldValue('membershipId', undefined)}
-          options={clients.map(c => ({ value: c.id, label: `${clientName(c)} · ${c.phone || 'телефон не указан'} · ${c.weightKg == null ? 'вес не указан' : `${c.weightKg} кг`}${c.membership ? ` · ${c.membership.remainingUnits} / ${c.membership.totalUnits} занятий` : ''}` }))} />
+        <ClientSelectWithCreate id="triad_clientId" onChange={() => form.setFieldValue('membershipId', undefined)} />
       </Form.Item>
       {client && <div className="triad-client-summary" aria-live="polite">
         <strong>{clientName(client)}</strong><span>{client.phone || 'Телефон не указан'} · {weight === undefined ? 'Вес не указан — уточните перед тренировкой' : `${weight} кг`}</span>

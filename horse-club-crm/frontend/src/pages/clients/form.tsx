@@ -10,7 +10,7 @@ export function ClientForm({ action }: { action: 'create' | 'edit' }) {
   return <CatalogForm<Client, ClientValues> resource="clients" action={action}
     title={action === 'create' ? 'Новый клиент' : 'Редактирование клиента'} defaults={{ isRider: true, isPayer: false }}
     toPayload={values => ({ ...values, ...clientIdentityPayload(values) })}>
-    <NumberField name="weightKg" label="Вес всадника, кг" min={0.01} max={999.99} precision={2} />
+    <NumberField name="weightKg" label="Вес всадника, кг" min={0.01} max={999.99} precision={2} required={false} />
     <ClientIdentityFields />
     <TextField name="email" label="Email" email max={254} />
     <BooleanField name="isRider" label="Всадник" />

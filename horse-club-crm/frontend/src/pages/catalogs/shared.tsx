@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { CatalogFormActivity } from './CatalogFormActivity'
 import { type BaseRecord, type HttpError } from '@refinedev/core'
 import { Create, Edit, List, EditButton, DeleteButton, useForm, useTable } from '@refinedev/antd'
-import { Alert, Button, Checkbox, Form, Input, InputNumber, Result, Space, Spin, type TableColumnsType } from 'antd'
+import { Alert, Button, Checkbox, Form, Input, InputNumber, Result, Select, Space, Spin, type TableColumnsType } from 'antd'
 import { useCatalogPermissions } from './permissions'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 
@@ -11,10 +11,11 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
   resource: string; title: string; columns: TableColumnsType<T>; extraActions?: (record: T) => ReactNode
 }) {
   const { canManage, role } = useCatalogPermissions(resource)
-  const { tableProps, searchFormProps, tableQuery, sorters } = useTable<T, HttpError, { q?: string }>({
+  const { tableProps, searchFormProps, tableQuery, sorters, filters } = useTable<T, HttpError, { q?: string; clientType?: string }>({
     resource, pagination: { pageSize: 10 }, sorters: { mode: 'server' },
     queryOptions: { retry: (count, error) => (error.statusCode === 0 || error.statusCode >= 500) && count < 2 },
-    onSearch: ({ q }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' }],
+    onSearch: ({ q, clientType }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' },
+      ...(resource === 'clients' ? [{ field: 'clientType', operator: 'eq' as const, value: clientType || undefined }] : [])],
   })
   const sortedColumns = columns.map(column => {
     const sorter = sorters.find(item => item.field === column.key)
@@ -30,10 +31,12 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
     </Space>,
   }] : []
   return <List title={title} canCreate={canManage} createButtonProps={{ children: 'Создать' }}>
-    <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}>
+    <Form noValidate {...searchFormProps} initialValues={{ ...searchFormProps.initialValues, clientType: filters.find(filter => 'field' in filter && filter.field === 'clientType')?.value }} layout="inline" style={{ marginBottom: 20 }}>
       <Form.Item name="q" style={{ width: 320, maxWidth: '100%' }}>
         <Input.Search aria-label="Поиск" placeholder="Поиск" allowClear onSearch={() => searchFormProps.form?.submit()} />
       </Form.Item>
+      {resource === 'clients' && <Form.Item name="clientType"><Select aria-label="Тип клиента" allowClear placeholder="Все клиенты" style={{ width: 200 }}
+        onChange={() => searchFormProps.form?.submit()} options={[{ value: 'REGULAR', label: 'Постоянные' }, { value: 'ONE_TIME', label: 'Разовые' }]} /></Form.Item>}
       <Button type="primary" htmlType="submit">Найти</Button>
     </Form>
     {tableQuery.error && <Alert type="error" showIcon message="Не удалось загрузить каталог" description={tableQuery.error.message} />}
@@ -81,11 +84,11 @@ export function TextField({ name, label, required = false, max = 150, multiline 
   </Form.Item>
 }
 
-export function NumberField({ name, label, min = 0, max = 1440, precision = 0 }: {
-  name: string; label: string; min?: number; max?: number; precision?: number
+export function NumberField({ name, label, min = 0, max = 1440, precision = 0, required = true }: {
+  name: string; label: string; min?: number; max?: number; precision?: number; required?: boolean
 }) {
   return <Form.Item name={name} label={label} rules={[
-    { required: true, message: `Заполните поле «${label}»` },
+    { required, message: `Заполните поле «${label}»` },
     { type: precision === 0 ? 'integer' : 'number', min, max, transform: (value: unknown) => value == null ? value : Number(value), message: `Допустимо от ${min} до ${max}` },
   ]} getValueProps={(value: unknown) => ({ value: value === undefined || value === null ? undefined : Number(value) })}>
     <InputNumber aria-label={label} min={min} max={max} precision={precision} style={{ width: '100%' }} />

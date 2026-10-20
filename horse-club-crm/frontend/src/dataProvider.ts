@@ -33,6 +33,12 @@ export const dataProvider = {
     }
 
     for (const filter of filters ?? []) {
+      if (resource === 'clients' && 'field' in filter && filter.field === 'clientType' && filter.operator === 'eq') {
+        if (filter.value == null || filter.value === '') continue
+        if (!['REGULAR', 'ONE_TIME'].includes(filter.value)) throw new Error('Недопустимый тип клиента')
+        params.set('clientType', filter.value)
+        continue
+      }
       if (!('field' in filter) || filter.field !== 'q' || !['eq', 'contains'].includes(filter.operator) || typeof filter.value !== 'string') {
         throw new Error('API каталогов поддерживает только текстовый фильтр q')
       }

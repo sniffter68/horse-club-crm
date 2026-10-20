@@ -1,7 +1,21 @@
+import { Transform } from 'class-transformer';
+import { ClientType } from '@prisma/client';
+import { IsEnum } from 'class-validator';
+import { cleanText } from './quick-create-client.dto';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsEmail, IsNumber, IsOptional, IsString, Max, Min, MaxLength, MinLength } from 'class-validator';
 
 export class CreateClientDto {
+  @Transform(({ value }) => value === '' ? undefined : value)
+  @IsOptional()
+  @IsEnum(ClientType)
+  clientType?: ClientType;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  riderLevel?: string;
+
   @ApiPropertyOptional({ minimum: 0.01, maximum: 999.99, nullable: true })
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -37,6 +51,7 @@ export class CreateClientDto {
   @IsString()
   @MaxLength(5000)
   preferences?: string;
+  @Transform(cleanText)
   @ApiProperty({ example: 'Анна Петрова' })
   @IsString()
   @MinLength(1)

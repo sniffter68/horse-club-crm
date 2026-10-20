@@ -1,7 +1,8 @@
+import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { useSelect } from '@refinedev/antd'
 import { Checkbox, DatePicker, Form, Input, InputNumber, Select as EntitySelect } from 'antd'
 import dayjs from 'dayjs'
-import type { Client, Horse, Stall } from '../catalogs/types'
+import type { Horse, Stall } from '../catalogs/types'
 import { CatalogForm } from '../catalogs/shared'
 import type { BoardingContract, BoardingContractStatus, BoardingContractValues } from './types'
 
@@ -19,9 +20,6 @@ function dateValue(value: unknown) {
   return { value: value ? dayjs(String(value)) : undefined }
 }
 
-function clientName(client: Client): string {
-  return [client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || 'Без имени'
-}
 
 function toPayload(values: BoardingContractValues): BoardingContractValues {
   const { clubHorse, ...fields } = values
@@ -38,10 +36,6 @@ function toPayload(values: BoardingContractValues): BoardingContractValues {
 }
 
 export function BoardingContractForm({ action }: { action: 'create' | 'edit' }) {
-  const { selectProps: clientSelectProps } = useSelect<Client>({
-    resource: 'clients', optionLabel: clientName, optionValue: client => client.id,
-    pagination: { mode: 'server', pageSize: 100 },
-  })
   const { selectProps: horseSelectProps } = useSelect<Horse>({
     resource: 'horses', optionLabel: horse => horse.name, optionValue: horse => horse.id,
     pagination: { mode: 'off' },
@@ -70,7 +64,7 @@ export function BoardingContractForm({ action }: { action: 'create' | 'edit' }) 
     </ContractField>
     <ContractField shouldUpdate>
       {({ getFieldValue }) => (getFieldValue('clubHorse') ?? !getFieldValue('clientId')) ? null : <ContractField name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}>
-        <EntitySelect {...clientSelectProps} showSearch optionFilterProp="label" placeholder="Выберите клиента" />
+        <ClientSelectWithCreate showSearch optionFilterProp="label" placeholder="Выберите клиента" />
       </ContractField>}
     </ContractField>
     <ContractField name="horseId" label="Лошадь" rules={[{ required: true, message: 'Выберите лошадь' }]}>
