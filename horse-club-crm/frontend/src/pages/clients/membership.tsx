@@ -37,6 +37,7 @@ type LedgerOperation = {
   lesson: { id: string; startTime: string; status: string; service: { title: string; name: string } } | null;
 }
 function operationLabel(row: LedgerOperation) {
+  if (row.transactionType === 'purchase' && row.unit === 'RUB') return 'Оплата'
   if (row.transactionType === 'manual_adjustment') return 'Ручная корректировка'
   if (row.transactionType === 'boarding_charge') return 'Начисление постоя'
   if (row.transactionType === 'penalty_cancellation') return /неявка/i.test(row.reason) ? 'Неявка' : 'Штрафная отмена'

@@ -123,14 +123,14 @@ export class ClientsService {
         include: { memberships: {
           where: { type: 'fixed_lessons', status: 'active', validFrom: { lte: now }, remainedLessons: { gt: 0 }, validUntil: { gte: now } },
           orderBy: [{ validUntil: 'asc' }, { id: 'asc' }], take: 1,
-          select: { id: true, remainedLessons: true, totalLessons: true, validUntil: true, pricingPlan: { select: { name: true } } },
+          select: { id: true, serviceTitle: true, remainedLessons: true, totalLessons: true, validUntil: true, pricingPlan: { select: { name: true } } },
         } },
       }),
     ]);
     return { data: data.map(({ memberships, ...client }) => {
       const membership = memberships[0];
       return { ...client, membership: membership ? {
-        id: membership.id, planName: membership.pricingPlan?.name || 'Индивидуальный абонемент',
+        id: membership.id, planName: membership.serviceTitle || membership.pricingPlan?.name || 'Индивидуальный абонемент',
         remainingUnits: membership.remainedLessons, totalUnits: membership.totalLessons,
         validUntil: membership.validUntil,
         status: membership.validUntil.getTime() - now.getTime() <= 7 * 86_400_000 ? 'EXPIRING' as const : 'ACTIVE' as const,
@@ -151,7 +151,7 @@ export class ClientsService {
     const services: Record<string, string> = { dressage: 'Выездка', jumping: 'Конкур', walks: 'Прогулка шагом', beginners: 'Начинающие', photoshoot: 'Фотосессия', corde: 'Корда' };
     return { data: data.map(row => ({ ...row, amount: row.amount.abs().toNumber(),
       type: row.transactionType === 'refund' ? 'REFUND' as const : row.amount.isNegative() ? 'DEBIT' as const : 'CREDIT' as const,
-      reason: row.description || '', signedAmount: row.amount.toString(), unit: row.membership?.type === 'deposit' || row.boardingContractId || row.boardingDailyLogId ? 'RUB' as const : 'lessons' as const,
+      reason: row.description || '', signedAmount: row.amount.toString(), unit: row.cashDeskPaymentId || row.membership?.type === 'deposit' || row.boardingContractId || row.boardingDailyLogId ? 'RUB' as const : 'lessons' as const,
       lesson: row.booking?.lesson ?? (row.booking ? { id: row.booking.id, startTime: row.booking.startTime, status: row.booking.status,
         service: { name: services[row.booking.serviceType ?? ''] || 'Тренировка', title: services[row.booking.serviceType ?? ''] || 'Тренировка' } } : null),
     })), total };

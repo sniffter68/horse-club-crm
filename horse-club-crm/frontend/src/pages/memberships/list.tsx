@@ -7,8 +7,11 @@ import type { RelationLesson, RelationPayment } from '../catalogs/types'
 import { dateOnly, dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
+import { usePermissions } from '../../modulePermissions'
+import { useCatalogPermissions } from '../catalogs/permissions'
 
 type Membership = {
+  serviceTitle?: string; totalPrice?: string | number; paymentMethod?: string;
   id: string; totalLessons: number; remainedLessons: number; validUntil: string; isActive: boolean;
   client: { id: string; name: string; firstName: string; lastName: string } | null;
   pricingPlan: { id: string; name: string; price: string | number } | null;
@@ -20,6 +23,9 @@ type MembershipDetails = Membership & {
 }
 
 export function MembershipList() {
+  const access = usePermissions()
+  const { canManage } = useCatalogPermissions()
+  const canSell = canManage && !access.loading && !access.error && (!access.isEnabled('CASHBOX') || access.canWrite('CASHBOX'))
   const [selectedId, setSelectedId] = useState<string>()
   const { tableProps, searchFormProps } = useTable<Membership, HttpError, { q?: string }>({
     resource: 'memberships', pagination: { pageSize: 10 },
@@ -27,13 +33,14 @@ export function MembershipList() {
   })
 
   return <>
-    <RefineList title="Абонементы" headerButtons={<CreateButton>Продать абонемент</CreateButton>}>
+    <RefineList title="Абонементы" headerButtons={<CreateButton disabled={!canSell}>Продать абонемент</CreateButton>}>
       <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q">
         <Input.Search placeholder="Поиск клиента" allowClear onSearch={() => searchFormProps.form?.submit()} />
       </Form.Item></Form>
       <ResponsiveTable<Membership> {...tableProps} rowKey="id" columns={[
         { key: 'client', title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : '—'}</CardLink> },
-        { key: 'plan', title: 'Тариф', render: (_: unknown, record) => record.pricingPlan?.name || 'Индивидуальный' },
+        { key: 'plan', title: 'Услуга / тариф', render: (_: unknown, record) => record.serviceTitle || record.pricingPlan?.name || 'Индивидуальный' },
+        { key: 'price', title: 'Стоимость', render: (_: unknown, record) => money(record.totalPrice) },
         { key: 'lessons', title: 'Остаток занятий', render: (_: unknown, record) => `${record.remainedLessons} / ${record.totalLessons}` },
         { key: 'validUntil', dataIndex: 'validUntil', title: 'Действует до', render: dateOnly },
         { key: 'isActive', dataIndex: 'isActive', title: 'Статус', render: (active: boolean) => <Tag color={active ? 'green' : 'default'}>{active ? 'Активен' : 'Неактивен'}</Tag> },
@@ -43,7 +50,9 @@ export function MembershipList() {
       {membership => <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'client', label: 'Клиент', children: membership.client ? personName(membership.client) : '—' },
-          { key: 'plan', label: 'Тариф', children: membership.pricingPlan?.name || 'Индивидуальный' },
+          { key: 'plan', label: 'Услуга / тариф', children: membership.serviceTitle || membership.pricingPlan?.name || 'Индивидуальный' },
+          { key: 'price', label: 'Стоимость', children: money(membership.totalPrice) },
+          { key: 'method', label: 'Способ оплаты', children: membership.paymentMethod === 'CASH' ? 'Наличные' : membership.paymentMethod === 'CARD' ? 'Безналичные' : '—' },
           { key: 'validUntil', label: 'Действует до', children: dateOnly(membership.validUntil) },
           { key: 'status', label: 'Статус', children: <Tag color={membership.isActive ? 'green' : 'default'}>{membership.isActive ? 'Активен' : 'Неактивен'}</Tag> },
         ]} />

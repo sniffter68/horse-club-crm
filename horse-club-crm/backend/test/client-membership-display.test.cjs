@@ -53,3 +53,22 @@ test('ledger rejects missing clients and restricts history to membership managem
   await assert.rejects(service.findLedger('missing', {}), { status: 404 });
   assert.deepEqual(Reflect.getMetadata('auth:roles', ClientsController.prototype.findLedger), ['ADMIN', 'MANAGER']);
 });
+
+test('membership cash receipt is RUB while credited lessons remain lesson units', async () => {
+  const service = new ClientsService({
+    client: { findUnique: async () => ({ id: 'client' }) },
+    $transaction: async queries => Promise.all(queries),
+    ledgerTransaction: {
+      count: async () => 2,
+      findMany: async () => [
+        { id: 'receipt', cashDeskPaymentId: 'payment', amount: new Prisma.Decimal('9500.25'), transactionType: 'purchase', membership: { type: 'fixed_lessons' } },
+        { id: 'credit', sourceMembershipOpId: 'credit-op', amount: new Prisma.Decimal(8), transactionType: 'purchase', membership: { type: 'fixed_lessons' } },
+      ],
+    },
+  });
+  const { data } = await service.findLedger('client', {});
+  assert.equal(data[0].unit, 'RUB');
+  assert.equal(data[0].signedAmount, '9500.25');
+  assert.equal(data[1].unit, 'lessons');
+  assert.equal(data[1].amount, 8);
+});

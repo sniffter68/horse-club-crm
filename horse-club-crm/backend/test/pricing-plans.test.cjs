@@ -28,13 +28,15 @@ test('membership issue uses selected pricing plan values', async () => {
       return { id: 'membership-1', ...data, client: { id: 'client-1' }, pricingPlan: { id: 'plan-1' }, createdAt: new Date(), updatedAt: new Date() };
     } },
   };
+  prisma.ledgerTransaction = { create: async () => ({}) };
+  prisma.$transaction = async callback => callback(prisma);
+  prisma.clubModuleSettings = { findUnique: async () => ({ isEnabled: false }) };
   const before = Date.now();
-  const result = await new MembershipsService(prisma).create({ clientId: 'client-1', pricingPlanId: 'plan-1' });
+  const result = await new MembershipsService(prisma).create({ clientId: 'client-1', pricingPlanId: 'plan-1', totalPrice: 24000, paymentMethod: 'CARD' }, { id: 'admin', role: 'ADMIN' });
   assert.equal(saved.pricingPlanId, 'plan-1');
-  assert.deepEqual(saved.payments, { create: {
-    clientId: 'client-1', amount: 24000, method: 'UNSPECIFIED', status: 'PENDING',
-    description: 'Продажа абонемента: 8 занятий',
-  } });
+  assert.equal(saved.payments, undefined);
+  assert.equal(saved.totalPrice.toString(), '24000');
+  assert.equal(saved.pricePerLesson.toString(), '3000');
   assert.equal(saved.totalLessons, 8);
   assert.equal(saved.remainedLessons, 8);
   assert.ok(saved.validUntil.getTime() >= before + 29 * 86_400_000);

@@ -1,3 +1,5 @@
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthUser } from '../auth/auth.types';
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
@@ -22,7 +24,7 @@ export class MembershipsController {
     const { data, total } = await this.membershipsService.findAll(query); setRefineTotalHeaders(res, total); return data;
   }
   @Post()
-  create(@Body() dto: CreateMembershipDto): Promise<MembershipResponse> { return this.membershipsService.create(dto); }
+  create(@Body() dto: CreateMembershipDto, @CurrentUser() actor: AuthUser): Promise<MembershipResponse> { return this.membershipsService.create(dto, actor); }
   @Get('pricing-plans')
   async findPricingPlans(@Res({ passthrough: true }) res: Response) {
     const plans = await this.membershipsService.findPricingPlans();

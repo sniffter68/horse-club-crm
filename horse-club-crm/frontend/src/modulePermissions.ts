@@ -14,10 +14,12 @@ const resources: Record<string, SystemModule> = {
 }
 export const moduleForResource = (resource?: string) => resource ? resources[resource] : undefined
 export interface PermissionsState {
+  isEnabled: (module: SystemModule) => boolean;
   loading: boolean; error: boolean; canRead: (module: SystemModule) => boolean;
   canWrite: (module: SystemModule) => boolean; refresh: () => Promise<unknown>;
 }
 export const PermissionsContext = createContext<PermissionsState>({ loading: true, error: false,
+  isEnabled: () => false,
   canRead: () => false, canWrite: () => false, refresh: async () => {} })
 
 export const usePermissions = () => useContext(PermissionsContext)

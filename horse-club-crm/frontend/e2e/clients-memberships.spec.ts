@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures'
+import { test, expect, type Page } from './fixtures'
 
 const client = { id: 'client-a', name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова',
   phone: '+79991234567', isRider: true, isPayer: true, preferences: '', createdAt: '2026-10-01T10:00:00Z',
@@ -6,6 +6,7 @@ const client = { id: 'client-a', name: 'Анна Орлова', firstName: 'Ан
     validUntil: '2099-12-31T12:00:00Z', status: 'ACTIVE' } }
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/services?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   await page.addInitScript(() => {
     localStorage.setItem('horsecrm.access_token', 'cookie-session')
     localStorage.setItem('horsecrm.email', 'qa@example.com')
@@ -15,6 +16,129 @@ test.beforeEach(async ({ page }) => {
     json: [client, { ...client, id: 'client-b', name: 'Борис Иванов', firstName: 'Борис', lastName: 'Иванов', membership: null }],
     headers: { 'x-total-count': '2' },
   }))
+})
+
+const saleClientId = '00000000-0000-4000-8000-000000000021'
+const saleServiceId = '00000000-0000-4000-8000-000000000022'
+async function setupSale(page: Page) {
+  const state = { posts: [] as Record<string, unknown>[], receipts: [] as Record<string, unknown>[], fail: false, disabled: false }
+  await page.route('**/api/clients?*', route => route.fulfill({ json: [{ ...client, id: saleClientId }], headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/pricing-plans?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
+  await page.route('**/api/services?*', route => route.fulfill({ json: [{ id: saleServiceId, title: 'Выездка', price: '1250.15', allowMembership: true }], headers: { 'x-total-count': '1' } }))
+  await page.route(/\/api\/memberships(?:\?.*)?$/, route => {
+    if (route.request().method() !== 'POST') return route.fulfill({ json: [], headers: { 'x-total-count': '0' } })
+    const payload = route.request().postDataJSON()
+    state.posts.push(payload)
+    if (state.fail) return route.fulfill({ status: 500, json: { message: 'Ответ сервера потерян' } })
+    if (!state.disabled && !state.receipts.some(row => row.requestId === payload.requestId)) state.receipts.push({ ...payload, id: 'receipt', amount: payload.totalPrice, method: payload.paymentMethod, paidAt: new Date().toISOString(),
+      client: { name: 'Анна Орлова' }, service: { title: 'Выездка' }, cashier: { email: 'qa@example.com' } })
+    return route.fulfill({ status: 201, json: { id: 'membership', ...payload, cashboxPosted: !state.disabled } })
+  })
+  await page.route('**/api/payments/shifts/current', route => route.fulfill({ json: null }))
+  await page.route('**/api/finance/summary?*', route => {
+    const cash = state.receipts.filter(row => row.method === 'CASH').reduce((sum, row) => sum + Number(row.amount), 0)
+    const card = state.receipts.filter(row => row.method === 'CARD').reduce((sum, row) => sum + Number(row.amount), 0)
+    return route.fulfill({ json: { totalCash: cash, totalCard: card, totalRevenue: cash + card, balanceCash: cash, balanceCard: card, balanceTotal: cash + card,
+      totalExpenses: 0, totalExpensesCash: 0, totalExpensesCard: 0, netTotal: cash + card, operationsCount: state.receipts.length, operations: state.receipts } })
+  })
+  return state
+}
+async function fillSale(page: Page) {
+  await page.goto(`/memberships/new?clientId=${saleClientId}`)
+  const drawer = page.getByRole('dialog', { name: 'Продажа абонемента', exact: true })
+  await expect(drawer.locator('.ant-select-selection-item').first()).toContainText('Анна Орлова')
+  const service = drawer.getByRole('combobox', { name: 'Услуга', exact: true })
+  await expect(service).toBeEnabled()
+  await service.focus(); await service.press('ArrowDown')
+  await expect(page.locator('.ant-select-dropdown:visible').getByText(/Выездка/)).toBeVisible()
+  await expect.poll(async () => {
+    const popup = await page.locator('.ant-select-dropdown:visible').boundingBox()
+    return popup ? popup.x + popup.width : Infinity
+  }).toBeLessThanOrEqual(page.viewportSize()!.width + 1)
+  await page.screenshot({ path: `test-results/membership-service-popup-${page.viewportSize()!.width}.png` })
+  await service.press('Enter')
+  await drawer.getByRole('button', { name: '8 занятий', exact: true }).click()
+  await expect(drawer.getByRole('spinbutton', { name: 'Итоговая стоимость к оплате (₽)', exact: true })).toHaveValue('10001.20')
+  return drawer
+}
+
+for (const [method, width] of [['CASH', 1280], ['CARD', 390]] as const) test(`membership sale ${method} at ${width}px posts discounted payment to cash book`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 850 })
+  const state = await setupSale(page)
+  await page.addInitScript(() => { window.addEventListener('cash-desk-paid', () => sessionStorage.setItem('sale-event', 'paid')) })
+  const drawer = await fillSale(page)
+  await drawer.getByRole('spinbutton', { name: 'Итоговая стоимость к оплате (₽)', exact: true }).fill('9500.25')
+  if (method === 'CARD') await drawer.getByText('Безналичные', { exact: true }).click()
+  await expect(drawer.getByText(/Сумма .* будет автоматически учтена/)).toBeVisible()
+  await page.screenshot({ path: `test-results/membership-sale-${width}.png`, fullPage: true })
+  await drawer.getByRole('button', { name: 'Создать абонемент', exact: true }).click()
+  await expect(page.getByText(/Абонемент оформлен, оплата .* проведена в кассу/)).toBeVisible()
+  await expect(page).toHaveURL(/\/memberships$/)
+  expect(state.posts[0]).toMatchObject({ clientId: saleClientId, serviceId: saleServiceId, totalLessons: 8, totalPrice: 9500.25, paymentMethod: method })
+  expect(await page.evaluate(() => sessionStorage.getItem('sale-event'))).toBe('paid')
+  await page.goto('/cash-desk')
+  await expect(page.getByText('Выездка', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(/9\s500,25/).first()).toBeVisible()
+  await expect(page.getByText(method === 'CASH' ? 'Наличные' : 'Карта', { exact: true }).first()).toBeVisible()
+  expect(state.receipts).toHaveLength(1)
+  expect(state.receipts[0].method).toBe(method)
+})
+
+test('membership sale uncertain retry keeps the same payload and operation key', async ({ page }) => {
+  const state = await setupSale(page)
+  const drawer = await fillSale(page)
+  state.fail = true
+  await drawer.getByRole('button', { name: 'Создать абонемент', exact: true }).click()
+  await expect(drawer.getByRole('alert').first()).toContainText('Повторите продажу')
+  await expect(drawer.getByRole('combobox', { name: 'Услуга', exact: true })).toBeDisabled()
+  state.fail = false
+  await drawer.getByRole('button', { name: 'Повторить продажу', exact: true }).click()
+  await expect(page).toHaveURL(/\/memberships$/)
+  expect(state.posts).toHaveLength(2)
+  expect(state.posts[0]).toEqual(state.posts[1])
+  expect(state.receipts).toHaveLength(1)
+})
+
+test('membership sale with cashbox disabled explains absence of a cash receipt', async ({ page }) => {
+  const state = await setupSale(page); state.disabled = true
+  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'ADMIN', modules: [{ module: 'CASHBOX', isEnabled: false, accessLevel: 'FULL' }] } }))
+  const drawer = await fillSale(page)
+  await expect(drawer.getByText('Касса клуба отключена. Абонемент будет оформлен без кассовой операции.')).toBeVisible()
+  await drawer.getByRole('button', { name: 'Создать абонемент', exact: true }).click()
+  await expect(page.getByText('Абонемент оформлен. Касса клуба отключена, приход не создан.')).toBeVisible()
+  expect(state.receipts).toHaveLength(0)
+})
+
+test('membership sale read-only cash access prevents submission', async ({ page }) => {
+  await setupSale(page)
+  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'ADMIN', modules: [{ module: 'CASHBOX', isEnabled: true, accessLevel: 'READ_ONLY' }] } }))
+  await page.goto('/memberships/new')
+  await expect(page.getByRole('button', { name: 'Создать абонемент', exact: true })).toBeDisabled()
+})
+
+test('membership sale handles empty catalogue, error retry and manual lesson count', async ({ page }) => {
+  await setupSale(page)
+  let error = true
+  await page.route('**/api/services?*', route => error ? route.fulfill({ status: 500, json: { message: 'Нет связи' } }) : route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
+  await page.goto('/memberships/new')
+  await expect(page.getByText('Не удалось загрузить услуги', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Создать абонемент', exact: true })).toBeDisabled()
+  error = false
+  await page.getByRole('button', { name: 'Повторить', exact: true }).click()
+  const service = page.getByRole('combobox', { name: 'Услуга', exact: true })
+  await service.focus(); await service.press('ArrowDown')
+  await expect(page.getByText('Нет услуг для продажи абонемента', { exact: true })).toBeVisible()
+  await service.press('Escape')
+  await page.getByRole('button', { name: 'Создать абонемент', exact: true }).click()
+  await expect(page.getByText('Выберите услугу', { exact: true }).last()).toBeVisible()
+  await setupSale(page)
+  const drawer = await fillSale(page)
+  await drawer.getByRole('spinbutton', { name: 'Количество занятий', exact: true }).fill('5')
+  await expect(drawer.getByRole('spinbutton', { name: 'Итоговая стоимость к оплате (₽)', exact: true })).toHaveValue('6250.75')
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Закрыть продажу абонемента?', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click()
+  await expect(drawer.getByRole('spinbutton', { name: 'Количество занятий', exact: true })).toHaveValue('5')
 })
 
 test('issue membership opens the existing form with the correct client selected', async ({ page }) => {

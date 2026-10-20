@@ -21,6 +21,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     candidate.modules.every(row => typeof row.isEnabled === 'boolean' && ['FULL', 'READ_ONLY', 'HIDDEN'].includes(row.accessLevel)) ? candidate : undefined
   const permission = (module: SystemModule) => snapshot?.modules.find(row => row.module === module && row.isEnabled)
   return <PermissionsContext.Provider value={{ loading: isLoading || query.isLoading, error: query.isError || query.isSuccess && !snapshot,
+    isEnabled: module => Boolean(permission(module)),
     canRead: module => Boolean(permission(module) && permission(module)?.accessLevel !== 'HIDDEN'),
     canWrite: module => permission(module)?.accessLevel === 'FULL', refresh: refetch }}>{children}</PermissionsContext.Provider>
 }

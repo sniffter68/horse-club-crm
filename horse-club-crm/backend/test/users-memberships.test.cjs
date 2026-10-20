@@ -29,10 +29,15 @@ test('membership issue creates balance and initial CREDIT operation atomically',
       return { id: 'membership-1', ...data, client: { id: 'client-1', name: 'Иван Иванов' }, pricingPlan: null, createdAt: new Date(), updatedAt: new Date() };
     } },
   };
+  prisma.ledgerTransaction = { create: async () => ({}) };
+  prisma.$transaction = async callback => callback(prisma);
+  prisma.clubModuleSettings = { findUnique: async () => ({ isEnabled: false }) };
   const validUntil = new Date(Date.now() + 86_400_000).toISOString();
-  const result = await new MembershipsService(prisma).create({ clientId: 'client-1', totalLessons: 8, validUntil });
+  const result = await new MembershipsService(prisma).create({ clientId: 'client-1', totalLessons: 8, validUntil, pricePerLesson: 3000, totalPrice: 24000, paymentMethod: 'CASH' }, { id: 'admin', role: 'ADMIN' });
   assert.equal(saved.totalLessons, 8);
   assert.equal(saved.remainedLessons, 8);
-  assert.deepEqual(saved.operations.create, { type: 'CREDIT', amount: 8, reason: 'Initial membership issue' });
+  assert.equal(saved.operations.create.type, 'CREDIT');
+  assert.equal(saved.operations.create.amount, 8);
+  assert.equal(saved.operations.create.reason, 'Выдача абонемента');
   assert.equal(result.isActive, true);
 });

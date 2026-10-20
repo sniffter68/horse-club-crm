@@ -1,5 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
+import { createHash, randomUUID } from 'node:crypto';
+import { DateTime } from 'luxon';
+import type { AuthUser } from '../auth/auth.types';
+import { defaultModuleAccess } from '../settings/module-access.service';
+import { isSerializationFailure } from '../common/serialization-failure';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { parseRefineQuery, type PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
@@ -62,35 +67,84 @@ export class MembershipsService {
     return this.withActive(membership);
   }
 
-  async create(dto: CreateMembershipDto): Promise<MembershipResponse> {
-    const client = await this.prisma.client.findUnique({ where: { id: dto.clientId }, select: { id: true } });
-    if (!client) throw new NotFoundException('Client not found');
-    const plan = dto.pricingPlanId
-      ? await this.prisma.pricingPlan.findUnique({ where: { id: dto.pricingPlanId } })
-      : null;
-    if (dto.pricingPlanId && !plan) throw new NotFoundException('Pricing plan not found');
-    if (!plan && (dto.totalLessons === undefined || !dto.validUntil)) {
-      throw new BadRequestException('totalLessons and validUntil are required without pricingPlanId');
+  async create(dto: CreateMembershipDto, actor: AuthUser): Promise<MembershipResponse> {
+    const fingerprint = createHash('sha256').update(JSON.stringify([
+      actor.id, dto.clientId, dto.serviceId, dto.pricingPlanId, dto.totalLessons,
+      dto.validUntil, dto.pricePerLesson, dto.totalPrice, dto.paymentMethod, dto.reason?.trim(),
+    ])).digest('hex');
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.prisma.$transaction(async tx => {
+          if (dto.requestId) {
+            await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${dto.requestId}, 0))::text`;
+            const previous = await tx.membership.findUnique({ where: { saleRequestId: dto.requestId }, include: membershipInclude });
+            if (previous) {
+              if (previous.saleFingerprint !== fingerprint) throw new ConflictException('Ключ продажи уже использован с другими данными');
+              return this.withActive(previous);
+            }
+          }
+          const cashbox = await tx.clubModuleSettings.findUnique({ where: { module: 'CASHBOX' } });
+          const cashboxEnabled = cashbox?.isEnabled ?? true;
+          if (cashboxEnabled && actor.role !== 'ADMIN') {
+            const permission = await tx.roleModulePermission.findUnique({ where: { role_module: { role: actor.role, module: 'CASHBOX' } } });
+            if ((permission?.accessLevel ?? defaultModuleAccess(actor.role, 'CASHBOX')) !== 'FULL')
+              throw new ForbiddenException('Для продажи с оплатой требуется полный доступ к кассе');
+          }
+          const client = await tx.client.findUnique({ where: { id: dto.clientId }, select: { id: true } });
+          if (!client) throw new NotFoundException('Клиент не найден');
+          const plan = dto.pricingPlanId ? await tx.pricingPlan.findUnique({ where: { id: dto.pricingPlanId } }) : null;
+          if (dto.pricingPlanId && !plan) throw new NotFoundException('Тариф не найден');
+          const service = dto.serviceId ? await tx.service.findUnique({ where: { id: dto.serviceId } }) : null;
+          if (dto.serviceId && !service) throw new NotFoundException('Услуга не найдена');
+          if (service && !service.allowMembership) throw new BadRequestException('Услуга недоступна по абонементу');
+          const totalLessons = dto.totalLessons ?? plan?.totalLessons;
+          if (!totalLessons || !Number.isInteger(totalLessons) || totalLessons < 1 || totalLessons > 10000)
+            throw new BadRequestException('Укажите количество занятий от 1 до 10000');
+          const validUntil = dto.validUntil ? new Date(dto.validUntil) : plan ? this.addDays(plan.validDays) : null;
+          if (!validUntil || !Number.isFinite(validUntil.getTime()) || validUntil <= new Date())
+            throw new BadRequestException('Укажите будущую дату окончания');
+          const basePrice = service?.price ?? dto.pricePerLesson ?? (plan ? new Prisma.Decimal(plan.price).div(totalLessons).toDecimalPlaces(2) : undefined);
+          if (basePrice === undefined) throw new BadRequestException('Выберите услугу или укажите базовую цену');
+          const pricePerLesson = new Prisma.Decimal(basePrice);
+          const totalPrice = new Prisma.Decimal(dto.totalPrice);
+          if ([pricePerLesson, totalPrice].some(price => !price.isFinite() || price.lt(0) || price.decimalPlaces() > 2 || price.gt('9999999999.99')))
+            throw new BadRequestException('Укажите корректную стоимость с точностью до копеек');
+          if (!['CASH', 'CARD'].includes(dto.paymentMethod)) throw new BadRequestException('Выберите наличную или безналичную оплату');
+          const title = service?.title || service?.name || plan?.name || 'Индивидуальный абонемент';
+          const description = `Оплата абонемента: ${title} (${totalLessons} зан.)`;
+          const creditId = randomUUID();
+          const creditReason = dto.reason?.trim() || 'Выдача абонемента';
+          const membership = await tx.membership.create({ data: {
+            clientId: client.id, pricingPlanId: plan?.id, serviceId: service?.id, serviceTitle: title,
+            title, totalLessons, remainedLessons: totalLessons, initialUnits: totalLessons, remainingUnits: totalLessons,
+            validUntil, validTo: validUntil, pricePerLesson, totalPrice, paymentMethod: dto.paymentMethod,
+            saleRequestId: dto.requestId, saleFingerprint: fingerprint, soldById: actor.id, cashboxPosted: cashboxEnabled,
+            operations: { create: { id: creditId, type: 'CREDIT', amount: totalLessons, reason: creditReason } },
+          }, include: membershipInclude });
+          await tx.ledgerTransaction.create({ data: {
+            clientId: client.id, membershipId: membership.id, sourceMembershipOpId: creditId,
+            transactionType: 'purchase', amount: totalLessons, description: creditReason,
+          } });
+          if (cashboxEnabled) {
+            const shift = await tx.cashShift.findFirst({ where: { cashierId: actor.id, closedAt: null } });
+            const payment = await tx.payment.create({ data: {
+              clientId: client.id, membershipId: membership.id, serviceId: service?.id,
+              amount: totalPrice, method: dto.paymentMethod, status: 'PAID', paidAt: new Date(),
+              cashierId: actor.id, shiftId: shift?.id, serviceType: 'MEMBERSHIP', description,
+            } });
+            await tx.ledgerTransaction.create({ data: {
+              clientId: client.id, membershipId: membership.id, cashDeskPaymentId: payment.id,
+              transactionType: 'purchase', amount: totalPrice, description,
+            } });
+          }
+          return this.withActive(membership);
+        }, { isolationLevel: 'Serializable' });
+      } catch (error) {
+        const duplicateRequest = dto.requestId && error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+        if ((isSerializationFailure(error) || duplicateRequest) && attempt < 4) continue;
+        throw error;
+      }
     }
-    const totalLessons = plan?.totalLessons ?? dto.totalLessons!;
-    const validUntil = plan ? this.addDays(plan.validDays) : new Date(dto.validUntil!);
-    if (!Number.isFinite(validUntil.getTime()) || validUntil <= new Date()) throw new BadRequestException('validUntil must be in the future');
-    const membership = await this.prisma.membership.create({
-      data: {
-        clientId: client.id, pricingPlanId: plan?.id, totalLessons, remainedLessons: totalLessons, validUntil,
-        operations: { create: { type: 'CREDIT', amount: totalLessons, reason: dto.reason?.trim() || 'Initial membership issue' } },
-        ...(plan && Number(plan.price) > 0 ? {
-          payments: { create: {
-            clientId: client.id,
-            amount: plan.price,
-            method: PaymentMethod.UNSPECIFIED,
-            status: PaymentStatus.PENDING,
-            description: `Продажа абонемента: ${plan.name}`,
-          } },
-        } : {}),
-      }, include: membershipInclude,
-    });
-    return this.withActive(membership);
   }
 
   findPricingPlans() {
@@ -98,7 +152,7 @@ export class MembershipsService {
   }
 
   private addDays(days: number): Date {
-    const date = new Date(); date.setUTCDate(date.getUTCDate() + days); return date;
+    return DateTime.now().setZone('Europe/Moscow').plus({ days }).toJSDate();
   }
   private withActive<T extends { remainedLessons: number; validUntil: Date }>(membership: T): T & { isActive: boolean } {
     return { ...membership, isActive: membership.remainedLessons > 0 && membership.validUntil >= new Date() };
