@@ -9,7 +9,7 @@ const { CompleteLessonDto } = require('../dist/lessons/dto/lesson-payment.dto');
 const actor = { id: '11111111-1111-4111-8111-111111111111', role: 'ADMIN', email: 'admin@test.local' };
 const decimal = value => new Prisma.Decimal(value ?? 0);
 
-function harness({ enabled = true, failLedger = false, role = 'ADMIN', cost = 1500 } = {}) {
+function harness({ enabled = true, failLedger = false, role = 'ADMIN', cost = 1500, isPerPerson = false } = {}) {
   let state = { lesson: null, payments: [], ledger: [] };
   let serial = Promise.resolve();
   const prisma = { $transaction: (work, options) => {
@@ -19,7 +19,7 @@ function harness({ enabled = true, failLedger = false, role = 'ADMIN', cost = 15
       const draft = { ...state, lesson: state.lesson && { ...state.lesson, bookings: state.lesson.bookings.map(b => ({ ...b })) }, payments: [...state.payments], ledger: [...state.ledger] };
       const details = () => ({ ...draft.lesson, bookings: draft.lesson.bookings.map(b => ({ ...b, payments: draft.payments.filter(p => p.bookingId === b.id && p.status === 'PAID') })) });
       const tx = {
-        service: { findUnique: async () => ({ id: 'service', durationMinutes: 60, price: cost, maxCapacity: 1, allowMembership: true, name: 'Тренировка' }) },
+        service: { findUnique: async () => ({ id: 'service', isPerPerson, durationMinutes: 60, price: cost, maxCapacity: 1, allowMembership: true, name: 'Тренировка' }) },
         clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] }) },
         clubModuleSettings: { findUnique: async () => ({ isEnabled: enabled }) },
         roleModulePermission: { findUnique: async () => ({ accessLevel: 'READ_ONLY' }) },
@@ -129,4 +129,55 @@ test('DTOs transform amounts and empty optional UUID/enums, reject invalid preci
   for (const body of [{ customAmount: -1 }, { customAmount: 0.001 }, { payRemaining: 'false' }, { paymentMethod: 'TRANSFER' }]) {
     await assert.rejects(pipe.transform(body, { type: 'body', metatype: CompleteLessonDto }), error => error.getStatus() === 400);
   }
+});
+
+
+test('excursion without horse snapshots 25 guests at 500 and collects 3000 + 9500', async () => {
+  const h = harness();
+  const lesson = await h.create(3000, { cost: undefined, participantsCount: 25, pricePerPerson: 500 });
+  assert.equal(lesson.bookings[0].horseId ?? null, null);
+  assert.equal(lesson.participantsCount, 25);
+  assert.equal(lesson.pricePerPerson.toString(), '500');
+  assert.equal(lesson.cost.toString(), '12500');
+  assert.equal(lesson.bookings[0].costAmount.toString(), '12500');
+  assert.equal(h.state().payments[0].amount.toString(), '3000');
+  await h.complete();
+  assert.equal(h.state().payments[1].amount.toString(), '9500');
+  assert.equal(h.state().lesson.paymentStatus, 'PAID');
+  assert.equal(h.state().ledger.length, 2);
+});
+
+test('group manual cost override and a single guest preserve the per-person rate', async () => {
+  const h = harness();
+  const lesson = await h.create(0, { cost: 12000, participantsCount: 25, pricePerPerson: 500 });
+  assert.equal(lesson.cost.toString(), '12000');
+  const single = harness();
+  assert.equal((await single.create(0, { cost: undefined, participantsCount: 1, pricePerPerson: 500 })).cost.toString(), '500');
+});
+
+test('group DTO transforms numeric strings and rejects out-of-range counts and rates', async () => {
+  const pipe = new ValidationPipe({ transform: true, whitelist: true });
+  const body = { trainerId: actor.id, serviceId: actor.id, clientId: actor.id, horseId: '', startTime: '2026-10-20T10:00:00Z', participantsCount: '25', pricePerPerson: '500' };
+  const result = await pipe.transform(body, { type: 'body', metatype: CreateLessonDto });
+  assert.equal(result.participantsCount, 25); assert.equal(result.pricePerPerson, 500);
+  for (const patch of [{ participantsCount: 0 }, { participantsCount: 101 }, { participantsCount: 1.5 }, { pricePerPerson: -1 }, { pricePerPerson: 0.001 }]) {
+    await assert.rejects(pipe.transform({ ...body, ...patch }, { type: 'body', metatype: CreateLessonDto }));
+  }
+});
+
+test('per-person catalog price is used without a submitted rate and keeps the full pending debt', async () => {
+  const h = harness({ cost: 500, isPerPerson: true });
+  const lesson = await h.create(0, { cost: undefined, participantsCount: 100 });
+  assert.equal(lesson.cost.toString(), '50000');
+  assert.equal(lesson.pricePerPerson.toString(), '500');
+  assert.equal(lesson.bookings[0].costAmount.toString(), '50000');
+  assert.equal(h.state().payments.length, 0);
+  await h.complete();
+  assert.equal(h.state().payments[0].amount.toString(), '50000');
+});
+test('excursions cannot charge an organizer membership or accept multiple payers', async () => {
+  const h = harness({ isPerPerson: true });
+  await assert.rejects(h.create(0, { cost: undefined, membershipId: 'membership' }));
+  await assert.rejects(h.create(0, { cost: undefined, clientId: undefined, participants: [{ clientId: 'a' }, { clientId: 'b' }] }));
+  assert.equal(h.state().lesson, null);
 });

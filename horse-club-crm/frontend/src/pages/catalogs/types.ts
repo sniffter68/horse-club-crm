@@ -49,7 +49,7 @@ export interface Trainer extends Omit<TrainerValues, 'baseRate' | 'phone' | 'qua
 }
 export interface ServiceValues extends PublicationValues {
   name?: string; title: string; durationMinutes: number; maxCapacity: number;
-  price?: number; cancellationWindowHours: number; allowMembership: boolean;
+  isPerPerson?: boolean; price?: number; cancellationWindowHours: number; allowMembership: boolean;
 }
 export interface Service extends Omit<ServiceValues, 'price'> { id: string; price?: string | number }
 export interface ArenaValues { name: string; description?: string; capacity: number; isUnavailable: boolean }

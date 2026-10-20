@@ -14,6 +14,7 @@ export function ServiceForm({ action }: { action: 'create' | 'edit' }) {
     <NumberField name="maxCapacity" label="Вместимость" min={1} max={1000} />
     {canManage && <NumberField name="price" label="Цена, ₽" precision={2} max={9999999999.99} />}
     <NumberField name="cancellationWindowHours" label="Окно бесплатной отмены, ч" max={8760} />
+    <BooleanField name="isPerPerson" label="Цена за одного участника" />
     <BooleanField name="allowMembership" label="Разрешена оплата абонементом" />
     <PublicationFields />
   </CatalogForm>

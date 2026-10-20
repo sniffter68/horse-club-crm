@@ -6,7 +6,8 @@ const client = { id: id(1), name: 'Анна Орлова', firstName: 'Анна'
 const trainer = { id: id(2), name: 'Мария' }
 const service = { id: id(3), title: 'Разовая тренировка', name: 'Разовая тренировка', price: '1500', durationMinutes: 60, maxCapacity: 1, allowMembership: false }
 
-async function setup(page: Page, prepaid?: number) {
+async function setup(page: Page, prepaid?: number, group = false) {
+  const selectedService = group ? { ...service, title: 'Экскурсия', name: 'Экскурсия', isPerPerson: true, price: '500' } : service
   await page.clock.setFixedTime(new Date('2026-10-20T08:00:00Z'))
   await page.addInitScript(() => {
     localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.role', 'ADMIN'); localStorage.setItem('horsecrm.email', 'qa@example.com')
@@ -16,7 +17,7 @@ async function setup(page: Page, prepaid?: number) {
     trainer, service, arena: null, cost: 1500, prepaymentAmount: amount, prepaymentMethod: 'CASH', finalPaymentAmount: 0,
     paymentStatus: amount === 1500 ? 'PAID' : amount ? 'PARTIALLY_PAID' : 'UNPAID', bookings: [{ id: id(5), client, horse: null, membership: null, costAmount: 1500 }] })
   if (prepaid !== undefined) state.lesson = makeLesson(prepaid)
-  for (const [resource, rows] of Object.entries({ clients: [client], trainers: [trainer], services: [service], horses: [], arenas: [] })) {
+  for (const [resource, rows] of Object.entries({ clients: [client], trainers: [trainer], services: [selectedService], horses: [], arenas: [] })) {
     await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } }))
   }
   await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } }))
@@ -28,6 +29,11 @@ async function setup(page: Page, prepaid?: number) {
   await page.route('**/api/lessons', async route => {
     const body = route.request().postDataJSON(); state.posts.push(body)
     state.lesson = { ...makeLesson(body.prepaymentAmount ?? 0), startTime: body.startTime, endTime: new Date(+new Date(body.startTime) + body.durationMinutes * 60000).toISOString() }
+    state.lesson.service = selectedService
+    state.lesson.cost = body.cost
+    state.lesson.participantsCount = body.participantsCount
+    state.lesson.pricePerPerson = body.pricePerPerson
+    state.lesson.bookings[0].costAmount = body.cost
     if (body.prepaymentAmount) state.receipts.push({ id: id(6), amount: body.prepaymentAmount, method: body.prepaymentMethod, description: 'Предоплата за занятие' })
     return route.fulfill({ status: 201, json: state.lesson })
   })
@@ -35,8 +41,8 @@ async function setup(page: Page, prepaid?: number) {
     if (state.fail) return route.fulfill({ status: 500, json: { message: 'Не удалось провести доплату' } })
     const body = route.request().postDataJSON(); state.posts.push(body)
     const lesson = state.lesson!
-    if (body.payRemaining && lesson.status !== 'COMPLETED' && Number(lesson.prepaymentAmount) < 1500) {
-      lesson.finalPaymentAmount = 1500 - Number(lesson.prepaymentAmount); lesson.paymentStatus = 'PAID'
+    if (body.payRemaining && lesson.status !== 'COMPLETED' && Number(lesson.prepaymentAmount) < Number(lesson.cost)) {
+      lesson.finalPaymentAmount = Number(lesson.cost) - Number(lesson.prepaymentAmount); lesson.paymentStatus = 'PAID'
       state.receipts.push({ id: id(7), amount: Number(lesson.finalPaymentAmount), method: body.paymentMethod, description: 'Доплата за занятие' })
     }
     lesson.status = 'COMPLETED'
@@ -57,6 +63,41 @@ async function choose(page: Page, form: Locator, label: string, text: string) {
   await form.getByRole('combobox', { name: new RegExp(`${label}$`) }).click()
   await page.locator('.ant-select-dropdown:visible').getByText(text, { exact: true }).click()
 }
+
+for (const width of [1440, 390]) test(`excursion for 20 guests calculates total and posts prepayment at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 1000 })
+  const state = await setup(page, undefined, true)
+  await page.goto('/schedule')
+  await page.getByRole('button', { name: 'Новое занятие', exact: true }).click()
+  const form = page.getByRole('dialog', { name: 'Быстрое бронирование' })
+  await choose(page, form, 'Услуга', 'Экскурсия')
+  await choose(page, form, 'Тренер', trainer.name)
+  await choose(page, form, 'Клиент', client.name)
+  await form.getByRole('button', { name: '20', exact: true }).click()
+  await expect(form.getByLabel('Количество участников')).toHaveValue('20')
+  await expect(form.getByLabel('Итоговая стоимость (₽)')).toHaveValue('10000.00')
+  await expect(form).toContainText('Для экскурсий выбор лошади необязателен')
+  await form.getByRole('switch', { name: 'Внесена предоплата' }).click()
+  await form.getByLabel('Сумма предоплаты (₽)').fill('3000')
+  await form.getByRole('button', { name: 'Создать занятие', exact: true }).click()
+  await expect(form).not.toBeVisible()
+  expect(state.posts[0]).toMatchObject({ participantsCount: 20, pricePerPerson: 500, cost: 10000, prepaymentAmount: 3000 })
+  expect(state.lesson?.bookings[0].horse).toBeNull()
+  await page.goto('/cash-desk')
+  await expect(page.getByText('Предоплата за занятие', { exact: true })).toBeVisible()
+  expect(state.receipts[0].amount).toBe(3000)
+  await page.goto('/schedule')
+  await page.locator('.fc-event').first().click()
+  await expect(page.getByRole('dialog', { name: 'Карточка занятия' })).toContainText('20 чел.')
+  await page.getByRole('button', { name: 'Отметить присутствие' }).click()
+  const completion = page.getByRole('dialog', { name: 'Занятие состоялось' })
+  await expect(completion).toContainText('7 000 ₽')
+  await completion.getByText('Оплачено картой', { exact: true }).click()
+  await page.screenshot({ path: `test-results/excursion-${width}.png`, fullPage: true, animations: 'disabled' })
+  await completion.getByRole('button', { name: 'Завершить занятие', exact: true }).click()
+  await expect(completion).not.toBeVisible()
+  expect(state.receipts.map(row => row.amount)).toEqual([3000, 7000])
+})
 
 for (const width of [1440, 390]) test(`cash prepayment and card completion appear in cashbox at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 })

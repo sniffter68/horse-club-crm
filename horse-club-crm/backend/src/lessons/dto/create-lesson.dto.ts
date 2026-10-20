@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { LessonPriceDto } from './lesson-payment.dto';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsISO8601, IsInt, IsOptional, IsUUID, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsISO8601, IsInt, IsNumber, IsOptional, IsUUID, Max, Min, ValidateNested } from 'class-validator';
 
 export class CreateLessonParticipantDto {
   @ApiProperty({ format: 'uuid' })
@@ -22,6 +22,21 @@ export class CreateLessonParticipantDto {
 }
 
 export class CreateLessonDto extends LessonPriceDto {
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  participantsCount?: number;
+
+  @ApiPropertyOptional({ minimum: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  pricePerPerson?: number;
+
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
   trainerId!: string;

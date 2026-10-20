@@ -235,7 +235,7 @@ export class LessonsService {
     const create = async (tx: Prisma.TransactionClient): Promise<LessonDetails> => {
       const service = await tx.service.findUnique({
         where: { id: dto.serviceId },
-        select: { durationMinutes: true, price: true, title: true, name: true, maxCapacity: true, allowMembership: true },
+        select: { durationMinutes: true, price: true, title: true, name: true, maxCapacity: true, allowMembership: true, isPerPerson: true },
       });
       if (!service) {
         throw new NotFoundException('Услуга не найдена');
@@ -246,7 +246,12 @@ export class LessonsService {
       if (participants.length > service.maxCapacity) {
         throw new BadRequestException(`Для услуги разрешено не более ${service.maxCapacity} участников`);
       }
-      const unitCost = money(dto.cost ?? service.price ?? 0);
+      const perPerson = service.isPerPerson || /экскурс|excursion/i.test(`${service.title} ${service.name}`) || dto.pricePerPerson != null || (dto.participantsCount ?? 1) > 1;
+      const participantsCount = perPerson ? dto.participantsCount ?? 1 : 1;
+      if (!Number.isInteger(participantsCount) || participantsCount < 1 || participantsCount > 100) throw new BadRequestException('Количество участников должно быть от 1 до 100');
+      if (perPerson && (participants.length !== 1 || participants[0].membershipId)) throw new BadRequestException('Для группового мероприятия укажите одного организатора без абонемента');
+      const pricePerPerson = perPerson ? money(dto.pricePerPerson ?? service.price ?? 0) : null;
+      const unitCost = money(dto.cost ?? pricePerPerson?.mul(participantsCount) ?? service.price ?? 0);
       const prepayment = money(dto.prepaymentAmount ?? 0);
       if (prepayment.gt(unitCost)) throw new BadRequestException('Предоплата не может превышать стоимость');
       if (prepayment.gt(0) && !dto.prepaymentMethod) throw new BadRequestException('Выберите способ предоплаты');
@@ -260,7 +265,7 @@ export class LessonsService {
         if (!arena) throw new NotFoundException('Манеж не найден');
         if (arena.isUnavailable) throw new ConflictException(`Манеж "${arena.name}" недоступен`);
         arenaCapacity = arena.capacity;
-        if (participants.length > arena.capacity) {
+        if ((perPerson ? participantsCount : participants.length) > arena.capacity) {
           throw new BadRequestException(`Вместимость манежа "${arena.name}" — ${arena.capacity} участников`);
         }
       }
@@ -290,7 +295,7 @@ export class LessonsService {
       }
       const schedule = await this.getClubSchedule(tx);
       this.assertClubWorkingHours(start, end, schedule);
-      const matchingLesson = participants.length
+      const matchingLesson = participants.length && !perPerson
         ? await tx.lesson.findFirst({
             where: {
               trainerId: dto.trainerId,
@@ -299,6 +304,7 @@ export class LessonsService {
               startTime: start,
               endTime: end,
               status: LessonStatus.SCHEDULED,
+              pricePerPerson: null,
             },
             select: {
               id: true, cost: true, prepaymentAmount: true, finalPaymentAmount: true,
@@ -346,7 +352,7 @@ export class LessonsService {
         arenaId: dto.arenaId ?? null,
         startTime: start,
         endTime: end,
-        costAmount: participant.membershipId || dto.cost == null ? service.price : unitCost,
+        costAmount: participant.membershipId || (!perPerson && dto.cost == null) ? service.price : unitCost,
         legacyLessonBinding: true,
         ...(prepayment.gt(0) ? { prepaymentAmount: prepayment, prepaymentMethod: dto.prepaymentMethod } : {}),
         clientId: participant.clientId,
@@ -355,7 +361,7 @@ export class LessonsService {
         ...(!participant.membershipId && unitCost.minus(prepayment).gt(0)
           ? { payments: { create: {
               clientId: participant.clientId,
-              amount: dto.cost == null && prepayment.isZero() ? service.price : unitCost.minus(prepayment),
+              amount: !perPerson && dto.cost == null && prepayment.isZero() ? service.price : unitCost.minus(prepayment),
               method: 'UNSPECIFIED' as const,
               status: 'PENDING' as const,
               description: `Начисление за занятие: ${service.title || service.name}`,
@@ -388,6 +394,8 @@ export class LessonsService {
           startTime: start,
           endTime: end,
           status: LessonStatus.SCHEDULED,
+          participantsCount,
+          pricePerPerson,
           cost: totalCost, prepaymentAmount: prepayment, prepaymentMethod: prepayment.gt(0) ? dto.prepaymentMethod : undefined,
           paymentStatus: paymentStatus(totalCost, prepayment),
           ...(participants.length

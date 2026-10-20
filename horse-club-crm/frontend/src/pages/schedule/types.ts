@@ -1,6 +1,7 @@
 import type { Arena, Client, Horse, Service, Trainer } from '../catalogs/types'
 export type Status = 'SCHEDULED' | 'COMPLETED' | 'NO_SHOW' | 'CANCELLED'
 export interface LessonMoney {
+  participantsCount?: number | null; pricePerPerson?: number | string | null;
   cost?: number | string | null; paymentStatus?: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID';
   prepaymentAmount?: number | string | null; prepaymentMethod?: string | null;
   finalPaymentAmount?: number | string | null; finalPaymentMethod?: string | null;
@@ -29,6 +30,7 @@ export interface BookingParticipantValues {
   clientId?: string; membershipId?: string; horseId?: string;
 }
 export interface BookingValues {
+  participantsCount?: number; pricePerPerson?: number;
   cost?: number; prepaymentAmount?: number; prepaymentMethod?: 'CASH' | 'CARD';
   participants: BookingParticipantValues[]; serviceId: string; trainerId: string; arenaId?: string; startTime: string; durationMinutes: number;
 }

@@ -1,11 +1,20 @@
 import { isUuid } from '../../uuid'
 import { useRef, useState } from 'react'
-import { Alert, App, Descriptions, Form, InputNumber, Modal, Radio, Space, Switch, Tag, Typography } from 'antd'
+import { Alert, App, Button, Descriptions, Form, InputNumber, Modal, Radio, Space, Switch, Tag, Typography } from 'antd'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { usePermissions } from '../../modulePermissions'
 import type { Lesson, LessonMoney } from './types'
 
 const rubles = (value: number | string | null | undefined) => `${Number(value ?? 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽`
+
+export function LessonGroupSummary({ lesson }: { lesson: LessonMoney }) {
+  if (lesson.pricePerPerson == null) return null
+  return <Typography.Paragraph>{lesson.service?.title || lesson.service?.name || 'Экскурсия'}: {lesson.participantsCount ?? 1} участников × {rubles(lesson.pricePerPerson)} = {rubles(Number(lesson.pricePerPerson) * (lesson.participantsCount ?? 1))}{Number(lesson.cost) !== Number(lesson.pricePerPerson) * (lesson.participantsCount ?? 1) ? ` · Итоговая стоимость: ${rubles(lesson.cost)}` : ''}</Typography.Paragraph>
+}
+
+export function LessonGroupBadge({ lesson }: { lesson: LessonMoney }) {
+  return lesson.pricePerPerson != null || (lesson.participantsCount ?? 1) > 1 ? <Tag color="blue">👥 {lesson.participantsCount ?? 1} чел.</Tag> : null
+}
 function lessonBalance(lesson: LessonMoney) {
   const cost = Number(lesson.cost ?? lesson.bookings?.filter(b => !b.membership && !b.membershipId).reduce((sum, b) => sum + Number(b.costAmount ?? lesson.service?.price ?? 0), 0) ?? 0)
   const prepayment = Number(lesson.prepaymentAmount ?? 0)
@@ -22,15 +31,26 @@ export function LessonPaymentBadge({ lesson }: { lesson: LessonMoney }) {
     : <Tag>Не оплачено</Tag>
 }
 
-export function LessonPriceFields({ price }: { price?: number | string }) {
+export function LessonPriceFields({ price, perPerson = false }: { price?: number | string; perPerson?: boolean }) {
   const form = Form.useFormInstance()
   const modules = usePermissions()
   const cost = Form.useWatch('cost', form) as number | undefined
   const prepayment = Form.useWatch('prepaymentAmount', form) as number | undefined
+  const count = Form.useWatch('participantsCount', form) as number | undefined
+  const rate = Form.useWatch('pricePerPerson', form) as number | undefined
+  const recalculate = (value: number | null) => form.setFieldsValue({ participantsCount: value, cost: value == null ? undefined : Math.round(Number(rate ?? price ?? 0) * value * 100) / 100 })
   const [enabled, setEnabled] = useState(false)
   const canPay = !modules.isEnabled('CASHBOX') || modules.canWrite('CASHBOX')
   return <>
-    <Form.Item name="cost" initialValue={Number(price ?? 0)} label="Стоимость услуги (₽)" rules={[{ required: true, message: 'Укажите стоимость' }, { type: 'number', min: 0, max: 9999999999.99, message: 'Укажите неотрицательную стоимость' }]}>
+    {perPerson && <>
+      <Form.Item name="participantsCount" initialValue={1} label="Количество участников" rules={[{ required: true, message: 'Укажите количество участников' }, { type: 'integer', min: 1, max: 100, message: 'Введите целое число от 1 до 100' }]}>
+        <InputNumber min={1} max={100} precision={0} onChange={recalculate} />
+      </Form.Item>
+      <Space wrap>{[10, 20, 25, 30].map(value => <Button key={value} onClick={() => recalculate(value)}>{value}</Button>)}</Space>
+      <Form.Item name="pricePerPerson" initialValue={Number(price ?? 0)} hidden><InputNumber /></Form.Item>
+      <Typography.Paragraph aria-live="polite">Цена за 1 участника: {rubles(rate ?? price)} · {rubles(rate ?? price)} × {count ?? 1} участников = {rubles(Number(rate ?? price ?? 0) * (count ?? 1))}</Typography.Paragraph>
+    </>}
+    <Form.Item name="cost" initialValue={Number(price ?? 0)} label={perPerson ? 'Итоговая стоимость (₽)' : 'Стоимость услуги (₽)'} rules={[{ required: true, message: 'Укажите стоимость' }, { type: 'number', min: 0, max: 9999999999.99, message: 'Укажите неотрицательную стоимость' }]}>
       <InputNumber min={0} max={9999999999.99} precision={2} style={{ width: '100%' }} />
     </Form.Item>
     <Space><Switch aria-label="Внесена предоплата" checked={enabled} disabled={!canPay} onChange={value => {
@@ -81,6 +101,7 @@ export function CompleteLessonModal({ lesson, onClose, onSaved }: { lesson: Less
     onCancel={() => { if (!busy) onClose() }} onOk={() => void save()}>
     {error && <Alert type="error" showIcon message={error} />}
     {oneOff ? <>
+      <LessonGroupSummary lesson={lesson} />
       <Descriptions column={1} items={[
         { key: 'cost', label: 'Стоимость', children: rubles(cost) },
         { key: 'prepayment', label: 'Предоплата', children: `${rubles(prepayment)}${prepayment > 0 ? lesson.prepaymentMethod === 'CASH' ? ' · Наличные' : ' · Безналичные' : ''}` },

@@ -207,6 +207,7 @@ model User {
 }
 
 model Service {
+  isPerPerson Boolean @default(false)
   memberships Membership[]
   isPublic Boolean @default(true)
   imageUrl String?
@@ -361,6 +362,8 @@ model VkConsent {
 }
 
 model Lesson {
+  participantsCount Int? @default(1)
+  pricePerPerson Decimal? @db.Decimal(12, 2)
   cost Decimal? @default(0) @db.Decimal(12, 2)
   paymentStatus LessonPaymentStatus @default(UNPAID)
   prepaymentAmount Decimal? @default(0) @db.Decimal(12, 2)

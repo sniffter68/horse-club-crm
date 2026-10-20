@@ -1,0 +1,1 @@
+export const isPerPersonService = (service?: { isPerPerson?: boolean; title?: string; name?: string }) => Boolean(service?.isPerPerson || /экскурс|excursion/i.test(`${service?.title} ${service?.name}`))

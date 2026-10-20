@@ -1,3 +1,4 @@
+import { isPerPersonService } from '../schedule/groupPricing'
 import { LessonPriceFields } from '../schedule/LessonPayments'
 import { isUuid } from '../../uuid'
 import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
@@ -24,7 +25,7 @@ import type { ClientWithMemberships, MembershipSummary } from '../schedule/types
 
 const stopPopupEscape = (event: { key: string; stopPropagation: () => void }) => { if (event.key === 'Escape') event.stopPropagation() }
 
-type LessonValues = { cost?: number; prepaymentAmount?: number; prepaymentMethod?: string; membershipId?: string; clientId: string; horseId: string; trainerId: string; serviceId: string; arenaId?: string; startTime: Dayjs; durationMinutes: number }
+type LessonValues = { participantsCount?: number; pricePerPerson?: number; cost?: number; prepaymentAmount?: number; prepaymentMethod?: string; membershipId?: string; clientId: string; horseId?: string; trainerId: string; serviceId: string; arenaId?: string; startTime: Dayjs; durationMinutes: number }
 
 function LessonDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [form] = Form.useForm<LessonValues>()
@@ -40,7 +41,8 @@ function LessonDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   const [memberships, setMemberships] = useState<MembershipSummary[]>([])
   const [membershipsLoading, setMembershipsLoading] = useState(false)
   const [membershipsError, setMembershipsError] = useState<string>()
-  const allowMembership = catalogs.services.find(row => row.id === serviceId)?.allowMembership
+  const perPerson = isPerPersonService(catalogs.services.find(row => row.id === serviceId))
+  const allowMembership = !perPerson && catalogs.services.find(row => row.id === serviceId)?.allowMembership
   useEffect(() => {
     const controller = new AbortController()
     void (async () => {
@@ -92,11 +94,11 @@ function LessonDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     </Form.Item>
     <Form.Item name="serviceId" label="Услуга" rules={required}><Select onInputKeyDown={stopPopupEscape} aria-label="Услуга" loading={catalogs.loading} showSearch optionFilterProp="label"
       options={catalogs.services.map(row => ({ value: row.id, label: row.title || row.name }))}
-      onChange={id => form.setFieldsValue({ durationMinutes: catalogs.services.find(row => row.id === id)?.durationMinutes ?? 60, cost: Number(catalogs.services.find(row => row.id === id)?.price ?? 0), prepaymentAmount: 0, prepaymentMethod: undefined })} /></Form.Item>
+      onChange={id => form.setFieldsValue({ participantsCount: 1, pricePerPerson: isPerPersonService(catalogs.services.find(row => row.id === id)) ? Number(catalogs.services.find(row => row.id === id)?.price ?? 0) : undefined, durationMinutes: catalogs.services.find(row => row.id === id)?.durationMinutes ?? 60, cost: Number(catalogs.services.find(row => row.id === id)?.price ?? 0), prepaymentAmount: 0, prepaymentMethod: undefined })} /></Form.Item>
     <Form.Item name="durationMinutes" label="Длительность, мин" initialValue={60} rules={[...required, { type: 'number', min: 1, max: 480 }]}><InputNumber min={1} max={480} precision={0} /></Form.Item>
     <Form.Item name="trainerId" label="Тренер" rules={required}><Select onInputKeyDown={stopPopupEscape} aria-label="Тренер" loading={catalogs.loading} showSearch optionFilterProp="label"
       options={catalogs.trainers.map(row => ({ value: row.id, label: row.fullName || row.name }))} /></Form.Item>
-    <Form.Item name="horseId" label="Лошадь" rules={required}><Select onInputKeyDown={stopPopupEscape} aria-label="Лошадь" loading={catalogs.loading || availability.loading} showSearch optionFilterProp="label"
+    <Form.Item name="horseId" label="Лошадь" rules={perPerson ? [] : required} extra={perPerson ? 'Для экскурсий выбор лошади необязателен' : undefined}><Select allowClear onInputKeyDown={stopPopupEscape} aria-label="Лошадь" loading={catalogs.loading || availability.loading} showSearch optionFilterProp="label"
       options={catalogs.horses.map(row => ({ value: row.id, label: row.name, disabled: !from || availability.loading || blockedHorse(row.id) }))} /></Form.Item>
     {horseId && blockedHorse(horseId) && <Alert type="warning" showIcon message="Лошадь недоступна или превышен дневной лимит. Выберите другую лошадь или время." />}
     <Form.Item name="arenaId" label="Манеж / локация"><Select onInputKeyDown={stopPopupEscape} allowClear showSearch optionFilterProp="label" loading={catalogs.loading}
@@ -105,7 +107,7 @@ function LessonDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
       <Select allowClear loading={membershipsLoading} placeholder="Без абонемента" options={memberships.map(membership => ({ value: membership.id, label: `${membership.pricingPlan?.name || membership.title || 'Абонемент'} · Осталось: ${membership.remainedLessons}` }))} />
     </Form.Item>}
     {membershipsError && <Alert type="error" showIcon message={membershipsError} />}
-    {serviceId && !membershipId && <LessonPriceFields key={serviceId} price={catalogs.services.find(row => row.id === serviceId)?.price} />}
+    {serviceId && !membershipId && <LessonPriceFields key={serviceId} perPerson={perPerson} price={catalogs.services.find(row => row.id === serviceId)?.price} />}
   </StableEntryModal>
 }
 

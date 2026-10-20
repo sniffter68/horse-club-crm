@@ -27,7 +27,7 @@ export interface ScheduleEntry {
   id: string; source: 'lesson' | 'booking'; startTime: string; endTime: string;
   trainerId: string; trainerName: string; arenaId?: string; arenaName?: string;
   horses: { id: string; name: string; restMinutes: number }[];
-  riders: string[]; discipline: string; status: string; active: boolean; completed: boolean;
+  riders: string[]; participantsCount?: number; discipline: string; status: string; active: boolean; completed: boolean;
 }
 export const clientName = (client: Pick<Client, 'id' | 'firstName' | 'lastName' | 'name'>) => [client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || client.id
 export const bookingStatusLabels: Record<TriadStatus, string> = { scheduled: 'Запланировано', completed: 'Проведено', no_show: 'Неявка', cancelled_client: 'Отменено клиентом', cancelled_club: 'Отменено клубом', penalty_cancellation: 'Штрафная отмена' }
@@ -39,6 +39,7 @@ export function scheduleEntries(lessons: Lesson[], bookings: TriadBooking[]): Sc
     ...lessons.map(l => ({ id: l.id, source: 'lesson' as const, startTime: l.startTime, endTime: l.endTime,
       trainerId: l.trainer.id, trainerName: l.trainer.fullName || l.trainer.name, arenaId: l.arena?.id, arenaName: l.arena?.name,
       horses: [...new Map(l.bookings.flatMap(b => b.horse ? [[b.horse.id, { id: b.horse.id, name: b.horse.name, restMinutes: b.horse.requiredRestMinutes ?? b.horse.minRestMinutes ?? 45 }] as const] : [])).values()],
+      participantsCount: l.pricePerPerson != null ? l.participantsCount ?? 1 : undefined,
       riders: l.bookings.map(b => clientName(b.client)), discipline: l.service.title || l.service.name || 'Занятие', status: l.status,
       active: ['SCHEDULED', 'COMPLETED'].includes(l.status), completed: l.status === 'COMPLETED' })),
     ...bookings.map(b => ({ id: b.id, source: 'booking' as const, startTime: b.startTime, endTime: b.endTime,

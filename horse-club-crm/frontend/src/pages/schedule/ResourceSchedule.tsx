@@ -63,6 +63,7 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
                   aria-label={text} onClick={() => onOpen(entry)}>
                   <b>{clock(entry.startTime)}–{clock(entry.endTime)}</b><strong>{entry.horses.map(h => h.name).join(', ') || 'Без лошади'}</strong>
                   <span>{entry.trainerName} · {entry.riders.join(', ') || 'Нет участников'}</span><span>{entry.discipline}</span><small>{entryStatusLabel(entry)}</small>
+                  {entry.participantsCount != null && <span>👥 {entry.participantsCount} чел.</span>}
                 </button></Tooltip>
               })}
             </div>

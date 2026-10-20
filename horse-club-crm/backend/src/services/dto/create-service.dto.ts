@@ -1,8 +1,13 @@
 import { PublicationDto } from '../../common/dto/publication.dto';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class CreateServiceDto extends PublicationDto {
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  isPerPerson?: boolean;
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -12,6 +17,7 @@ export class CreateServiceDto extends PublicationDto {
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(1000)
@@ -19,6 +25,7 @@ export class CreateServiceDto extends PublicationDto {
 
   @ApiPropertyOptional({ default: 24 })
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   @Max(8760)
@@ -35,12 +42,14 @@ export class CreateServiceDto extends PublicationDto {
   name!: string;
 
   @ApiProperty({ example: 60 })
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(1440)
   durationMinutes!: number;
 
   @ApiProperty({ example: 3000 })
+  @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   price!: number;

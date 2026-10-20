@@ -1,4 +1,6 @@
-import { CompleteLessonModal, LessonPaymentBadge, LessonPriceFields } from './LessonPayments'
+import { isPerPersonService } from './groupPricing'
+import { EntryOverlay } from '../../components/EntryOverlay'
+import { LessonGroupBadge, LessonGroupSummary, CompleteLessonModal, LessonPaymentBadge, LessonPriceFields } from './LessonPayments'
 import { isUuid } from '../../uuid'
 import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { ReplaceHorseAction } from './ReplaceHorseAction'
@@ -45,6 +47,7 @@ function ParticipantEditor({ index, form, horses, participants, service, duratio
   report: (cause: unknown) => void
 }) {
   const selectedClient = Form.useWatch(['participants', index, 'clientId'], form) as string | undefined
+  const perPerson = isPerPersonService(service)
   const selectedHorse = Form.useWatch(['participants', index, 'horseId'], form) as string | undefined
   const [memberships, setMemberships] = useState<MembershipSummary[]>([])
   const [membershipsLoading, setMembershipsLoading] = useState(false)
@@ -58,7 +61,7 @@ function ParticipantEditor({ index, form, horses, participants, service, duratio
       await Promise.resolve()
       if (controller.signal.aborted) return
       setMemberships([]); setMembershipsError(undefined)
-      if (!selectedClient || !service?.allowMembership) {
+      if (!selectedClient || (!service?.allowMembership || perPerson)) {
         setMembershipsLoading(false)
         form.setFieldValue(['participants', index, 'membershipId'], undefined)
         return
@@ -84,7 +87,7 @@ function ParticipantEditor({ index, form, horses, participants, service, duratio
     }
     void loadMemberships()
     return () => controller.abort()
-  }, [form, index, readOnly, report, selectedClient, service?.allowMembership])
+  }, [form, index, readOnly, report, selectedClient, service?.allowMembership, perPerson])
 
   const selectedClientIds = participants.map(participant => participant?.clientId).filter(Boolean)
   const selectedHorseIds = participants.map(participant => participant?.horseId).filter(Boolean)
@@ -93,14 +96,14 @@ function ParticipantEditor({ index, form, horses, participants, service, duratio
     <Form.Item name={[index, 'clientId']} label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}>
       <ClientSelectWithCreate disabled={readOnly} excludedIds={selectedClientIds as string[]} />
     </Form.Item>
-    {service?.allowMembership && !readOnly && <Form.Item name={[index, 'membershipId']} label="Абонемент" extra="Активный абонемент с ближайшим сроком окончания выбирается автоматически.">
+    {service?.allowMembership && !isPerPersonService(service) && !readOnly && <Form.Item name={[index, 'membershipId']} label="Абонемент" extra="Активный абонемент с ближайшим сроком окончания выбирается автоматически.">
       <Select allowClear loading={membershipsLoading} placeholder={memberships.length ? 'Выберите абонемент' : 'Активных абонементов нет'} options={memberships.map(membership => ({
         value: membership.id,
         label: `${membership.pricingPlan?.name || 'Абонемент'} · ${membership.remainedLessons} / ${membership.totalLessons} · до ${membershipDate.format(new Date(membership.validUntil))}`,
       }))} />
     </Form.Item>}
     {membershipsError && <Alert type="error" showIcon message="Не удалось загрузить абонементы" description={membershipsError} />}
-    <Form.Item name={[index, 'horseId']} label="Лошадь участника" extra="Оставьте пустым для теоретического занятия или занятия без клубной лошади.">
+    <Form.Item name={[index, 'horseId']} label="Лошадь участника" extra={isPerPersonService(service) ? 'Для экскурсий выбор лошади необязателен' : 'Оставьте пустым для теоретического занятия или занятия без клубной лошади.'}>
       <Select disabled={readOnly} loading={workloadLoading} allowClear showSearch optionFilterProp="label" options={horses.map(row => {
         const load = workloads.find(item => item.horseId === row.id)
         return { value: row.id, label: `${row.name} — ${load ? `${load.currentWorkloadMinutes} / ${load.maxDailyWorkloadMinutes} мин` : workloadLoading ? 'загрузка…' : 'нагрузка недоступна'}`,
@@ -378,7 +381,7 @@ export function SchedulePage() {
           const lesson = lessons.find(item => item.id === event.id)
           if (!lesson) return null
           const date = toLocalInput(new Date(lesson.startTime)).slice(0, 10)
-          return <div className="schedule-event-content"><strong>{timeText}</strong><div>{lesson.service.title || lesson.service.name} · {lesson.trainer.name}</div><div>{lesson.bookings.map(b => personName(b.client)).join(', ')} · {statuses[lesson.status].label}</div><LessonPaymentBadge lesson={lesson} />
+          return <div className="schedule-event-content"><strong>{timeText}</strong><div>{lesson.service.title || lesson.service.name} · {lesson.trainer.name}</div><div>{lesson.bookings.map(b => personName(b.client)).join(', ')} · {statuses[lesson.status].label}</div><LessonGroupBadge lesson={lesson} /><LessonPaymentBadge lesson={lesson} />
             {lesson.bookings.filter(booking => booking.horse).map(booking => <div key={booking.id} className="schedule-event-horse">
               <span>{booking.horse?.name}</span><HorseWorkloadBadge date={date} workload={dayWorkloads.byDate[date]?.find(row => row.horseId === booking.horse?.id)} />
             </div>)}
@@ -401,11 +404,11 @@ export function SchedulePage() {
       {canManage && <BookingLifecycleActions disabled={triadLifecycleBusy} key={triadDetail.id} booking={triadDetail} report={report} onBusyChange={setTriadLifecycleBusy} onSaved={() => { setTriadDetail(undefined); setTriadLifecycleBusy(false); setRevision(r => r + 1) }} />}{canManage && <Button disabled={triadLifecycleBusy || triadDetail.status !== 'scheduled' || !ready} onClick={() => openTriad({ clientId: triadDetail.clientId, horseId: triadDetail.horseId, trainerId: triadDetail.trainerId,
         arenaId: triadDetail.arenaId, membershipId: triadDetail.membershipId ?? undefined, startTime: toLocalInput(new Date(triadDetail.startTime)), endTime: toLocalInput(new Date(triadDetail.endTime)), serviceType: triadDetail.serviceType, costAmount: Number(triadDetail.costAmount) }, triadDetail)}>Редактировать бронирование</Button>}</Space>}
     </Modal>
-    <Modal title={editingLesson ? 'Перенос занятия' : 'Быстрое бронирование'} open={bookingOpen} onCancel={() => { if (!saving) setBookingOpen(false) }} footer={null} forceRender width={720}>
+    <EntryOverlay variant="drawer" title={editingLesson ? 'Перенос занятия' : 'Быстрое бронирование'} open={bookingOpen} onCancel={() => { if (!saving) setBookingOpen(false) }} footer={null} forceRender width={720} keyboard={!saving} maskClosable={!saving} closable={!saving}>
       {failure}
       <Form form={form} noValidate layout="vertical" onFinish={createBooking} disabled={saving}>
         {editingLesson && <Typography.Paragraph type="secondary">Меняются только время и длительность. Переносимое занятие исключено из текущей нагрузки.</Typography.Paragraph>}
-        <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} onChange={id => form.setFieldsValue({ durationMinutes: services.find(row => row.id === id)?.durationMinutes, cost: Number(services.find(row => row.id === id)?.price ?? 0), prepaymentAmount: 0, prepaymentMethod: undefined })} /></Form.Item>
+        <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} onChange={id => form.setFieldsValue({ participantsCount: 1, pricePerPerson: isPerPersonService(services.find(row => row.id === id)) ? Number(services.find(row => row.id === id)?.price ?? 0) : undefined, durationMinutes: services.find(row => row.id === id)?.durationMinutes, cost: Number(services.find(row => row.id === id)?.price ?? 0), prepaymentAmount: 0, prepaymentMethod: undefined })} /></Form.Item>
         <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
         <Form.Item name="arenaId" label="Манеж" extra="Необязательно для выездного или теоретического занятия."><Select disabled={Boolean(editingLesson)} allowClear showSearch optionFilterProp="label" options={arenaOptions} /></Form.Item>
         <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><Input type="datetime-local" /></Form.Item>
@@ -437,20 +440,20 @@ export function SchedulePage() {
               onRemove={() => remove(field.name)}
               report={report}
             />)}
-            <Button onClick={() => add({})} disabled={Boolean(editingLesson) || !selectedServiceRecord || fields.length >= participantLimit}>Добавить участника</Button>
+            <Button onClick={() => add({})} disabled={Boolean(editingLesson) || !selectedServiceRecord || fields.length >= participantLimit || isPerPersonService(selectedServiceRecord)}>Добавить участника</Button>
             <Form.ErrorList errors={errors} />
           </Space>}
         </Form.List>
-        {!editingLesson && selectedServiceRecord && participants?.length === 1 && !participants[0]?.membershipId && <LessonPriceFields key={selectedService} price={selectedServiceRecord.price} />}
+        {!editingLesson && selectedServiceRecord && participants?.length === 1 && !participants[0]?.membershipId && <LessonPriceFields key={selectedService} perPerson={isPerPersonService(selectedServiceRecord)} price={selectedServiceRecord.price} />}
         {workloadBlocked && !bookingWorkloads.loading && !bookingWorkloads.error && <Typography.Paragraph type="danger" role="status">Выбранная лошадь недоступна или суточный лимит будет превышен.</Typography.Paragraph>}
         <Button type="primary" htmlType="submit" aria-label={editingLesson ? 'Сохранить перенос' : 'Создать занятие'} aria-busy={saving}
           loading={saving} disabled={!ready || workloadBlocked} style={{ marginTop: 16 }}>{editingLesson ? 'Сохранить перенос' : 'Создать занятие'}</Button>
       </Form>
-    </Modal>
+    </EntryOverlay>
     <Modal title="Карточка занятия" open={Boolean(detail)} keyboard={!saving} maskClosable={!saving} closable={!saving} onCancel={() => { if (!saving) setDetail(undefined) }} footer={null}>
       {failure}
       {detail && <Space direction="vertical" style={{ width: '100%' }}>
-        <LessonPaymentBadge lesson={detail} />
+        <LessonGroupBadge lesson={detail} /><LessonGroupSummary lesson={detail} /><LessonPaymentBadge lesson={detail} />
         <Tag className="status-badge" bordered={false} style={{ background: statuses[detail.status].background, color: statuses[detail.status].text }}>{statuses[detail.status].label}</Tag>
         <Descriptions column={1} items={[
           { key: 'service', label: 'Услуга', children: detail.service.title || detail.service.name },
