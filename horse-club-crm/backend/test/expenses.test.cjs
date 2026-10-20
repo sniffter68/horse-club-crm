@@ -35,6 +35,38 @@ test('Moscow business dates include the full final day; offsetless timestamps ar
   assert.equal(financeDate('2026-10-18', true).toISOString(), '2026-10-18T21:00:00.000Z');
   assert.throws(() => financeDate('2026-10-18T12:00:00'), e => e.status === 400);
 });
+
+for (const now of ['2026-10-19T21:05:00Z', '2026-10-20T20:59:59.999Z']) {
+  test(`expense date validation uses the whole Moscow day at ${now}`, async t => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.parse(now) });
+    const saved = [];
+    const service = new FinanceService({ $transaction: async (work, options) => {
+      assert.equal(options.isolationLevel, 'Serializable');
+      return work({
+        cashShift: { findFirst: async () => null },
+        expense: { create: async ({ data }) => { saved.push(data); return { id: randomUUID(), ...data }; } },
+      });
+    } });
+    for (const [date, expected] of [
+      ['2026-10-20', '2026-10-19T21:00:00.000Z'],
+      ['2026-10-19', '2026-10-18T21:00:00.000Z'],
+      ['2026-10-20T23:59:59.999+03:00', '2026-10-20T20:59:59.999Z'],
+      ['2026-10-20T20:59:59.999Z', '2026-10-20T20:59:59.999Z'],
+    ]) {
+      const dto = plainToInstance(CreateExpenseDto, { ...valid, date });
+      assert.equal((await validate(dto)).length, 0);
+      const expense = await service.create(dto, 'author');
+      assert.equal(expense.date.toISOString(), expected);
+      assert.equal(expense.createdById, 'author');
+    }
+    const withoutDate = await service.create(valid, 'author');
+    assert.equal(withoutDate.date.getTime(), Date.parse(now));
+    for (const date of ['2026-10-21', '2026-10-21T00:00:00+03:00', '2026-10-20T21:00:00Z']) {
+      assert.throws(() => service.create({ ...valid, date }, 'author'), e => e.status === 400 && e.message === 'Дата расхода не может быть в будущем');
+    }
+    assert.equal(saved.length, 5, 'future dates must not reach the transaction');
+  });
+}
 test('summary subtracts CASH/CARD expenses exactly and keeps cumulative balance independent of period and pagination', async () => {
   const queries = [];
   const service = new FinanceService({ $transaction: async (work, options) => {

@@ -110,6 +110,45 @@ for (const policy of ['disabled', 'hidden', 'read-only']) test(`${policy} module
   else await expect(page.getByTestId('dashboard-cash')).toBeVisible()
 })
 
+for (const day of ['today', 'yesterday', 'tomorrow']) test(`expense drawer validates ${day} by Moscow day across timezones`, async ({ page }) => {
+  await setup(page)
+  // It is already October 20 in Moscow, but still October 19 in UTC and New York.
+  await page.clock.setFixedTime(new Date('2026-10-19T21:05:00Z'))
+  const posts: Record<string, unknown>[] = []
+  await page.route('**/api/finance/expenses', route => {
+    posts.push(route.request().postDataJSON())
+    return route.fulfill({ status: 201, json: { id: 'expense', ...posts.at(-1) } })
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: '− Внести расход', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: 'Внесение расхода', exact: true })
+  const date = drawer.getByRole('textbox', { name: 'Дата расхода', exact: true })
+  await expect(date).toHaveValue('20.10.2026')
+  await date.click()
+  const calendar = page.locator('.ant-picker-dropdown:visible')
+  await expect(calendar.locator('[title="2026-10-20"]')).not.toHaveClass(/ant-picker-cell-disabled/)
+  await expect(calendar.locator('[title="2026-10-21"]')).toHaveClass(/ant-picker-cell-disabled/)
+  await calendar.locator(`[title="${day === 'yesterday' ? '2026-10-19' : '2026-10-20'}"]`).click()
+  await drawer.getByText('Внесение расхода', { exact: true }).click()
+  await expect(calendar).not.toBeVisible()
+  await expect(date).toHaveValue(day === 'yesterday' ? '19.10.2026' : '20.10.2026')
+  await drawer.getByRole('spinbutton', { name: 'Сумма (руб.)', exact: true }).fill('1500')
+  await drawer.getByRole('combobox', { name: 'Статья / Категория', exact: true }).click()
+  await page.locator('.ant-select-dropdown:visible').getByText('Опилки', { exact: true }).click()
+  await drawer.getByRole('textbox', { name: 'На что потрачено', exact: true }).fill('Закупка опилок')
+  // A date that became future after a clock correction must also fail on submit.
+  if (day === 'tomorrow') await page.clock.setFixedTime(new Date('2026-10-18T21:05:00Z'))
+  await drawer.getByRole('button', { name: 'Внести расход', exact: true }).click()
+  if (day === 'tomorrow') {
+    await expect(drawer).toContainText('Дата расхода не может быть в будущем')
+    expect(posts).toHaveLength(0)
+  } else {
+    await expect(drawer).not.toBeVisible()
+    expect(posts).toHaveLength(1)
+    expect(posts[0].date).toBe(day === 'today' ? '2026-10-20T00:05:00.000+03:00' : '2026-10-19T00:00:00.000+03:00')
+  }
+})
+
 test('timeline completion refreshes progress and removes the finished lesson', async ({ page }) => {
   const state = await setup(page)
   await page.route('**/api/lessons/lesson/status', route => { state.completed++; return route.fulfill({ json: { id: 'lesson', bookings: [] } }) })

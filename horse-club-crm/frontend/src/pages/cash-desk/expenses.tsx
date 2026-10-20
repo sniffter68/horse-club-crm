@@ -52,7 +52,11 @@ export function ExpenseModal({ onClose, variant = 'modal' }: { onClose: () => vo
       <Form.Item name="paymentMethod" label="Способ оплаты"><Segmented options={[{ value: 'CASH', label: 'Наличные' }, { value: 'CARD', label: 'Безналичные' }]} /></Form.Item>
       <Form.Item name="category" label="Статья / Категория" rules={[{ required: true, message: 'Выберите статью расхода' }]}><Select aria-label="Статья / Категория" options={categoryOptions} /></Form.Item>
       <Form.Item name="description" label="На что потрачено" rules={[{ required: true, whitespace: true, message: 'Опишите, на что потрачены деньги' }]}><Input.TextArea aria-label="На что потрачено" maxLength={500} autoSize={{ minRows: 3, maxRows: 6 }} style={{ resize: 'none' }} /></Form.Item>
-      <Form.Item name="date" label="Дата расхода" rules={[{ required: true, message: 'Выберите дату расхода' }]}><DatePicker aria-label="Дата расхода" locale={ruDatePicker} format="DD.MM.YYYY" disabledDate={date => date.format('YYYY-MM-DD') > DateTime.now().setZone('Europe/Moscow').toISODate()!} /></Form.Item>
+      <Form.Item name="date" label="Дата расхода" rules={[
+        { required: true, message: 'Выберите дату расхода' },
+        { validator: (_, date: Dayjs | null) => date && (!date.isValid() || date.format('YYYY-MM-DD') > DateTime.now().setZone('Europe/Moscow').toISODate()!)
+          ? Promise.reject(new Error('Дата расхода не может быть в будущем')) : Promise.resolve() },
+      ]}><DatePicker aria-label="Дата расхода" locale={ruDatePicker} format="DD.MM.YYYY" disabledDate={date => date.format('YYYY-MM-DD') > DateTime.now().setZone('Europe/Moscow').toISODate()!} /></Form.Item>
     </Form>
   </EntryOverlay>
 }

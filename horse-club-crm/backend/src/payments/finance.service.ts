@@ -36,8 +36,9 @@ export class FinanceService {
     }
   }
   create(dto: CreateExpenseDto, createdById: string) {
-    const date = dto.date ? financeDate(dto.date) : new Date();
-    if (date > new Date()) throw new BadRequestException('Дата расхода не может быть в будущем');
+    const now = DateTime.now().setZone('Europe/Moscow');
+    const date = dto.date ? financeDate(dto.date) : now.toJSDate();
+    if (date > now.endOf('day').toJSDate()) throw new BadRequestException('Дата расхода не может быть в будущем');
     return this.atomic(async tx => {
       if (dto.requestId) {
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${dto.requestId}, 0))::text`;
