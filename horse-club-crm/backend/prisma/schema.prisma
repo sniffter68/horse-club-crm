@@ -134,6 +134,12 @@ enum LessonStatus {
   CANCELLED
 }
 
+enum LessonPaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
 enum MembershipOpType {
   DEBIT
   CREDIT
@@ -355,6 +361,12 @@ model VkConsent {
 }
 
 model Lesson {
+  cost Decimal? @default(0) @db.Decimal(12, 2)
+  paymentStatus LessonPaymentStatus @default(UNPAID)
+  prepaymentAmount Decimal? @default(0) @db.Decimal(12, 2)
+  prepaymentMethod PaymentMethod?
+  finalPaymentAmount Decimal? @default(0) @db.Decimal(12, 2)
+  finalPaymentMethod PaymentMethod?
   id         String         @id @default(uuid()) @db.Uuid
   trainerId  String         @db.Uuid
   serviceId  String         @db.Uuid
@@ -428,6 +440,10 @@ model PricingPlan {
 }
 
 model Booking {
+  prepaymentAmount Decimal @default(0) @db.Decimal(12, 2)
+  prepaymentMethod PaymentMethod?
+  finalPaymentAmount Decimal @default(0) @db.Decimal(12, 2)
+  finalPaymentMethod PaymentMethod?
   horseChanges BookingHorseChange[]
   isPaid Boolean @default(false)
   trainerId           String              @db.Uuid

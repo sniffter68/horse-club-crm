@@ -50,7 +50,7 @@ function harness({ existing = false, collision, failLeadUpdate = false, missingS
       lesson: {
         findMany: async () => [], findFirst: async () => null,
         create: async ({ data }) => {
-          const lesson = { id: ids.lesson, ...data, service, trainer,
+          const lesson = { id: ids.lesson, ...data, cost: Number(data.cost), prepaymentAmount: Number(data.prepaymentAmount), service, trainer,
             bookings: data.bookings.create.map(row => ({ ...row, client: draft.clients.find(client => client.id === row.clientId), horse })) };
           draft.lessons.push(lesson); return lesson;
         },

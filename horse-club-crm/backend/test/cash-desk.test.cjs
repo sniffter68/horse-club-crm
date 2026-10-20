@@ -59,6 +59,29 @@ test('payment settles existing pending charge and marks booking paid', async () 
   assert.equal(result.id, 'pending1'); assert.equal(calls.some(([name]) => name === 'payment'), false);
   assert.equal(calls.find(([name]) => name === 'booking')[1].data.isPaid, true);
 });
+
+test('lesson balance can be collected after prepayment without overwriting the pending charge', async () => {
+  const booking = { id: 'b1', clientId: 'c1', lessonId: 'lesson1', membershipId: null, isPaid: false, status: 'completed',
+    costAmount: new Prisma.Decimal(1500), prepaymentAmount: new Prisma.Decimal(500), finalPaymentAmount: new Prisma.Decimal(0),
+    payments: [{ amount: new Prisma.Decimal(500) }], transactions: [] };
+  let lessonData;
+  const receipts = [];
+  const tx = {
+    $queryRaw: async () => [], client: { findUnique: async () => ({ id: 'c1' }) }, cashShift: { findFirst: async () => null },
+    booking: { findUnique: async () => booking, update: async ({ data }) => Object.assign(booking, data), findMany: async () => [booking] },
+    lesson: { update: async ({ data }) => { lessonData = data; } },
+    payment: { findUnique: async () => null, findFirst: async () => ({ id: 'pending' }),
+      create: async ({ data }) => { receipts.push(data); booking.payments.push({ amount: data.amount }); return { id: 'receipt', ...data }; },
+      update: async () => { throw new Error('Must not overwrite pending or prepaid receipt'); }, updateMany: async () => {} },
+    ledgerTransaction: { create: async () => {} },
+  };
+  const service = new CashDeskService({ $transaction: async work => work(tx) });
+  await assert.rejects(service.pay({ clientId: 'c1', bookingId: 'b1', amount: 1001, method: 'CARD' }, 'u1'), /остаток/);
+  assert.equal(receipts.length, 0);
+  await service.pay({ clientId: 'c1', bookingId: 'b1', amount: 1000, method: 'CARD' }, 'u1');
+  assert.equal(receipts.length, 1); assert.equal(booking.isPaid, true);
+  assert.equal(lessonData.paymentStatus, 'PAID'); assert.equal(lessonData.finalPaymentAmount.toString(), '1000');
+});
 test('rejects paid bookings, wrong client and unsupported cash tender', async () => {
   for (const booking of [{ id: 'b1', clientId: 'other', status: 'scheduled' }, { id: 'b1', clientId: 'c1', isPaid: true, status: 'scheduled' }]) {
     const { service, calls } = fixture({ booking });

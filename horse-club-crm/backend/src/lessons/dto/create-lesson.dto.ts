@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { LessonPriceDto } from './lesson-payment.dto';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsISO8601, IsInt, IsOptional, IsUUID, Min, ValidateNested } from 'class-validator';
 
 export class CreateLessonParticipantDto {
@@ -8,27 +9,31 @@ export class CreateLessonParticipantDto {
   clientId!: string;
 
   @ApiPropertyOptional({ format: 'uuid', description: 'Лошадь участника. Не требуется для теоретического занятия.' })
+  @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional()
   @IsUUID()
   horseId?: string;
 
   @ApiPropertyOptional({ format: 'uuid', description: 'Абонемент участника.' })
+  @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional()
   @IsUUID()
   membershipId?: string;
 }
 
-export class CreateLessonDto {
+export class CreateLessonDto extends LessonPriceDto {
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
   trainerId!: string;
 
   @ApiPropertyOptional({ format: 'uuid', description: 'Лошадь участника. Не требуется для теоретического занятия.' })
+  @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional()
   @IsUUID()
   horseId?: string;
 
   @ApiPropertyOptional({ format: 'uuid', description: 'Манеж или площадка проведения занятия.' })
+  @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional()
   @IsUUID()
   arenaId?: string;
@@ -62,6 +67,7 @@ export class CreateLessonDto {
   durationMinutes?: number;
 
   @ApiPropertyOptional({ format: 'uuid', deprecated: true, description: 'Для обратной совместимости. Используйте participants.' })
+  @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional()
   @IsUUID()
   clientId?: string;
@@ -71,6 +77,7 @@ export class CreateLessonDto {
     description: 'Для обратной совместимости. Используйте participants.',
     deprecated: true,
   })
+  @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional()
   @IsUUID()
   membershipId?: string;

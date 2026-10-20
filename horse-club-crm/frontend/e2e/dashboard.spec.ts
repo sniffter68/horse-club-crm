@@ -3,7 +3,7 @@ import { test, expect, type Page, type Locator } from './fixtures'
 test.use({ timezoneId: 'America/New_York' })
 test.setTimeout(45000)
 const modules = ['SCHEDULE', 'CASHBOX', 'STABLES', 'VETERINARY', 'STAFF_PAYROLL']
-const client = { id: 'client', name: 'Анна Орлова', phone: '+79991234567' }
+const client = { id: '00000001-1111-4111-8111-111111111111', name: 'Анна Орлова', phone: '+79991234567' }
 
 async function setup(page: Page, role = 'ADMIN') {
   await page.clock.setFixedTime(new Date('2026-10-20T08:00:00Z'))
@@ -18,23 +18,23 @@ async function setup(page: Page, role = 'ADMIN') {
     alerts: [], horseWorkloads: [], leadRequests: [], kpi: { lessonsTotal: state.lessons, lessonsCompleted: state.completed, newLeads: 0, activeMemberships: 0 },
     todayLessons: { total: state.lessons, completed: state.completed, cancelled: 0 }, cashboxSummary: { cash: String(state.cash), card: '2000', revenueToday: '500', expensesToday: '0' },
     horsesStatus: { total: 3, healthy: 1, treatment: 1, quarantine: 1 }, activeShifts: 1, onDutyStaff: [{ id: 'shift', staffId: 'staff', fullName: 'Мария Волкова', roleTitle: 'Тренер', startTime: '08:00', endTime: '20:00', status: 'SCHEDULED' }], pendingVetAlerts: 2,
-    upcomingLessons: state.completed ? [] : [{ id: 'lesson', startTime: '2026-10-20T09:00:00Z', endTime: '2026-10-20T10:00:00Z', trainer: { name: 'Мария Волкова' }, service: { name: 'Выездка', title: 'Индивидуальная тренировка' }, bookings: [{ client, horse: { name: 'Валдай' } }] }],
+    upcomingLessons: state.completed ? [] : [{ id: '00000007-1111-4111-8111-111111111111', startTime: '2026-10-20T09:00:00Z', endTime: '2026-10-20T10:00:00Z', trainer: { name: 'Мария Волкова' }, service: { name: 'Выездка', title: 'Индивидуальная тренировка' }, bookings: [{ client, horse: { name: 'Валдай' } }] }],
   } }))
-  for (const [resource, rows] of Object.entries({ clients: [client], horses: [{ id: 'horse', name: 'Валдай', status: 'active', healthStatus: 'HEALTHY' }], trainers: [{ id: 'trainer', name: 'Мария Волкова', isActive: true }], arenas: [{ id: 'arena', name: 'Манеж', isActive: true }], services: [{ id: 'service', name: 'Выездка', title: 'Выездка', durationMinutes: 60, price: '500' }] })) {
+  for (const [resource, rows] of Object.entries({ clients: [client], horses: [{ id: '00000002-1111-4111-8111-111111111111', name: 'Валдай', status: 'active', healthStatus: 'HEALTHY' }], trainers: [{ id: '00000003-1111-4111-8111-111111111111', name: 'Мария Волкова', isActive: true }], arenas: [{ id: '00000005-1111-4111-8111-111111111111', name: 'Манеж', isActive: true }], services: [{ id: '00000004-1111-4111-8111-111111111111', name: 'Выездка', title: 'Выездка', durationMinutes: 60, price: '500' }] })) {
     await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } }))
   }
-  await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { horseWorkloads: [{ horseId: 'horse', currentWorkloadMinutes: 0, maxDailyWorkloadMinutes: 240, status: 'AVAILABLE' }], arenaOccupancy: [] } }))
+  await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { horseWorkloads: [{ horseId: '00000002-1111-4111-8111-111111111111', currentWorkloadMinutes: 0, maxDailyWorkloadMinutes: 240, status: 'AVAILABLE' }], arenaOccupancy: [] } }))
   await page.route('**/api/payments/cash-desk/options/*', route => route.fulfill({ json: { bookings: [], memberships: [] } }))
   await page.route('**/api/staff?*', route => route.fulfill({ json: { data: [{ id: 'staff', userId: 'user', fullName: 'Мария Волкова', roleTitle: 'Тренер', isActive: true }], total: 1 } }))
-  await page.route('**/api/boarding-contracts/availability?*', route => route.fulfill({ json: { horses: [{ id: 'horse', name: 'Валдай' }], stalls: [{ id: 'stall', name: 'Денник 1' }] } }))
+  await page.route('**/api/boarding-contracts/availability?*', route => route.fulfill({ json: { horses: [{ id: '00000002-1111-4111-8111-111111111111', name: 'Валдай' }], stalls: [{ id: 'stall', name: 'Денник 1' }] } }))
   await page.route('**/api/lessons', route => {
     state.calls++
     if (state.failure) return route.fulfill({ status: 409, json: { message: 'Тренер уже занят' } })
-    expect(route.request().postDataJSON()).toMatchObject({ clientId: 'client', horseId: 'horse', trainerId: 'trainer', serviceId: 'service', startTime: '2026-10-20T09:00:00.000Z' })
+    expect(route.request().postDataJSON()).toMatchObject({ clientId: '00000001-1111-4111-8111-111111111111', horseId: '00000002-1111-4111-8111-111111111111', trainerId: '00000003-1111-4111-8111-111111111111', serviceId: '00000004-1111-4111-8111-111111111111', startTime: '2026-10-20T09:00:00.000Z' })
     state.lessons++; return route.fulfill({ status: 201, json: { id: 'new-lesson' } })
   })
   await page.route('**/api/payments/cash-desk', route => {
-    expect(route.request().postDataJSON()).toMatchObject({ clientId: 'client', amount: 500, method: 'CASH', cashGiven: 500 })
+    expect(route.request().postDataJSON()).toMatchObject({ clientId: '00000001-1111-4111-8111-111111111111', amount: 500, method: 'CASH', cashGiven: 500 })
     state.cash += 500; return route.fulfill({ status: 201, json: { method: 'CASH', cashChange: '0' } })
   })
   return state
@@ -63,7 +63,7 @@ for (const width of [1440, 390]) test(`creates a guest inside lesson drawer and 
   const posts: unknown[] = []
   await page.route('**/api/clients/quick', route => {
     posts.push(route.request().postDataJSON())
-    return route.fulfill({ status: 201, json: { id: 'new-guest', name: 'Гость клуба', clientType: 'ONE_TIME', phone: null } })
+    return route.fulfill({ status: 201, json: { id: '00000006-1111-4111-8111-111111111111', name: 'Гость клуба', clientType: 'ONE_TIME', phone: null } })
   })
   let saved: Record<string, unknown> | undefined
   await page.route('**/api/lessons', route => {
@@ -85,7 +85,7 @@ for (const width of [1440, 390]) test(`creates a guest inside lesson drawer and 
   await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   await expect(drawer).not.toBeVisible()
   expect(posts).toEqual([{ name: 'Гость клуба', isOneTime: true }])
-  expect(saved).toMatchObject({ clientId: 'new-guest', horseId: 'horse', trainerId: 'trainer', serviceId: 'service' })
+  expect(saved).toMatchObject({ clientId: '00000006-1111-4111-8111-111111111111', horseId: '00000002-1111-4111-8111-111111111111', trainerId: '00000003-1111-4111-8111-111111111111', serviceId: '00000004-1111-4111-8111-111111111111' })
 })
 
 test('admin quick actions create a lesson in a right drawer and refresh the day counter', async ({ page }) => {
@@ -180,11 +180,35 @@ for (const day of ['today', 'yesterday', 'tomorrow']) test(`expense drawer valid
   }
 })
 
+test('lesson drawer accepts a cash prepayment and keeps the agreed price', async ({ page }) => {
+  await setup(page)
+  let payload: Record<string, unknown> | undefined
+  await page.route('**/api/lessons', route => { payload = route.request().postDataJSON(); return route.fulfill({ status: 201, json: { id: 'saved' } }) })
+  await page.goto('/')
+  const drawer = await lesson(page)
+  await drawer.getByLabel('Стоимость услуги (₽)').fill('1500')
+  await drawer.getByRole('switch', { name: 'Внесена предоплата' }).click()
+  await drawer.getByLabel('Сумма предоплаты (₽)').fill('500')
+  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await expect(drawer).not.toBeVisible()
+  expect(payload).toMatchObject({ cost: 1500, prepaymentAmount: 500, prepaymentMethod: 'CASH' })
+})
+
+test('read-only cashbox disables collecting a lesson prepayment', async ({ page }) => {
+  await setup(page, 'MANAGER')
+  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'MANAGER', modules: modules.map(module => ({ module, isEnabled: true, accessLevel: module === 'CASHBOX' ? 'READ_ONLY' : 'FULL' })) } }))
+  await page.goto('/')
+  const drawer = await lesson(page)
+  await expect(drawer.getByRole('switch', { name: 'Внесена предоплата' })).toBeDisabled()
+})
+
 test('timeline completion refreshes progress and removes the finished lesson', async ({ page }) => {
   const state = await setup(page)
-  await page.route('**/api/lessons/lesson/status', route => { state.completed++; return route.fulfill({ json: { id: 'lesson', bookings: [] } }) })
+  await page.route('**/api/lessons/00000007-1111-4111-8111-111111111111', route => route.fulfill({ json: { id: '00000007-1111-4111-8111-111111111111', cost: 500, prepaymentAmount: 0, bookings: [{ membership: null }] } }))
+  await page.route('**/api/lessons/00000007-1111-4111-8111-111111111111/complete', route => { state.completed++; return route.fulfill({ json: { id: '00000007-1111-4111-8111-111111111111', bookings: [] } }) })
   await page.goto('/')
   await page.getByRole('button', { name: 'Завершено', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Занятие состоялось' }).getByRole('button', { name: 'Завершить занятие', exact: true }).click()
   await expect(page.getByText('Предстоящих тренировок сегодня нет')).toBeVisible()
   await expect(page.locator('.dashboard-day-card--lessons .ant-statistic-content')).toHaveText('1/ 1')
 })
@@ -218,7 +242,7 @@ test('administrator signs in through the login screen and sees quick actions', a
 
 test('horse overload disables the option and Escape closes only the select popup', async ({ page }) => {
   await setup(page)
-  await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { horseWorkloads: [{ horseId: 'horse', currentWorkloadMinutes: 240, maxDailyWorkloadMinutes: 240, status: 'AT_LIMIT' }], arenaOccupancy: [] } }))
+  await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { horseWorkloads: [{ horseId: '00000002-1111-4111-8111-111111111111', currentWorkloadMinutes: 240, maxDailyWorkloadMinutes: 240, status: 'AT_LIMIT' }], arenaOccupancy: [] } }))
   await page.goto('/')
   await page.getByRole('button', { name: '+ Записать на тренировку', exact: true }).click()
   const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })

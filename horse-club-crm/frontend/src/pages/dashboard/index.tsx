@@ -1,3 +1,6 @@
+import { CompleteLessonModal, LessonPaymentBadge } from '../schedule/LessonPayments'
+import type { Lesson, LessonMoney } from '../schedule/types'
+import { isUuid } from '../../uuid'
 import { OperationalDashboard, type OperationalSummary } from './OperationalDashboard'
 import { usePermissions } from '../../modulePermissions'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -24,7 +27,7 @@ interface DashboardAlertBooking {
   membershipId: string | null
 }
 
-interface DashboardAlert {
+interface DashboardAlert extends LessonMoney {
   id: string
   startTime: string
   endTime: string
@@ -173,12 +176,19 @@ export function DashboardPage() {
     }
   }, [loadSummary])
 
+  const [completing, setCompleting] = useState<Lesson>()
   const updateStatus = useCallback(async (lessonId: string, status: FinalLessonStatus) => {
     if (updatingIdsRef.current.has(lessonId)) return
     updatingIdsRef.current.add(lessonId)
     setUpdatingIds(current => new Set(current).add(lessonId))
     setError(undefined)
     try {
+      if (status === 'COMPLETED') {
+        if (!isUuid(lessonId)) throw new Error('Некорректный идентификатор занятия. Обновите расписание.')
+        const response = await httpClient.get<Lesson>(`${API_URL}/lessons/${lessonId}`)
+        setCompleting(response.data)
+        return
+      }
       const response = await httpClient.patch<UpdatedLesson>(
         `${API_URL}/lessons/${lessonId}/status`,
         { status },
@@ -200,11 +210,11 @@ export function DashboardPage() {
         alerts: current.alerts.filter(alert => alert.id !== lessonId),
         kpi: {
           ...current.kpi,
-          lessonsCompleted: current.kpi.lessonsCompleted + (status === 'COMPLETED' ? 1 : 0),
+          lessonsCompleted: current.kpi.lessonsCompleted,
           activeMemberships: Math.max(0, current.kpi.activeMemberships - membershipsMadeInactive),
         },
       } : current)
-      void message.success(status === 'COMPLETED' ? 'Занятие отмечено как проведённое' : 'Неявка зафиксирована')
+      void message.success('Неявка зафиксирована')
     } catch (cause) {
       reportError(cause)
     } finally {
@@ -252,6 +262,7 @@ export function DashboardPage() {
       title: 'Занятие',
       key: 'lesson',
       render: (_, row) => <Space direction="vertical" size={0}>
+        <LessonPaymentBadge lesson={row} />
         <Link to={`/services/edit/${row.service.id}`}><Typography.Text strong>{row.service.title || row.service.name}</Typography.Text></Link>
         <Link to={`/trainers/edit/${row.trainer.id}`}><Typography.Text type="secondary">{row.trainer.name}</Typography.Text></Link>
       </Space>,
@@ -330,6 +341,7 @@ export function DashboardPage() {
         />}
     </Card>}
 
+    {completing && <CompleteLessonModal lesson={completing} onClose={() => setCompleting(undefined)} onSaved={() => { setCompleting(undefined); void loadSummary() }} />}
     {modules.canRead('SCHEDULE') && modules.canRead('STABLES') && <Card title={<Link to="/horses">Загрузка лошадей на сегодня</Link>} loading={loading && !summary}>
       <Row gutter={[16, 16]}>
         {(summary?.horseWorkloads ?? []).map(horse => <Col key={horse.horseId} xs={24} md={12} xl={8}>

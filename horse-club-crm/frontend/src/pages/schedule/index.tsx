@@ -1,3 +1,5 @@
+import { CompleteLessonModal, LessonPaymentBadge, LessonPriceFields } from './LessonPayments'
+import { isUuid } from '../../uuid'
 import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { ReplaceHorseAction } from './ReplaceHorseAction'
 import { HorseIssues } from './HorseIssues'
@@ -172,6 +174,7 @@ export function SchedulePage() {
   const entries = useMemo(() => scheduleEntries(lessons, triadBookings), [lessons, triadBookings])
   const [workloadOpen, setWorkloadOpen] = useState(false)
   const [detail, setDetail] = useState<Lesson>()
+  const [completing, setCompleting] = useState<Lesson>()
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const [form] = Form.useForm<BookingValues>()
@@ -276,6 +279,10 @@ export function SchedulePage() {
       if (editingLesson) {
         await httpClient.patch<Lesson>(`${API_URL}/lessons/${editingLesson.id}/reschedule`, { startTime: toInstant(values.startTime), durationMinutes: values.durationMinutes })
       } else {
+        const ids = [values.serviceId, values.trainerId, values.arenaId, ...values.participants.flatMap(p => [p.clientId, p.horseId, p.membershipId])].filter(Boolean) as string[]
+        if (ids.some(id => !isUuid(id))) throw new Error('Выберите корректные записи из справочников')
+        const oneOff = values.participants.length === 1 && !values.participants[0].membershipId
+        if (!oneOff) { delete values.cost; delete values.prepaymentAmount; delete values.prepaymentMethod }
         await httpClient.post<Lesson>(`${API_URL}/lessons`, { ...values, startTime: toInstant(values.startTime) })
       }
       setWorkloadDate(values.startTime.slice(0, 10))
@@ -314,6 +321,7 @@ export function SchedulePage() {
   const participantLimit = Math.min(selectedServiceRecord?.maxCapacity ?? 1, selectedArenaRecord?.capacity ?? Number.POSITIVE_INFINITY)
   const failure = error ? <Alert type="error" showIcon message={error} /> : null
   return <Space className="schedule-page" direction="vertical" size="middle" style={{ width: '100%' }}>
+    {completing && <CompleteLessonModal lesson={completing} onClose={() => { setDetail(completing); setCompleting(undefined) }} onSaved={updated => { setCompleting(undefined); setDetail(updated); setRevision(v => v + 1) }} />}
     <Typography.Title level={2}>Расписание занятий</Typography.Title>
     <Typography.Text type="secondary">Часовой пояс клуба: {CLUB_TIME_ZONE}</Typography.Text>
     {failure}
@@ -370,7 +378,7 @@ export function SchedulePage() {
           const lesson = lessons.find(item => item.id === event.id)
           if (!lesson) return null
           const date = toLocalInput(new Date(lesson.startTime)).slice(0, 10)
-          return <div className="schedule-event-content"><strong>{timeText}</strong><div>{lesson.service.title || lesson.service.name} · {lesson.trainer.name}</div><div>{lesson.bookings.map(b => personName(b.client)).join(', ')} · {statuses[lesson.status].label}</div>
+          return <div className="schedule-event-content"><strong>{timeText}</strong><div>{lesson.service.title || lesson.service.name} · {lesson.trainer.name}</div><div>{lesson.bookings.map(b => personName(b.client)).join(', ')} · {statuses[lesson.status].label}</div><LessonPaymentBadge lesson={lesson} />
             {lesson.bookings.filter(booking => booking.horse).map(booking => <div key={booking.id} className="schedule-event-horse">
               <span>{booking.horse?.name}</span><HorseWorkloadBadge date={date} workload={dayWorkloads.byDate[date]?.find(row => row.horseId === booking.horse?.id)} />
             </div>)}
@@ -397,7 +405,7 @@ export function SchedulePage() {
       {failure}
       <Form form={form} noValidate layout="vertical" onFinish={createBooking} disabled={saving}>
         {editingLesson && <Typography.Paragraph type="secondary">Меняются только время и длительность. Переносимое занятие исключено из текущей нагрузки.</Typography.Paragraph>}
-        <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} onChange={id => form.setFieldsValue({ durationMinutes: services.find(row => row.id === id)?.durationMinutes })} /></Form.Item>
+        <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} onChange={id => form.setFieldsValue({ durationMinutes: services.find(row => row.id === id)?.durationMinutes, cost: Number(services.find(row => row.id === id)?.price ?? 0), prepaymentAmount: 0, prepaymentMethod: undefined })} /></Form.Item>
         <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
         <Form.Item name="arenaId" label="Манеж" extra="Необязательно для выездного или теоретического занятия."><Select disabled={Boolean(editingLesson)} allowClear showSearch optionFilterProp="label" options={arenaOptions} /></Form.Item>
         <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><Input type="datetime-local" /></Form.Item>
@@ -433,6 +441,7 @@ export function SchedulePage() {
             <Form.ErrorList errors={errors} />
           </Space>}
         </Form.List>
+        {!editingLesson && selectedServiceRecord && participants?.length === 1 && !participants[0]?.membershipId && <LessonPriceFields key={selectedService} price={selectedServiceRecord.price} />}
         {workloadBlocked && !bookingWorkloads.loading && !bookingWorkloads.error && <Typography.Paragraph type="danger" role="status">Выбранная лошадь недоступна или суточный лимит будет превышен.</Typography.Paragraph>}
         <Button type="primary" htmlType="submit" aria-label={editingLesson ? 'Сохранить перенос' : 'Создать занятие'} aria-busy={saving}
           loading={saving} disabled={!ready || workloadBlocked} style={{ marginTop: 16 }}>{editingLesson ? 'Сохранить перенос' : 'Создать занятие'}</Button>
@@ -441,6 +450,7 @@ export function SchedulePage() {
     <Modal title="Карточка занятия" open={Boolean(detail)} keyboard={!saving} maskClosable={!saving} closable={!saving} onCancel={() => { if (!saving) setDetail(undefined) }} footer={null}>
       {failure}
       {detail && <Space direction="vertical" style={{ width: '100%' }}>
+        <LessonPaymentBadge lesson={detail} />
         <Tag className="status-badge" bordered={false} style={{ background: statuses[detail.status].background, color: statuses[detail.status].text }}>{statuses[detail.status].label}</Tag>
         <Descriptions column={1} items={[
           { key: 'service', label: 'Услуга', children: detail.service.title || detail.service.name },
@@ -461,7 +471,7 @@ export function SchedulePage() {
         ]} />
         {canManage && <Space wrap>
           <Button disabled={saving || !ready || detail.status !== 'SCHEDULED'} onClick={() => openReschedule(detail)}>Перенести занятие</Button>
-          <Button disabled={saving || detail.status === 'CANCELLED' || detail.status === 'COMPLETED'} onClick={() => void changeStatus('COMPLETED')}>Отметить присутствие</Button>
+          <Button disabled={saving || detail.status === 'CANCELLED' || detail.status === 'COMPLETED'} onClick={() => { setCompleting(detail); setDetail(undefined) }}>Отметить присутствие</Button>
           <Button disabled={saving || detail.status === 'CANCELLED' || detail.status === 'NO_SHOW'} onClick={() => void changeStatus('NO_SHOW')}>Неявка</Button>
           <Popconfirm title="Отменить занятие?" description="Списанные занятия абонемента будут возвращены." okText="Да" cancelText="Нет" onConfirm={() => changeStatus('CANCELLED')}><Button danger disabled={saving || detail.status === 'CANCELLED'}>Отменить занятие</Button></Popconfirm>
         </Space>}

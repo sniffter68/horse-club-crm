@@ -1,9 +1,16 @@
 import type { Arena, Client, Horse, Service, Trainer } from '../catalogs/types'
 export type Status = 'SCHEDULED' | 'COMPLETED' | 'NO_SHOW' | 'CANCELLED'
-export interface Lesson {
+export interface LessonMoney {
+  cost?: number | string | null; paymentStatus?: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID';
+  prepaymentAmount?: number | string | null; prepaymentMethod?: string | null;
+  finalPaymentAmount?: number | string | null; finalPaymentMethod?: string | null;
+  service?: { id?: string; name?: string; title?: string; price?: number | string };
+  bookings?: { membership?: unknown; membershipId?: string | null; costAmount?: number | string; payments?: { status: string; amount: number | string }[] }[];
+}
+export interface Lesson extends LessonMoney {
   id: string; startTime: string; endTime: string; status: Status;
   trainer: Trainer; service: Service; arena: Arena | null;
-  bookings: { id: string; client: Client; horse: Horse | null; membership: MembershipSummary | null }[];
+  bookings: { id: string; client: Client; horse: Horse | null; membership: MembershipSummary | null; costAmount?: number | string; payments?: { status: string; amount: number | string }[] }[];
 }
 export interface MembershipSummary {
   type?: 'fixed_lessons' | 'deposit' | 'boarding'; title?: string; initialUnits?: number | string; remainingUnits?: number | string;
@@ -22,6 +29,7 @@ export interface BookingParticipantValues {
   clientId?: string; membershipId?: string; horseId?: string;
 }
 export interface BookingValues {
+  cost?: number; prepaymentAmount?: number; prepaymentMethod?: 'CASH' | 'CARD';
   participants: BookingParticipantValues[]; serviceId: string; trainerId: string; arenaId?: string; startTime: string; durationMinutes: number;
 }
 export const statuses: Record<Status, { background: string; text: string; event: string; label: string }> = {

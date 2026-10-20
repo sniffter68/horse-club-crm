@@ -53,7 +53,7 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal' }: { onClose: 
     ]).then(([services, linked]) => {
       if (controller.signal.aborted) return
       const options: Choice[] = services.data.map((row: { id: string; title: string; name: string; price: string }) => ({ value: `service:${row.id}`, label: row.title || row.name, price: Number(row.price), serviceId: row.id }))
-      for (const row of linked.data.bookings) options.unshift({ value: `booking:${row.id}`, label: `Занятие · ${cashTime(row.startTime)} · ${row.lesson?.service?.title || row.lesson?.service?.name || row.serviceType || 'Тренировка'}`, price: Number(row.costAmount) || Number(row.lesson?.service?.price || 0), bookingId: row.id })
+      for (const row of linked.data.bookings) options.unshift({ value: `booking:${row.id}`, label: `Занятие · ${cashTime(row.startTime)} · ${row.lesson?.service?.title || row.lesson?.service?.name || row.serviceType || 'Тренировка'}`, price: Number(row.remainingAmount ?? row.costAmount ?? row.lesson?.service?.price ?? 0), bookingId: row.id })
       for (const row of linked.data.memberships) if ((row.type !== 'fixed_lessons' || !row.payments.some((p: { status: string }) => p.status === 'PAID')) && row.status !== 'frozen') options.push({ value: `membership:${row.id}`, label: `Абонемент · ${row.title || row.pricingPlan?.name || row.type}`, price: Number(row.payments.find((p: { status: string }) => p.status === 'PENDING')?.amount || row.pricingPlan?.price || 0), membershipId: row.id })
       options.push({ value: 'manual', label: 'Другая услуга — указать сумму', price: 0, serviceType: 'Другая услуга' })
       setChoices(options)

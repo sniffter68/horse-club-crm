@@ -1,3 +1,5 @@
+import { LessonPaymentBadge } from '../schedule/LessonPayments'
+import type { LessonMoney } from '../schedule/types'
 import { Button, Card, Col, Empty, List, Progress, Row, Space, Statistic, Tag, Typography } from 'antd'
 import { usePermissions } from '../../modulePermissions'
 import { QuickActions } from './QuickActions'
@@ -11,7 +13,7 @@ export interface OperationalSummary {
   activeShifts?: number
   onDutyStaff?: Array<{ id: string; staffId: string; fullName: string; roleTitle: string; startTime: string; endTime: string; status: ShiftStatus }>
   pendingVetAlerts?: number
-  upcomingLessons?: Array<{ id: string; startTime: string; endTime: string; trainer: { name: string }; service: { name: string; title: string }; bookings: Array<{ client: { name: string }; horse: { name: string } | null }> }>
+  upcomingLessons?: Array<Omit<LessonMoney, 'bookings'> & { id: string; startTime: string; endTime: string; trainer: { name: string }; service: { name: string; title: string }; bookings: Array<NonNullable<LessonMoney['bookings']>[number] & { client: { name: string }; horse: { name: string } | null }> }>
 }
 
 const time = (date: string) => new Date(date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })
@@ -53,7 +55,7 @@ export function OperationalDashboard({ summary, loading, refresh, complete, upda
     {modules.canRead('SCHEDULE') && <Card title="Ближайшие тренировки на сегодня" loading={loading}>
       {summary?.upcomingLessons?.length ? <List dataSource={summary.upcomingLessons} renderItem={lesson => <List.Item className="dashboard-timeline-item">
         <span className="dashboard-timeline-time data-mono">{time(lesson.startTime)}<small>{time(lesson.endTime)}</small></span>
-        <div className="dashboard-timeline-details"><strong>{lesson.service.title || lesson.service.name}</strong><div>{lesson.trainer.name}</div>
+        <div className="dashboard-timeline-details"><LessonPaymentBadge lesson={lesson} /><strong>{lesson.service.title || lesson.service.name}</strong><div>{lesson.trainer.name}</div>
           <Typography.Text type="secondary">{lesson.bookings.map(row => `${row.client.name}${row.horse ? ` · ${row.horse.name}` : ''}`).join(', ') || 'Нет участников'}</Typography.Text></div>
         {modules.canWrite('SCHEDULE') && <Button loading={updatingIds.has(lesson.id)} disabled={updatingIds.has(lesson.id)} onClick={() => complete(lesson.id)}>Завершено</Button>}
       </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Предстоящих тренировок сегодня нет" />}

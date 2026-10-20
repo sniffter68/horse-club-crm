@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { isSerializationFailure } from '../common/serialization-failure';
 import { CashDeskPaymentDto, CashSummaryQueryDto, OpenCashShiftDto } from './dto/cash-desk.dto';
 import { aggregatePaymentMethods, calculateCashChange } from './cash-desk.math';
+import { paymentStatus } from '../lessons/lesson-finance';
 
 const include = {
   client: { select: { id: true, name: true, firstName: true, lastName: true, phone: true } },
@@ -47,10 +48,20 @@ export class CashDeskService {
       if (!await tx.client.findUnique({ where: { id: dto.clientId } })) throw new NotFoundException('Клиент не найден');
       if (dto.serviceId && !await tx.service.findUnique({ where: { id: dto.serviceId } })) throw new NotFoundException('Услуга не найдена');
       let pendingId: string | undefined;
+      let lessonSettlement: { lessonId: string; outstanding: Prisma.Decimal; finalPaid: Prisma.Decimal } | undefined;
       if (dto.bookingId) {
-        const booking = await tx.booking.findUnique({ where: { id: dto.bookingId }, include: { transactions: true } });
+        const booking = await tx.booking.findUnique({ where: { id: dto.bookingId }, include: { transactions: true, payments: { where: { status: 'PAID' } } } });
         if (!booking || booking.clientId !== dto.clientId) throw new BadRequestException('Занятие не принадлежит клиенту');
-        if (booking.isPaid || await tx.payment.count({ where: { bookingId: booking.id, status: 'PAID' } })) throw new ConflictException('Занятие уже оплачено');
+        if (booking.isPaid || (!booking.lessonId && await tx.payment.count({ where: { bookingId: booking.id, status: 'PAID' } }))) throw new ConflictException('Занятие уже оплачено');
+        if (booking.lessonId) {
+          if (booking.membershipId) throw new ConflictException('Занятие оплачивается абонементом');
+          const paid = Prisma.Decimal.max(new Prisma.Decimal(booking.prepaymentAmount).plus(booking.finalPaymentAmount),
+            booking.payments.reduce((sum, payment) => sum.plus(payment.amount), new Prisma.Decimal(0)));
+          const remaining = booking.costAmount.minus(paid);
+          if (remaining.lte(0)) throw new ConflictException('Занятие уже оплачено');
+          if (new Prisma.Decimal(dto.amount).gt(remaining)) throw new BadRequestException('Сумма превышает остаток за занятие');
+          lessonSettlement = { lessonId: booking.lessonId, outstanding: remaining.minus(dto.amount), finalPaid: paid.minus(booking.prepaymentAmount).plus(dto.amount) };
+        }
         if (booking.status.startsWith('cancelled') || booking.status === 'penalty_cancellation') throw new ConflictException('Занятие отменено');
         if (booking.transactions.some(row => row.membershipId && row.transactionType === 'usage')) throw new ConflictException('Занятие уже списано с абонемента');
         pendingId = (await tx.payment.findFirst({ where: { bookingId: booking.id, status: 'PENDING' }, orderBy: { createdAt: 'asc' } }))?.id;
@@ -78,7 +89,7 @@ export class CashDeskService {
         notes: dto.notes?.trim() || null, description: dto.notes?.trim() || null, requestId,
         status: 'PAID' as const, paidAt: new Date(),
       };
-      const payment = pendingId
+      const payment = pendingId && !lessonSettlement
         ? await tx.payment.update({ where: { id: pendingId }, data, include })
         : await tx.payment.create({ data, include });
       await tx.ledgerTransaction.create({ data: {
@@ -87,8 +98,20 @@ export class CashDeskService {
         description: dto.notes?.trim() || 'Приём оплаты в кассе',
       } });
       if (dto.bookingId) {
-        await tx.booking.update({ where: { id: dto.bookingId }, data: { isPaid: true } });
-        await tx.payment.updateMany({ where: { bookingId: dto.bookingId, status: 'PENDING' }, data: { status: 'CANCELLED' } });
+        await tx.booking.update({ where: { id: dto.bookingId }, data: { isPaid: !lessonSettlement || lessonSettlement.outstanding.isZero(),
+          ...(lessonSettlement ? { finalPaymentAmount: lessonSettlement.finalPaid, finalPaymentMethod: dto.method } : {}) } });
+        await tx.payment.updateMany({ where: { bookingId: dto.bookingId, status: 'PENDING' }, data: lessonSettlement?.outstanding.gt(0)
+          ? { amount: lessonSettlement.outstanding } : { status: 'CANCELLED' } });
+        if (lessonSettlement) {
+          const bookings = await tx.booking.findMany({ where: { lessonId: lessonSettlement.lessonId, membershipId: null }, include: { payments: { where: { status: 'PAID' } } } });
+          const cost = bookings.reduce((sum, b) => sum.plus(b.costAmount), new Prisma.Decimal(0));
+          const prepaid = bookings.reduce((sum, b) => sum.plus(b.prepaymentAmount), new Prisma.Decimal(0));
+          const paid = bookings.reduce((sum, b) => sum.plus(Prisma.Decimal.max(b.prepaymentAmount.plus(b.finalPaymentAmount),
+            b.isPaid ? b.costAmount : b.payments.reduce((v, p) => v.plus(p.amount), new Prisma.Decimal(0)))), new Prisma.Decimal(0));
+          await tx.lesson.update({ where: { id: lessonSettlement.lessonId }, data: {
+            cost, prepaymentAmount: prepaid, finalPaymentAmount: paid.minus(prepaid), finalPaymentMethod: dto.method, paymentStatus: paymentStatus(cost, paid),
+          } });
+        }
       }
       return payment;
     });
@@ -126,7 +149,9 @@ export class CashDeskService {
 
   async options(clientId: string) {
     return this.prisma.$transaction(async tx => ({
-      bookings: await tx.booking.findMany({ where: { clientId, isPaid: false, status: { in: ['scheduled', 'completed', 'no_show'] }, payments: { none: { status: 'PAID' } } }, include: { lesson: { include: { service: true } } }, orderBy: { startTime: 'desc' }, take: 100 }),
+      bookings: (await tx.booking.findMany({ where: { clientId, isPaid: false, membershipId: null, status: { in: ['scheduled', 'completed', 'no_show'] }, OR: [{ lessonId: { not: null } }, { payments: { none: { status: 'PAID' } } }] }, include: { payments: { where: { status: 'PAID' } }, lesson: { include: { service: true } } }, orderBy: { startTime: 'desc' }, take: 100 })).map(booking => ({ ...booking,
+        remainingAmount: Prisma.Decimal.max(0, booking.costAmount.minus(Prisma.Decimal.max(new Prisma.Decimal(booking.prepaymentAmount ?? 0).plus(booking.finalPaymentAmount ?? 0), booking.payments?.reduce((sum, p) => sum.plus(p.amount), new Prisma.Decimal(0)) ?? 0))),
+      })),
       memberships: await tx.membership.findMany({ where: { clientId }, include: { pricingPlan: true, payments: { select: { status: true, amount: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
     }));
   }

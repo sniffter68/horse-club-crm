@@ -1,3 +1,6 @@
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthUser } from '../auth/auth.types';
+import { CompleteLessonDto } from './dto/lesson-payment.dto';
 import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import {
   Body,
@@ -41,8 +44,8 @@ export class LessonsController {
   @Post()
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiCreatedResponse({ description: 'Занятие создано.' })
-  create(@Body() dto: CreateLessonDto): Promise<LessonDetails> {
-    return this.lessonsService.createLesson(dto);
+  create(@Body() dto: CreateLessonDto, @CurrentUser() actor: AuthUser): Promise<LessonDetails> {
+    return this.lessonsService.createLesson(dto, undefined, actor);
   }
 
   @Get()
@@ -67,8 +70,15 @@ export class LessonsController {
   updateStatus(
     @Param('id', new ParseUUIDPipe()) lessonId: string,
     @Body() dto: UpdateLessonStatusDto,
+    @CurrentUser() actor: AuthUser,
   ): Promise<LessonDetails> {
-    return this.lessonsService.updateLessonStatus(lessonId, dto.status);
+    return this.lessonsService.updateLessonStatus(lessonId, dto.status, dto, actor);
+  }
+
+  @Post(':id/complete')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  complete(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CompleteLessonDto, @CurrentUser() actor: AuthUser) {
+    return this.lessonsService.updateLessonStatus(id, 'COMPLETED', dto, actor);
   }
 
   @Patch(':id/reschedule')

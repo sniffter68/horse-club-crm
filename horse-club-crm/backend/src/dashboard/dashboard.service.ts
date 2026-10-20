@@ -123,7 +123,7 @@ export class DashboardService {
             status: LessonStatus.SCHEDULED,
           },
           select: {
-            id: true,
+            id: true, cost: true, paymentStatus: true, prepaymentAmount: true, finalPaymentAmount: true,
             startTime: true,
             endTime: true,
             trainer: { select: { id: true, name: true } },
@@ -132,7 +132,7 @@ export class DashboardService {
               orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
               select: {
                 id: true,
-                membershipId: true,
+                membershipId: true, costAmount: true, payments: { select: { status: true, amount: true } },
                 client: {
                   select: {
                     id: true,
@@ -268,8 +268,8 @@ export class DashboardService {
       }) : undefined,
       canRead('VETERINARY') ? this.prisma.vetEvent.count({ where: { status: { in: ['scheduled', 'overdue'] }, eventDate: { lt: end } } }) : undefined,
       canRead('SCHEDULE') ? this.prisma.lesson.findMany({ where: { ...lessonDay, status: 'SCHEDULED', endTime: { gt: now } },
-        select: { id: true, startTime: true, endTime: true, trainer: { select: { name: true } }, service: { select: { name: true, title: true } },
-          bookings: { select: { client: { select: { name: true } }, horse: { select: { name: true } } } } },
+        select: { id: true, cost: true, paymentStatus: true, prepaymentAmount: true, finalPaymentAmount: true, startTime: true, endTime: true, trainer: { select: { name: true } }, service: { select: { name: true, title: true } },
+          bookings: { select: { membershipId: true, costAmount: true, payments: { select: { amount: true, status: true } }, client: { select: { name: true } }, horse: { select: { name: true } } } } },
         orderBy: [{ startTime: 'asc' }, { id: 'asc' }], take: 10 }) : undefined,
       canRead('CASHBOX') ? this.cashboxSummary(start, end) : undefined,
     ]);

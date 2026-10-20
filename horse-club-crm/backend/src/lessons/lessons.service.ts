@@ -1,3 +1,6 @@
+import type { AuthUser } from '../auth/auth.types';
+import type { CompleteLessonDto } from './dto/lesson-payment.dto';
+import { money, paymentStatus, postLessonReceipt } from './lesson-finance';
 import { isSerializationFailure } from '../common/serialization-failure';
 import { BookingRulesService } from '../bookings/booking-rules.service';
 import { randomUUID } from 'node:crypto';
@@ -198,7 +201,7 @@ export class LessonsService {
     });
   }
 
-  async createLesson(dto: CreateLessonDto, transaction?: Prisma.TransactionClient): Promise<LessonDetails> {
+  async createLesson(dto: CreateLessonDto, transaction?: Prisma.TransactionClient, actor?: AuthUser): Promise<LessonDetails> {
     if (dto.participants && (dto.clientId || dto.horseId || dto.membershipId)) {
       throw new BadRequestException('Передайте участников либо в participants, либо в устаревших полях clientId/horseId/membershipId');
     }
@@ -213,6 +216,10 @@ export class LessonsService {
       ...(dto.horseId ? { horseId: dto.horseId } : {}),
       ...(dto.membershipId ? { membershipId: dto.membershipId } : {}),
     }] : []);
+    const explicitPrice = dto.cost != null || dto.prepaymentAmount != null || dto.prepaymentMethod != null;
+    if (explicitPrice && (participants.length !== 1 || participants[0].membershipId)) {
+      throw new BadRequestException('Стоимость и предоплату укажите для одного участника без абонемента');
+    }
     const clientIds = participants.map(participant => participant.clientId);
     if (new Set(clientIds).size !== clientIds.length) {
       throw new BadRequestException('Один клиент не может быть добавлен в занятие дважды');
@@ -239,6 +246,11 @@ export class LessonsService {
       if (participants.length > service.maxCapacity) {
         throw new BadRequestException(`Для услуги разрешено не более ${service.maxCapacity} участников`);
       }
+      const unitCost = money(dto.cost ?? service.price ?? 0);
+      const prepayment = money(dto.prepaymentAmount ?? 0);
+      if (prepayment.gt(unitCost)) throw new BadRequestException('Предоплата не может превышать стоимость');
+      if (prepayment.gt(0) && !dto.prepaymentMethod) throw new BadRequestException('Выберите способ предоплаты');
+      const totalCost = money(unitCost.mul(participants.filter(p => !p.membershipId).length));
       let arenaCapacity: number | undefined;
       if (dto.arenaId) {
         const arena = await tx.arena.findUnique({
@@ -289,8 +301,8 @@ export class LessonsService {
               status: LessonStatus.SCHEDULED,
             },
             select: {
-              id: true,
-              bookings: { select: { clientId: true, horseId: true } },
+              id: true, cost: true, prepaymentAmount: true, finalPaymentAmount: true,
+              bookings: { select: { clientId: true, horseId: true, membershipId: true, costAmount: true } },
             },
           })
         : null;
@@ -334,15 +346,16 @@ export class LessonsService {
         arenaId: dto.arenaId ?? null,
         startTime: start,
         endTime: end,
-        costAmount: service.price,
+        costAmount: participant.membershipId || dto.cost == null ? service.price : unitCost,
         legacyLessonBinding: true,
+        ...(prepayment.gt(0) ? { prepaymentAmount: prepayment, prepaymentMethod: dto.prepaymentMethod } : {}),
         clientId: participant.clientId,
         ...(participant.horseId ? { horseId: participant.horseId } : {}),
         ...(participant.membershipId ? { membershipId: participant.membershipId } : {}),
-        ...(!participant.membershipId && Number(service.price) > 0
+        ...(!participant.membershipId && unitCost.minus(prepayment).gt(0)
           ? { payments: { create: {
               clientId: participant.clientId,
-              amount: service.price,
+              amount: dto.cost == null && prepayment.isZero() ? service.price : unitCost.minus(prepayment),
               method: 'UNSPECIFIED' as const,
               status: 'PENDING' as const,
               description: `Начисление за занятие: ${service.title || service.name}`,
@@ -351,11 +364,18 @@ export class LessonsService {
       }));
 
       if (matchingLesson) {
+        const previousCost = new Prisma.Decimal(matchingLesson.cost ?? matchingLesson.bookings
+          .filter(b => !b.membershipId).reduce((sum, b) => sum.plus(b.costAmount ?? 0), new Prisma.Decimal(0)));
+        const combinedCost = money(previousCost.plus(totalCost));
+        const combinedPrepayment = new Prisma.Decimal(matchingLesson.prepaymentAmount ?? 0).plus(prepayment);
         const updated = await tx.lesson.update({
           where: { id: matchingLesson.id },
-          data: { bookings: { create: bookingCreateData } },
+          data: { cost: combinedCost, prepaymentAmount: combinedPrepayment,
+            paymentStatus: paymentStatus(combinedCost, combinedPrepayment.plus(matchingLesson.finalPaymentAmount ?? 0)),
+            bookings: { create: bookingCreateData } },
           ...lessonDetails,
         });
+        await this.recordPrepayment(tx, updated, clientIds[0], prepayment, dto.prepaymentMethod, actor);
         await this.notifyLesson(tx, updated, `booking:${[...clientIds].sort().join(',')}`, 'Новая запись на тренировку', clientIds);
         return updated;
       }
@@ -368,6 +388,8 @@ export class LessonsService {
           startTime: start,
           endTime: end,
           status: LessonStatus.SCHEDULED,
+          cost: totalCost, prepaymentAmount: prepayment, prepaymentMethod: prepayment.gt(0) ? dto.prepaymentMethod : undefined,
+          paymentStatus: paymentStatus(totalCost, prepayment),
           ...(participants.length
             ? {
                 bookings: {
@@ -378,6 +400,7 @@ export class LessonsService {
         },
         ...lessonDetails,
       });
+      await this.recordPrepayment(tx, created, clientIds[0], prepayment, dto.prepaymentMethod, actor);
       await this.notifyLesson(tx, created, 'created', 'Запись на тренировку подтверждена');
       return created;
     };
@@ -465,6 +488,8 @@ export class LessonsService {
   async updateLessonStatus(
     lessonId: string,
     newStatus: LessonStatus,
+    payment: CompleteLessonDto = {},
+    actor?: AuthUser,
   ): Promise<LessonDetails> {
     if (!ALLOWED_FINAL_STATUSES.has(newStatus)) {
       throw new BadRequestException('Недопустимый статус занятия');
@@ -474,9 +499,9 @@ export class LessonsService {
       const lesson = await tx.lesson.findUnique({
         where: { id: lessonId },
         select: {
-          status: true,
+          status: true, cost: true, prepaymentAmount: true, finalPaymentAmount: true, startTime: true, serviceId: true,
           service: { select: { allowMembership: true } },
-          bookings: { select: { id: true, clientId: true, membershipId: true } },
+          bookings: { select: { id: true, clientId: true, membershipId: true, costAmount: true, prepaymentAmount: true, finalPaymentAmount: true, isPaid: true, client: { select: { name: true } }, payments: { where: { status: 'PAID' }, select: { amount: true } } } },
           operations: {
             where: {
               type: { in: [MembershipOpType.DEBIT, MembershipOpType.REFUND] },
@@ -507,7 +532,7 @@ export class LessonsService {
       for (const booking of lesson.bookings) {
         let membershipId = booking.membershipId;
         if (
-          !membershipId &&
+          !membershipId && lesson.cost == null &&
           lesson.service.allowMembership &&
           (newStatus === LessonStatus.COMPLETED || newStatus === LessonStatus.NO_SHOW)
         ) {
@@ -582,14 +607,65 @@ export class LessonsService {
         }
       }
 
+      let financialData: Prisma.LessonUpdateInput = {};
+      if (newStatus !== 'COMPLETED' && (payment.payRemaining || payment.paymentMethod || payment.customAmount != null)) {
+        throw new BadRequestException('Оплата доступна при завершении занятия');
+      }
+      if (newStatus === 'COMPLETED') {
+        const oneOff = lesson.bookings.filter((_, index) => !resolvedMembershipIds[index]);
+        const cost = money(lesson.cost ?? oneOff.reduce((sum, b) => sum.plus(b.costAmount ?? 0), new Prisma.Decimal(0)));
+        const prepaid = money(lesson.prepaymentAmount ?? 0);
+        const paidByBooking = oneOff.map(b => Prisma.Decimal.max(
+          new Prisma.Decimal(b.prepaymentAmount ?? 0).plus(b.finalPaymentAmount ?? 0),
+          b.isPaid ? b.costAmount ?? 0 : b.payments?.reduce((v, p) => v.plus(p.amount), new Prisma.Decimal(0)) ?? 0));
+        const previouslyPaid = paidByBooking.reduce((sum, paid) => sum.plus(paid), new Prisma.Decimal(0));
+        const remaining = Prisma.Decimal.max(0, cost.minus(previouslyPaid));
+        const acceptPayment = payment.payRemaining ?? Boolean(payment.paymentMethod);
+        if (acceptPayment && remaining.gt(0) && !payment.paymentMethod) throw new BadRequestException('Выберите способ доплаты');
+        if (!acceptPayment && payment.customAmount != null) throw new BadRequestException('Укажите приём доплаты');
+        const amount = acceptPayment ? money(payment.customAmount ?? remaining) : new Prisma.Decimal(0);
+        if (amount.gt(remaining)) throw new BadRequestException('Доплата не может превышать остаток');
+        let toCollect = amount;
+        for (const [index, booking] of oneOff.entries()) {
+          const bookingCost = money(booking.costAmount ?? cost);
+          const allocatedPaid = Prisma.Decimal.min(bookingCost, paidByBooking[index]);
+          const collected = Prisma.Decimal.min(toCollect, bookingCost.minus(allocatedPaid));
+          if (collected.gt(0)) {
+            const date = lesson.startTime.toLocaleString('ru-RU', { timeZone: CLUB_TIME_ZONE });
+            await postLessonReceipt(tx, actor, booking, lesson.serviceId, collected, payment.paymentMethod,
+              `Оплата занятия: ${booking.client?.name ?? booking.clientId}, ${date}`, 'LESSON_PAYMENT');
+            toCollect = toCollect.minus(collected);
+          }
+          if (collected.gt(0) || allocatedPaid.gte(bookingCost)) {
+            const outstanding = bookingCost.minus(allocatedPaid).minus(collected);
+            await tx.booking.update({ where: { id: booking.id }, data: { isPaid: outstanding.lte(0), finalPaymentAmount: allocatedPaid.minus(booking.prepaymentAmount ?? 0).plus(collected), ...(collected.gt(0) ? { finalPaymentMethod: payment.paymentMethod } : {}) } });
+            if (outstanding.lte(0)) await tx.payment.updateMany({ where: { bookingId: booking.id, status: 'PENDING' }, data: { status: 'CANCELLED' } });
+            else await tx.payment.updateMany({ where: { bookingId: booking.id, status: 'PENDING' }, data: { amount: outstanding } });
+          }
+        }
+        financialData = { cost, paymentStatus: paymentStatus(cost, previouslyPaid.plus(amount)),
+          finalPaymentAmount: previouslyPaid.minus(prepaid).plus(amount),
+          ...(amount.gt(0) ? { finalPaymentMethod: payment.paymentMethod } : {}) };
+      }
       const updated = await tx.lesson.update({
         where: { id: lessonId },
-        data: { status: newStatus },
+        data: { status: newStatus, ...financialData },
         ...lessonDetails,
       });
       if (newStatus === LessonStatus.CANCELLED) await this.notifyLesson(tx, updated, 'cancelled', 'Тренировка отменена');
       return updated;
     });
+  }
+
+  private async recordPrepayment(tx: TransactionClient, lesson: LessonDetails, clientId: string,
+    amount: Prisma.Decimal, method: CreateLessonDto['prepaymentMethod'], actor?: AuthUser) {
+    if (!amount.gt(0)) return;
+    const booking = lesson.bookings.find(b => b.clientId === clientId);
+    if (!booking) throw new BadRequestException('Участник для предоплаты не найден');
+    const date = lesson.startTime.toLocaleString('ru-RU', { timeZone: CLUB_TIME_ZONE });
+    await postLessonReceipt(tx, actor, booking, lesson.serviceId, amount, method,
+      `Предоплата за занятие ${date} (${booking.client.name})`, 'LESSON_PREPAYMENT');
+    await tx.booking.update({ where: { id: booking.id }, data: { isPaid: amount.gte(booking.costAmount) } });
   }
 
   private async notifyLesson(tx: TransactionClient, lesson: LessonDetails, event: string, title: string,

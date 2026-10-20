@@ -3,6 +3,7 @@ import { LessonStatus } from '@prisma/client';
 import { IsIn, IsISO8601, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateLessonDto } from './create-lesson.dto';
+import { CompleteLessonDto } from './lesson-payment.dto';
 
 export class UpdateLessonDto extends PartialType(CreateLessonDto) {}
 
@@ -24,7 +25,7 @@ const FINAL_LESSON_STATUSES = [
   LessonStatus.CANCELLED,
 ] as const;
 
-export class UpdateLessonStatusDto {
+export class UpdateLessonStatusDto extends CompleteLessonDto {
   @ApiProperty({ enum: FINAL_LESSON_STATUSES })
   @IsIn(FINAL_LESSON_STATUSES)
   status!: LessonStatus;
