@@ -11,7 +11,7 @@ import { cashTime, currency } from './shared'
 
 const expenseCategories = { FEED: 'Сено и корма', BEDDING: 'Опилки', VET_FARRIER: 'Коваль/Ветврач', AMMUNITION: 'Амуниция', MAINTENANCE: 'Хознужды/Ремонт', SALARY: 'Зарплата', OTHER: 'Прочее' }
 const categoryOptions = Object.entries(expenseCategories).map(([value, label]) => ({ value, label }))
-type Expense = { id: string; amount: string; date: string; category: keyof typeof expenseCategories; description: string; paymentMethod: 'CASH' | 'CARD'; createdBy: { email: string } }
+type Expense = { id: string; isEncashment?: boolean; amount: string; date: string; category: keyof typeof expenseCategories; description: string; paymentMethod: 'CASH' | 'CARD'; createdBy: { email: string } }
 type Values = { amount: number; paymentMethod: 'CASH' | 'CARD'; category: keyof typeof expenseCategories; description: string; date: Dayjs }
 
 export function ExpenseModal({ onClose, variant = 'modal' }: { onClose: () => void; variant?: 'modal' | 'drawer' }) {
@@ -111,7 +111,7 @@ export function ExpenseHistory({ from, to, shiftId, refresh, admin }: { from?: s
         { key: 'method', title: 'Способ оплаты', render: (_, row) => <Tag>{row.paymentMethod === 'CASH' ? 'Наличные' : 'Безнал'}</Tag> },
         { key: 'amount', title: 'Сумма', render: (_, row) => <Typography.Text type="danger">−{currency(row.amount)}</Typography.Text> },
         { key: 'author', title: 'Автор записи', render: (_, row) => row.createdBy.email },
-        ...(admin ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Expense) => <Button danger onClick={() => cancel(row)}>Удалить расход</Button> }] : []),
+        ...(admin ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Expense) => row.isEncashment ? <Tag>Инкассация</Tag> : <Button danger onClick={() => cancel(row)}>Удалить расход</Button> }] : []),
       ]} />
   </Card>
 }

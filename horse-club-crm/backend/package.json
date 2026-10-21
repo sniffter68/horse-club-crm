@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "lint": "node ../frontend/node_modules/oxlint/bin/oxlint src test",
     "start": "node dist/main.js",
     "prestart:dev": "npm run build",
     "start:dev": "concurrently --kill-others --names types,server \"tsc --watch --preserveWatchOutput\" \"node --env-file=.env --watch dist/main.js\"",

@@ -64,13 +64,13 @@ export class CashDeskService {
         }
         if (booking.status.startsWith('cancelled') || booking.status === 'penalty_cancellation') throw new ConflictException('Занятие отменено');
         if (booking.transactions.some(row => row.membershipId && row.transactionType === 'usage')) throw new ConflictException('Занятие уже списано с абонемента');
-        pendingId = (await tx.payment.findFirst({ where: { bookingId: booking.id, status: 'PENDING' }, orderBy: { createdAt: 'asc' } }))?.id;
+        pendingId = (await tx.payment.findFirst({ where: { bookingId: booking.id, status: 'PENDING', archivedAt: null }, orderBy: { createdAt: 'asc' } }))?.id;
       }
       if (dto.membershipId) {
         const membership = await tx.membership.findUnique({ where: { id: dto.membershipId } });
         if (!membership || membership.clientId !== dto.clientId) throw new BadRequestException('Абонемент не принадлежит клиенту');
         if (membership.deletedAt || membership.status === 'frozen' || (membership.totalLessons > 0 ? membership.validUntil : membership.validTo) < new Date()) throw new ConflictException('Абонемент заморожен или истёк');
-        pendingId = (await tx.payment.findFirst({ where: { membershipId: membership.id, status: 'PENDING' }, orderBy: { createdAt: 'asc' } }))?.id;
+        pendingId = (await tx.payment.findFirst({ where: { membershipId: membership.id, status: 'PENDING', archivedAt: null }, orderBy: { createdAt: 'asc' } }))?.id;
         if (membership.type === 'fixed_lessons') {
           if (await tx.payment.count({ where: { membershipId: membership.id, status: 'PAID' } })) throw new ConflictException('Абонемент уже оплачен');
           // Issuance already credits lesson units; accepting money must not credit them a second time.
@@ -81,7 +81,7 @@ export class CashDeskService {
           } });
         }
       }
-      const shift = await tx.cashShift.findFirst({ where: { cashierId, closedAt: null } });
+      const shift = await tx.cashShift.findFirst({ where: { cashierId, archivedAt: null, closedAt: null } });
       const data = {
         clientId: dto.clientId, bookingId: dto.bookingId ?? null, membershipId: dto.membershipId ?? null,
         amount: new Prisma.Decimal(dto.amount), method: dto.method, cashGiven: dto.cashGiven === undefined ? null : new Prisma.Decimal(dto.cashGiven),
@@ -121,7 +121,7 @@ export class CashDeskService {
     const from = new Date(query.from), to = new Date(query.to);
     if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || from >= to) throw new BadRequestException('Укажите корректный период: начало раньше конца');
     const where: Prisma.PaymentWhereInput = {
-      status: 'PAID', OR: [{ paidAt: { gte: from, lt: to } }, { paidAt: null, createdAt: { gte: from, lt: to } }],
+      archivedAt: null, status: 'PAID', OR: [{ paidAt: { gte: from, lt: to } }, { paidAt: null, createdAt: { gte: from, lt: to } }],
       ...(query.cashierId ? { cashierId: query.cashierId } : {}), ...(query.shiftId ? { shiftId: query.shiftId } : {}),
     };
     return this.prisma.$transaction(async tx => {
@@ -131,17 +131,17 @@ export class CashDeskService {
     }, { isolationLevel: 'RepeatableRead' });
   }
 
-  currentShift(cashierId: string) { return this.prisma.cashShift.findFirst({ where: { cashierId, closedAt: null } }); }
+  currentShift(cashierId: string) { return this.prisma.cashShift.findFirst({ where: { cashierId, archivedAt: null, closedAt: null } }); }
   openShift(dto: OpenCashShiftDto, cashierId: string) {
     return this.atomic(async tx => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${cashierId}, 0))::text`;
-      if (await tx.cashShift.findFirst({ where: { cashierId, closedAt: null } })) throw new ConflictException('Смена уже открыта');
+      if (await tx.cashShift.findFirst({ where: { cashierId, archivedAt: null, closedAt: null } })) throw new ConflictException('Смена уже открыта');
       return tx.cashShift.create({ data: { cashierId, startingCash: dto.startingCash, notes: dto.notes?.trim() } });
     });
   }
   closeShift(id: string, cashierId: string) {
     return this.atomic(async tx => {
-      const shift = await tx.cashShift.findFirst({ where: { id, cashierId, closedAt: null } });
+      const shift = await tx.cashShift.findFirst({ where: { id, cashierId, archivedAt: null, closedAt: null } });
       if (!shift) throw new ConflictException('Открытая смена не найдена');
       return tx.cashShift.update({ where: { id }, data: { closedAt: new Date() } });
     });

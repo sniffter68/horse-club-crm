@@ -52,6 +52,7 @@ export class PaymentsService {
       { description: { contains: options.search, mode: 'insensitive' } },
       { boardingContract: { is: { horse: { is: { name: { contains: options.search, mode: 'insensitive' } } } } } },
     ] } : {};
+    where.archivedAt = null;
     const orderBy = { [options.sort]: options.order } as Prisma.PaymentOrderByWithRelationInput;
     const [total, data] = await this.prisma.$transaction([
       this.prisma.payment.count({ where }),
@@ -88,7 +89,7 @@ export class PaymentsService {
     try {
       const current = await this.prisma.payment.findUnique({ where: { id } });
       if (!current) throw new NotFoundException('Платёж не найден');
-      if (current.cashierId) throw new ConflictException('Проведённый кассовый платёж нельзя редактировать');
+      if (current.archivedAt || current.cashierId) throw new ConflictException('Проведённый кассовый платёж нельзя редактировать');
       const data = await this.resolveData({
         clientId: dto.clientId ?? current.clientId,
         bookingId: dto.bookingId === undefined ? current.bookingId : dto.bookingId,
@@ -109,7 +110,7 @@ export class PaymentsService {
   async remove(id: string): Promise<PaymentWithRelations> {
     try {
       const current = await this.prisma.payment.findUnique({ where: { id } });
-      if (current?.cashierId) throw new ConflictException('Проведённый кассовый платёж нельзя удалить');
+      if (current?.archivedAt || current?.cashierId) throw new ConflictException('Проведённый кассовый платёж нельзя удалить');
       return await this.prisma.payment.delete({ where: { id }, include: paymentInclude.include });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Платёж');

@@ -53,6 +53,82 @@ async function fillPayment(page: Page) {
   await modal.getByRole('combobox', { name: 'Услуга / занятие / абонемент', exact: true }).press('Enter')
   return modal
 }
+
+for (const width of [1440, 390]) test(`owner reset requires exact word, preserves failure and refreshes book at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  const state = await setup(page)
+  state.paid = true
+  let reset = false, fail = true
+  const posts: Record<string, unknown>[] = []
+  await page.route('**/api/cash/reset', route => {
+    posts.push(route.request().postDataJSON())
+    if (fail) return route.fulfill({ status: 500, json: { message: 'Не удалось записать аудит' } })
+    reset = true
+    return route.fulfill({ json: { success: true, currentBalance: 0 } })
+  })
+  await page.route('**/api/finance/summary?*', route => route.fulfill({ json: {
+    balanceCash: reset ? 0 : 5000, balanceCard: reset ? 0 : 2000,
+    totalExpenses: 0, operationsCount: reset ? 0 : 1,
+    operations: reset ? [] : [{ id: 'p1', amount: '1000', method: 'CASH', paidAt: '2026-10-09T09:00:00Z', client: { name: 'Тестовый платёж' } }],
+  } }))
+  await page.route('**/api/payments/shifts/current', route => route.fulfill({ json: reset ? null : { id: 'shift1', openedAt: '2026-10-09T07:00:00Z', startingCash: '1000' } }))
+  await page.goto('/cash-desk')
+  await expect(page.getByText('Тестовый платёж', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Очистить журнал кассы', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Обнулить кассу?' })
+  const submit = dialog.getByRole('button', { name: 'Обнулить кассу', exact: true })
+  await expect(dialog.getByRole('button', { name: 'Сохранить кассу' })).toBeFocused()
+  await expect(submit).toBeDisabled()
+  const word = dialog.getByRole('textbox', { name: 'Для подтверждения введите СБРОСИТЬ' })
+  await word.fill('сбросить'); await expect(submit).toBeDisabled()
+  await word.fill('СБРОСИТЬ '); await expect(submit).toBeDisabled()
+  await word.fill('СБРОСИТЬ')
+  await page.screenshot({ path: `test-results/cash-reset-${width}.png`, fullPage: true, animations: 'disabled' })
+  await submit.click()
+  await expect(dialog.locator('.ant-alert-error')).toContainText('Не удалось записать аудит')
+  await expect(word).toHaveValue('СБРОСИТЬ')
+  fail = false; await submit.click()
+  await expect(dialog).not.toBeVisible()
+  expect(posts[0]).toEqual(posts[1])
+  expect(posts[0].confirmation).toBe('RESET_CASH')
+  await expect(page.getByText('Тестовый платёж', { exact: true })).not.toBeVisible()
+  await expect(page.getByText('Нет открытой смены', { exact: true })).toBeVisible()
+  await expect(page.locator('.kpi-card').filter({ hasText: 'Остаток в кассе (наличные)' })).toContainText('0,00')
+  await expect(page.getByText('Касса успешно обнулена', { exact: true })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('owner withdrawal retries same operation after uncertain failure and permits correcting insufficient amount', async ({ page }) => {
+  await setup(page)
+  const posts: Record<string, unknown>[] = []
+  let mode = 'invalid'
+  await page.route('**/api/cash/withdraw', route => {
+    posts.push(route.request().postDataJSON())
+    return mode === 'invalid' ? route.fulfill({ status: 400, json: { message: 'Недостаточно наличных в кассе' } })
+      : mode === 'failure' ? route.fulfill({ status: 500, json: { message: 'Ответ потерян' } })
+      : route.fulfill({ json: { id: 'encashment' } })
+  })
+  await page.goto('/cash-desk')
+  await page.getByRole('button', { name: 'Инкассация / Снятие выручки', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Инкассация / Снятие выручки' })
+  const amount = dialog.getByRole('spinbutton', { name: 'Сумма инкассации, ₽' })
+  await amount.fill('6000'); await dialog.getByRole('button', { name: 'Передать выручку' }).click()
+  await expect(dialog.locator('.ant-alert-error')).toContainText('Недостаточно наличных')
+  await expect(amount).toBeEnabled()
+  mode = 'failure'; await amount.fill('1500'); await dialog.getByRole('button', { name: 'Передать выручку' }).click()
+  await expect(dialog.locator('.ant-alert-error')).toContainText('Ответ потерян')
+  await expect(amount).toBeDisabled()
+  mode = 'success'; await dialog.getByRole('button', { name: 'Передать выручку' }).click()
+  await expect(dialog).not.toBeVisible()
+  expect(posts[1]).toEqual(posts[2]); expect(posts[1].amount).toBe(1500)
+})
+
+test('manager cannot see owner reset or withdrawal controls', async ({ page }) => {
+  await setup(page, 'MANAGER'); await page.goto('/cash-desk')
+  await expect(page.getByRole('button', { name: 'Обновить', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Очистить журнал кассы' })).not.toBeVisible()
+  await expect(page.getByRole('button', { name: 'Инкассация / Снятие выручки' })).not.toBeVisible()
+})
 for (const width of [1440, 390]) test(`expense 1500 reduces cash balance, filters and admin cancellation at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 })
   const state = await setup(page)
@@ -109,7 +185,7 @@ test('expense failure preserves payload for retry; manager cannot delete', async
   await dialog.getByRole('textbox', { name: 'На что потрачено' }).fill('Закупка сена')
   state.expenseFail = true
   await dialog.getByRole('button', { name: 'Внести расход', exact: true }).click()
-  await expect(dialog.getByRole('alert')).toContainText('Не удалось сохранить расход')
+  await expect(dialog.locator('.ant-alert-error')).toContainText('Не удалось сохранить расход')
   await expect(dialog.getByRole('textbox', { name: 'На что потрачено' })).toHaveValue('Закупка сена')
   state.expenseFail = false
   await dialog.getByRole('button', { name: 'Внести расход', exact: true }).click()

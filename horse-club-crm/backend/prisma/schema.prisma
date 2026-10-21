@@ -621,6 +621,7 @@ model BoardingContract {
 }
 
 model CashShift {
+  archivedAt DateTime? @db.Timestamptz(6)
   expenses Expense[]
   id String @id @default(uuid()) @db.Uuid
   cashierId String @db.Uuid
@@ -649,6 +650,8 @@ enum ExpenseCategory {
 }
 
 model Expense {
+  archivedAt DateTime? @db.Timestamptz(6)
+  isEncashment Boolean @default(false)
   payroll PayrollCalculation?
   id String @id @default(uuid()) @db.Uuid
   requestId String? @unique @db.Uuid
@@ -739,6 +742,7 @@ model PayrollCalculation {
 }
 
 model Payment {
+  archivedAt DateTime? @db.Timestamptz(6)
   cashDeskTransaction LedgerTransaction? @relation("CashDeskLedger")
   cashGiven Decimal? @db.Decimal(12, 2)
   cashChange Decimal? @db.Decimal(12, 2)
@@ -776,6 +780,18 @@ model Payment {
   @@index([cashierId, paidAt])
   @@index([shiftId])
   @@index([membershipId])
+}
+
+// Immutable audit survives cash resets. Actor identity is snapshotted for retention.
+model CashAuditLog {
+  id String @id @default(uuid()) @db.Uuid
+  requestId String @unique @db.Uuid
+  action String
+  actorId String @db.Uuid
+  actorName String
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  details Json
+  @@index([createdAt])
 }
 
 enum BookingAttendance {

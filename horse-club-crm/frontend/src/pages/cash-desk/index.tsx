@@ -13,6 +13,7 @@ import { CashDeskButton } from './CashDeskPaymentModal'
 import { cashTime, currency, operationService, periodRange, type CashOperation, type CashShift, type CashSummary } from './shared'
 import { personName } from '../cards/format'
 import { ExpenseHistory, ExpenseModal } from './expenses'
+import { CashManagement } from './CashManagement'
 
 export function CashDeskPage() {
   const { data: role, isLoading } = usePermissions({})
@@ -84,7 +85,7 @@ function CashDeskBook() {
   } })
   return <Space className="cash-desk-page" direction="vertical" size="large" style={{ width: '100%' }}>
     {!writable && <Alert type="info" showIcon message="Доступно только для просмотра" />}
-    <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}><div><Typography.Title level={2}>Касса</Typography.Title><Typography.Text type="secondary">Кассовая книга · время Москвы</Typography.Text></div><Space wrap><CashDeskButton /><Button type="primary" disabled={!writable} onClick={() => setExpenseOpen(true)}>Внести расход</Button><Button onClick={() => setRefresh(value => value + 1)} loading={loading}>Обновить</Button></Space></Space>
+    <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}><div><Typography.Title level={2}>Касса</Typography.Title><Typography.Text type="secondary">Кассовая книга · время Москвы</Typography.Text></div><Space wrap><CashDeskButton /><Button type="primary" disabled={!writable} onClick={() => setExpenseOpen(true)}>Внести расход</Button><Button onClick={() => setRefresh(value => value + 1)} loading={loading}>Обновить</Button>{writable && role === 'ADMIN' && <CashManagement onReset={() => { setShift(null); setSummary(undefined); changeParams({ period: 'today', page: '1', expensePage: '1' }) }} />}</Space></Space>
     <Card><Space wrap>
       <Tag>{shift ? `Смена открыта ${cashTime(shift.openedAt)}` : 'Нет открытой смены'}</Tag>
       {shift ? <><Typography.Text>Размен на начало: {currency(shift.startingCash)}</Typography.Text><Button disabled={!writable} onClick={closeShift}>Закрыть смену</Button></> : <Button disabled={!writable} onClick={() => { setShiftError(undefined); setOpening(true) }}>Открыть смену</Button>}

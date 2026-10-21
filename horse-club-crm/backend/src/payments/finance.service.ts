@@ -62,7 +62,7 @@ export class FinanceService {
     return { gte, lt };
   }
   list(query: ExpenseQueryDto) {
-    const where: Prisma.ExpenseWhereInput = { cancelledAt: null, date: this.range(query.from, query.to), paymentMethod: query.paymentMethod, category: query.category, shiftId: query.shiftId };
+    const where: Prisma.ExpenseWhereInput = { archivedAt: null, cancelledAt: null, date: this.range(query.from, query.to), paymentMethod: query.paymentMethod, category: query.category, shiftId: query.shiftId };
     return this.prisma.$transaction(async tx => ({
       data: await tx.expense.findMany({ where, include: author, orderBy: [{ date: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.pageSize, take: query.pageSize }),
       total: await tx.expense.count({ where }), page: query.page, pageSize: query.pageSize,
@@ -73,6 +73,7 @@ export class FinanceService {
     return this.atomic(async tx => {
       const existing = await tx.expense.findUnique({ where: { id } });
       if (!existing) throw new NotFoundException('Расход не найден');
+      if (existing.archivedAt || existing.isEncashment) throw new ConflictException('Архивные расходы и инкассацию нельзя отменить');
       if (existing.cancelledAt) return existing;
       if (existing.category === 'SALARY' && await tx.payrollCalculation.findUnique({ where: { expenseId: id } })) {
         throw new ConflictException('Расход связан с выплаченной ведомостью. Отмена зарплаты через кассу недоступна');
@@ -82,11 +83,11 @@ export class FinanceService {
   }
   summary(query: CashSummaryQueryDto) {
     const { gte, lt } = this.range(query.from, query.to);
-    const paymentWhere = (start?: Date): Prisma.PaymentWhereInput => ({ status: 'PAID',
+    const paymentWhere = (start?: Date): Prisma.PaymentWhereInput => ({ archivedAt: null, status: 'PAID',
       OR: [{ paidAt: { gte: start, lt } }, { paidAt: null, createdAt: { gte: start, lt } }],
       ...(query.cashierId ? { cashierId: query.cashierId } : {}), ...(query.shiftId ? { shiftId: query.shiftId } : {}),
     });
-    const expenseWhere = (start?: Date): Prisma.ExpenseWhereInput => ({ cancelledAt: null, date: { gte: start, lt },
+    const expenseWhere = (start?: Date): Prisma.ExpenseWhereInput => ({ archivedAt: null, cancelledAt: null, date: { gte: start, lt },
       ...(query.cashierId ? { createdById: query.cashierId } : {}), ...(query.shiftId ? { shiftId: query.shiftId } : {}),
     });
     return this.prisma.$transaction(async tx => {
