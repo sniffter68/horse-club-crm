@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
+import { CatalogDrawerForm } from './EditDrawer'
+import { CatalogEditContext } from './editContext'
 import { CatalogFormActivity } from './CatalogFormActivity'
 import { type BaseRecord, type HttpError } from '@refinedev/core'
 import { Create, Edit, List, EditButton, DeleteButton, useForm, useTable } from '@refinedev/antd'
@@ -60,9 +62,11 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
 export function CatalogForm<T extends BaseRecord, V extends object>({ resource, action, title, defaults, toPayload, children }: {
   resource: string; action: 'create' | 'edit'; title: string; defaults?: Partial<V>; toPayload?: (values: V) => V; children: ReactNode
 }) {
+  const drawer = useContext(CatalogEditContext)
   const { canManage, isLoading } = useCatalogPermissions(resource)
   if (isLoading) return <Spin />
   if (!canManage) return <Result status="403" title="Доступ только для чтения" subTitle="Изменять каталоги могут администратор и менеджер." />
+  if (drawer) return <CatalogDrawerForm<T, V> resource={resource} title={title} toPayload={toPayload}>{children}</CatalogDrawerForm>
   return <WritableCatalogForm<T, V> resource={resource} action={action} title={title} defaults={defaults} toPayload={toPayload}>{children}</WritableCatalogForm>
 }
 

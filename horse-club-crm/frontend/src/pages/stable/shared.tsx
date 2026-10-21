@@ -14,10 +14,10 @@ export function StableListState({ loading, error, total, page, onPage, refresh, 
         <Pagination current={page} total={total} pageSize={20} showSizeChanger={false} onChange={onPage} simple /></>}
   </>
 }
-export function StableEntryModal<T extends object>({ title, form, submitLabel, submitDisabled, onClose, onSaved, save, children, resources = ['horses', 'clients', 'boarding-contracts'], variant = 'modal', successMessage = 'Запись сохранена' }: {
+export function StableEntryModal<T extends object>({ title, form, initialValues, submitLabel, submitDisabled, onClose, onSaved, save, children, resources = ['horses', 'clients', 'boarding-contracts'], variant = 'modal', successMessage = 'Запись сохранена' }: {
   title: string; form: FormInstance<T>; submitLabel: string; onClose: () => void; onSaved: () => void;
   save: (values: T) => Promise<unknown>; children: ReactNode
-  variant?: 'modal' | 'drawer'; submitDisabled?: boolean; resources?: string[]; successMessage?: string
+  initialValues?: Record<string, unknown>; variant?: 'modal' | 'drawer'; submitDisabled?: boolean; resources?: string[]; successMessage?: string
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -32,7 +32,7 @@ export function StableEntryModal<T extends object>({ title, form, submitLabel, s
     else onClose()
   }
   const submit = async (values: T) => {
-    if (lock.current) return
+    if (lock.current || submitDisabled) return
     lock.current = true; setBusy(true); setError(undefined)
     try {
       await save(values)
@@ -46,9 +46,9 @@ export function StableEntryModal<T extends object>({ title, form, submitLabel, s
   return <EntryOverlay variant={variant} open title={title} className="stable-entry-modal" width={520} onCancel={close}
     maskClosable={!busy} keyboard={!busy} closable={!busy} footer={<Space wrap>
       <Button onClick={close} disabled={busy}>Закрыть</Button>
-      <Button type="primary" loading={busy} disabled={submitDisabled || busy} onClick={() => form.submit()}>{submitLabel}</Button>
+      <Button type="primary" aria-label={submitLabel} loading={busy} disabled={submitDisabled || busy} onClick={() => form.submit()}>{submitLabel}</Button>
     </Space>}>
-    <Form form={form} layout="vertical" noValidate disabled={busy} onFinish={submit} scrollToFirstError={{ focus: true }}>{children}</Form>
+    <Form form={form} initialValues={initialValues} layout="vertical" noValidate disabled={busy} onFinish={submit} scrollToFirstError={{ focus: true }}>{children}</Form>
     {error && <Alert type="error" showIcon message="Запись не сохранена" description={error} />}
   </EntryOverlay>
 }

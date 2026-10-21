@@ -1,4 +1,6 @@
 import { ArchiveAction } from './ArchiveAction'
+import { ClientForm } from './form'
+import { CatalogEditAction } from '../catalogs/EditDrawer'
 import { useState } from 'react'
 import { VkProfileLink } from '../../components/VkProfileLink'
 import { useInvalidate, useOne, type HttpError } from '@refinedev/core'
@@ -91,6 +93,7 @@ export function ClientList() {
       {query.isLoading && <Skeleton active />}
       {query.error && <Alert type="error" showIcon message="Не удалось загрузить карточку клиента" description={query.error.message} />}
       {client && !query.isLoading && <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <CatalogEditAction resource="clients" id={client.id}><ClientForm action="edit" /></CatalogEditAction>
         {canManage && !client.deletedAt && <MembershipBalance clientId={client.id} membership={(() => {
           const active = client.memberships.filter(item => item.isActive)
             .sort((a, b) => a.validUntil.localeCompare(b.validUntil) || a.id.localeCompare(b.id))[0]
@@ -105,6 +108,8 @@ export function ClientList() {
           { key: 'name', label: 'ФИО', span: 2, children: <span className="client-name">{[client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || '—'}</span> },
           { key: 'phone', label: 'Телефон', children: client.phone ? <a className="data-mono" href={`tel:${client.phone}`}>{client.phone}</a> : '—' },
           { key: 'email', label: 'Email', children: client.email ? <a href={`mailto:${client.email}`}>{client.email}</a> : '—' },
+          { key: 'birthDate', label: 'Дата рождения', children: client.birthDate ? dateOnly(client.birthDate) : '—' },
+          { key: 'riderLevel', label: 'Уровень опыта', children: client.riderLevel || '—' },
           { key: 'roles', label: 'Роли', span: 2, children: <Space>{client.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{client.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
           { key: 'preferences', label: 'Заметки', span: 2, children: client.preferences || '—' },
           ...(client.medicalNotes !== undefined ? [{ key: 'medicalNotes', label: 'Медицинские заметки', span: 2, children: client.medicalNotes || '—' }] : []),

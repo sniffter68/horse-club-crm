@@ -14,10 +14,11 @@ import { setRefineTotalHeaders } from '../common/refine';
 import { CreateHorseDto } from './dto/create-horse.dto';
 import { UpdateHorseDto } from './dto/update-horse.dto';
 import { HorsesService, type HorseDetailsResponse } from './horses.service';
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 
 @ApiTags('Horses')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
 @Controller('horses')
 export class HorsesController {
   constructor(private readonly horsesService: HorsesService) {}
@@ -37,18 +38,21 @@ export class HorsesController {
   }
 
   @Post()
+  @RequireModule('STABLES')
   @Roles(Role.ADMIN, Role.MANAGER)
   create(@Body() dto: CreateHorseDto): Promise<Horse> {
     return this.horsesService.create(dto);
   }
 
   @Patch(':id')
+  @RequireModule('STABLES')
   @Roles(Role.ADMIN, Role.MANAGER)
   update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateHorseDto): Promise<Horse> {
     return this.horsesService.update(id, dto);
   }
 
   @Delete(':id')
+  @RequireModule('STABLES')
   @Roles(Role.ADMIN, Role.MANAGER)
   remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<Horse> {
     return this.horsesService.remove(id);

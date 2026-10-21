@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { HorseForm } from './form'
+import { CatalogEditAction } from '../catalogs/EditDrawer'
 import { Descriptions, Empty, List, Space, Tabs, Tag, Typography } from 'antd'
 import { money } from '../catalogs/format'
 import { CatalogList } from '../catalogs/shared'
@@ -33,10 +35,14 @@ export function HorseList() {
     ]} />
     <DetailsModal<HorseDetails> resource="horses" id={selectedId} title="Карточка лошади" onClose={() => setSelectedId(undefined)}>
       {(horse, ready) => <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <CatalogEditAction resource="horses" id={horse.id}><HorseForm action="edit" /></CatalogEditAction>
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'name', label: 'Кличка', children: horse.name },
           { key: 'status', label: 'Статус', children: <Tag className={`crm-tag crm-tag--${horse.status === 'sick' || horse.status === 'quarantine' ? 'danger' : horse.isUnavailable ? 'warning' : 'success'}`}>{horse.status ? horseStatuses[horse.status] : horse.isUnavailable ? 'Недоступна' : 'Доступна'}</Tag> },
           { key: 'breed', label: 'Порода', children: horse.breed || '—' },
+          { key: 'coat', label: 'Масть', children: horse.coat || '—' },
+          { key: 'birthYear', label: 'Год рождения', children: horse.birthYear || '—' },
+          { key: 'ownerType', label: 'Тип', children: horse.ownerType === 'private' ? 'Постой' : 'Клубная' },
           { key: 'level', label: 'Уровень всадника', children: horse.riderLevel || '—' },
           { key: 'load', label: 'Лимит нагрузки', children: `${horse.maxDailyMinutes} мин/день` },
           { key: 'rest', label: 'Минимальный отдых', children: `${horse.minRestMinutes} мин` },

@@ -41,7 +41,7 @@ import { BoardingContractCreate } from './pages/boarding-contracts/create'
 import { BoardingContractEdit } from './pages/boarding-contracts/edit'
 import { PaymentList } from './pages/payments/list'
 import { Authenticated, Refine, usePermissions, type ResourceProps } from '@refinedev/core'
-import { ThemedLayout as ThemedLayoutV2, ThemedTitle as ThemedTitleV2, useNotificationProvider } from '@refinedev/antd'
+import { useNotificationProvider } from '@refinedev/antd'
 import routerProvider, { CatchAllNavigate } from '@refinedev/react-router'
 import { App as AntdApp, ConfigProvider, Result, Spin, theme as antdTheme } from 'antd'
 import ruRU from 'antd/locale/ru_RU'
@@ -49,7 +49,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom
 import { authProvider } from './authProvider'
 import { dataProvider } from './dataProvider'
 import { LoginPage } from './pages/login'
-import { Sidebar } from './components/layout/Sidebar'
+import { AppLayout } from './components/layout/AppLayout'
 import { LeadNotifications } from './components/LeadNotifications'
 import { DashboardPage } from './pages/dashboard'
 import { LessonHistoryPage } from './pages/lesson-history'
@@ -180,7 +180,7 @@ export default function App() {
             options={{ syncWithLocation: true, disableTelemetry: true }}>
             <Routes>
               <Route element={<Authenticated key="private" fallback={<CatchAllNavigate to="/login" />} loading={<LoadingPage />}>
-                <PermissionsProvider><CashDeskProvider><ThemedLayoutV2 Header={() => <div className="cash-desk-header"><LeadNotifications /><CashDeskButton /></div>} Sider={() => <Sidebar darkMode={darkMode} onToggleTheme={toggleTheme} />} Title={(props) => <ThemedTitleV2 {...props} text="Horse CRM" />}><ModuleGuard><Outlet /></ModuleGuard></ThemedLayoutV2></CashDeskProvider></PermissionsProvider>
+                <PermissionsProvider><CashDeskProvider><AppLayout darkMode={darkMode} onToggleTheme={toggleTheme} header={<div className="cash-desk-header"><LeadNotifications /><CashDeskButton /></div>}><ModuleGuard><Outlet /></ModuleGuard></AppLayout></CashDeskProvider></PermissionsProvider>
               </Authenticated>}>
                 <Route index element={<DashboardRoute />} />
                 {catalogs.map(({ name, ListPage, CreatePage, EditPage }) => (

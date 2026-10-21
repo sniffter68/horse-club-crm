@@ -375,7 +375,7 @@ export function SchedulePage() {
         events={entries.map(entry => ({ id: entry.source === 'booking' ? `triad:${entry.id}` : entry.id,
           title: eventSummary(entry), start: entry.startTime, end: entry.endTime,
           backgroundColor: entry.source === 'lesson' ? statuses[entry.status as Status].event : entry.completed ? '#3E5F48' : entry.active ? '#724C39' : '#8C6527',
-          borderColor: 'transparent', textColor: '#FFFFFF' }))}
+          borderColor: trainers.find(trainer => trainer.id === entry.trainerId)?.scheduleColor || 'transparent', textColor: '#FFFFFF' }))}
         eventContent={({ event }) => {
           const entry = entries.find(item => (item.source === 'booking' ? `triad:${item.id}` : item.id) === event.id)
           return entry ? <ScheduleEventContent entry={entry} /> : null

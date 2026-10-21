@@ -128,7 +128,7 @@ export function Sidebar({ darkMode, onToggleTheme }: { darkMode: boolean; onTogg
 
   return (
     <Layout.Sider className="crm-sidebar" theme="dark" collapsible collapsed={collapsed} onCollapse={setCollapsed}
-      breakpoint="lg" collapsedWidth={80} style={{ minHeight: '100vh' }}>
+      breakpoint="lg" collapsedWidth={80} style={{ height: '100dvh', position: 'sticky', top: 0, flexShrink: 0 }}>
       <div className="sidebar-title-row sidebar-title-row--desktop">
         <BrandMark collapsed={collapsed} />
         <Button type="text" shape="circle" icon={darkMode ? <BulbOutlined /> : <MoonOutlined />}

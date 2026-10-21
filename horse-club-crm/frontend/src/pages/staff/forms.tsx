@@ -6,6 +6,9 @@ import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { StableEntryModal } from '../stable/shared'
 import { currency } from '../cash-desk/shared'
 import { shiftStatuses, type Payroll, type Shift, type ShiftStatus, type Staff } from './types'
+import { PhoneField } from '../../components/PhoneField'
+import { phonePayload } from '../../components/formatPhone'
+import { isUuid } from '../../uuid'
 
 const required = [{ required: true, message: 'Заполните поле' }]
 const moneyProps = { min: 0, max: 9999999999.99, precision: 2, style: { width: '100%' } }
@@ -20,8 +23,12 @@ export function ProfileModal({ staff, onClose, onSaved }: { staff?: Staff; onClo
     void httpClient.get(`${API_URL}/staff/candidates`, { signal: controller.signal }).then(res => setCandidates(res.data)).catch(cause => { if (!controller.signal.aborted) setError(toHttpError(cause).message) })
     return () => controller.abort()
   }, [staff])
-  return <StableEntryModal title={staff ? `Ставки: ${staff.fullName}` : 'Добавить сотрудника'} form={form} submitLabel="Сохранить ставки" resources={['staff']} onClose={onClose} onSaved={onSaved}
-    save={values => staff ? httpClient.patch(`${API_URL}/staff/${staff.id}`, values) : httpClient.post(`${API_URL}/staff`, values)}>
+  return <StableEntryModal variant="drawer" title={staff ? `Редактирование сотрудника: ${staff.fullName}` : 'Добавить сотрудника'} form={form} submitLabel="Сохранить" resources={['staff']} onClose={onClose} onSaved={onSaved} successMessage="Данные сотрудника обновлены"
+    save={values => {
+      if (!isUuid(staff ? staff.id : values.userId)) throw new Error('Некорректный идентификатор сотрудника')
+      const payload = { ...values, phone: phonePayload(values.phone) }
+      return staff ? httpClient.patch(`${API_URL}/staff/${staff.id}`, payload) : httpClient.post(`${API_URL}/staff`, payload)
+    }}>
     {error && <Alert type="error" message={error} />}
     {!staff && <Form.Item name="userId" label="Учетная запись" rules={required}><Select aria-label="Учетная запись" showSearch optionFilterProp="label" options={candidates.map(user => ({ value: user.id, label: user.email }))} onChange={id => {
       const trainer = candidates.find(user => user.id === id)?.trainer
@@ -29,6 +36,8 @@ export function ProfileModal({ staff, onClose, onSaved }: { staff?: Staff; onClo
     }} /></Form.Item>}
     <Form.Item name="fullName" label="ФИО" initialValue={staff?.fullName} rules={required}><Input aria-label="ФИО" maxLength={150} /></Form.Item>
     <Form.Item name="roleTitle" label="Должность" initialValue={staff?.roleTitle} rules={required}><Input aria-label="Должность" maxLength={150} /></Form.Item>
+    <PhoneField initialValue={staff?.phone} />
+    <Form.Item name="scheduleColor" label="Цвет в расписании" initialValue={staff?.scheduleColor} rules={[{ pattern: /^#[0-9a-fA-F]{6}$/, message: 'Укажите цвет в формате #724C39' }]}><Input aria-label="Цвет в расписании" maxLength={7} placeholder="#724C39" /></Form.Item>
     {([['shiftRate', 'Ставка за смену (₽)'], ['lessonRate', 'Индивидуальное занятие (₽)'], ['groupLessonRate', 'Групповое занятие (₽)'], ['lessonPercentage', 'Процент от стоимости занятий (%)']] as const).map(([name, label]) =>
       <Form.Item key={name} name={name} label={label} initialValue={staff?.[name] == null ? undefined : Number(staff[name])}><InputNumber {...moneyProps} max={name === 'lessonPercentage' ? 100 : moneyProps.max} /></Form.Item>)}
     <Typography.Paragraph type="secondary">Фиксированная ставка и процент складываются. Групповая ставка начисляется один раз за занятие с несколькими участниками; без отдельной ставки используется индивидуальная.</Typography.Paragraph>

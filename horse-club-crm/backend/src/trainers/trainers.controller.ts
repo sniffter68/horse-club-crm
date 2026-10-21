@@ -16,7 +16,7 @@ import { setRefineTotalHeaders } from '../common/refine';
 import { CreateTrainerDto } from './dto/create-trainer.dto';
 import { UpdateTrainerDto } from './dto/update-trainer.dto';
 import { TrainersService } from './trainers.service';
-import { ModuleAccessGuard, RequireModuleForFields } from '../auth/module-access.guard';
+import { ModuleAccessGuard, RequireModule, RequireModuleForFields } from '../auth/module-access.guard';
 
 @ApiTags('Trainers')
 @ApiBearerAuth()
@@ -43,18 +43,21 @@ export class TrainersController {
   }
 
   @Post()
+  @RequireModule('SCHEDULE')
   @Roles(Role.ADMIN, Role.MANAGER)
   create(@Body() dto: CreateTrainerDto): Promise<Trainer> {
     return this.trainersService.create(dto);
   }
 
   @Patch(':id')
+  @RequireModule('SCHEDULE')
   @Roles(Role.ADMIN, Role.MANAGER)
   update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateTrainerDto): Promise<Trainer> {
     return this.trainersService.update(id, dto);
   }
 
   @Delete(':id')
+  @RequireModule('SCHEDULE')
   @Roles(Role.ADMIN, Role.MANAGER)
   remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<Trainer> {
     return this.trainersService.remove(id);

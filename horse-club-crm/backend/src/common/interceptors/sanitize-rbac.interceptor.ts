@@ -45,7 +45,7 @@ export class SanitizeRbacInterceptor implements NestInterceptor {
     if (request.user?.role !== Role.TRAINER && request.user?.role !== Role.STABLE_WORKER) {
       return next.handle();
     }
-    const fields = [...new Set(['medicalNotes', 'preferences', 'email', 'phone', 'vkUserId',
+    const fields = [...new Set(['medicalNotes', 'preferences', 'birthDate', 'email', 'phone', 'vkUserId',
       'baseRate', 'price', 'monthlyRate', 'payments', 'membership', 'memberships',
       'membershipId', 'operations', 'passwordHash', ...(extraFields ?? [])])];
     if (!this.access) return next.handle().pipe(map((value: unknown) => this.sanitize(value, fields)));

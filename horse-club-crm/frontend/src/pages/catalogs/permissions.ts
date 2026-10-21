@@ -9,7 +9,8 @@ export function useCatalogPermissions(resource?: string) {
   const access = useRoleAccess()
   const modules = useModules()
   const { pathname } = useLocation()
-  const module = moduleForResource(resource) ?? moduleForResource(pathname.split('/')[1])
+  const resourceName = resource ?? pathname.split('/')[1]
+  const module = moduleForResource(resourceName) ?? (resourceName === 'horses' ? 'STABLES' : resourceName === 'trainers' ? 'SCHEDULE' : undefined)
   return { role, isLoading: isLoading || resource === 'horse-health-logs' && access.loading, canManage: (!module || modules.canWrite(module)) && (resource === 'horse-health-logs' ? access.permissions.healthWrite : role === 'ADMIN' || role === 'MANAGER') }
 }
 

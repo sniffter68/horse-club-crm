@@ -1,7 +1,8 @@
 export interface PublicationValues { isPublic?: boolean; imageUrl?: string | null; description?: string | null; role?: string | null; order?: number }
 export interface ClientValues {
+  birthDate?: string | null;
   clientType?: 'REGULAR' | 'ONE_TIME'; riderLevel?: string | null;
-  name?: string; firstName: string; lastName?: string; phone?: string; email?: string | null;
+  name?: string; firstName: string; lastName?: string; phone?: string | null; email?: string | null;
   isRider: boolean; isPayer: boolean; preferences?: string; medicalNotes?: string;
 }
 export interface Client extends Omit<ClientValues, 'phone' | 'preferences' | 'medicalNotes'> {
@@ -12,6 +13,8 @@ export interface Client extends Omit<ClientValues, 'phone' | 'preferences' | 'me
   id: string; createdAt: string; phone: string | null; preferences: string | null; medicalNotes?: string | null;
 }
 export interface HorseValues extends PublicationValues {
+  status?: 'active' | 'rest' | 'sick' | 'quarantine';
+  coat?: string | null; ownerType?: 'club' | 'private'; ownerId?: string | null;
   sex?: 'STALLION' | 'MARE' | 'GELDING' | null;
   birthYear?: number | null;
   maxRiderWeight?: number;
@@ -42,7 +45,7 @@ export interface HorseDetails extends Horse {
     client: { id: string; name: string; firstName: string; lastName: string } | null; stall: { id: string; name: string } | null; payments: RelationPayment[] }>;
   bookings: Array<RelationBooking & { client: { id: string; name: string; firstName: string; lastName: string } }>;
 }
-export interface TrainerValues extends PublicationValues { name: string; phone?: string; qualification?: string; maxDailyLoad: number; baseRate?: number }
+export interface TrainerValues extends PublicationValues { name: string; phone?: string | null; scheduleColor?: string | null; qualification?: string; maxDailyLoad: number; baseRate?: number }
 export interface Trainer extends Omit<TrainerValues, 'baseRate' | 'phone' | 'qualification'> {
   fullName?: string; specializations?: string[]; isActive?: boolean;
   vkUserId?: string | null;
