@@ -15,7 +15,8 @@ async function setup(page: Page, prepaid?: number, group = false) {
   const state = { lesson: undefined as Lesson | undefined, receipts: [] as { id: string; amount: number; method: string; description: string }[], posts: [] as Record<string, unknown>[], fail: false }
   const makeLesson = (amount: number): Lesson => ({ id: id(4), status: 'SCHEDULED', startTime: '2026-10-20T09:00:00Z', endTime: '2026-10-20T10:00:00Z',
     trainer, service, arena: null, cost: 1500, prepaymentAmount: amount, prepaymentMethod: 'CASH', finalPaymentAmount: 0,
-    paymentStatus: amount === 1500 ? 'PAID' : amount ? 'PARTIALLY_PAID' : 'UNPAID', bookings: [{ id: id(5), client, horse: null, membership: null, costAmount: 1500 }] })
+    paymentStatus: amount === 1500 ? 'PAID' : amount ? 'PARTIALLY_PAID' : 'UNPAID', bookings: [{ id: id(5), client, horse: null, membership: null, costAmount: 1500,
+      payments: amount ? [{ status: 'PAID', amount }] : [] }] })
   if (prepaid !== undefined) state.lesson = makeLesson(prepaid)
   for (const [resource, rows] of Object.entries({ clients: [client], trainers: [trainer], services: [selectedService], horses: [], arenas: [] })) {
     await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } }))
@@ -201,4 +202,77 @@ test('calendar shows a compact excursion label or a fallback for a missing train
   state.lesson!.pricePerPerson = null
   await page.reload()
   await expect(page.locator('.schedule-event-trainer')).toHaveText('Без тренера')
+})
+
+for (const width of [1440, 390]) test(`lesson deletion confirms client, membership and cash history at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 1000 })
+  const state = await setup(page, 500)
+  state.lesson!.bookings[0].membership = { id: id(8), totalLessons: 8, remainedLessons: 7, validUntil: '2026-12-31T00:00:00Z' }
+  let deletions = 0
+  await page.route(`**/api/lessons/${id(4)}`, async route => {
+    expect(route.request().method()).toBe('DELETE')
+    deletions++; state.lesson = undefined
+    await route.fulfill({ json: { success: true, message: 'Занятие успешно удалено' } })
+  })
+  await page.goto('/schedule')
+  await page.locator('.fc-event').first().click()
+  const detail = page.getByRole('dialog', { name: 'Карточка занятия' })
+  await detail.getByRole('button', { name: 'Удалить занятие', exact: true }).click()
+  const confirm = page.getByRole('dialog', { name: 'Удалить занятие?', exact: true })
+  await expect(confirm).toContainText('20 окт. 2026, 12:00')
+  await expect(confirm).toContainText(client.name)
+  await expect(confirm).toContainText('Списанное занятие будет возвращено на баланс абонемента')
+  await expect(confirm).toContainText('500 ₽. Кассовые чеки сохранятся в истории кассы')
+  await expect(confirm.getByRole('button', { name: 'Отмена', exact: true })).toBeFocused()
+  await confirm.getByRole('button', { name: 'Отмена', exact: true }).click()
+  expect(deletions).toBe(0)
+  await expect(detail).toBeVisible()
+  await detail.getByRole('button', { name: 'Удалить занятие', exact: true }).click()
+  await expect(confirm).toBeVisible()
+  await expect(confirm.getByRole('button', { name: 'Отмена', exact: true })).toBeFocused()
+  await page.screenshot({ path: `test-results/lesson-deletion-${width}.png`, animations: 'disabled' })
+  await confirm.getByRole('button', { name: 'Удалить занятие', exact: true }).click()
+  await expect(confirm).not.toBeVisible()
+  await expect(detail).not.toBeVisible()
+  await expect(page.getByText('Занятие удалено из расписания', { exact: true })).toBeVisible()
+  await expect(page.locator('.fc-event')).toHaveCount(0)
+  expect(deletions).toBe(1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('lesson deletion preserves the dialog on error and blocks duplicate requests while busy', async ({ page }) => {
+  const state = await setup(page, 0)
+  let deletions = 0
+  let finish: (() => void) | undefined
+  await page.route(`**/api/lessons/${id(4)}`, async route => {
+    deletions++
+    if (deletions === 1) return route.fulfill({ status: 500, json: { message: 'Не удалось сохранить изменения' } })
+    await new Promise<void>(resolve => { finish = resolve })
+    state.lesson = undefined
+    await route.fulfill({ json: { success: true } })
+  })
+  await page.goto('/schedule'); await page.locator('.fc-event').first().click()
+  await page.getByRole('button', { name: 'Удалить занятие', exact: true }).click()
+  const confirm = page.getByRole('dialog', { name: 'Удалить занятие?', exact: true })
+  const remove = confirm.getByRole('button', { name: 'Удалить занятие', exact: true })
+  await remove.click()
+  await expect(confirm.getByRole('alert')).toContainText('Не удалось сохранить изменения')
+  await expect(page.locator('.fc-event')).toHaveCount(1)
+  await remove.click()
+  await expect(confirm.getByRole('button', { name: 'Отмена', exact: true })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(confirm).toBeVisible()
+  expect(deletions).toBe(2)
+  finish!()
+  await expect(page.locator('.fc-event')).toHaveCount(0)
+})
+
+for (const mode of ['TRAINER', 'READ_ONLY']) test(`lesson deletion is hidden for ${mode}`, async ({ page }) => {
+  await setup(page, 0)
+  if (mode === 'TRAINER') await page.addInitScript(() => localStorage.setItem('horsecrm.role', 'TRAINER'))
+  else await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'ADMIN', modules:
+    ['SCHEDULE', 'STABLES', 'VETERINARY', 'CASHBOX', 'STAFF_PAYROLL'].map(module => ({ module, isEnabled: true, accessLevel: module === 'SCHEDULE' ? 'READ_ONLY' : 'FULL' })) } }))
+  await page.goto('/schedule'); await page.locator('.fc-event').first().click()
+  await expect(page.getByRole('dialog', { name: 'Карточка занятия' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Удалить занятие', exact: true })).toHaveCount(0)
 })

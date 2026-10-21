@@ -493,6 +493,45 @@ export class LessonsService {
     return lesson;
   }
 
+  async deleteLesson(lessonId: string, actor: AuthUser) {
+    return this.runSerializable(async (tx) => {
+      const lesson = await tx.lesson.findUnique({
+        where: { id: lessonId },
+        include: { bookings: { include: { membership: true, client: true } }, operations: true },
+      });
+      if (!lesson) throw new NotFoundException('Занятие не найдено');
+
+      const reason = `Удаление занятия ${lessonId}; пользователь ${actor.id}; ${new Date().toISOString()}`;
+      const refunded = new Set(lesson.operations.filter(op => op.type === 'REFUND').map(op => op.membershipId));
+      // The ledger is authoritative: scheduled visits and already refunded visits
+      // must never receive an extra credit. Include debits from former participants.
+      const membershipIds = [...new Set(lesson.operations
+        .filter(op => op.type === 'DEBIT' && !refunded.has(op.membershipId))
+        .map(op => op.membershipId))].sort();
+      for (const membershipId of membershipIds) {
+        await this.membershipLedgerService.refundLesson(membershipId, lessonId, reason, tx);
+      }
+      // Retain both DEBIT and REFUND history, including the original lesson ID.
+      // SetNull alone would lose that context once the lesson is gone.
+      const operations = await tx.membershipOp.findMany({ where: { lessonId }, select: { id: true, reason: true } });
+      for (const operation of operations) {
+        await tx.membershipOp.update({ where: { id: operation.id },
+          data: { lessonId: null, reason: operation.reason.includes(reason) ? operation.reason : `${operation.reason}\n${reason}` } });
+      }
+      // Cash receipts and purchase ledger entries retain their booking, actor,
+      // amount and timestamps. Only unpaid charges are cancelled, never refunded.
+      await tx.payment.updateMany({ where: { booking: { lessonId }, status: 'PENDING' }, data: { status: 'CANCELLED' } });
+      for (const booking of lesson.bookings) {
+        await tx.booking.updateMany({ where: { id: booking.id, lessonId }, data: {
+          lessonId: null, legacyLessonBinding: true, status: 'cancelled_club',
+          cancellationReason: [booking.cancellationReason, `${reason}; исходный статус ${booking.status}`].filter(Boolean).join('\n'),
+        } });
+      }
+      await tx.lesson.delete({ where: { id: lessonId } });
+      return { success: true, message: 'Занятие успешно удалено' };
+    });
+  }
+
   async updateLessonStatus(
     lessonId: string,
     newStatus: LessonStatus,

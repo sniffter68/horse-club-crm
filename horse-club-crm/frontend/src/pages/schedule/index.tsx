@@ -1,4 +1,5 @@
 import { ScheduleEventContent } from './ScheduleEventContent'
+import { DeleteLessonAction } from './DeleteLessonAction'
 import { eventSummary } from './scheduleEventPresentation'
 import { isPerPersonService } from './groupPricing'
 import { EntryOverlay } from '../../components/EntryOverlay'
@@ -146,10 +147,12 @@ export function SchedulePage() {
   useEffect(() => {
     const refresh = () => setRevision(value => value + 1)
     window.addEventListener('cash-desk-paid', refresh)
+    window.addEventListener('lesson-deleted', refresh)
     window.addEventListener('horse-assignment-changed', refresh)
     window.addEventListener('horse-status-changed', refresh)
     return () => {
       window.removeEventListener('cash-desk-paid', refresh)
+      window.removeEventListener('lesson-deleted', refresh)
       window.removeEventListener('horse-assignment-changed', refresh)
       window.removeEventListener('horse-status-changed', refresh)
     }
@@ -467,6 +470,7 @@ export function SchedulePage() {
           <Button disabled={saving || detail.status === 'CANCELLED' || detail.status === 'COMPLETED'} onClick={() => { setCompleting(detail); setDetail(undefined) }}>Отметить присутствие</Button>
           <Button disabled={saving || detail.status === 'CANCELLED' || detail.status === 'NO_SHOW'} onClick={() => void changeStatus('NO_SHOW')}>Неявка</Button>
           <Popconfirm title="Отменить занятие?" description="Списанные занятия абонемента будут возвращены." okText="Да" cancelText="Нет" onConfirm={() => changeStatus('CANCELLED')}><Button danger disabled={saving || detail.status === 'CANCELLED'}>Отменить занятие</Button></Popconfirm>
+          <DeleteLessonAction key={detail.id} lesson={detail} disabled={saving} onBusyChange={busy => { savingRef.current = busy; setSaving(busy) }} onDeleted={() => setDetail(undefined)} />
         </Space>}
       </Space>}
     </Modal>

@@ -469,7 +469,7 @@ model Booking {
   attended         Boolean           @default(false)
   horseChangeReason String?
   attendanceStatus BookingAttendance @default(PENDING)
-  lesson           Lesson?           @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  lesson           Lesson?           @relation(fields: [lessonId], references: [id], onDelete: SetNull)
   client           Client            @relation(fields: [clientId], references: [id])
   horse            Horse?            @relation(fields: [horseId], references: [id], onDelete: Restrict)
   membership       Membership?       @relation(fields: [membershipId], references: [id])
@@ -811,7 +811,7 @@ model MembershipOp {
   amount       Int
   reason       String
   membership   Membership       @relation(fields: [membershipId], references: [id])
-  lesson       Lesson?          @relation(fields: [lessonId], references: [id])
+  lesson       Lesson?          @relation(fields: [lessonId], references: [id], onDelete: SetNull)
   createdAt    DateTime         @default(now()) @db.Timestamptz(6)
 
   // PostgreSQL допускает несколько строк с lessonId = NULL, но запрещает

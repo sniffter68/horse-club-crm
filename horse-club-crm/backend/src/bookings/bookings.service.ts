@@ -185,7 +185,7 @@ export class BookingsService {
   async findAll(query: ListBookingsDto) {
     const { start, end } = this.interval(query);
     const paging = parseRefineQuery(query, ['startTime', 'id'], 'startTime');
-    const where: Prisma.BookingWhereInput = { lessonId: null, startTime: { lt: end }, endTime: { gt: start },
+    const where: Prisma.BookingWhereInput = { lessonId: null, legacyLessonBinding: false, startTime: { lt: end }, endTime: { gt: start },
       ...(query.trainerId ? { trainerId: query.trainerId } : {}), ...(query.horseId ? { horseId: query.horseId } : {}), ...(query.arenaId ? { arenaId: query.arenaId } : {}) };
     const [total, data] = await this.prisma.$transaction([
       this.prisma.booking.count({ where }),

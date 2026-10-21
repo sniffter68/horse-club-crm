@@ -166,12 +166,14 @@ export function DashboardPage() {
     window.addEventListener('focus', refreshWhenVisible)
     const refreshAfterPayment = () => { void loadSummary() }
     window.addEventListener('cash-desk-paid', refreshAfterPayment)
+    window.addEventListener('lesson-deleted', refreshAfterPayment)
     document.addEventListener('visibilitychange', refreshWhenVisible)
     return () => {
       controller.abort()
       window.clearInterval(intervalId)
       window.removeEventListener('focus', refreshWhenVisible)
       window.removeEventListener('cash-desk-paid', refreshAfterPayment)
+      window.removeEventListener('lesson-deleted', refreshAfterPayment)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
   }, [loadSummary])

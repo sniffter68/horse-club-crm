@@ -5,6 +5,7 @@ import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -40,6 +41,13 @@ import { LessonsService } from './lessons.service';
 @Controller('lessons')
 export class LessonsController {
   constructor(private readonly lessonsService: LessonsService) {}
+
+  @Delete(':id')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  @ApiOkResponse({ description: 'Занятие удалено; списания возвращены, кассовая история сохранена.' })
+  remove(@Param('id', new ParseUUIDPipe()) lessonId: string, @CurrentUser() actor: AuthUser) {
+    return this.lessonsService.deleteLesson(lessonId, actor);
+  }
 
   @Post()
   @Roles(Role.ADMIN, Role.MANAGER)

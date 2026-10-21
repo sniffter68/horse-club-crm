@@ -7,6 +7,7 @@ import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import type { Arena, Client, Horse, Service, Trainer } from '../catalogs/types'
 import { dateTime, personName } from '../cards/format'
 import { statuses, type Status } from '../schedule/types'
+import { DeleteLessonAction } from '../schedule/DeleteLessonAction'
 
 interface JournalPayment {
   id: string
@@ -80,6 +81,8 @@ export function LessonHistoryPage() {
   const [filters, setFilters] = useState<FilterValues>({})
   const [lessons, setLessons] = useState<JournalLesson[]>([])
   const [selected, setSelected] = useState<JournalLesson>()
+  const [deleting, setDeleting] = useState(false)
+  const [revision, setRevision] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
@@ -120,6 +123,8 @@ export function LessonHistoryPage() {
       if (!signal.aborted) {
         setLessons(response.data)
         setTotal(Number(response.headers['x-total-count']) || 0)
+        const lastPage = Math.max(1, Math.ceil((Number(response.headers['x-total-count']) || 0) / pageSize))
+        if (page > lastPage) setPage(lastPage)
       }
     } catch (cause) {
       if (!signal.aborted) { setLessons([]); setError(toHttpError(cause).message) }
@@ -134,7 +139,7 @@ export function LessonHistoryPage() {
     // oxlint-disable-next-line react/set-state-in-effect
     void loadLessons(controller.signal)
     return () => controller.abort()
-  }, [loadLessons])
+  }, [loadLessons, revision])
 
   const applyFilters = (values: FilterValues) => { setPage(1); setFilters(values) }
   const resetFilters = () => { form.resetFields(); setPage(1); setFilters({}) }
@@ -170,7 +175,8 @@ export function LessonHistoryPage() {
         ]} />
     </RefineList>
 
-    <Modal title="Карточка занятия" open={Boolean(selected)} footer={null} width={760} destroyOnHidden onCancel={() => setSelected(undefined)}>
+    <Modal title="Карточка занятия" open={Boolean(selected)} footer={null} width={760} destroyOnHidden
+      closable={!deleting} keyboard={!deleting} maskClosable={!deleting} onCancel={() => { if (!deleting) setSelected(undefined) }}>
       {selected && <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Descriptions bordered size="small" column={2} items={[
           { key: 'time', label: 'Дата и время', children: <span className="data-mono">{dateTime(selected.startTime)} — {dateTime(selected.endTime)}</span> },
@@ -189,6 +195,7 @@ export function LessonHistoryPage() {
             </Space>
           </List.Item>} />
         </section>
+        <DeleteLessonAction key={selected.id} lesson={selected} onBusyChange={setDeleting} onDeleted={() => { setSelected(undefined); setRevision(value => value + 1) }} />
       </Space>}
     </Modal>
   </>
