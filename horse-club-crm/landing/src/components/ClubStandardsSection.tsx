@@ -1,3 +1,4 @@
+import { otherServices, type ChooseBooking } from '../booking';
 import { Carousel } from './Carousel';
 import { type ReactElement } from 'react';
 import { motion } from 'framer-motion';
@@ -55,7 +56,7 @@ const standards: StandardItem[] = [
   },
 ];
 
-export function ClubStandardsSection(): ReactElement {
+export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }): ReactElement {
   return (
     <section
       id="about"
@@ -144,7 +145,8 @@ export function ClubStandardsSection(): ReactElement {
             </p>
           </div>
           <a
-            href="#contacts"
+            href="#booking-form"
+            onClick={event => { event.preventDefault(); onChoose('service', otherServices[3]); }}
             className="shrink-0 rounded-full bg-[#3A2F2B] px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition-all hover:bg-[#5A483E] hover:scale-105 active:scale-95"
           >
             Приехать на экскурсию ↗

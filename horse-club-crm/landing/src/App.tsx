@@ -1,6 +1,6 @@
 import { usePublicContent } from './usePublicContent';
 import { useState, type ReactElement } from 'react';
-import { scrollToBooking, type BookingSelection, type ChooseBooking } from './booking';
+import { firstLesson, scrollToBooking, type BookingSelection, type ChooseBooking } from './booking';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { ServicesSection } from './components/ServicesSection';
@@ -17,14 +17,15 @@ export default function App(): ReactElement {
     setSelection(previous => ({ ...previous, [kind]: choice }));
     scrollToBooking();
   };
+  const bookFirstLesson = () => choose('service', { ...firstLesson });
   return (
     <div className="min-h-screen bg-[#E4DAD0] text-[#3A2F2B] selection:bg-[#3A2F2B] selection:text-[#E4DAD0] antialiased">
       {/* Умная навигационная капсула (сворачивается в бургер при скролле) */}
-      <Navbar />
+      <Navbar onBookFirstLesson={bookFirstLesson} />
 
       <main>
         {/* 1. Секция Hero с кинематографичным взмыванием всадника */}
-        <HeroSection />
+        <HeroSection onBookFirstLesson={bookFirstLesson} />
 
         {/* 2. Тёмная секция услуг с интерактивными парящими предметами */}
         <ServicesSection services={content.services} onChoose={choose} />
@@ -33,9 +34,9 @@ export default function App(): ReactElement {
         <HorsesAndTrainersSection horses={content.horses} trainers={content.trainers} onChoose={choose} />
 
         {/* 4. Блок "Стандарты клуба" (архитектура, еврогрунт, гуманный тренинг) */}
-        <ClubStandardsSection />
+        <ClubStandardsSection onChoose={choose} />
 
-        <FirstLessonSection />
+        <FirstLessonSection onBookFirstLesson={bookFirstLesson} />
         <GiftCertificatesSection />
 
         {/* 5. Премиальный блок контактов с интерактивной формой бронирования */}

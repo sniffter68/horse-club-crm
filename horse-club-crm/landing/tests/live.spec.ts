@@ -16,7 +16,7 @@ test('real API accepts a public lead from the landing form', async ({ page }) =>
     await page.locator('#contact-phone').fill(phone)
     await page.getByLabel('Я даю согласие на обработку персональных данных для рассмотрения заявки.').check()
     const response = page.waitForResponse(response => response.url().endsWith('/api/leads') && response.request().method() === 'POST')
-    await page.getByRole('button', { name: 'Отправить заявку на тренировку' }).click()
+    await page.getByRole('button', { name: 'Оставить заявку на первое занятие' }).click()
     const saved = await response
     expect(saved.status()).toBe(201)
     expect(saved.request().headers()).not.toHaveProperty('authorization')

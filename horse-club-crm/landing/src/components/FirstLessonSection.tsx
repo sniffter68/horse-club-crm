@@ -1,6 +1,5 @@
 import { Carousel } from './Carousel';
 import { type ReactElement } from 'react';
-import { scrollToBooking } from '../booking';
 
 const steps = [
   {
@@ -27,7 +26,7 @@ const preparation = [
   { title: 'Лакомство', description: 'По желанию — мытая морковь или яблоки, нарезанные дольками.' },
 ];
 
-export function FirstLessonSection(): ReactElement {
+export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
   return (
     <section
       id="first-lesson"
@@ -76,7 +75,7 @@ export function FirstLessonSection(): ReactElement {
         <div className="mt-6 md:mt-8 text-center">
           <a
             href="#booking-form"
-            onClick={event => { event.preventDefault(); scrollToBooking(); }}
+            onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
             className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition-all hover:scale-105 hover:bg-[#5A483E] active:scale-95"
           >
             Записаться на первое занятие

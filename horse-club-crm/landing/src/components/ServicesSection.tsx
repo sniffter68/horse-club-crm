@@ -162,7 +162,7 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
                   </div>
 
                   <a
-                    href="#contacts"
+                    href="#booking-form"
                     onClick={event => { event.preventDefault(); onChoose('service', { id: currentService.id, name: currentService.title }); }}
                     className="inline-flex w-full items-center justify-center rounded-2xl bg-[#614535] px-6 py-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-md transition-all hover:scale-105 hover:bg-[#432F24] active:scale-95 sm:w-auto sm:px-8"
                   >

@@ -49,7 +49,7 @@ function Brand({ inverse = false }: BrandProps): ReactElement {
   );
 }
 
-export function Navbar(): ReactElement {
+export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -182,7 +182,8 @@ export function Navbar(): ReactElement {
                   </div>
 
                   <a
-                    href="#contacts"
+                    href="#booking-form"
+                    onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
                     className="rounded-full bg-[#3A2F2B] px-5 py-2.5 text-xs font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-[#724C39] active:scale-95"
                   >
                     Записаться ↗
@@ -261,8 +262,8 @@ export function Navbar(): ReactElement {
               </div>
 
               <motion.a
-                href="#contacts"
-                onClick={(event) => handleNavigation(event, '#contacts')}
+                href="#booking-form"
+                onClick={event => { event.preventDefault(); setIsOpen(false); onBookFirstLesson(); }}
                 whileHover={{ scale: 1.015 }}
                 whileTap={{ scale: 0.98 }}
                 className="mt-10 flex min-h-14 w-full items-center justify-between rounded-2xl bg-[#E4DAD0] px-6 text-sm font-semibold uppercase tracking-[0.12em] text-[#241E1C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"

@@ -1,28 +1,22 @@
-import { useRef, useState, type ReactElement, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ReactElement, type FormEvent } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { phoneDigits, phoneMask, sendLead } from '../lead';
+import { PrivacyPolicyLink } from './PrivacyPolicyLink';
 import { legal } from '../legal';
-import { bookingNotes, type BookingSelection, type BookingKind, type ChooseBooking } from '../booking';
+import { firstLesson, otherServices, bookingNotes, type BookingSelection, type BookingKind, type ChooseBooking } from '../booking';
 import type { PublicService } from '../usePublicContent';
 import { landingData } from '../data/landingContent';
-
-const serviceOptions = [
-  'Выездка',
-  'Конкур',
-  'Конная прогулка',
-  'Фотосессия',
-  'Экскурсия по клубу',
-];
 
 export function ContactsSection({ services, selection, onChoose, onRemove, onReset }: {
   services: PublicService[]; selection: BookingSelection; onChoose: ChooseBooking;
   onRemove: (kind: BookingKind) => void; onReset: () => void;
 }): ReactElement {
   const reducedMotion = useReducedMotion();
-  const options = services.map(service => ({ id: service.id, name: service.title }));
-  const fallbackOptions = serviceOptions.map(name => ({ id: name, name }));
-  const available = [...options, ...fallbackOptions.filter(option => !options.some(item => item.name === option.name))];
-  const selectedService = selection.service?.name || 'Выездка';
+  // Only exact canonical labels can supply a CRM ID; never attach an unrelated discipline.
+  const available = [firstLesson, ...otherServices].map(choice => ({
+    ...choice, id: services.find(service => service.title === choice.name)?.id || choice.id,
+  }));
+  const selectedService = selection.service?.name || firstLesson.name;
   const [name, setName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -32,6 +26,11 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
   const [invalidField, setInvalidField] = useState('');
   const [consent, setConsent] = useState(false);
   const submitting = useRef(false);
+  const serviceList = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    if (serviceList.current) serviceList.current.open = false;
+    setIsSubmitted(false);
+  }, [selection.service]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -178,7 +177,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
           </div>
 
           {/* Правая колонка: Форма записи */}
-          <div id="booking-form" className="lg:col-span-7">
+          <div id="booking-form" className="scroll-mt-20 lg:col-span-7">
             <div className="relative rounded-[2.8rem] bg-white p-8 text-[#241E1C] shadow-2xl sm:p-12">
               <AnimatePresence mode="wait">
                 {isSubmitted ? (
@@ -194,10 +193,10 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                       ✓
                     </div>
                     <h3 className="font-serif text-3xl font-normal text-[#241E1C]">
-                      Заявка принята
+                      Заявка принята!
                     </h3>
                     <p className="mt-3 max-w-md text-sm leading-relaxed text-[#6E645F]">
-                      Благодарим вас, <span className="font-semibold text-[#241E1C]">{name}</span>! Администратор клуба свяжется с вами по номеру <span className="font-semibold text-[#241E1C]">{phone}</span> для подтверждения времени и подбора лошади.
+                      Мы получили ваши контакты. Администратор клуба свяжется с вами в ближайшее время, чтобы согласовать дату и время первого занятия.
                     </p>
                     <button
                       type="button"
@@ -231,39 +230,38 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                         Онлайн-запись
                       </div>
                       <h3 id="booking-heading" tabIndex={-1} className="font-serif text-3xl sm:text-4xl font-normal text-[#241E1C]">
-                        Забронировать занятие
+                        Запись на первое занятие
                       </h3>
                       <p className="mt-1 text-xs text-[#6E645F]">
-                        Выберите направление и оставьте контактные данные.
+                        Оставьте контактные данные — администратор клуба перезвонит вам и поможет подобрать удобное время
                       </p>
                     </div>
 
                     {/* Выбор направления */}
                     <div>
-                      <p id="direction-heading" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-2.5">
-                        Направление
+                      <p className="rounded-2xl bg-[#E4DAD0]/60 px-4 py-3 text-sm text-[#3A2F2B]" aria-live="polite">
+                        Выбранная услуга: <strong>{selectedService}</strong>
                       </p>
-                      <div className="flex flex-wrap gap-2" role="group" aria-labelledby="direction-heading">
-                        {available.map((srv) => {
-                          const isSel = selectedService === srv.name;
-                          return (
-                            <button
-                              key={srv.id}
-                              type="button"
-                              disabled={loading}
-                              aria-pressed={isSel}
-                              onClick={() => onChoose('service', srv)}
-                              className={`rounded-full px-4 py-2 text-xs font-medium transition-all ${
-                                isSel
-                                  ? 'bg-[#3A2F2B] text-white shadow-sm'
-                                  : 'border border-black/10 bg-[#FAF7F2] text-[#6E645F] hover:text-[#241E1C] hover:border-black/20'
-                              }`}
-                            >
+                      <details ref={serviceList} className="mt-2">
+                        <summary className="w-fit cursor-pointer rounded-lg py-2 text-sm text-[#5A483E] underline underline-offset-4 hover:text-[#241E1C]">
+                          Выбрать другую услугу
+                        </summary>
+                        <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Услуги">
+                          {available.map(srv => (
+                            <button key={srv.id} type="button" disabled={loading}
+                              aria-pressed={selectedService === srv.name}
+                              onClick={() => {
+                                onChoose('service', srv);
+                                serviceList.current?.querySelector('summary')?.focus();
+                              }}
+                              className={`min-h-11 cursor-pointer rounded-2xl border px-4 py-2 text-left text-sm transition-colors disabled:cursor-wait disabled:opacity-60 ${selectedService === srv.name
+                                ? 'border-[#3A2F2B] bg-[#3A2F2B] text-white'
+                                : 'border-black/10 bg-[#FAF7F2] text-[#5A483E] hover:border-black/30'}`}>
                               {srv.name}
                             </button>
-                          );
-                        })}
-                      </div>
+                          ))}
+                        </div>
+                      </details>
                       <div className="mt-3 flex flex-wrap gap-2" aria-live="polite">
                         {(['horse', 'trainer'] as const).map(kind => selection[kind] && <button key={kind} type="button"
                           disabled={loading} className="rounded-full border border-black/10 bg-[#FAF7F2] px-4 py-2 text-xs font-medium text-[#6E645F]" onClick={() => onRemove(kind)}
@@ -290,7 +288,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                           required
                           value={name}
                           onChange={(e) => setName(e.target.value)}
-                          placeholder="Анастасия"
+                          placeholder="Например, Анна"
                           className="w-full rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
                         />
                       </div>
@@ -309,7 +307,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                           required
                           value={phone}
                           onChange={(e) => setPhone(phoneMask(e.target.value))}
-                          placeholder="+7 (900) 000-00-00"
+                          placeholder="+7 (___) ___-__-__"
                           className="w-full rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
                         />
                       </div>
@@ -318,7 +316,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                     {/* Пожелания / комментарий */}
                     <div>
                       <label htmlFor="contact-notes" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
-                        Удобная дата или опыт верховой езды (необязательно)
+                        Пожелания к занятию (необязательно)
                       </label>
                       <textarea
                         id="contact-notes"
@@ -329,7 +327,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                         rows={3}
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Например: суббота, первая половина дня. Опыта нет, хотелось бы спокойную лошадь."
+                        placeholder="Для ребёнка / для взрослого, удобные выходные или будни"
                         className="w-full resize-none rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
                       />
                     </div>
@@ -351,12 +349,12 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                         disabled={loading}
                         className="w-full cursor-pointer rounded-2xl bg-[#614535] py-4 text-xs font-semibold uppercase tracking-[0.16em] text-white shadow-lg transition-all hover:bg-[#432F24] hover:scale-[1.01] active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 disabled:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#614535]"
                       >
-                        {loading ? 'Отправляем…' : 'Отправить заявку на тренировку ↗'}
+                        {loading ? 'Отправляем…' : 'Оставить заявку на первое занятие'}
                       </button>
 
-                      <p className="mt-3 text-center text-[11px] text-[#9C8F87]">
-                        Нажимая кнопку, вы соглашаетесь на обработку персональных данных в соответствии с политикой конфиденциальности клуба.
-                      </p>
+                      <div className="mt-3 text-center text-[11px] text-[#9C8F87]">
+                        Нажимая кнопку, вы соглашаетесь с <PrivacyPolicyLink />
+                      </div>
                     </div>
                   </motion.form>
                 )}

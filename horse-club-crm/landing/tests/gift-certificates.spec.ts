@@ -19,7 +19,7 @@ for (const width of [320, 768, 1440]) {
     await page.screenshot({ path: test.info().outputPath(`gift-certificates-${width}.png`) });
 
     await page.getByLabel('Ваше имя').fill('Анна');
-    await page.getByLabel('Удобная дата или опыт').fill('Сертификат в подарок');
+    await page.getByLabel('Пожелания к занятию').fill('Сертификат в подарок');
     const order = section.getByRole('link', { name: 'Заказать сертификат' });
     await order.focus();
     await order.press('Enter');
@@ -29,7 +29,7 @@ for (const width of [320, 768, 1440]) {
       return rect.top >= 0 && rect.top < window.innerHeight;
     })).toBe(true);
     await expect(page.getByLabel('Ваше имя')).toHaveValue('Анна');
-    await expect(page.getByLabel('Удобная дата или опыт')).toHaveValue('Сертификат в подарок');
+    await expect(page.getByLabel('Пожелания к занятию')).toHaveValue('Сертификат в подарок');
   });
 }
 

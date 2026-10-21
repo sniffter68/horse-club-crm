@@ -397,7 +397,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
                   </div>
 
                   <a
-                    href="#contacts"
+                    href="#booking-form"
                     onClick={event => {
                       event.preventDefault();
                       setSelectedItem(null);

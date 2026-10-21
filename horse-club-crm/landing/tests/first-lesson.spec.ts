@@ -22,7 +22,7 @@ for (const width of [320, 768, 1440]) {
     await page.screenshot({ path: test.info().outputPath(`first-lesson-${width}.png`) });
 
     await page.getByLabel('Ваше имя').fill('Анна');
-    await page.getByLabel('Удобная дата или опыт').fill('Хочу попробовать впервые');
+    await page.getByLabel('Пожелания к занятию').fill('Хочу попробовать впервые');
     await section.getByRole('link', { name: 'Записаться на первое занятие' }).click();
     await expect(page.locator('#booking-heading')).toBeFocused();
     await expect.poll(async () => page.locator('#booking-form').evaluate(element => {
@@ -30,6 +30,6 @@ for (const width of [320, 768, 1440]) {
       return rect.top >= 0 && rect.top < window.innerHeight;
     })).toBe(true);
     await expect(page.getByLabel('Ваше имя')).toHaveValue('Анна');
-    await expect(page.getByLabel('Удобная дата или опыт')).toHaveValue('Хочу попробовать впервые');
+    await expect(page.getByLabel('Пожелания к занятию')).toHaveValue('Хочу попробовать впервые');
   });
 }

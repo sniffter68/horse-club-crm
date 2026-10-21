@@ -2,7 +2,7 @@ import { useRef, type ReactElement } from 'react';
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import riderImg from '../assets/rider.png';
 
-export function HeroSection(): ReactElement {
+export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
   const containerRef = useRef<HTMLElement>(null);
 
   // Скролл-прогресс по секции Hero
@@ -120,11 +120,12 @@ export function HeroSection(): ReactElement {
 
             <div className="mt-5 flex w-full flex-col items-stretch gap-3 sm:mt-6 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
               <a
-                href="#contacts"
+                href="#booking-form"
+                onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
                 className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[#36423A] px-6 py-3 text-xs font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-luxury-brown active:scale-95 sm:w-auto"
               >
-                <span>Первое занятие</span>
-                <span className="text-[12px]">↗</span>
+                <span>Записаться на первое занятие</span>
+                <span aria-hidden="true" className="text-[12px]">↗</span>
               </a>
 
               <a
