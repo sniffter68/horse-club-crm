@@ -23,6 +23,7 @@ async function setup(page: Page, role = 'ADMIN') {
   for (const [resource, rows] of Object.entries({ clients: [client], horses: [{ id: '00000002-1111-4111-8111-111111111111', name: 'Валдай', status: 'active', healthStatus: 'HEALTHY' }], trainers: [{ id: '00000003-1111-4111-8111-111111111111', name: 'Мария Волкова', isActive: true }], arenas: [{ id: '00000005-1111-4111-8111-111111111111', name: 'Манеж', isActive: true }], services: [{ id: '00000004-1111-4111-8111-111111111111', name: 'Выездка', title: 'Выездка', durationMinutes: 60, price: '500' }] })) {
     await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } }))
   }
+  await page.route('**/api/clients/*', route => route.fulfill({ json: { ...client, id: new URL(route.request().url()).pathname.split('/').at(-1), memberships: [] } }))
   await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { horseWorkloads: [{ horseId: '00000002-1111-4111-8111-111111111111', currentWorkloadMinutes: 0, maxDailyWorkloadMinutes: 240, status: 'AVAILABLE' }], arenaOccupancy: [] } }))
   await page.route('**/api/payments/cash-desk/options/*', route => route.fulfill({ json: { bookings: [], memberships: [] } }))
   await page.route('**/api/staff?*', route => route.fulfill({ json: { data: [{ id: 'staff', userId: 'user', fullName: 'Мария Волкова', roleTitle: 'Тренер', isActive: true }], total: 1 } }))
@@ -42,9 +43,11 @@ async function setup(page: Page, role = 'ADMIN') {
 
 async function choose(page: Page, drawer: Locator, label: string, value: string) {
   const input = drawer.getByRole('combobox', { name: label, exact: true })
-  await input.click()
+  await input.scrollIntoViewIfNeeded()
+  await input.focus()
   await input.fill(value)
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: value }).first().click()
+  await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0)
 }
 async function lesson(page: Page) {
   await page.getByRole('button', { name: '+ Записать на тренировку', exact: true }).click()
@@ -56,6 +59,114 @@ async function lesson(page: Page) {
   await choose(page, drawer, 'Лошадь', 'Валдай')
   return drawer
 }
+
+async function preferenceSetup(page: Page) {
+  await setup(page)
+  const trainers = [3, 8].map((n, i) => ({ id: `0000000${n}-1111-4111-8111-111111111111`, name: i ? 'Иван Петров' : 'Мария Волкова', isActive: true }))
+  const horses = [2, 9].map((n, i) => ({ id: `0000000${n}-1111-4111-8111-111111111111`, name: i ? 'Алмаз' : 'Валдай', status: 'active', healthStatus: 'HEALTHY' }))
+  const clients = [client, { ...client, id: '00000010-1111-4111-8111-111111111111', name: 'Ольга Соколова' }, { ...client, id: '00000011-1111-4111-8111-111111111111', name: 'Клиент без предпочтений' }].map((row, i) => ({ ...row, preferredTrainerId: trainers[i]?.id ?? null, preferredHorseId: horses[i]?.id ?? null, memberships: [] }))
+  for (const [resource, rows] of Object.entries({ clients, horses, trainers })) {
+    await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } }))
+  }
+  await page.route('**/api/clients/*', route => route.fulfill({ json: clients.find(row => route.request().url().endsWith(row.id)) }))
+  await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { horseWorkloads: horses.map(row => ({ horseId: row.id, currentWorkloadMinutes: 0, maxDailyWorkloadMinutes: 240, status: 'AVAILABLE' })), arenaOccupancy: [] } }))
+  await page.goto('/')
+  await page.getByRole('button', { name: '+ Записать на тренировку', exact: true }).click()
+  return { drawer: page.getByRole('dialog', { name: 'Записать на тренировку', exact: true }), clients, horses, trainers }
+}
+
+function resourceSelection(drawer: Locator, label: string) {
+  return drawer.getByRole('combobox', { name: label, exact: true }).locator('xpath=ancestor::div[contains(@class,"ant-select-selector")]').locator('.ant-select-selection-item')
+}
+
+for (const width of [1440, 390]) test(`dashboard booking applies client defaults and preserves manual changes at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  const { drawer } = await preferenceSetup(page)
+  await choose(page, drawer, 'Клиент', 'Анна Орлова')
+  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Мария Волкова')
+  await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Валдай')
+  await page.screenshot({ path: `test-results/dashboard-booking-defaults-${width}.png` })
+  await choose(page, drawer, 'Клиент', 'Ольга Соколова')
+  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
+  await choose(page, drawer, 'Клиент', 'Клиент без предпочтений')
+  for (const label of ['Тренер', 'Лошадь']) await expect(resourceSelection(drawer, label)).toHaveCount(0)
+  await choose(page, drawer, 'Клиент', 'Анна Орлова')
+  await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Валдай')
+  await choose(page, drawer, 'Тренер', 'Иван Петров')
+  await choose(page, drawer, 'Лошадь', 'Алмаз')
+  await choose(page, drawer, 'Клиент', 'Клиент без предпочтений')
+  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
+  await choose(page, drawer, 'Клиент', 'Анна Орлова')
+  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
+  await drawer.getByRole('combobox', { name: 'Тренер', exact: true }).focus()
+  await page.keyboard.press('ArrowDown')
+  await expect(page.locator('.ant-select-dropdown:visible')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(drawer).toBeVisible()
+  await choose(page, drawer, 'Услуга', 'Выездка')
+  const saved = page.waitForRequest(request => request.url().endsWith('/api/lessons') && request.method() === 'POST')
+  await page.route('**/api/lessons', route => route.fulfill({ status: 201, json: { id: 'saved' } }))
+  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  expect((await saved).postDataJSON()).toMatchObject({ trainerId: '00000008-1111-4111-8111-111111111111', horseId: '00000009-1111-4111-8111-111111111111' })
+  await expect(drawer).not.toBeVisible()
+})
+
+test('dashboard delayed preferences preserve manual resources', async ({ page }) => {
+  const { drawer, clients } = await preferenceSetup(page)
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  await page.route(`**/api/clients/${clients[0].id}`, async route => { await gate; await route.fulfill({ json: clients[0] }) })
+  await choose(page, drawer, 'Клиент', 'Анна Орлова')
+  await choose(page, drawer, 'Тренер', 'Иван Петров')
+  await choose(page, drawer, 'Лошадь', 'Алмаз')
+  const response = page.waitForResponse(`**/api/clients/${clients[0].id}`)
+  release()
+  await (await response).finished()
+  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
+  const horseSelect = drawer.getByRole('combobox', { name: 'Лошадь', exact: true }).locator('xpath=ancestor::div[contains(@class,"ant-select") and not(contains(@class,"ant-select-selector"))][1]')
+  await horseSelect.hover()
+  await horseSelect.locator('.ant-select-clear').click()
+  await choose(page, drawer, 'Клиент', 'Клиент без предпочтений')
+  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Лошадь')).toHaveCount(0)
+  await choose(page, drawer, 'Клиент', 'Ольга Соколова')
+  await expect(resourceSelection(drawer, 'Лошадь')).toHaveCount(0)
+})
+
+test('dashboard ignores preferences from a previously selected client', async ({ page }) => {
+  const { drawer, clients } = await preferenceSetup(page)
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  await page.route(`**/api/clients/${clients[0].id}`, async route => { await gate; await route.fulfill({ json: clients[0] }) })
+  const requested = page.waitForRequest(`**/api/clients/${clients[0].id}`)
+  await choose(page, drawer, 'Клиент', 'Анна Орлова')
+  await requested
+  await choose(page, drawer, 'Клиент', 'Ольга Соколова')
+  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
+  release()
+  await choose(page, drawer, 'Услуга', 'Выездка')
+  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
+})
+
+test('dashboard skips inactive preferences and retries failed client details', async ({ page }) => {
+  const { drawer, clients, trainers, horses } = await preferenceSetup(page)
+  let fail = true
+  await page.route(`**/api/clients/${clients[0].id}`, route => route.fulfill(fail ? { status: 503, json: { message: 'Не удалось загрузить предпочтения' } } : { json: clients[0] }))
+  await page.route('**/api/trainers?*', route => route.fulfill({ json: trainers.map(row => ({ ...row, isActive: false })) }))
+  await page.route('**/api/horses?*', route => route.fulfill({ json: horses.map(row => ({ ...row, healthStatus: 'TREATMENT' })) }))
+  await choose(page, drawer, 'Клиент', 'Анна Орлова')
+  await expect(drawer.getByRole('alert')).toContainText('Не удалось загрузить предпочтения')
+  fail = false
+  await drawer.getByRole('button', { name: 'Повторить', exact: true }).click()
+  await expect(drawer.getByRole('alert')).toHaveCount(0)
+  for (const label of ['Тренер', 'Лошадь']) await expect(resourceSelection(drawer, label)).toHaveCount(0)
+})
 
 for (const width of [1440, 390]) test(`creates a guest inside lesson drawer and retains lesson fields at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 })
