@@ -27,20 +27,20 @@ describe('Authentication', () => {
   it('saves the token and identity returned by login', async () => {
     const post = vi.spyOn(axios, 'post').mockResolvedValue({ data: { access_token: 'test-token', user: { id: '1', ...identity } } })
     expect(await authProvider.login({ email: identity.email, password: 'test-password' })).toMatchObject({ success: true })
-    expect(post).toHaveBeenCalledWith('/api/auth/login', { email: identity.email, password: 'test-password' }, { timeout: 15_000 })
+    expect(post).toHaveBeenCalledWith('/api/auth/login', { email: identity.email, password: 'test-password' }, { timeout: 15_000, withCredentials: true })
     expect(getToken()).toBe('cookie-session')
     expect(await authProvider.getIdentity()).toEqual(identity)
     expect(await authProvider.getPermissions()).toBe('ADMIN')
     expect(await authProvider.check()).toEqual({ authenticated: true })
   })
-  it('rejects malformed login responses and clears a previous session', async () => {
+  it('rejects malformed login responses and preserves a previous session', async () => {
     saveSession('old-token', identity)
     vi.spyOn(axios, 'post').mockResolvedValue({ data: { access_token: 'new-token', user: { ...identity, role: 'INVALID' } } })
     expect(await authProvider.login({ email: identity.email, password: 'test' })).toMatchObject({ success: false })
-    expect(getToken()).toBeNull()
+    expect(getToken()).toBe('cookie-session')
   })
   it('logs out without deleting unrelated application storage', async () => {
-    vi.spyOn(axios, 'post').mockResolvedValue({ data: { success: true } })
+    httpClient.defaults.adapter = async config => response(config, { success: true })
     localStorage.setItem('preference', 'dark')
     saveSession('test-token', identity)
     expect(await authProvider.logout()).toEqual({ success: true, redirectTo: '/login' })
@@ -48,12 +48,12 @@ describe('Authentication', () => {
     expect(await authProvider.getIdentity()).toBeNull()
     expect(localStorage.getItem('preference')).toBe('dark')
   })
-  it('clears authentication on a Refine 401 but preserves it on 403', async () => {
+  it('preserves authentication on 401 and 403', async () => {
     saveSession('test-token', identity)
     expect(await authProvider.onError({ statusCode: 403, message: 'Forbidden' })).not.toHaveProperty('logout')
     expect(getToken()).toBe('cookie-session')
-    expect(await authProvider.onError({ statusCode: 401 })).toEqual({ logout: true, redirectTo: '/login' })
-    expect(getToken()).toBeNull()
+    expect(await authProvider.onError({ statusCode: 401 })).not.toHaveProperty('logout')
+    expect(getToken()).toBe('cookie-session')
   })
 })
 describe('Data provider', () => {
@@ -99,12 +99,43 @@ describe('Data provider', () => {
   })
   it('normalizes an Axios 401 for the Refine authentication handler', async () => {
     saveSession('expired', identity)
+    vi.spyOn(axios, 'post').mockRejectedValue({ statusCode: 401, message: 'Session revoked' })
     httpClient.defaults.adapter = async (config) => {
       throw new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, undefined, response(config, { message: 'Unauthorized' }, 401))
     }
     const error: unknown = await dataProvider.getList({ resource: 'trainers' }).catch((failure: unknown) => failure)
     expect(error).toMatchObject({ statusCode: 401 })
-    expect(await authProvider.onError(error)).toEqual({ logout: true, redirectTo: '/login' })
-    expect(getToken()).toBeNull()
+    expect(await authProvider.onError(error)).not.toHaveProperty('logout')
+    expect(getToken()).toBe('cookie-session')
+  })
+})
+
+
+describe('Silent refresh', () => {
+  it('shares refresh across concurrent 401 requests and retries each once', async () => {
+    saveSession('cookie-session', identity)
+    const post = vi.spyOn(axios, 'post').mockResolvedValue({ data: { access_token: 'cookie-session' } })
+    httpClient.defaults.adapter = async config => {
+      if (!(config as typeof config & { sessionRetried?: boolean }).sessionRetried) {
+        throw new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, undefined, response(config, {}, 401))
+      }
+      return response(config, { ok: true })
+    }
+    const results = await Promise.all([httpClient.get('/api/clients'), httpClient.get('/api/horses')])
+    expect(results.every(result => result.data.ok)).toBe(true)
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(getToken()).toBe('cookie-session')
+  })
+  it('does not loop when the retried request remains unauthorized', async () => {
+    saveSession('cookie-session', identity)
+    const post = vi.spyOn(axios, 'post').mockResolvedValue({ data: {} })
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => {
+      throw new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, undefined, response(config, {}, 401))
+    })
+    httpClient.defaults.adapter = adapter
+    await expect(httpClient.get('/api/clients')).rejects.toMatchObject({ statusCode: 401 })
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(adapter).toHaveBeenCalledTimes(2)
+    expect(getToken()).toBe('cookie-session')
   })
 })

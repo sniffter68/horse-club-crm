@@ -1,6 +1,7 @@
 ﻿import { test, expect, type Page } from './fixtures'
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/leads/events', route => route.fulfill({ contentType: 'text/event-stream', body: ': heartbeat\n\n' }))
   await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   await page.route('**/api/settings/access/me*', async route => {
     const role = await page.evaluate(() => localStorage.getItem('horsecrm.role') ?? 'ADMIN')
@@ -9,6 +10,7 @@ test.beforeEach(async ({ page }) => {
   })
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { date: '2026-10-08', horseWorkloads: [], arenaOccupancy: [] } }))
+  await page.route('**/api/auth/refresh', route => route.fulfill({ status: 401, json: { message: 'Session revoked' } }))
   await page.route('**/api/auth/logout', route => route.fulfill({ json: { success: true } }))
   await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] } }))
   await page.route('**/api/lessons?*', route => route.fulfill({ json: [] }))
@@ -46,12 +48,12 @@ test('schedule: slot booking preserves input and displays backend 409', async ({
   await expect(modal.getByRole('button', { name: 'Создать занятие', exact: true })).toBeEnabled()
 })
 
-test('schedule: 401 from raw Axios request redirects to login', async ({ page }) => {
+test('schedule: failed refresh preserves the current screen and session', async ({ page }) => {
   await login(page)
   await page.route('**/api/lessons?*', route => route.fulfill({ status: 401, json: { message: 'Unauthorized' } }))
   await page.goto('/schedule')
-  await expect(page).toHaveURL(/\/login(?:\?|$)/)
-  expect(await page.evaluate(() => localStorage.getItem('horsecrm.access_token'))).toBeNull()
+  await expect(page).toHaveURL(/\/schedule$/)
+  expect(await page.evaluate(() => localStorage.getItem('horsecrm.access_token'))).toBe('cookie-session')
 })
 
 const catalogs = ['clients', 'horses', 'trainers', 'services']
@@ -125,16 +127,37 @@ test('all catalogs use cookies, pagination and total (mock API)', async ({ page 
   }
 })
 
-test('401 clears session and redirects through Refine (mock API, real catalog query)', async ({ page }) => {
+test('401 and failed refresh preserve session after reload', async ({ page }) => {
   await login(page)
   await page.route('**/api/clients?*', route => route.fulfill({ status: 401, json: { message: 'Unauthorized' } }))
   const unauthorized = page.waitForResponse(response => response.url().includes('/api/clients?') && response.status() === 401)
   await page.reload()
   await unauthorized
-  await expect(page).toHaveURL(/\/login(?:\?|$)/)
-  expect(await page.evaluate(() => localStorage.getItem('horsecrm.access_token'))).toBeNull()
-  expect(await page.evaluate(() => localStorage.getItem('horsecrm.role'))).toBeNull()
-  await expect(page.getByRole('button', { name: 'Войти', exact: true })).toBeVisible()
+  await expect(page).toHaveURL(url => url.pathname === '/clients')
+  expect(await page.evaluate(() => localStorage.getItem('horsecrm.access_token'))).toBe('cookie-session')
+  expect(await page.evaluate(() => localStorage.getItem('horsecrm.role'))).toBe('ADMIN')
+  await expect(page.getByRole('button', { name: 'Войти', exact: true })).toHaveCount(0)
 })
 
 
+
+
+test('silent refresh restores requests after idle and session survives reopening a tab', async ({ page, context }) => {
+  await login(page)
+  let refreshed = false
+  await page.route('**/api/auth/refresh', route => { refreshed = true; return route.fulfill({ json: { access_token: 'cookie-session' } }) })
+  await page.route('**/api/clients?*', route => refreshed
+    ? route.fulfill({ json: [], headers: { 'x-total-count': '0' } })
+    : route.fulfill({ status: 401, json: { message: 'Expired' } }))
+  await page.clock.install()
+  await page.clock.setSystemTime(Date.now() + 31 * 24 * 60 * 60_000)
+  await page.clock.fastForward(60_000)
+  await page.reload()
+  await expect.poll(() => refreshed).toBe(true)
+  await expect(page).toHaveURL(url => url.pathname === '/clients')
+  const reopened = await context.newPage()
+  await reopened.goto('/clients')
+  await expect(reopened).toHaveURL(url => url.pathname === '/clients')
+  expect(await reopened.evaluate(() => localStorage.getItem('horsecrm.access_token'))).toBe('cookie-session')
+  await reopened.close()
+})

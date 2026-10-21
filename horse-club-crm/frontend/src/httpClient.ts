@@ -1,8 +1,14 @@
 import axios from 'axios'
 import type { HttpError } from '@refinedev/core'
+import { getToken } from './authStorage'
 
 export const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '')
-export const httpClient = axios.create({ timeout: 15_000 })
+export const httpClient = axios.create({ timeout: 15_000, withCredentials: true })
+let refreshing: Promise<void> | undefined
+export function refreshSession(): Promise<void> {
+  return refreshing ??= axios.post(`${API_URL}/auth/refresh`, {}, { timeout: 15_000, withCredentials: true })
+    .then(() => undefined).finally(() => { refreshing = undefined })
+}
 export interface ApiError extends HttpError { code?: string; details?: Record<string, unknown> }
 httpClient.interceptors.request.use((config) => {
   config.headers.delete('Authorization')
@@ -30,4 +36,15 @@ export function toHttpError(error: unknown): ApiError {
   }
   return Object.assign(error instanceof Error ? error : new Error('Неизвестная ошибка'), { statusCode: 0 })
 }
-httpClient.interceptors.response.use((response) => response, (error: unknown) => Promise.reject(toHttpError(error)))
+httpClient.interceptors.response.use((response) => response, async (error: unknown) => {
+  if (axios.isAxiosError(error) && error.response?.status === 401 && error.config && getToken()) {
+    const config = error.config as typeof error.config & { sessionRetried?: boolean }
+    if (!config.sessionRetried) {
+      config.sessionRetried = true
+      try { await refreshSession() }
+      catch (failure) { throw toHttpError(failure) }
+      return httpClient.request(config)
+    }
+  }
+  throw toHttpError(error)
+})

@@ -23,6 +23,7 @@ const { JwtStrategy } = require('../dist/auth/strategies/jwt.strategy');
 const { JwtAuthGuard } = require('../dist/auth/guards/jwt-auth.guard');
 const { RolesGuard } = require('../dist/auth/guards/roles.guard');
 const { Roles } = require('../dist/auth/decorators/roles.decorator');
+const { ACCESS_TOKEN_SECONDS, sessionCookieOptions, refreshCookieOptions } = require('../dist/auth/session-cookie');
 const { createAuthOptions } = require('../dist/auth/auth.config');
 Module._load = originalLoad;
 
@@ -31,7 +32,7 @@ const { Reflector } = require('@nestjs/core');
 const { JwtService } = require('@nestjs/jwt');
 const bcrypt = require('bcrypt');
 const secret = 'test-only-secret-abcdefghijklmnopqrstuvwxyz0123456789';
-const jwt = new JwtService({ secret, signOptions: { algorithm: 'HS256', expiresIn: '30m' } });
+const jwt = new JwtService({ secret, signOptions: { algorithm: 'HS256', expiresIn: ACCESS_TOKEN_SECONDS } });
 const tokenVersion = 1;
 const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true,
   transform: true, transformOptions: { enableImplicitConversion: true } });
@@ -48,11 +49,11 @@ test('DTO rejects extra fields, invalid roles and numeric credentials', async ()
   await assert.rejects(validate({ ...login, password: 'short', role: Role.ADMIN }, RegisterDto), status(400));
 });
 
-test('login verifies bcrypt, signs short-lived versioned claims and does not expose the hash', async () => {
+test('login verifies bcrypt, signs persistent versioned claims and does not expose the hash', async () => {
   const password = 'test-password-123';
   const user = { id: 'user-1', email: 'admin@example.com', role: Role.ADMIN,
     tokenVersion, passwordHash: await bcrypt.hash(password, 12) };
-  const service = new AuthService({ user: { findUnique: async () => user } }, jwt);
+  const service = new AuthService({ user: { findUnique: async () => user } }, jwt, { secret });
   await service.onModuleInit();
   const response = await service.login({ email: user.email, password });
   assert.deepEqual(response.user, { id: user.id, email: user.email, role: user.role });
@@ -61,11 +62,11 @@ test('login verifies bcrypt, signs short-lived versioned claims and does not exp
   assert.equal(payload.sub, user.id);
   assert.equal(payload.email, user.email);
   assert.equal(payload.role, user.role);
-  assert.equal(payload.exp - payload.iat, 30 * 60);
+  assert.equal(payload.exp - payload.iat, ACCESS_TOKEN_SECONDS);
   assert.equal(payload.authVersion, String(tokenVersion));
   assert.equal(payload.passwordHash, undefined);
   await assert.rejects(service.validateUser(user.email, 'wrong'), status(401));
-  const missing = new AuthService({ user: { findUnique: async () => null } }, jwt);
+  const missing = new AuthService({ user: { findUnique: async () => null } }, jwt, { secret });
   await missing.onModuleInit();
   await assert.rejects(missing.validateUser(user.email, password), status(401));
 });
@@ -75,14 +76,14 @@ test('registration hashes passwords, rejects bcrypt truncation and maps duplicat
   const service = new AuthService({ user: { create: async ({ data }) => {
     saved = data;
     return { id: 'new-user', email: data.email, role: data.role };
-  } } }, jwt);
+  } } }, jwt, { secret });
   const dto = { email: 'trainer@example.com', password: 'secure-password-123', role: Role.TRAINER };
   const result = await service.register(dto);
   assert.equal(await bcrypt.compare(dto.password, saved.passwordHash), true);
   assert.equal(bcrypt.getRounds(saved.passwordHash), 12);
   assert.equal(result.passwordHash, undefined);
   await assert.rejects(service.register({ ...dto, password: 'я'.repeat(37) }), status(400));
-  const duplicate = new AuthService({ user: { create: async () => { throw new PrismaError('P2002'); } } }, jwt);
+  const duplicate = new AuthService({ user: { create: async () => { throw new PrismaError('P2002'); } } }, jwt, { secret });
   await assert.rejects(duplicate.register(dto), status(409));
 });
 
@@ -149,4 +150,29 @@ test('profile and VK updates preserve sessions; token version and role changes r
   await assert.rejects(strategy.validate(claims), status(401));
   user.role = Role.ADMIN; user.tokenVersion++;
   await assert.rejects(strategy.validate(claims), status(401));
+});
+
+
+test('persistent refresh restores an expired access session and respects revocation', async () => {
+  const user = { id: 'user-1', email: 'admin@example.com', role: Role.ADMIN, tokenVersion: 1 };
+  const service = new AuthService({ user: { findUnique: async () => user } }, jwt, { secret });
+  const access = jwt.sign({ sub: user.id, email: user.email, role: user.role, authVersion: '1' });
+  const refresh = await service.createRefreshToken(access);
+  assert.equal(jwt.verify(refresh).exp, undefined);
+  await assert.rejects(authenticate(refresh));
+  const realNow = Date.now;
+  Date.now = () => realNow() + 100 * 24 * 60 * 60_000;
+  try {
+    await assert.rejects(authenticate(access));
+    const restored = await service.refresh(refresh);
+    assert.equal((await authenticate(restored.access_token)).id, user.id);
+  } finally { Date.now = realNow; }
+  await assert.rejects(service.refresh(access), status(401));
+  await assert.rejects(service.refresh(null), status(401));
+  await assert.rejects(service.refresh(refresh + 'broken'), status(401));
+  user.tokenVersion++;
+  await assert.rejects(service.refresh(refresh), status(401));
+  assert.equal(sessionCookieOptions().maxAge, ACCESS_TOKEN_SECONDS * 1000);
+  assert.ok(refreshCookieOptions().maxAge > sessionCookieOptions().maxAge);
+  assert.equal(refreshCookieOptions().httpOnly, true);
 });

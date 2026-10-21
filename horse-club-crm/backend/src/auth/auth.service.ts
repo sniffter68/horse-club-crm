@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Inject,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { OnModuleInit } from '@nestjs/common';
@@ -10,7 +11,8 @@ import { Prisma } from '@prisma/client';
 import { compare, hash } from 'bcrypt';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
-import { BCRYPT_ROUNDS } from './auth.config';
+import { AUTH_OPTIONS, BCRYPT_ROUNDS } from './auth.config';
+import type { AuthOptions } from './auth.config';
 import type { AccessTokenResponse, AuthUser, JwtPayload } from './auth.types';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
@@ -22,6 +24,7 @@ export class AuthService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    @Inject(AUTH_OPTIONS) private readonly options: AuthOptions,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -54,6 +57,33 @@ export class AuthService implements OnModuleInit {
     // Revoke every previously issued token for this account, including stolen copies.
     await this.prisma.user.update({ where: { id: user.id }, data: { tokenVersion: { increment: 1 } } });
     return { success: true };
+  }
+
+  async createRefreshToken(accessToken: string): Promise<string> {
+    const { sub, email, role, authVersion } = await this.jwt.verifyAsync<JwtPayload>(accessToken);
+    // An explicit logout/password/role change revokes this credential via tokenVersion.
+    // Use a dedicated JWT service to avoid inheriting the access token expiry.
+    return new JwtService().signAsync({ sub, email, role, authVersion, tokenType: 'refresh' }, {
+      secret: this.options.secret, algorithm: 'HS256',
+    });
+  }
+
+  async refresh(token: string | null): Promise<AccessTokenResponse> {
+    if (!token) throw new UnauthorizedException('Session unavailable');
+    let payload: JwtPayload & { tokenType?: string };
+    try { payload = await this.jwt.verifyAsync(token, { algorithms: ['HS256'] }); }
+    catch { throw new UnauthorizedException('Invalid session'); }
+    if (payload.tokenType !== 'refresh' || typeof payload.sub !== 'string' || !payload.authVersion) {
+      throw new UnauthorizedException('Invalid session');
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub },
+      select: { id: true, email: true, role: true, tokenVersion: true } });
+    if (!user || String(user.tokenVersion) !== payload.authVersion || user.role !== payload.role) {
+      throw new UnauthorizedException('Session revoked');
+    }
+    return { access_token: await this.jwt.signAsync({ sub: user.id, email: user.email,
+      role: user.role, authVersion: String(user.tokenVersion) }),
+      user: { id: user.id, email: user.email, role: user.role } };
   }
 
   async register(dto: RegisterDto): Promise<AuthUser> {

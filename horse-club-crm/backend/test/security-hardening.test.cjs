@@ -78,7 +78,7 @@ test('limiter blocks login floods and rejects cross-origin cookie writes', () =>
 
 test('browser login sets HttpOnly cookie and never exposes the JWT in JSON', async () => {
   const module=await Test.createTestingModule({controllers:[AuthController],providers:[
-    {provide:AuthService,useValue:{login:async()=>({access_token:'private-jwt',user:{id:'a',email:'a@example.com',role:'ADMIN'}})}}
+    {provide:AuthService,useValue:{createRefreshToken:async()=> 'private-refresh',login:async()=>({access_token:'private-jwt',user:{id:'a',email:'a@example.com',role:'ADMIN'}})}}
   ]}).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
     .overrideGuard(JwtAuthGuard).useValue({canActivate:()=>true}).compile();
   const app=module.createNestApplication();await app.init();
@@ -124,10 +124,19 @@ test('real HTTP cookie authentication, CSRF rejection and logout revocation',asy
     const login=await agent.post('/api/auth/login').set('Host','crm.test').set('Origin','http://crm.test')
       .send({email:row.email,password:'test-password'}).expect(200);
     const copiedToken=login.headers['set-cookie'][0].split(';')[0].split('=')[1];
+    const refreshCookie = login.headers['set-cookie'][1].split(';')[0];
+    const restored = await request(app.getHttpServer()).post('/api/auth/refresh')
+      .set('Host','crm.test').set('Origin','http://crm.test').set('Cookie',refreshCookie).send({}).expect(200);
+    assert.equal(restored.body.access_token, 'cookie-session');
+    assert.equal(restored.headers['set-cookie'].length, 2);
+    await request(app.getHttpServer()).post('/api/auth/refresh').set('Host','crm.test')
+      .set('Cookie',refreshCookie).send({}).expect(403);
     assert.equal(login.body.access_token,'cookie-session');
     await agent.get('/api/auth/me').set('Host','crm.test').expect(200);
     await agent.post('/api/auth/logout').set('Host','crm.test').set('Origin','http://evil.test').send({}).expect(403);
     await agent.post('/api/auth/logout').set('Host','crm.test').set('Origin','http://crm.test').send({}).expect(201);
+    await request(app.getHttpServer()).post('/api/auth/refresh')
+      .set('Host','crm.test').set('Origin','http://crm.test').set('Cookie',refreshCookie).send({}).expect(401);
     await request(app.getHttpServer()).get('/api/auth/me').set('Authorization',`Bearer ${copiedToken}`).expect(401);
   }finally{if(app)await app.close();if(oldSecret===undefined)delete process.env.JWT_SECRET;else process.env.JWT_SECRET=oldSecret;}
 });

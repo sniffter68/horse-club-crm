@@ -11,6 +11,7 @@ import { sessionCookie } from '../session-cookie';
 function isJwtPayload(value: unknown): value is JwtPayload {
   if (typeof value !== 'object' || value === null) return false;
   const payload = value as Record<string, unknown>;
+  if (payload.tokenType === 'refresh') return false;
   return (
     ((typeof payload.sub === 'string' && payload.sub.length > 0) ||
       (typeof payload.sub === 'number' && Number.isSafeInteger(payload.sub))) &&

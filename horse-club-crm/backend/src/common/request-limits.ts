@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { sessionCookie } from '../auth/session-cookie';
+import { sessionCookie, refreshCookie } from '../auth/session-cookie';
 
 // Single-process limiter for the single backend in docker-compose.prod.yml.
 // Fail closed on capacity rather than evicting active limits.
@@ -10,7 +10,7 @@ export function requestLimits() {
     res.setHeader('Cache-Control', 'no-store');
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       const origin = req.headers.origin;
-      if ((origin && origin !== `${req.protocol}://${req.get('host')}`) || (sessionCookie(req) && !origin)) {
+      if ((origin && origin !== `${req.protocol}://${req.get('host')}`) || ((sessionCookie(req) || refreshCookie(req)) && !origin)) {
         res.status(403).json({ statusCode: 403, message: 'Недопустимый источник запроса' });
         return;
       }

@@ -11,6 +11,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RoleAccessModule } from './role-access.module';
+import { ACCESS_TOKEN_SECONDS } from './session-cookie';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { RoleAccessModule } from './role-access.module';
       inject: [AUTH_OPTIONS],
       useFactory: (options: AuthOptions): JwtModuleOptions => ({
         secret: options.secret,
-        signOptions: { algorithm: 'HS256', expiresIn: '30m' },
+        signOptions: { algorithm: 'HS256', expiresIn: ACCESS_TOKEN_SECONDS },
         verifyOptions: { algorithms: ['HS256'] },
       }),
     }),

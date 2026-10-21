@@ -6,7 +6,7 @@ export function isRole(value: unknown): value is Role {
 }
 export function getToken(): string | null {
   const value = localStorage.getItem(keys.token)
-  if (value !== 'cookie-session') { localStorage.removeItem(keys.token); return null }
+  if (value !== 'cookie-session') return null
   return value
 }
 export function getIdentity(): Identity | null {

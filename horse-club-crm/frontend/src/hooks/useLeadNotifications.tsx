@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { App, Button } from 'antd'
 import { useNavigate } from 'react-router-dom'
-import { API_URL } from '../httpClient'
+import { API_URL, refreshSession } from '../httpClient'
 import { isUuid } from '../uuid'
 
 export const LEAD_SOUND_KEY = 'horsecrm.lead-notification-sound'
@@ -71,11 +71,11 @@ export function useLeadNotifications() {
 
   useEffect(() => {
     if (typeof EventSource === 'undefined') return
-    const stream = new EventSource(`${API_URL}/leads/events`, { withCredentials: true })
+    let stream: EventSource
+    let disposed = false
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
     const seen = new Set<string>()
     const systemNotifications = new Set<Notification>()
-    stream.onopen = () => setConnected(true)
-    stream.onerror = () => setConnected(false) // EventSource reconnects, including in a background tab.
     const receive = (event: MessageEvent<string>) => {
       let payload: LeadCreated
       try {
@@ -97,13 +97,13 @@ export function useLeadNotifications() {
       }
       const description = `${payload.clientName} (${payload.phone}) — ${payload.serviceName || 'Первое занятие'}`
       notification.info({ key: `lead-${payload.id}`, message: '🐴 Новая заявка с сайта!', description,
-        duration: 12, role: 'status', actions: <Button type="primary" onClick={open}>Открыть заявку</Button> })
+        duration: 0, role: 'status', actions: <Button type="primary" onClick={open}>Открыть заявку</Button> })
       playSound()
       window.dispatchEvent(new Event('lead:created'))
       if (permissionNow() === 'granted') {
         try {
           const push = new Notification('🐴 Новая заявка с сайта!', {
-            body: description, icon: '/favicon.svg', tag: `lead-${payload.id}`, silent: true,
+            body: description, icon: '/favicon.svg', tag: `lead-${payload.id}`, silent: true, requireInteraction: true,
           })
           systemNotifications.add(push)
           push.onclose = () => systemNotifications.delete(push)
@@ -111,8 +111,25 @@ export function useLeadNotifications() {
         } catch { /* Toast and sound still work where the Notification constructor is unavailable. */ }
       }
     }
-    stream.addEventListener('lead:created', receive)
+    const connect = () => {
+      if (disposed) return
+      stream = new EventSource(`${API_URL}/leads/events`, { withCredentials: true })
+      stream.onopen = () => setConnected(true)
+      stream.addEventListener('lead:created', receive)
+      stream.onerror = () => {
+        setConnected(false)
+        // Native reconnect retains Last-Event-ID. A 401 closes EventSource permanently.
+        if (stream.readyState !== EventSource.CLOSED || disposed) return
+        stream.close()
+        retryTimer = setTimeout(() => {
+          void refreshSession().catch(() => undefined).finally(connect)
+        }, 5000)
+      }
+    }
+    connect()
     return () => {
+      disposed = true
+      clearTimeout(retryTimer)
       stream.close()
       systemNotifications.forEach(push => { push.onclick = null; push.close() })
       seen.forEach(id => notification.destroy(`lead-${id}`))

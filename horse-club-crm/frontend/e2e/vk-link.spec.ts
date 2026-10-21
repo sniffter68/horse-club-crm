@@ -136,12 +136,14 @@ test('trainer read-only catalog hides VK account management', async ({ page }) =
   await expect(page.getByRole('button', { name: 'Привязать VK', exact: true })).toHaveCount(0)
 })
 
-test('expired session during invitation returns to login', async ({ page }) => {
+test('expired session during invitation preserves screen and shows an error', async ({ page }) => {
   await page.route('**/api/clients?*', route => route.fulfill({ json: [profile], headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/auth/refresh', route => route.fulfill({ status: 401, json: { message: 'Сессия истекла' } }))
   await page.route('**/api/vk/link-codes', route => route.fulfill({ status: 401, json: { message: 'Сессия истекла' } }))
   await page.goto('/clients')
   await page.getByRole('button', { name: 'Привязать VK', exact: true }).click()
-  await expect(page).toHaveURL(/\/login/)
+  await expect(page.getByText('Сессия истекла').first()).toBeVisible()
+  await expect(page).toHaveURL(url => url.pathname === '/clients')
 })
 
 test('dark theme and reduced motion preserve readable code and keyboard dismissal', async ({ page }) => {
