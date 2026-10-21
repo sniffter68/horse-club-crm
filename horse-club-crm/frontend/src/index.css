@@ -374,7 +374,7 @@ html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); borde
 .stable-dashboard { padding: 24px; background: var(--crm-alabaster); border-radius: 24px; min-width: 0; }
 @media (max-width: 576px) { .stable-dashboard { padding: 16px; } .stable-section .ant-picker-range { max-width: 100%; } }
 
-.cash-desk-header { display: flex; justify-content: flex-end; padding: 12px 24px; }
+.cash-desk-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: flex-end; padding: 12px 24px; }
 .cash-desk-change { padding: 20px; margin-bottom: 20px; border: 1px solid var(--color-border, #E4DAD0); border-radius: 16px; font-variant-numeric: tabular-nums; }
 .cash-desk-change .ant-statistic-content { font-size: 36px; font-family: Georgia, serif; }
 .cash-desk-page, .cash-desk-page > .ant-space-item { min-width: 0; max-width: 100%; }

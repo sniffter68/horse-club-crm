@@ -1,4 +1,4 @@
-import { Body, Controller, Param, ParseUUIDPipe, Patch, UseGuards, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Headers, Param, ParseUUIDPipe, Patch, Sse, UseGuards, ValidationPipe } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AcceptLeadDto } from './accept-lead.dto';
 import { LeadsService } from './leads.service';
+import { LeadEventsService } from './lead-events.service';
 
 @ApiTags('Lead management')
 @ApiBearerAuth()
@@ -13,7 +14,13 @@ import { LeadsService } from './leads.service';
 @Roles(Role.ADMIN)
 @Controller('leads')
 export class LeadManagementController {
-  constructor(private readonly leads: LeadsService) {}
+  constructor(private readonly leads: LeadsService, private readonly events: LeadEventsService) {}
+
+  // Leads have no SystemModule; use the same ADMIN-only policy as accept/reject.
+  @Sse('events')
+  eventsStream(@Headers('last-event-id') lastEventId?: string) {
+    return this.events.stream(lastEventId);
+  }
 
   @Patch(':id/accept')
   accept(@Param('id', new ParseUUIDPipe()) id: string,

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOnError } from '@refinedev/core'
 import type { ColumnsType } from 'antd/es/table'
 import { Alert, App, Button, Card, Col, Grid, List, Progress, Row, Space, Table, Tag, Typography } from 'antd'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { PendingLeads, type PendingLead } from './PendingLeads'
 
@@ -84,10 +84,16 @@ function workloadColor(percent: number): string {
 }
 
 export function DashboardPage() {
+  const location = useLocation()
+  useEffect(() => {
+    if (location.hash === '#pending-leads') {
+      document.getElementById('pending-leads')?.scrollIntoView({ block: 'start' })
+    }
+  }, [location.key, location.hash])
   const modules = usePermissions()
   const screens = Grid.useBreakpoint()
   const isMobile = !screens.md
-  const { message, notification } = App.useApp()
+  const { message } = App.useApp()
   const { mutate: onError } = useOnError()
   const onErrorRef = useRef(onError)
   useEffect(() => { onErrorRef.current = onError }, [onError])
@@ -97,7 +103,6 @@ export function DashboardPage() {
   const [error, setError] = useState<string>()
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(() => new Set())
   const updatingIdsRef = useRef<Set<string>>(new Set())
-  const knownLeadIdsRef = useRef<Set<string> | undefined>(undefined)
   const loadingSummaryRef = useRef(false)
   const summaryRequestId = useRef(0)
 
@@ -118,21 +123,6 @@ export function DashboardPage() {
     try {
       const response = await httpClient.get<DashboardSummary>(`${API_URL}/dashboard/summary`, { signal })
       if (!signal?.aborted && requestId === summaryRequestId.current) {
-        const nextLeadIds = new Set(response.data.leadRequests.map(lead => lead.id))
-        const knownLeadIds = knownLeadIdsRef.current
-        if (knownLeadIds) {
-          const newLeads = response.data.leadRequests.filter(lead => !knownLeadIds.has(lead.id))
-          if (newLeads.length) {
-            notification.info({
-              key: 'dashboard-new-leads',
-              message: newLeads.length === 1 ? 'Новая заявка с сайта' : `Новые заявки с сайта: ${newLeads.length}`,
-              description: newLeads.length === 1 ? `${newLeads[0].firstName}, ${newLeads[0].phone}` : 'Откройте раздел новых заявок на дашборде.',
-              placement: 'topRight',
-              duration: 8,
-            })
-          }
-        }
-        knownLeadIdsRef.current = nextLeadIds
         setSummary(response.data)
         setError(undefined)
       }
@@ -151,7 +141,7 @@ export function DashboardPage() {
         loadingSummaryRef.current = false
       }
     }
-  }, [notification, reportError])
+  }, [reportError])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -165,6 +155,7 @@ export function DashboardPage() {
     const intervalId = window.setInterval(refreshWhenVisible, DASHBOARD_REFRESH_INTERVAL_MS)
     window.addEventListener('focus', refreshWhenVisible)
     const refreshAfterPayment = () => { void loadSummary() }
+    window.addEventListener('lead:created', refreshAfterPayment)
     window.addEventListener('cash-desk-paid', refreshAfterPayment)
     window.addEventListener('lesson-deleted', refreshAfterPayment)
     document.addEventListener('visibilitychange', refreshWhenVisible)
@@ -172,6 +163,7 @@ export function DashboardPage() {
       controller.abort()
       window.clearInterval(intervalId)
       window.removeEventListener('focus', refreshWhenVisible)
+      window.removeEventListener('lead:created', refreshAfterPayment)
       window.removeEventListener('cash-desk-paid', refreshAfterPayment)
       window.removeEventListener('lesson-deleted', refreshAfterPayment)
       document.removeEventListener('visibilitychange', refreshWhenVisible)

@@ -6,6 +6,7 @@ const { ValidationPipe } = require('@nestjs/common');
 const request = require('supertest');
 const { LeadsController } = require('../dist/leads/leads.controller');
 const { LeadsService } = require('../dist/leads/leads.service');
+const { LeadEventsService } = require('../dist/leads/lead-events.service');
 const { VkNotifications } = require('../dist/vk-bot/vk-delivery.module');
 const { requestLimits } = require('../dist/common/request-limits');
 const { PrismaService } = require('../dist/prisma/prisma.service');
@@ -15,7 +16,7 @@ const { Prisma } = require('@prisma/client');
 const serviceId = '11111111-1111-4111-8111-111111111111';
 const leadId = '22222222-2222-4222-8222-222222222222';
 const clientId = '33333333-3333-4333-8333-333333333333';
-let clients, leads, notifications, app, queueFails;
+let clients, leads, notifications, app, queueFails, browserEvents;
 const originalPeer = process.env.VK_ADMIN_PEER_ID;
 const prisma = {
   vkNotification: { upsert: async ({ create }) => {
@@ -47,18 +48,36 @@ const prisma = {
 };
 
 before(async () => {
-  const module = await Test.createTestingModule({ controllers: [LeadsController], providers: [LeadsService, { provide: PrismaService, useValue: prisma }] }).compile();
+  const module = await Test.createTestingModule({ controllers: [LeadsController], providers: [LeadsService,
+    { provide: LeadEventsService, useValue: { publish: payload => { assert.ok(leads.some(row => row.id === payload.id)); browserEvents.push(payload); } } },
+    { provide: PrismaService, useValue: prisma }] }).compile();
   app = module.createNestApplication(); app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true } }));
   await app.init();
 });
-beforeEach(() => { queueFails = false; clients = []; leads = []; notifications = []; delete process.env.VK_ADMIN_PEER_ID; });
+beforeEach(() => { queueFails = false; clients = []; leads = []; notifications = []; browserEvents = []; delete process.env.VK_ADMIN_PEER_ID; });
 after(async () => {
   if (originalPeer === undefined) delete process.env.VK_ADMIN_PEER_ID; else process.env.VK_ADMIN_PEER_ID = originalPeer;
   await app?.close();
 });
 
 const lead = { consentAccepted: true, consentVersion: '2026-09-19', firstName: 'Анна', phone: '+79991234567' };
+
+test('browser event is published once after saving, even if VK is unavailable', async () => {
+  process.env.VK_ADMIN_PEER_ID = '2000000001';
+  queueFails = true;
+  await request(app.getHttpServer()).post('/api/leads').send({ ...lead, direction: 'Конкур' }).expect(201);
+  await request(app.getHttpServer()).post('/api/leads').send(lead).expect(201);
+  assert.equal(browserEvents.length, 1);
+  assert.deepEqual(browserEvents[0], { id: leadId, clientName: lead.firstName, phone: lead.phone,
+    serviceName: 'Конкур', createdAt: leads[0].createdAt.toISOString() });
+});
+
+test('invalid leads and VK leads do not publish a site browser event', async () => {
+  await request(app.getHttpServer()).post('/api/leads').send({ ...lead, phone: 'invalid' }).expect(400);
+  await new LeadsService(prisma, undefined, { publish: payload => browserEvents.push(payload) }).create(lead, 'VK');
+  assert.equal(browserEvents.length, 0);
+});
 
 test('public valid lead creates a pending request without creating a client', async () => {
   const response = await request(app.getHttpServer()).post('/api/leads').send(lead).expect(201);

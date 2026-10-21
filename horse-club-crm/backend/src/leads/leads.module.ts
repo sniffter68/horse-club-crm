@@ -6,5 +6,6 @@ import { LeadsController } from './leads.controller';
 import { LeadManagementController } from './lead-management.controller';
 import { LeadsService } from './leads.service';
 import { LessonsModule } from '../lessons/lessons.module';
-@Module({ imports: [PrismaModule, AuthModule, VkDeliveryModule, LessonsModule], controllers: [LeadsController, LeadManagementController], providers: [LeadsService], exports: [LeadsService] })
+import { LeadEventsService } from './lead-events.service';
+@Module({ imports: [PrismaModule, AuthModule, VkDeliveryModule, LessonsModule], controllers: [LeadsController, LeadManagementController], providers: [LeadsService, LeadEventsService], exports: [LeadsService] })
 export class LeadsModule {}

@@ -50,6 +50,7 @@ import { authProvider } from './authProvider'
 import { dataProvider } from './dataProvider'
 import { LoginPage } from './pages/login'
 import { Sidebar } from './components/layout/Sidebar'
+import { LeadNotifications } from './components/LeadNotifications'
 import { DashboardPage } from './pages/dashboard'
 import { LessonHistoryPage } from './pages/lesson-history'
 import type { Role } from './authStorage'
@@ -179,7 +180,7 @@ export default function App() {
             options={{ syncWithLocation: true, disableTelemetry: true }}>
             <Routes>
               <Route element={<Authenticated key="private" fallback={<CatchAllNavigate to="/login" />} loading={<LoadingPage />}>
-                <PermissionsProvider><CashDeskProvider><ThemedLayoutV2 Header={() => <div className="cash-desk-header"><CashDeskButton /></div>} Sider={() => <Sidebar darkMode={darkMode} onToggleTheme={toggleTheme} />} Title={(props) => <ThemedTitleV2 {...props} text="Horse CRM" />}><ModuleGuard><Outlet /></ModuleGuard></ThemedLayoutV2></CashDeskProvider></PermissionsProvider>
+                <PermissionsProvider><CashDeskProvider><ThemedLayoutV2 Header={() => <div className="cash-desk-header"><LeadNotifications /><CashDeskButton /></div>} Sider={() => <Sidebar darkMode={darkMode} onToggleTheme={toggleTheme} />} Title={(props) => <ThemedTitleV2 {...props} text="Horse CRM" />}><ModuleGuard><Outlet /></ModuleGuard></ThemedLayoutV2></CashDeskProvider></PermissionsProvider>
               </Authenticated>}>
                 <Route index element={<DashboardRoute />} />
                 {catalogs.map(({ name, ListPage, CreatePage, EditPage }) => (

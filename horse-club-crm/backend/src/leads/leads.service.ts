@@ -6,11 +6,13 @@ import type { AcceptLeadDto } from './accept-lead.dto';
 import type { CreateLeadDto } from './create-lead.dto';
 import { currentLeadConsentVersion } from '../common/lead-consent';
 import { LessonsService } from '../lessons/lessons.service';
+import { LeadEventsService } from './lead-events.service';
 
 @Injectable()
 export class LeadsService {
   private readonly logger = new Logger(LeadsService.name);
-  constructor(private readonly prisma: PrismaService, @Optional() private readonly lessons?: LessonsService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly lessons?: LessonsService,
+    @Optional() private readonly events?: LeadEventsService) {}
 
   async create(dto: CreateLeadDto, consentSource: 'LANDING' | 'VK' = 'LANDING'): Promise<{ success: true; leadId: string; message: string }> {
     if (process.env.PUBLIC_LEADS_ENABLED !== 'true' && process.env.NODE_ENV === 'production') {
@@ -45,6 +47,18 @@ export class LeadsService {
           });
       return { lead, created: !pending };
     });
+    if (result.created && consentSource === 'LANDING' && this.events) {
+      // Publish only after commit; VK delivery failures must not delay browser alerts.
+      let serviceName = dto.direction?.trim() || '';
+      if (!serviceName && result.lead.serviceId) {
+        try {
+          const service = await this.prisma.service.findUnique({ where: { id: result.lead.serviceId }, select: { title: true, name: true } });
+          serviceName = service?.title || service?.name || '';
+        } catch { this.logger.warn({ event: 'lead_event_service_lookup_failed', leadId: result.lead.id }); }
+      }
+      this.events.publish({ id: result.lead.id, clientName: result.lead.firstName, phone: result.lead.phone,
+        serviceName: serviceName || 'Первое занятие', createdAt: result.lead.createdAt.toISOString() });
+    }
     // Retry a missing outbox entry on resubmission, using the saved lead rather
     // than new input. The stable notification key also covers already sent rows.
     if (result.created || (consentSource === 'LANDING' && result.lead.consentSource === 'LANDING')) {
