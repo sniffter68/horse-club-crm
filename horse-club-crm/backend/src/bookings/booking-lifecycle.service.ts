@@ -39,7 +39,7 @@ export class BookingLifecycleService {
           if (initial.membershipId) membership = await this.lockMembership(tx, initial.membershipId);
           else if (action !== 'cancel' || cancellation!.cancelledBy === 'client') {
             const candidates = await tx.membership.findMany({ where: {
-              clientId: initial.clientId, type: { in: ['fixed_lessons', 'deposit'] }, status: 'active',
+              deletedAt: null, clientId: initial.clientId, type: { in: ['fixed_lessons', 'deposit'] }, status: 'active',
               validFrom: { lte: lookupTime }, validTo: { gte: lookupTime },
               OR: [{ allowedDisciplines: { isEmpty: true } }, { allowedDisciplines: { has: initial.serviceType! } }],
             }, orderBy: [{ validTo: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }] });
@@ -93,7 +93,7 @@ export class BookingLifecycleService {
   }
 
   private usable(m: Membership, clientId: string, discipline: string, now: Date) {
-    return m.clientId === clientId && ['fixed_lessons', 'deposit'].includes(m.type) && m.status === 'active'
+    return !m.deletedAt && m.clientId === clientId && ['fixed_lessons', 'deposit'].includes(m.type) && m.status === 'active'
       && m.validFrom <= now && m.validTo >= now && (!m.allowedDisciplines.length || m.allowedDisciplines.includes(discipline));
   }
   private async lockMembership(tx: Prisma.TransactionClient, id: string) {

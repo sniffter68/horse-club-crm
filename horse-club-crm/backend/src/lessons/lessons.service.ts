@@ -285,11 +285,11 @@ export class LessonsService {
         if (!participant.membershipId) continue;
         if (!service.allowMembership) throw new BadRequestException('Услуга не допускает оплату абонементом');
         const membership = await tx.membership.findUnique({ where: { id: participant.membershipId },
-          select: { clientId: true, remainedLessons: true, validUntil: true } });
+          select: { clientId: true, remainedLessons: true, validUntil: true, deletedAt: true } });
         if (!membership || membership.clientId !== participant.clientId) {
           throw new BadRequestException('Абонемент не принадлежит участнику');
         }
-        if (membership.remainedLessons <= 0 || membership.validUntil < end) {
+        if (membership.deletedAt || membership.remainedLessons <= 0 || membership.validUntil < end) {
           throw new BadRequestException('Абонемент недоступен на время занятия');
         }
       }
@@ -586,6 +586,7 @@ export class LessonsService {
           const membership = await tx.membership.findFirst({
             where: {
               clientId: booking.clientId,
+              deletedAt: null,
               remainedLessons: { gt: 0 },
               validUntil: { gte: new Date() },
             },

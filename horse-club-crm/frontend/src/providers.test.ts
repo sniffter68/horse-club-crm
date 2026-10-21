@@ -57,6 +57,20 @@ describe('Authentication', () => {
   })
 })
 describe('Data provider', () => {
+  it('serializes and clears archive filters while retaining the catalogue allowlist', async () => {
+    httpClient.defaults.adapter = async config => {
+      const params = new URL(config.url ?? '', 'http://localhost').searchParams
+      expect(params.get('archivedOnly')).toBe('true')
+      expect(params.has('includeArchived')).toBe(false)
+      return response(config, [])
+    }
+    await dataProvider.getList({ resource: 'clients', filters: [
+      { field: 'archivedOnly', operator: 'eq', value: 'true' },
+      { field: 'includeArchived', operator: 'eq', value: undefined },
+    ] })
+    await expect(dataProvider.getList({ resource: 'clients', filters: [{ field: 'archivedOnly', operator: 'eq', value: 'yes' }] })).rejects.toThrow()
+    await expect(dataProvider.getList({ resource: 'horses', filters: [{ field: 'archivedOnly', operator: 'eq', value: true }] })).rejects.toThrow()
+  })
   it('sends and clears client type filters without weakening other resource contracts', async () => {
     httpClient.defaults.adapter = async config => {
       expect(new URL(config.url ?? '', 'http://localhost').searchParams.get('clientType')).toBe('ONE_TIME')

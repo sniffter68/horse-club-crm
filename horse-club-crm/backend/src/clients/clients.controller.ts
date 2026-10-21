@@ -5,6 +5,7 @@ import {
   Res, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { RequireModule } from '../auth/module-access.guard';
 import { Role } from '@prisma/client';
 import type { Client } from '@prisma/client';
 import type { Response } from 'express';
@@ -19,6 +20,7 @@ import { ClientsService, type ClientDetailsResponse, type ClientListResponse } f
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
+@RequireModule('SCHEDULE')
 @ApiTags('Clients')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -75,9 +77,15 @@ export class ClientsController {
     return this.clientsService.update(id, dto);
   }
 
+  @Post(':id/restore')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  restore(@Param('id', new ParseUUIDPipe()) id: string): Promise<Client> {
+    return this.clientsService.restore(id);
+  }
+
   @Delete(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
-  remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<Client> {
+  remove(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.clientsService.remove(id);
   }
 }

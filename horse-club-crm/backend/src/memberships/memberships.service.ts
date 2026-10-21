@@ -5,7 +5,8 @@ import { defaultModuleAccess } from '../settings/module-access.service';
 import { isSerializationFailure } from '../common/serialization-failure';
 import { BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { RefineQueryDto } from '../common/dto/refine-query.dto';
+import type { ArchiveQueryDto } from '../common/dto/archive-query.dto';
+import { archiveTransaction } from '../common/archive-transaction';
 import { parseRefineQuery, type PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateMembershipDto } from './dto/create-membership.dto';
@@ -13,6 +14,7 @@ import type { CreateMembershipDto } from './dto/create-membership.dto';
 const membershipInclude = { client: true, pricingPlan: true } satisfies Prisma.MembershipInclude;
 const membershipDetailsInclude = {
   ...membershipInclude,
+  _count: { select: { bookings: true, payments: true, transactions: true, operations: true } },
   operations: {
     orderBy: { createdAt: 'desc' as const },
     include: { lesson: { include: { service: true, trainer: true, arena: true } } },
@@ -45,7 +47,7 @@ export class MembershipsService {
   private readonly logger = new Logger(MembershipsService.name);
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(query: RefineQueryDto): Promise<PaginatedResult<MembershipResponse>> {
+  async findAll(query: ArchiveQueryDto): Promise<PaginatedResult<MembershipResponse>> {
     const options = parseRefineQuery(query, ['id', 'totalLessons', 'remainedLessons', 'validUntil', 'createdAt', 'updatedAt'], 'createdAt');
     const where: Prisma.MembershipWhereInput = options.search ? {
       client: { is: { OR: [
@@ -54,6 +56,8 @@ export class MembershipsService {
         { lastName: { contains: options.search, mode: 'insensitive' } },
       ] } },
     } : {};
+    if (query.archivedOnly) where.deletedAt = { not: null };
+    else if (!query.includeArchived) where.deletedAt = null;
     const orderBy = { [options.sort]: options.order } as Prisma.MembershipOrderByWithRelationInput;
     const [total, data] = await this.prisma.$transaction([
       this.prisma.membership.count({ where }),
@@ -97,7 +101,8 @@ export class MembershipsService {
               throw new ForbiddenException('Для продажи с оплатой требуется полный доступ к кассе');
           }
           stage = 'client.lookup';
-          const client = await tx.client.findUnique({ where: { id: dto.clientId }, select: { id: true } });
+          const client = await tx.client.findUnique({ where: { id: dto.clientId }, select: { id: true, deletedAt: true } });
+          if (client?.deletedAt) throw new BadRequestException('Сначала восстановите клиента из архива');
           if (!client) throw new NotFoundException('Клиент не найден');
           stage = 'pricingPlan.lookup';
           const plan = dto.pricingPlanId ? await tx.pricingPlan.findUnique({ where: { id: dto.pricingPlanId } }) : null;
@@ -127,7 +132,7 @@ export class MembershipsService {
           stage = 'membership.create';
           const membership = await tx.membership.create({ data: {
             clientId: client.id, pricingPlanId: plan?.id, serviceId: service?.id, serviceTitle: title,
-            title, totalLessons, remainedLessons: totalLessons, initialUnits: totalLessons, remainingUnits: totalLessons,
+            title, status: 'active', totalLessons, remainedLessons: totalLessons, initialUnits: totalLessons, remainingUnits: totalLessons,
             validUntil, validTo: validUntil, pricePerLesson, totalPrice, paymentMethod: dto.paymentMethod,
             saleRequestId: dto.requestId, saleFingerprint: fingerprint, soldById: actor.id, cashboxPosted: cashboxEnabled,
             operations: { create: { id: creditId, type: 'CREDIT', amount: totalLessons, reason: creditReason } },
@@ -173,6 +178,26 @@ export class MembershipsService {
     }
   }
 
+  async remove(id: string) {
+    return archiveTransaction(this.prisma, async tx => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${id}, 0))::text`;
+      const membership = await tx.membership.findUnique({ where: { id }, include: {
+        _count: { select: { bookings: true, payments: true, transactions: true, operations: true } },
+      } });
+      if (!membership) throw new NotFoundException('Абонемент не найден');
+      // Even issuance CREDIT is immutable journal history. Never remove its projection.
+      const softDeleted = Boolean(membership.deletedAt) || membership.cashboxPosted
+        || membership.remainedLessons !== membership.totalLessons
+        || !membership.remainingUnits.equals(membership.initialUnits)
+        || Object.values(membership._count).some(count => count > 0);
+      if (softDeleted) await tx.membership.update({ where: { id }, data: { deletedAt: membership.deletedAt ?? new Date() } });
+      else await tx.membership.delete({ where: { id } });
+      return { id, softDeleted, message: softDeleted
+        ? 'Абонемент аннулирован и перенесен в архив. При наличии остатка оформите возврат в кассе'
+        : 'Абонемент удален безвозвратно' };
+    });
+  }
+
   findPricingPlans() {
     return this.prisma.pricingPlan.findMany({ orderBy: [{ name: 'asc' }, { id: 'asc' }] });
   }
@@ -180,7 +205,7 @@ export class MembershipsService {
   private addDays(days: number): Date {
     return DateTime.now().setZone('Europe/Moscow').plus({ days }).toJSDate();
   }
-  private withActive<T extends { remainedLessons: number; validUntil: Date }>(membership: T): T & { isActive: boolean } {
-    return { ...membership, isActive: membership.remainedLessons > 0 && membership.validUntil >= new Date() };
+  private withActive<T extends { remainedLessons: number; validUntil: Date; deletedAt: Date | null; status: string }>(membership: T): T & { isActive: boolean } {
+    return { ...membership, isActive: !membership.deletedAt && membership.status === 'active' && membership.remainedLessons > 0 && membership.validUntil >= new Date() };
   }
 }

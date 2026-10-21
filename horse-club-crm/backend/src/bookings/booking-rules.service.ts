@@ -61,6 +61,7 @@ export class BookingRulesService {
     const clients = await tx.client.findMany({ where: { id: { in: clientIds } } });
     for (const participant of input.participants) {
       const client = clients.find(c => c.id === participant.clientId);
+      if (client?.deletedAt) throw new BookingValidationError('RESOURCE_NOT_FOUND', 'Сначала восстановите клиента из архива');
       if (!client) throw new BookingValidationError('RESOURCE_NOT_FOUND', 'Клиент не найден');
       if (!participant.horseId) continue;
       const horse = horses.find(h => h.id === participant.horseId);

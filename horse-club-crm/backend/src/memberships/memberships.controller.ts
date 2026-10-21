@@ -1,26 +1,28 @@
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { RequireModule } from '../auth/module-access.guard';
 import { Role } from '@prisma/client';
 import type { Response } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { RefineQueryDto } from '../common/dto/refine-query.dto';
+import { ArchiveQueryDto } from '../common/dto/archive-query.dto';
 import { setRefineTotalHeaders } from '../common/refine';
 import { CreateMembershipDto } from './dto/create-membership.dto';
 import { MembershipsService, type MembershipResponse } from './memberships.service';
 
+@RequireModule('SCHEDULE')
 @ApiTags('Memberships')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.MANAGER)
-@Controller('memberships')
+@Controller(['memberships', 'client-memberships'])
 export class MembershipsController {
   constructor(private readonly membershipsService: MembershipsService) {}
   @Get()
-  async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) res: Response): Promise<MembershipResponse[]> {
+  async findAll(@Query() query: ArchiveQueryDto, @Res({ passthrough: true }) res: Response): Promise<MembershipResponse[]> {
     const { data, total } = await this.membershipsService.findAll(query); setRefineTotalHeaders(res, total); return data;
   }
   @Post()
@@ -31,6 +33,8 @@ export class MembershipsController {
     setRefineTotalHeaders(res, plans.length);
     return plans;
   }
+  @Delete(':id')
+  remove(@Param('id', new ParseUUIDPipe()) id: string) { return this.membershipsService.remove(id); }
   @Get(':id')
   findOne(@Param('id', new ParseUUIDPipe()) id: string) { return this.membershipsService.findOne(id); }
 }

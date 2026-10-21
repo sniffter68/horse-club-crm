@@ -33,6 +33,13 @@ export const dataProvider = {
     }
 
     for (const filter of filters ?? []) {
+      if (['clients', 'memberships'].includes(resource) && 'field' in filter
+        && ['includeArchived', 'archivedOnly'].includes(filter.field) && filter.operator === 'eq') {
+        if (filter.value == null || filter.value === '') continue
+        if (!['true', 'false', true, false].includes(filter.value)) throw new Error('Недопустимый фильтр архива')
+        params.set(filter.field, String(filter.value))
+        continue
+      }
       if (resource === 'clients' && 'field' in filter && filter.field === 'clientType' && filter.operator === 'eq') {
         if (filter.value == null || filter.value === '') continue
         if (!['REGULAR', 'ONE_TIME'].includes(filter.value)) throw new Error('Недопустимый тип клиента')

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CatalogFormActivity } from './CatalogFormActivity'
 import { type BaseRecord, type HttpError } from '@refinedev/core'
 import { Create, Edit, List, EditButton, DeleteButton, useForm, useTable } from '@refinedev/antd'
@@ -11,12 +11,20 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
   resource: string; title: string; columns: TableColumnsType<T>; extraActions?: (record: T) => ReactNode
 }) {
   const { canManage, role } = useCatalogPermissions(resource)
-  const { tableProps, searchFormProps, tableQuery, sorters, filters } = useTable<T, HttpError, { q?: string; clientType?: string }>({
+  const { tableProps, searchFormProps, tableQuery, sorters, filters, currentPage, pageSize, setCurrentPage } = useTable<T, HttpError, { q?: string; clientType?: string; archive?: string }>({
     resource, pagination: { pageSize: 10 }, sorters: { mode: 'server' },
     queryOptions: { retry: (count, error) => (error.statusCode === 0 || error.statusCode >= 500) && count < 2 },
-    onSearch: ({ q, clientType }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' },
-      ...(resource === 'clients' ? [{ field: 'clientType', operator: 'eq' as const, value: clientType || undefined }] : [])],
+    onSearch: ({ q, clientType, archive }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' },
+      ...(resource === 'clients' ? [{ field: 'clientType', operator: 'eq' as const, value: clientType || undefined },
+        { field: 'includeArchived', operator: 'eq' as const, value: archive === 'all' ? 'true' : undefined },
+        { field: 'archivedOnly', operator: 'eq' as const, value: archive === 'archived' ? 'true' : undefined }] : [])],
   })
+  const total = tableQuery.data?.total
+  useEffect(() => {
+    if (total === undefined || tableQuery.isFetching) return
+    const lastPage = Math.max(1, Math.ceil(total / pageSize))
+    if (currentPage > lastPage) setCurrentPage(lastPage)
+  }, [total, pageSize, currentPage, setCurrentPage, tableQuery.isFetching])
   const sortedColumns = columns.map(column => {
     const sorter = sorters.find(item => item.field === column.key)
     return { ...column, sortOrder: sorter ? (sorter.order === 'asc' ? 'ascend' as const : 'descend' as const) : null }
@@ -26,7 +34,7 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
     render: (_: unknown, record: T) => <Space wrap>
       <EditButton resource={resource} recordItemId={record.id} size="small" aria-label="Редактировать">Редактировать</EditButton>
       {extraActions?.(record)}
-      {(resource !== 'horse-health-logs' || role !== 'TRAINER') && <DeleteButton resource={resource} recordItemId={record.id} size="small" aria-label="Удалить"
+      {resource !== 'clients' && (resource !== 'horse-health-logs' || role !== 'TRAINER') && <DeleteButton resource={resource} recordItemId={record.id} size="small" aria-label="Удалить"
         confirmTitle="Удалить запись?" confirmOkText="Удалить" confirmCancelText="Отмена">Удалить</DeleteButton>}
     </Space>,
   }] : []
@@ -37,6 +45,10 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
       </Form.Item>
       {resource === 'clients' && <Form.Item name="clientType"><Select aria-label="Тип клиента" allowClear placeholder="Все клиенты" style={{ width: 200 }}
         onChange={() => searchFormProps.form?.submit()} options={[{ value: 'REGULAR', label: 'Постоянные' }, { value: 'ONE_TIME', label: 'Разовые' }]} /></Form.Item>}
+      {resource === 'clients' && <Form.Item name="archive" initialValue={filters.some(f => 'field' in f && f.field === 'archivedOnly' && f.value === 'true') ? 'archived' : filters.some(f => 'field' in f && f.field === 'includeArchived' && f.value === 'true') ? 'all' : 'active'}>
+        <Select aria-label="Архив клиентов" style={{ width: 190 }} onChange={() => searchFormProps.form?.submit()}
+          options={[{ value: 'all', label: 'Все' }, { value: 'active', label: 'Только активные' }, { value: 'archived', label: 'Архив' }]} />
+      </Form.Item>}
       <Button type="primary" htmlType="submit">Найти</Button>
     </Form>
     {tableQuery.error && <Alert type="error" showIcon message="Не удалось загрузить каталог" description={tableQuery.error.message} />}

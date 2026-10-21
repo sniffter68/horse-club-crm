@@ -1,3 +1,4 @@
+import { ArchiveAction } from './ArchiveAction'
 import { useState } from 'react'
 import { VkProfileLink } from '../../components/VkProfileLink'
 import { useInvalidate, useOne, type HttpError } from '@refinedev/core'
@@ -15,6 +16,7 @@ import { ClientLedger, MembershipBalance, type ActiveMembership } from './member
 type ClientRow = Client & { membership: ActiveMembership | null }
 
 type ClientMembership = {
+  deletedAt?: string | null
   id: string
   totalLessons: number
   remainedLessons: number
@@ -66,7 +68,7 @@ export function ClientList() {
 
   return <>
     <CatalogList<ClientRow> resource="clients" title="Клиенты"
-      extraActions={row => <><Button size="small" onClick={() => setLedgerClient(row)}>История баланса</Button>{row.clientType === 'ONE_TIME' && <ConvertClient client={row} />}</>} columns={[
+      extraActions={row => <><ArchiveAction resource="clients" id={row.id} archived={Boolean(row.deletedAt)} /><Button size="small" onClick={() => setLedgerClient(row)}>История баланса</Button>{!row.deletedAt && row.clientType === 'ONE_TIME' && <ConvertClient client={row} />}</>} columns={[
       {
         key: 'name',
         title: 'Клиент',
@@ -75,10 +77,10 @@ export function ClientList() {
           {[row.firstName, row.lastName].filter(Boolean).join(' ') || row.name || 'Без имени'}
         </Button>,
       },
-      { key: 'clientType', title: 'Тип', render: (_: unknown, row) => row.clientType === 'ONE_TIME' ? <OneTimeBadge /> : 'Постоянный' },
+      { key: 'clientType', title: 'Тип', render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : row.clientType === 'ONE_TIME' ? <OneTimeBadge /> : 'Постоянный' },
       { key: 'phone', dataIndex: 'phone', title: 'Телефон', sorter: true, render: (value: string | null) => <span className="data-mono">{value || '—'}</span> },
       { key: 'vk', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name || row.firstName} kind="CLIENT" vkUserId={row.vkUserId} /> },
-      { key: 'membership', title: 'Абонемент', hidden: !canManage, width: 300, render: (_: unknown, row) => <MembershipBalance membership={row.membership} clientId={row.id} /> },
+      { key: 'membership', title: 'Абонемент', hidden: !canManage, width: 300, render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : <MembershipBalance membership={row.membership} clientId={row.id} /> },
       { key: 'roles', title: 'Роли', render: (_: unknown, row) => <Space>{row.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{row.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
       { key: 'preferences', dataIndex: 'preferences', title: 'Заметки', width: 260, ellipsis: true, render: (value: string | null) => value || '—' },
       { key: 'createdAt', dataIndex: 'createdAt', title: 'Дата создания', sorter: true, render: (value: string) => dateFormatter.format(new Date(value)) },
@@ -89,15 +91,16 @@ export function ClientList() {
       {query.isLoading && <Skeleton active />}
       {query.error && <Alert type="error" showIcon message="Не удалось загрузить карточку клиента" description={query.error.message} />}
       {client && !query.isLoading && <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        {canManage && <MembershipBalance clientId={client.id} membership={(() => {
+        {canManage && !client.deletedAt && <MembershipBalance clientId={client.id} membership={(() => {
           const active = client.memberships.filter(item => item.isActive)
             .sort((a, b) => a.validUntil.localeCompare(b.validUntil) || a.id.localeCompare(b.id))[0]
           return active ? { id: active.id, planName: active.pricingPlan?.name || 'Индивидуальный абонемент',
             remainingUnits: active.remainedLessons, totalUnits: active.totalLessons, validUntil: active.validUntil,
             status: new Date(active.validUntil).getTime() - now <= 7 * 86_400_000 ? 'EXPIRING' : 'ACTIVE' } : null
         })()} />}
+        <ArchiveAction resource="clients" id={client.id} archived={Boolean(client.deletedAt)} onChanged={() => setSelectedClientId(undefined)} />
         {canManage && <Button onClick={() => setLedgerClient(client)}>История баланса</Button>}
-        {client.clientType === 'ONE_TIME' && <Space><OneTimeBadge />{canManage && <ConvertClient client={client} />}</Space>}
+        {!client.deletedAt && client.clientType === 'ONE_TIME' && <Space><OneTimeBadge />{canManage && <ConvertClient client={client} />}</Space>}
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'name', label: 'ФИО', span: 2, children: <span className="client-name">{[client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || '—'}</span> },
           { key: 'phone', label: 'Телефон', children: client.phone ? <a className="data-mono" href={`tel:${client.phone}`}>{client.phone}</a> : '—' },
@@ -114,8 +117,9 @@ export function ClientList() {
               <div style={{ width: '100%' }}>
                 <Space style={{ width: '100%', justifyContent: 'space-between' }} align="start">
                   <Typography.Text strong>{membership.pricingPlan?.name || 'Индивидуальный абонемент'}</Typography.Text>
-                  <Tag color={membership.isActive ? 'green' : 'default'}>{membership.isActive ? 'Активен' : 'Неактивен'}</Tag>
+                  <Tag color={membership.isActive ? 'green' : 'default'}>{membership.deletedAt ? 'В архиве' : membership.isActive ? 'Активен' : 'Неактивен'}</Tag>
                 </Space>
+                <ArchiveAction resource="memberships" id={membership.id} archived={Boolean(membership.deletedAt)} />
                 <Progress
                   percent={membership.totalLessons > 0 ? Math.round(membership.remainedLessons / membership.totalLessons * 100) : 0}
                   format={() => `${membership.remainedLessons} / ${membership.totalLessons} занятий`}

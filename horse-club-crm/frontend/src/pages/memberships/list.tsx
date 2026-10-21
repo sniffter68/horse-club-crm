@@ -1,3 +1,4 @@
+import { ArchiveAction } from '../clients/ArchiveAction'
 import { useState } from 'react'
 import { CreateButton, List as RefineList, useTable } from '@refinedev/antd'
 import type { HttpError } from '@refinedev/core'
@@ -11,6 +12,7 @@ import { usePermissions } from '../../modulePermissions'
 import { useCatalogPermissions } from '../catalogs/permissions'
 
 type Membership = {
+  deletedAt?: string | null;
   serviceTitle?: string; totalPrice?: string | number; paymentMethod?: string;
   id: string; totalLessons: number; remainedLessons: number; validUntil: string; isActive: boolean;
   client: { id: string; name: string; firstName: string; lastName: string } | null;
@@ -48,6 +50,7 @@ export function MembershipList() {
     </RefineList>
     <DetailsModal<MembershipDetails> resource="memberships" id={selectedId} title="Карточка абонемента" onClose={() => setSelectedId(undefined)}>
       {membership => <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <ArchiveAction resource="memberships" id={membership.id} archived={Boolean(membership.deletedAt)} onChanged={() => setSelectedId(undefined)} />
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'client', label: 'Клиент', children: membership.client ? personName(membership.client) : '—' },
           { key: 'plan', label: 'Услуга / тариф', children: membership.serviceTitle || membership.pricingPlan?.name || 'Индивидуальный' },

@@ -69,7 +69,7 @@ export class CashDeskService {
       if (dto.membershipId) {
         const membership = await tx.membership.findUnique({ where: { id: dto.membershipId } });
         if (!membership || membership.clientId !== dto.clientId) throw new BadRequestException('Абонемент не принадлежит клиенту');
-        if (membership.status === 'frozen' || (membership.totalLessons > 0 ? membership.validUntil : membership.validTo) < new Date()) throw new ConflictException('Абонемент заморожен или истёк');
+        if (membership.deletedAt || membership.status === 'frozen' || (membership.totalLessons > 0 ? membership.validUntil : membership.validTo) < new Date()) throw new ConflictException('Абонемент заморожен или истёк');
         pendingId = (await tx.payment.findFirst({ where: { membershipId: membership.id, status: 'PENDING' }, orderBy: { createdAt: 'asc' } }))?.id;
         if (membership.type === 'fixed_lessons') {
           if (await tx.payment.count({ where: { membershipId: membership.id, status: 'PAID' } })) throw new ConflictException('Абонемент уже оплачен');
@@ -152,7 +152,7 @@ export class CashDeskService {
       bookings: (await tx.booking.findMany({ where: { clientId, isPaid: false, membershipId: null, status: { in: ['scheduled', 'completed', 'no_show'] }, OR: [{ lessonId: { not: null } }, { payments: { none: { status: 'PAID' } } }] }, include: { payments: { where: { status: 'PAID' } }, lesson: { include: { service: true } } }, orderBy: { startTime: 'desc' }, take: 100 })).map(booking => ({ ...booking,
         remainingAmount: Prisma.Decimal.max(0, booking.costAmount.minus(Prisma.Decimal.max(new Prisma.Decimal(booking.prepaymentAmount ?? 0).plus(booking.finalPaymentAmount ?? 0), booking.payments?.reduce((sum, p) => sum.plus(p.amount), new Prisma.Decimal(0)) ?? 0))),
       })),
-      memberships: await tx.membership.findMany({ where: { clientId }, include: { pricingPlan: true, payments: { select: { status: true, amount: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
+      memberships: await tx.membership.findMany({ where: { clientId, deletedAt: null }, include: { pricingPlan: true, payments: { select: { status: true, amount: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
     }));
   }
 }

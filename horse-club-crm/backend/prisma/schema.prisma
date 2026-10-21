@@ -304,6 +304,8 @@ enum ClientType {
 }
 
 model Client {
+  deletedAt DateTime? @db.Timestamptz(6)
+  @@index([deletedAt])
   clientType ClientType @default(REGULAR)
   riderLevel String?
   boardingBalance Decimal @default(0) @db.Decimal(14, 2)
@@ -390,6 +392,8 @@ model Lesson {
 }
 
 model Membership {
+  deletedAt DateTime? @db.Timestamptz(6)
+  @@index([deletedAt])
   serviceId String? @db.Uuid
   service Service? @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   serviceTitle String?

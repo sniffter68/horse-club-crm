@@ -133,7 +133,7 @@ test('membership sale generic 500 explains uncertain outcome and keeps safe retr
 
 test('membership sale with cashbox disabled explains absence of a cash receipt', async ({ page }) => {
   const state = await setupSale(page); state.disabled = true
-  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'ADMIN', modules: [{ module: 'CASHBOX', isEnabled: false, accessLevel: 'FULL' }] } }))
+  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'ADMIN', modules: [{ module: 'SCHEDULE', isEnabled: true, accessLevel: 'FULL' }, { module: 'CASHBOX', isEnabled: false, accessLevel: 'FULL' }] } }))
   const drawer = await fillSale(page)
   await expect(drawer.getByText('Касса клуба отключена. Абонемент будет оформлен без кассовой операции.')).toBeVisible()
   await drawer.getByRole('button', { name: 'Создать абонемент', exact: true }).click()
@@ -143,7 +143,7 @@ test('membership sale with cashbox disabled explains absence of a cash receipt',
 
 test('membership sale read-only cash access prevents submission', async ({ page }) => {
   await setupSale(page)
-  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'ADMIN', modules: [{ module: 'CASHBOX', isEnabled: true, accessLevel: 'READ_ONLY' }] } }))
+  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'ADMIN', modules: [{ module: 'SCHEDULE', isEnabled: true, accessLevel: 'FULL' }, { module: 'CASHBOX', isEnabled: true, accessLevel: 'READ_ONLY' }] } }))
   await page.goto('/memberships/new')
   await expect(page.getByRole('button', { name: 'Создать абонемент', exact: true })).toBeDisabled()
 })
@@ -278,7 +278,7 @@ for (const width of [1280, 390]) {
     await expect(modal).not.toBeVisible()
     await expect(trigger).toBeFocused()
     await expect(page.getByRole('button', { name: 'Редактировать', exact: true }).first()).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Удалить', exact: true }).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Удалить клиента', exact: true }).first()).toBeVisible()
   })
 }
 

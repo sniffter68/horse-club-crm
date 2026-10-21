@@ -5,6 +5,7 @@ import type { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { rethrowCatalogMutation } from '../common/prisma-errors';
 import { parseRefineQuery } from '../common/refine';
 import type { PaginatedResult } from '../common/refine';
+import { archiveTransaction } from '../common/archive-transaction';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateClientDto } from './dto/create-client.dto';
 import type { ClientQueryDto } from './dto/client-query.dto';
@@ -21,7 +22,7 @@ const paymentSummarySelect = {
 } satisfies Prisma.PaymentSelect;
 
 const clientMembershipSelect = {
-  type: true, title: true, initialUnits: true, remainingUnits: true, validFrom: true, validTo: true, status: true,
+  deletedAt: true, _count: { select: { bookings: true, operations: true, transactions: true, payments: true } }, totalPrice: true, type: true, title: true, initialUnits: true, remainingUnits: true, validFrom: true, validTo: true, status: true,
   id: true,
   totalLessons: true,
   remainedLessons: true,
@@ -34,6 +35,7 @@ const clientMembershipSelect = {
 type ClientMembership = Prisma.MembershipGetPayload<{ select: typeof clientMembershipSelect }> & { isActive: boolean };
 const clientDetailsInclude = Prisma.validator<Prisma.ClientDefaultArgs>()({
   include: {
+    _count: { select: { bookings: true, memberships: true, payments: true, transactions: true, boardingContracts: true, boardingDailyLogs: true, ownedHorses: true, leadRequests: true } },
     memberships: { select: clientMembershipSelect, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }] },
     boardingContracts: {
       include: {
@@ -111,6 +113,8 @@ export class ClientsService {
           ],
         }
       : {};
+    if (query.archivedOnly) where.deletedAt = { not: null };
+    else if (!query.includeArchived) where.deletedAt = null;
     if (query.clientType) where.clientType = query.clientType;
     const orderBy = { [options.sort]: options.order } as Prisma.ClientOrderByWithRelationInput;
     const [total, data] = await this.prisma.$transaction([
@@ -121,7 +125,7 @@ export class ClientsService {
         skip: options.skip,
         take: options.take,
         include: { memberships: {
-          where: { type: 'fixed_lessons', status: 'active', validFrom: { lte: now }, remainedLessons: { gt: 0 }, validUntil: { gte: now } },
+          where: { deletedAt: null, type: 'fixed_lessons', status: 'active', validFrom: { lte: now }, remainedLessons: { gt: 0 }, validUntil: { gte: now } },
           orderBy: [{ validUntil: 'asc' }, { id: 'asc' }], take: 1,
           select: { id: true, serviceTitle: true, remainedLessons: true, totalLessons: true, validUntil: true, pricingPlan: { select: { name: true } } },
         } },
@@ -168,7 +172,7 @@ export class ClientsService {
       ...client,
       memberships: client.memberships.map((membership) => ({
         ...membership,
-        isActive: membership.remainedLessons > 0 && membership.validUntil >= now,
+        isActive: !membership.deletedAt && membership.status === 'active' && membership.remainedLessons > 0 && membership.validUntil >= now,
       })),
     };
   }
@@ -212,11 +216,26 @@ export class ClientsService {
     }
   }
 
-  async remove(id: string): Promise<Client> {
+  async restore(id: string): Promise<Client> {
     try {
-      return await this.prisma.client.delete({ where: { id } });
-    } catch (error: unknown) {
-      return rethrowCatalogMutation(error, 'Клиент');
-    }
+      return await this.prisma.client.update({ where: { id }, data: { deletedAt: null } });
+    } catch (error) { return rethrowCatalogMutation(error, 'Клиент'); }
+  }
+
+  async remove(id: string) {
+    try {
+      return await archiveTransaction(this.prisma, async tx => {
+        const client = await tx.client.findUnique({ where: { id }, select: {
+          id: true, deletedAt: true, boardingBalance: true,
+          _count: { select: { bookings: true, memberships: true, payments: true, transactions: true,
+            boardingContracts: true, boardingDailyLogs: true, ownedHorses: true, leadRequests: true } },
+        } });
+        if (!client) throw new NotFoundException('Клиент не найден');
+        const softDeleted = Boolean(client.deletedAt) || !client.boardingBalance.isZero() || Object.values(client._count).some(count => count > 0);
+        if (softDeleted) await tx.client.update({ where: { id }, data: { deletedAt: client.deletedAt ?? new Date() } });
+        else await tx.client.delete({ where: { id } });
+        return { id, softDeleted, message: softDeleted ? 'Клиент перенесен в архив. История сохранена' : 'Клиент удален безвозвратно' };
+      });
+    } catch (error) { return rethrowCatalogMutation(error, 'Клиент'); }
   }
 }

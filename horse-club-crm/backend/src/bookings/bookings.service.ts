@@ -148,7 +148,7 @@ export class BookingsService {
           if (dto.membershipId) {
             await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Membership" WHERE "id" = ${dto.membershipId}::uuid FOR UPDATE`);
             const membership = await tx.membership.findUnique({ where: { id: dto.membershipId } });
-            if (!membership || membership.clientId !== dto.clientId) throw new BookingValidationError('MEMBERSHIP_INVALID', 'Абонемент не принадлежит клиенту');
+            if (!membership || membership.deletedAt || membership.clientId !== dto.clientId) throw new BookingValidationError('MEMBERSHIP_INVALID', 'Абонемент не принадлежит клиенту');
           }
           const data = {
             clientId: dto.clientId, trainerId: dto.trainerId, horseId: dto.horseId, arenaId: dto.arenaId,

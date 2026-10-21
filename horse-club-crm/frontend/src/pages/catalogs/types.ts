@@ -5,6 +5,7 @@ export interface ClientValues {
   isRider: boolean; isPayer: boolean; preferences?: string; medicalNotes?: string;
 }
 export interface Client extends Omit<ClientValues, 'phone' | 'preferences' | 'medicalNotes'> {
+  deletedAt?: string | null;
   weightKg?: string | number | null;
   membership?: { planName: string; remainingUnits: number; totalUnits: number; status: string } | null;
   vkUserId?: string | null;

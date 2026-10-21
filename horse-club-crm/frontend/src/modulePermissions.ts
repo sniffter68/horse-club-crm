@@ -6,6 +6,7 @@ export type AccessLevel = 'FULL' | 'READ_ONLY' | 'HIDDEN'
 export interface ModulePermission { module: SystemModule; isEnabled: boolean; accessLevel: AccessLevel }
 export interface Snapshot { role: Role; modules: ModulePermission[] }
 const resources: Record<string, SystemModule> = {
+  clients: 'SCHEDULE', memberships: 'SCHEDULE', 'client-memberships': 'SCHEDULE',
   lessons: 'SCHEDULE', schedule: 'SCHEDULE', 'lesson-history': 'SCHEDULE', bookings: 'SCHEDULE',
   stalls: 'STABLES', stable: 'STABLES', 'stall-map': 'STABLES', 'boarding-contracts': 'STABLES', boarding: 'STABLES',
   vet: 'VETERINARY', 'horse-health-logs': 'VETERINARY',

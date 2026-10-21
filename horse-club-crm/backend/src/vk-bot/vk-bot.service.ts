@@ -173,7 +173,7 @@ export class VkBotService {
       }
       if (trainer && ['today', 'расписание на сегодня'].includes(command)) { await this.today(trainer.id, peer, eventId, offset); return; }
       if (client && ['balance', 'мой баланс', 'баланс абонемента'].includes(command)) {
-        const rows = await this.prisma.membership.findMany({ where: { clientId: client.id, validUntil: { gte: new Date() }, remainedLessons: { gt: 0 } },
+        const rows = await this.prisma.membership.findMany({ where: { deletedAt: null, clientId: client.id, validUntil: { gte: new Date() }, remainedLessons: { gt: 0 } },
           include: { pricingPlan: { select: { name: true } } }, orderBy: [{ validUntil: 'asc' }, { id: 'asc' }], skip: offset, take: 11 });
         const lines = rows.slice(0, 10).map(row => {
           const title = row.title?.trim() || row.pricingPlan?.name.trim() || 'Абонемент';
