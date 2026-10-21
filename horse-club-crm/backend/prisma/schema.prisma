@@ -230,6 +230,7 @@ model Service {
 }
 
 model Trainer {
+  preferredByClients Client[] @relation("ClientPreferredTrainer")
   scheduleColor String? @db.VarChar(7)
   user User?
   isPublic Boolean @default(true)
@@ -254,6 +255,7 @@ model Trainer {
 }
 
 model Horse {
+  preferredByClients Client[] @relation("ClientPreferredHorse")
   coat String?
   healthStatus HorseHealthStatus @default(HEALTHY)
   quarantineUntil DateTime? @db.Timestamptz(6)
@@ -306,6 +308,12 @@ enum ClientType {
 }
 
 model Client {
+  preferredTrainerId String? @db.Uuid
+  preferredHorseId String? @db.Uuid
+  preferredTrainer Trainer? @relation("ClientPreferredTrainer", fields: [preferredTrainerId], references: [id], onDelete: SetNull)
+  preferredHorse Horse? @relation("ClientPreferredHorse", fields: [preferredHorseId], references: [id], onDelete: SetNull)
+  @@index([preferredTrainerId])
+  @@index([preferredHorseId])
   birthDate String? @db.VarChar(10)
   deletedAt DateTime? @db.Timestamptz(6)
   @@index([deletedAt])

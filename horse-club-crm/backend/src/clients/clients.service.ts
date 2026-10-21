@@ -12,6 +12,11 @@ import type { ClientQueryDto } from './dto/client-query.dto';
 import type { QuickCreateClientDto } from './dto/quick-create-client.dto';
 import type { UpdateClientDto } from './dto/update-client.dto';
 
+const preferredResourcesInclude = {
+  preferredTrainer: { select: { id: true, name: true } },
+  preferredHorse: { select: { id: true, name: true } },
+} satisfies Prisma.ClientInclude;
+
 const paymentSummarySelect = {
   id: true,
   amount: true,
@@ -35,6 +40,7 @@ const clientMembershipSelect = {
 type ClientMembership = Prisma.MembershipGetPayload<{ select: typeof clientMembershipSelect }> & { isActive: boolean };
 const clientDetailsInclude = Prisma.validator<Prisma.ClientDefaultArgs>()({
   include: {
+    ...preferredResourcesInclude,
     _count: { select: { bookings: true, memberships: true, payments: true, transactions: true, boardingContracts: true, boardingDailyLogs: true, ownedHorses: true, leadRequests: true } },
     memberships: { select: clientMembershipSelect, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }] },
     boardingContracts: {
@@ -82,7 +88,7 @@ export type ActiveMembership = {
   id: string; planName: string; remainingUnits: number; totalUnits: number;
   validUntil: Date; status: 'ACTIVE' | 'EXPIRING';
 };
-export type ClientListResponse = Client & { membership: ActiveMembership | null };
+export type ClientListResponse = Prisma.ClientGetPayload<{ include: typeof preferredResourcesInclude }> & { membership: ActiveMembership | null };
 const ledgerInclude = {
   membership: { select: { title: true, type: true, pricingPlan: { select: { name: true } } } },
   booking: { select: { id: true, startTime: true, status: true, serviceType: true,
@@ -124,7 +130,7 @@ export class ClientsService {
         orderBy: [orderBy, { id: 'asc' }],
         skip: options.skip,
         take: options.take,
-        include: { memberships: {
+        include: { ...preferredResourcesInclude, memberships: {
           where: { deletedAt: null, type: 'fixed_lessons', status: 'active', validFrom: { lte: now }, remainedLessons: { gt: 0 }, validUntil: { gte: now } },
           orderBy: [{ validUntil: 'asc' }, { id: 'asc' }], take: 1,
           select: { id: true, serviceTitle: true, remainedLessons: true, totalLessons: true, validUntil: true, pricingPlan: { select: { name: true } } },
@@ -198,7 +204,7 @@ export class ClientsService {
     const firstName = dto.firstName ?? dto.name;
     const lastName = dto.lastName ?? '';
     try {
-      return await this.prisma.client.create({ data: { ...dto, firstName, lastName, name: [firstName, lastName].filter(Boolean).join(' ') } });
+      return await this.prisma.client.create({ include: preferredResourcesInclude, data: { ...dto, firstName, lastName, name: [firstName, lastName].filter(Boolean).join(' ') } });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Клиент');
     }
@@ -210,7 +216,7 @@ export class ClientsService {
       const current = await this.findOne(id);
       const firstName = dto.firstName ?? (dto.name !== undefined ? dto.name : current.firstName);
       const lastName = dto.lastName ?? (dto.name !== undefined && dto.firstName === undefined ? '' : current.lastName);
-      return await this.prisma.client.update({ where: { id }, data: { ...dto, firstName, lastName, name: [firstName, lastName].filter(Boolean).join(' ') } });
+      return await this.prisma.client.update({ where: { id }, include: preferredResourcesInclude, data: { ...dto, firstName, lastName, name: [firstName, lastName].filter(Boolean).join(' ') } });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Клиент');
     }

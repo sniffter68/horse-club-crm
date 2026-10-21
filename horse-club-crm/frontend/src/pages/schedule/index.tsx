@@ -1,3 +1,4 @@
+import { useClientPreferences } from './useClientPreferences'
 import { ScheduleEventContent } from './ScheduleEventContent'
 import { DeleteLessonAction } from './DeleteLessonAction'
 import { eventSummary } from './scheduleEventPresentation'
@@ -33,11 +34,13 @@ import { BookingLifecycleActions } from './BookingLifecycleActions'
 import { catalog } from '../catalogs/loadCatalog'
 const membershipDate = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeZone: CLUB_TIME_ZONE })
 
-function ParticipantEditor({ index, form, horses, participants, service, durationMinutes, workloads, workloadLoading, readOnly, canRemove, onRemove, report }: {
+function ParticipantEditor({ index, form, horses, trainers, trainerManual, participants, service, durationMinutes, workloads, workloadLoading, readOnly, canRemove, onRemove, report }: {
   index: number
   form: FormInstance<BookingValues>
   clients: Client[]
   horses: Horse[]
+  trainers: Trainer[]
+  trainerManual: boolean
   participants: BookingParticipantValues[]
   service?: Service
   durationMinutes?: number
@@ -51,6 +54,8 @@ function ParticipantEditor({ index, form, horses, participants, service, duratio
   const selectedClient = Form.useWatch(['participants', index, 'clientId'], form) as string | undefined
   const perPerson = isPerPersonService(service)
   const selectedHorse = Form.useWatch(['participants', index, 'horseId'], form) as string | undefined
+  const [preferenceClient, setPreferenceClient] = useState<Client>()
+  const preferences = useClientPreferences(form, preferenceClient?.id === selectedClient ? preferenceClient : undefined, horses, trainers, ['participants', index, 'horseId'], readOnly, trainerManual, index === 0)
   const [memberships, setMemberships] = useState<MembershipSummary[]>([])
   const [membershipsLoading, setMembershipsLoading] = useState(false)
   const [membershipsError, setMembershipsError] = useState<string>()
@@ -63,7 +68,7 @@ function ParticipantEditor({ index, form, horses, participants, service, duratio
       await Promise.resolve()
       if (controller.signal.aborted) return
       setMemberships([]); setMembershipsError(undefined)
-      if (!selectedClient || (!service?.allowMembership || perPerson)) {
+      if (!selectedClient || !isUuid(selectedClient)) {
         setMembershipsLoading(false)
         form.setFieldValue(['participants', index, 'membershipId'], undefined)
         return
@@ -72,7 +77,8 @@ function ParticipantEditor({ index, form, horses, participants, service, duratio
       try {
         const response = await httpClient.get<ClientWithMemberships>(`${API_URL}/clients/${selectedClient}`, { signal: controller.signal })
         if (controller.signal.aborted) return
-        const active = response.data.memberships
+        setPreferenceClient(response.data)
+        const active = (!service?.allowMembership || perPerson ? [] : response.data.memberships)
           .filter(membership => membership.isActive)
           .sort((left, right) => new Date(left.validUntil).getTime() - new Date(right.validUntil).getTime())
         setMemberships(active)
@@ -106,7 +112,7 @@ function ParticipantEditor({ index, form, horses, participants, service, duratio
     </Form.Item>}
     {membershipsError && <Alert type="error" showIcon message="Не удалось загрузить абонементы" description={membershipsError} />}
     <Form.Item name={[index, 'horseId']} label="Лошадь участника" extra={isPerPersonService(service) ? 'Для экскурсий выбор лошади необязателен' : 'Оставьте пустым для теоретического занятия или занятия без клубной лошади.'}>
-      <Select disabled={readOnly} loading={workloadLoading} allowClear showSearch optionFilterProp="label" options={horses.map(row => {
+      <Select onChange={preferences.horseChanged} disabled={readOnly} loading={workloadLoading} allowClear showSearch optionFilterProp="label" options={horses.map(row => {
         const load = workloads.find(item => item.horseId === row.id)
         return { value: row.id, label: `${row.name} — ${load ? `${load.currentWorkloadMinutes} / ${load.maxDailyWorkloadMinutes} мин` : workloadLoading ? 'загрузка…' : 'нагрузка недоступна'}`,
           disabled: row.isUnavailable || (row.id !== selectedHorse && selectedHorseIds.includes(row.id)) }
@@ -158,6 +164,7 @@ export function SchedulePage() {
     }
   }, [])
   const [range, setRange] = useState<{ from: string; to: string }>()
+  const [trainerManual, setTrainerManual] = useState(false)
   const [trainerId, setTrainerId] = useState<string>()
   const [horseId, setHorseId] = useState<string>()
   const [arenaId, setArenaId] = useState<string>()
@@ -267,6 +274,7 @@ export function SchedulePage() {
     setEditingLesson(undefined)
     setWorkloadDate(toLocalInput(start).slice(0, 10))
     form.resetFields()
+    setTrainerManual(false)
     form.setFieldsValue({ startTime: toLocalInput(start), durationMinutes: minutes, trainerId, arenaId, participants: [{ horseId }] })
     setError(undefined); setBookingOpen(true)
   }
@@ -402,7 +410,7 @@ export function SchedulePage() {
       <Form form={form} noValidate layout="vertical" onFinish={createBooking} disabled={saving}>
         {editingLesson && <Typography.Paragraph type="secondary">Меняются только время и длительность. Переносимое занятие исключено из текущей нагрузки.</Typography.Paragraph>}
         <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} onChange={id => form.setFieldsValue({ participantsCount: 1, pricePerPerson: isPerPersonService(services.find(row => row.id === id)) ? Number(services.find(row => row.id === id)?.price ?? 0) : undefined, durationMinutes: services.find(row => row.id === id)?.durationMinutes, cost: Number(services.find(row => row.id === id)?.price ?? 0), prepaymentAmount: 0, prepaymentMethod: undefined })} /></Form.Item>
-        <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
+        <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" onChange={() => { setTrainerManual(true) }} disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
         <Form.Item name="arenaId" label="Манеж" extra="Необязательно для выездного или теоретического занятия."><Select disabled={Boolean(editingLesson)} allowClear showSearch optionFilterProp="label" options={arenaOptions} /></Form.Item>
         <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><Input type="datetime-local" /></Form.Item>
         <Form.Item name="durationMinutes" label="Длительность, мин" rules={[{ required: true }, { type: 'integer', min: 1 }]}><InputNumber min={1} precision={0} /></Form.Item>
@@ -422,6 +430,8 @@ export function SchedulePage() {
               index={field.name}
               form={form}
               clients={clients}
+              trainers={trainers}
+              trainerManual={trainerManual}
               horses={horses}
               participants={participants ?? []}
               service={selectedServiceRecord}

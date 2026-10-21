@@ -1,11 +1,14 @@
 export interface PublicationValues { isPublic?: boolean; imageUrl?: string | null; description?: string | null; role?: string | null; order?: number }
 export interface ClientValues {
+  preferredTrainerId?: string | null; preferredHorseId?: string | null;
   birthDate?: string | null;
   clientType?: 'REGULAR' | 'ONE_TIME'; riderLevel?: string | null;
   name?: string; firstName: string; lastName?: string; phone?: string | null; email?: string | null;
   isRider: boolean; isPayer: boolean; preferences?: string; medicalNotes?: string;
 }
 export interface Client extends Omit<ClientValues, 'phone' | 'preferences' | 'medicalNotes'> {
+  preferredTrainer?: { id: string; name: string } | null;
+  preferredHorse?: { id: string; name: string } | null;
   deletedAt?: string | null;
   weightKg?: string | number | null;
   membership?: { planName: string; remainingUnits: number; totalUnits: number; status: string } | null;

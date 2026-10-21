@@ -1,3 +1,5 @@
+import { useClientPreferences } from './useClientPreferences'
+import { activePreferredHorse } from '../clients/preferredResources'
 import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Spin, Typography } from 'antd'
@@ -63,6 +65,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
   try { if (startTime && endTime) { from = toInstant(startTime); to = toInstant(endTime); if (from >= to) { from = undefined; to = undefined } } } catch { /* Inline date validation owns malformed intervals. */ }
   const availability = useTriadAvailability(from, to, revision, report, booking?.id)
   const client = loadedClient?.id === clientId ? loadedClient : clients.find(c => c.id === clientId)
+  const preferences = useClientPreferences(form, client, horses, trainers, ['horseId'], Boolean(booking))
   const horse = horses.find(h => h.id === horseId)
   const weight = client?.weightKg == null ? undefined : Number(client.weightKg)
   const overweight = Boolean(horse && weight !== undefined && weight > (horse.maxRiderWeight ?? 85))
@@ -124,7 +127,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
         } }]}><DatePicker locale={ruDatePicker} onKeyDown={stopPopupEscape} popupClassName="triad-date-popup" showTime={{ format: 'HH:mm' }} format="DD.MM.YYYY HH:mm" placeholder="Дата и время окончания" /></Form.Item>
       </div>
       <Form.Item name="horseId" label="Лошадь" rules={[required]} extra={horse ? `Допустимый вес: до ${horse.maxRiderWeight ?? 85} кг. Отдых между тренировками: ${horse.requiredRestMinutes ?? horse.minRestMinutes ?? 45} мин.` : undefined}>
-        <Select onInputKeyDown={stopPopupEscape} id="triad_horseId" aria-label="Лошадь" showSearch allowClear optionFilterProp="label" placeholder="Выберите активную лошадь" loading={availability.loading} options={horses.filter(h => (!h.status || h.status === 'active') && !h.isUnavailable).map(h => {
+        <Select onInputKeyDown={stopPopupEscape} onChange={preferences.horseChanged} id="triad_horseId" aria-label="Лошадь" showSearch allowClear optionFilterProp="label" placeholder="Выберите активную лошадь" loading={availability.loading} options={horses.filter(activePreferredHorse).map(h => {
           const load = availability.data?.horseWorkloads.find(w => w.horseId === h.id)
           const unsuitable = weight !== undefined && weight > (h.maxRiderWeight ?? 85)
           return { value: h.id, disabled: unsuitable, label: `${h.name} — ${load ? `${formatMinutes(load.currentWorkloadMinutes)} / ${load.maxDailyWorkloadMinutes} мин` : 'нагрузка уточняется'}${unsuitable ? ` · вес до ${h.maxRiderWeight ?? 85} кг` : ''}` }
@@ -132,7 +135,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
       </Form.Item>
       {overweight && <Alert className="horse-workload-warning" type="error" showIcon role="alert" message="Вес всадника превышает допустимый лимит для выбранной лошади. Выберите другую лошадь." />}
       {workload && <Typography.Paragraph className="triad-load" role="status">Нагрузка за {availability.data?.date?.split('-').reverse().join('.')}: {formatMinutes(workload.currentWorkloadMinutes)} / {workload.maxDailyWorkloadMinutes} мин</Typography.Paragraph>}
-      <Form.Item name="trainerId" label="Тренер" rules={[required]}><Select onInputKeyDown={stopPopupEscape} id="triad_trainerId" aria-label="Тренер" showSearch allowClear optionFilterProp="label" placeholder="Выберите тренера"
+      <Form.Item name="trainerId" label="Тренер" rules={[required]}><Select onInputKeyDown={stopPopupEscape} onChange={preferences.trainerChanged} id="triad_trainerId" aria-label="Тренер" showSearch allowClear optionFilterProp="label" placeholder="Выберите тренера"
         options={trainers.filter(t => t.isActive !== false).map(t => ({ value: t.id, label: `${t.fullName || t.name}${t.specializations?.length ? ` · ${t.specializations.join(', ')}` : t.qualification ? ` · ${t.qualification}` : ''}` }))} /></Form.Item>
       <Form.Item name="arenaId" label="Локация" rules={[required]}><Select onInputKeyDown={stopPopupEscape} id="triad_arenaId" aria-label="Локация" showSearch allowClear optionFilterProp="label" placeholder="Манеж, плац или маршрут" loading={availability.loading}
         options={arenas.filter(a => a.isActive !== false && !a.isUnavailable).map(a => {

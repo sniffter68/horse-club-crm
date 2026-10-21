@@ -109,6 +109,8 @@ export function ClientList() {
           { key: 'phone', label: 'Телефон', children: client.phone ? <a className="data-mono" href={`tel:${client.phone}`}>{client.phone}</a> : '—' },
           { key: 'email', label: 'Email', children: client.email ? <a href={`mailto:${client.email}`}>{client.email}</a> : '—' },
           { key: 'birthDate', label: 'Дата рождения', children: client.birthDate ? dateOnly(client.birthDate) : '—' },
+          { key: 'preferredTrainer', label: 'Тренер по умолчанию', children: client.preferredTrainer?.name || 'Не назначен' },
+          { key: 'preferredHorse', label: 'Лошадь по умолчанию', children: client.preferredHorse?.name || 'Не назначена' },
           { key: 'riderLevel', label: 'Уровень опыта', children: client.riderLevel || '—' },
           { key: 'roles', label: 'Роли', span: 2, children: <Space>{client.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{client.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
           { key: 'preferences', label: 'Заметки', span: 2, children: client.preferences || '—' },

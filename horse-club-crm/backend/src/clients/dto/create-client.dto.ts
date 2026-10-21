@@ -3,9 +3,21 @@ import { ClientType } from '@prisma/client';
 import { IsEnum } from 'class-validator';
 import { cleanText } from './quick-create-client.dto';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsDateString, Matches, IsEmail, IsNumber, IsOptional, IsString, Max, Min, MaxLength, MinLength } from 'class-validator';
+import { IsUUID, IsBoolean, IsDateString, Matches, IsEmail, IsNumber, IsOptional, IsString, Max, Min, MaxLength, MinLength } from 'class-validator';
 
 export class CreateClientDto {
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  @Transform(({ value }) => value === '' ? undefined : value)
+  @IsOptional()
+  @IsUUID()
+  preferredTrainerId?: string | null;
+
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  @Transform(({ value }) => value === '' ? undefined : value)
+  @IsOptional()
+  @IsUUID()
+  preferredHorseId?: string | null;
+
   @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) birthDate?: string | null;
 
   @Transform(({ value }) => value === '' ? undefined : value)

@@ -15,6 +15,9 @@ for (const resource of ['clients', 'horses', 'trainers'] as const) {
   for (const width of [1440, 390]) test(`${resource}: edit drawer, failed save and live refresh at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await login(page)
+    if (resource === 'clients') {
+      for (const catalog of ['trainers', 'horses']) await page.route(`**/api/${catalog}?*`, route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
+    }
     const cardTitle = { clients: 'Карточка клиента', horses: 'Карточка лошади', trainers: 'Карточка тренера' }[resource]
     let record: Record<string, unknown> = {
       id, name: 'Тестовая запись', firstName: 'Тестовая', lastName: 'запись', phone: '+79991234567', email: 'qa@example.com',

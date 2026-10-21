@@ -1,3 +1,4 @@
+import { PreferredResourceFields } from './PreferredResourceFields'
 import { useCatalogPermissions } from '../catalogs/permissions'
 import { BooleanField, CatalogForm, NumberField, TextField } from '../catalogs/shared'
 import type { Client, ClientValues } from '../catalogs/types'
@@ -12,7 +13,7 @@ export function ClientForm({ action }: { action: 'create' | 'edit' }) {
   const medicalNotesEnabled = import.meta.env.VITE_ENABLE_MEDICAL_NOTES === 'true'
   return <CatalogForm<Client, ClientValues> resource="clients" action={action}
     title={action === 'create' ? 'Новый клиент' : 'Редактирование клиента'} defaults={{ isRider: true, isPayer: false }}
-    toPayload={values => ({ ...values, ...clientIdentityPayload(values) })}>
+    toPayload={values => ({ ...values, ...clientIdentityPayload(values), preferredTrainerId: values.preferredTrainerId || null, preferredHorseId: values.preferredHorseId || null })}>
     <NumberField name="weightKg" label="Вес всадника, кг" min={0.01} max={999.99} precision={2} required={false} />
     <ClientIdentityFields />
     <TextField name="email" label="Email" email max={254} />
@@ -20,6 +21,7 @@ export function ClientForm({ action }: { action: 'create' | 'edit' }) {
       getValueFromEvent={value => value ? value.format('YYYY-MM-DD') : null}>
       <DatePicker aria-label="Дата рождения" locale={ruDatePicker} format="DD.MM.YYYY" maxDate={dayjs()} />
     </Form.Item>
+    <PreferredResourceFields />
     <TextField name="riderLevel" label="Уровень опыта" max={100} />
     <BooleanField name="isRider" label="Всадник" />
     <BooleanField name="isPayer" label="Плательщик" />
