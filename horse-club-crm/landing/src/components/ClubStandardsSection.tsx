@@ -1,3 +1,4 @@
+import { Carousel } from './Carousel';
 import { type ReactElement } from 'react';
 import { motion } from 'framer-motion';
 
@@ -82,52 +83,54 @@ export function ClubStandardsSection(): ReactElement {
           </p>
         </div>
 
-        {/* Сетка стандартов */}
-        <div className="mt-6 md:mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
-          {standards.map((item, index) => (
-            <motion.div
-              key={item.number}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-60px' }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="group relative flex flex-col justify-between overflow-hidden rounded-[2.5rem] border border-black/5 bg-white/90 p-8 sm:p-12 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_50px_rgba(58,47,43,0.08)]"
-            >
-              <div>
-                {/* Верхняя строка карточки */}
-                <div className="flex items-center justify-between">
-                  <span className="font-serif text-3xl font-light text-[#724C39]/70">
-                    {item.number}
-                  </span>
-                  <span className="rounded-full bg-[#FAF7F2] border border-black/5 px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5A483E]">
-                    {item.tag}
-                  </span>
+        {/* Карусель стандартов */}
+        <div className="mt-6 md:mt-8">
+          <Carousel label="Стандарты клуба">
+            {standards.map((item, index) => (
+              <motion.div
+                key={item.number}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-60px' }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className="group relative flex flex-col justify-between overflow-hidden rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_50px_rgba(58,47,43,0.08)]"
+              >
+                <div>
+                  {/* Верхняя строка карточки */}
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <span className="font-serif text-3xl font-light text-[#724C39]/70">
+                      {item.number}
+                    </span>
+                    <span className="rounded-full bg-[#FAF7F2] border border-black/5 px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5A483E]">
+                      {item.tag}
+                    </span>
+                  </div>
+
+                  <div className="mt-8">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7E77]">
+                      {item.category}
+                    </span>
+                    <h3 className="mt-2 font-serif text-2xl sm:text-3xl font-normal leading-snug text-[#3A2F2B]">
+                      {item.title}
+                    </h3>
+                    <p className="mt-4 text-xs sm:text-sm leading-relaxed text-[#6E645F]">
+                      {item.description}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="mt-8">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7E77]">
-                    {item.category}
+                {/* Нижняя метрика */}
+                <div className="mt-10 flex items-baseline justify-between gap-3 flex-wrap border-t border-black/5 pt-6">
+                  <span className="text-xs uppercase tracking-wider text-[#8C7E77]">
+                    {item.metricLabel}
                   </span>
-                  <h3 className="mt-2 font-serif text-2xl sm:text-3xl font-normal leading-snug text-[#3A2F2B]">
-                    {item.title}
-                  </h3>
-                  <p className="mt-4 text-xs sm:text-sm leading-relaxed text-[#6E645F]">
-                    {item.description}
-                  </p>
+                  <span className="font-serif text-2xl sm:text-3xl font-light text-[#3A2F2B]">
+                    {item.metricValue}
+                  </span>
                 </div>
-              </div>
-
-              {/* Нижняя метрика */}
-              <div className="mt-10 flex items-baseline justify-between border-t border-black/5 pt-6">
-                <span className="text-xs uppercase tracking-wider text-[#8C7E77]">
-                  {item.metricLabel}
-                </span>
-                <span className="font-serif text-2xl sm:text-3xl font-light text-[#3A2F2B]">
-                  {item.metricValue}
-                </span>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))}
+          </Carousel>
         </div>
 
         {/* Нижняя инфо-плашка с цитатой клуба */}

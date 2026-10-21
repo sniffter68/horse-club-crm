@@ -1,3 +1,4 @@
+import { Carousel } from './Carousel';
 import { handleCatalogImageError } from '../catalogImage';
 import type { PublicHorse, PublicTrainer } from '../usePublicContent';
 import { useState, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactElement } from 'react';
@@ -47,6 +48,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
     qualification: item.qualification, quote: '', fullBio: item.description,
     specialization: item.specializations, image: item.imageUrl,
   }));
+  const carouselPositions = useRef({ horses: 0, trainers: 0 });
   const [tab, setTab] = useState<TabType>('horses');
   const [selectedItem, setSelectedItem] = useState<ModalItem | null>(null);
   const modalTriggerRef = useRef<HTMLButtonElement>(null);
@@ -116,6 +118,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
           <div className="inline-flex rounded-full border border-black/10 bg-white/70 p-1.5 backdrop-blur-md">
             <button
               type="button"
+              aria-pressed={tab === 'horses'}
               onClick={() => setTab('horses')}
               className={`rounded-full px-6 py-2.5 text-xs font-medium uppercase tracking-[0.12em] transition-all duration-300 ${
                 tab === 'horses'
@@ -127,6 +130,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
             </button>
             <button
               type="button"
+              aria-pressed={tab === 'trainers'}
               onClick={() => setTab('trainers')}
               className={`rounded-full px-6 py-2.5 text-xs font-medium uppercase tracking-[0.12em] transition-all duration-300 ${
                 tab === 'trainers'
@@ -148,52 +152,55 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.45 }}
-              className="mt-6 md:mt-8 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3"
+              className="mt-6 md:mt-8"
             >
-              {horsesData.map((horse) => (
-                <button
-                  key={horse.id}
-                  type="button"
-                  onClick={(event) => {
-                    modalTriggerRef.current = event.currentTarget;
-                    setSelectedItem(horse);
-                  }}
-                  className="group relative flex w-full flex-col overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/90 text-left shadow-[0_15px_35px_rgba(58,47,43,0.06)] backdrop-blur-lg transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_45px_rgba(58,47,43,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#724C39]"
-                >
-                  <div className="relative h-72 w-full overflow-hidden">
-                    <img loading="lazy" decoding="async"
-                  onError={handleCatalogImageError}
-                      src={horse.image}
-                      alt={horse.name}
-                      className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-                    <div className="absolute top-4 right-4 rounded-full bg-white/90 px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#3A2F2B] backdrop-blur-md">
-                      {horse.age}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-1 flex-col justify-between p-7">
-                    <div>
-                      <span className="text-[11px] uppercase tracking-[0.16em] text-[#724C39]">
-                        {horse.breed}
-                      </span>
-                      <h3 className="mt-1 font-serif text-2xl font-normal text-[#3A2F2B]">
-                        {horse.name}
-                      </h3>
-                      <p className="mt-3 text-xs leading-relaxed text-[#6E645F] line-clamp-2">
-                        {horse.character}
-                      </p>
+              <Carousel label="Лошади клуба" initialIndex={carouselPositions.current.horses}
+                onIndexChange={index => { carouselPositions.current.horses = index; }}>
+                {horsesData.map((horse) => (
+                  <button
+                    key={horse.id}
+                    type="button"
+                    onClick={(event) => {
+                      modalTriggerRef.current = event.currentTarget;
+                      setSelectedItem(horse);
+                    }}
+                    className="group relative flex w-full flex-col overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/90 text-left shadow-[0_15px_35px_rgba(58,47,43,0.06)] backdrop-blur-lg transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_45px_rgba(58,47,43,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#724C39]"
+                  >
+                    <div className="relative h-72 w-full overflow-hidden">
+                      <img loading="lazy" decoding="async"
+                    onError={handleCatalogImageError}
+                        src={horse.image}
+                        alt={horse.name}
+                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
+                      <div className="absolute top-4 right-4 rounded-full bg-white/90 px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#3A2F2B] backdrop-blur-md">
+                        {horse.breed || horse.discipline}
+                      </div>
                     </div>
 
-                    <div className="mt-6 flex items-center justify-between border-t border-black/5 pt-4 text-xs">
-                      <span className="font-medium text-[#3A2F2B]">{horse.discipline}</span>
-                      <span className="inline-flex items-center gap-1 font-semibold text-[#724C39] group-hover:translate-x-1 transition-transform">
-                        Подробнее ↗
-                      </span>
+                    <div className="flex flex-1 flex-col justify-between p-7">
+                      <div>
+                        <span className="text-[11px] uppercase tracking-[0.16em] text-[#724C39]">
+                          {horse.breed}
+                        </span>
+                        <h3 className="mt-1 font-serif text-2xl font-normal text-[#3A2F2B]">
+                          {horse.name}
+                        </h3>
+                        <p className="mt-3 text-xs leading-relaxed text-[#6E645F] line-clamp-2">
+                          {horse.character}
+                        </p>
+                      </div>
+
+                      <div className="mt-6 flex items-center justify-between border-t border-black/5 pt-4 text-xs">
+                        <span className="font-medium text-[#3A2F2B]">{horse.discipline}</span>
+                        <span className="inline-flex items-center gap-1 font-semibold text-[#724C39] group-hover:translate-x-1 transition-transform">
+                          Подробнее ↗
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </Carousel>
             </motion.div>
           ) : (
             <motion.div
@@ -202,57 +209,60 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.45 }}
-              className="mt-6 md:mt-8 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3"
+              className="mt-6 md:mt-8"
             >
-              {trainersData.map((trainer) => (
-                <button
-                  key={trainer.id}
-                  type="button"
-                  onClick={(event) => {
-                    modalTriggerRef.current = event.currentTarget;
-                    setSelectedItem(trainer);
-                  }}
-                  className="group relative flex w-full flex-col overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/90 text-left shadow-[0_15px_35px_rgba(58,47,43,0.06)] backdrop-blur-lg transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_45px_rgba(58,47,43,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#724C39]"
-                >
-                  <div className="relative h-72 w-full overflow-hidden">
-                    <img loading="lazy" decoding="async"
-                  onError={handleCatalogImageError}
-                      src={trainer.image}
-                      alt={trainer.name}
-                      className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-                    <div className="absolute top-4 right-4 rounded-full bg-[#3A2F2B]/85 px-3.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-white backdrop-blur-md">
-                      {trainer.experience}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-1 flex-col justify-between p-7">
-                    <div>
-                      <span className="text-[11px] uppercase tracking-[0.16em] text-[#724C39]">
-                        {trainer.role}
-                      </span>
-                      <h3 className="mt-1 font-serif text-2xl font-normal text-[#3A2F2B]">
-                        {trainer.name}
-                      </h3>
-                      <p className="mt-2 text-xs font-medium text-[#5C4F49]">
-                        {trainer.qualification}
-                      </p>
-                      <p className="mt-3 text-xs italic leading-relaxed text-[#7C716B] line-clamp-2">
-                        {trainer.quote}
-                      </p>
+              <Carousel label="Тренеры" initialIndex={carouselPositions.current.trainers}
+                onIndexChange={index => { carouselPositions.current.trainers = index; }}>
+                {trainersData.map((trainer) => (
+                  <button
+                    key={trainer.id}
+                    type="button"
+                    onClick={(event) => {
+                      modalTriggerRef.current = event.currentTarget;
+                      setSelectedItem(trainer);
+                    }}
+                    className="group relative flex w-full flex-col overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/90 text-left shadow-[0_15px_35px_rgba(58,47,43,0.06)] backdrop-blur-lg transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_45px_rgba(58,47,43,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#724C39]"
+                  >
+                    <div className="relative h-72 w-full overflow-hidden">
+                      <img loading="lazy" decoding="async"
+                    onError={handleCatalogImageError}
+                        src={trainer.image}
+                        alt={trainer.name}
+                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
+                      <div className="absolute top-4 right-4 rounded-full bg-[#3A2F2B]/85 px-3.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-white backdrop-blur-md">
+                        {trainer.experience}
+                      </div>
                     </div>
 
-                    <div className="mt-6 flex items-center justify-between border-t border-black/5 pt-4">
-                      <span className="text-xs font-medium text-[#3A2F2B] group-hover:text-[#724C39] transition-colors">
-                        Биография наставника
-                      </span>
-                      <span className="inline-flex items-center gap-1 font-semibold text-[#724C39] group-hover:translate-x-1 transition-transform">
-                        Подробнее ↗
-                      </span>
+                    <div className="flex flex-1 flex-col justify-between p-7">
+                      <div>
+                        <span className="text-[11px] uppercase tracking-[0.16em] text-[#724C39]">
+                          {trainer.role}
+                        </span>
+                        <h3 className="mt-1 font-serif text-2xl font-normal text-[#3A2F2B]">
+                          {trainer.name}
+                        </h3>
+                        <p className="mt-2 text-xs font-medium text-[#5C4F49]">
+                          {trainer.qualification}
+                        </p>
+                        <p className="mt-3 text-xs italic leading-relaxed text-[#7C716B] line-clamp-2">
+                          {trainer.quote}
+                        </p>
+                      </div>
+
+                      <div className="mt-6 flex items-center justify-between border-t border-black/5 pt-4">
+                        <span className="text-xs font-medium text-[#3A2F2B] group-hover:text-[#724C39] transition-colors">
+                          Биография наставника
+                        </span>
+                        <span className="inline-flex items-center gap-1 font-semibold text-[#724C39] group-hover:translate-x-1 transition-transform">
+                          Подробнее ↗
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </Carousel>
             </motion.div>
           )}
         </AnimatePresence>

@@ -1,6 +1,26 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+/* A clipped viewport owns horizontal movement; the document never scrolls sideways. */
+.club-carousel { min-width: 0; }
+.club-carousel__viewport { overflow: hidden; padding: 10px 4px 36px; margin: -10px -4px -20px; }
+.club-carousel__track { display: flex; gap: 2rem; margin: 0; padding: 0; list-style: none; touch-action: pan-y pinch-zoom; }
+.club-carousel__slide { flex: 0 0 84%; min-width: 0; display: flex; }
+.club-carousel__slide > * { width: 100%; }
+.club-carousel__controls { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1rem; }
+.club-carousel__arrow { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; border: 1px solid rgb(58 47 43 / .15); border-radius: 999px; background: rgb(255 255 255 / .7); color: #724C39; cursor: pointer; transition: background .2s, color .2s; }
+.club-carousel__arrow:hover:not(:disabled) { background: #3A2F2B; color: white; }
+.club-carousel__arrow:active:not(:disabled) { background: #5A483E; }
+.club-carousel__arrow:disabled { opacity: .3; cursor: default; }
+.club-carousel__dots { display: flex; flex-wrap: wrap; justify-content: center; }
+.club-carousel__dot { display: grid; place-items: center; width: 28px; height: 44px; cursor: pointer; }
+.club-carousel__dot span { width: 6px; height: 6px; border-radius: 999px; background: #8C7E77; transition: width .2s, background .2s; }
+.club-carousel__dot[aria-current] span { width: 18px; background: #724C39; }
+.club-carousel :is(button, [tabindex]):focus-visible { outline: 2px solid #724C39; outline-offset: 2px; }
+@media (min-width: 640px) { .club-carousel__slide { flex-basis: calc((100% - 3rem) / 2.2); } }
+@media (min-width: 1025px) { .club-carousel__slide { flex-basis: calc((100% - 4rem) / 3); } }
+@media (prefers-reduced-motion: reduce) { .club-carousel *, .club-carousel *::before, .club-carousel *::after { transition-duration: 0s !important; } }
+
 /* Preserve the original Tailwind 3 theme with the existing Tailwind 4 build. */
 @theme {
   --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";

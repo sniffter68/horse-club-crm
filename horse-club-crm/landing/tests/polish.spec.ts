@@ -47,7 +47,7 @@ for (const width of [320, 390, 768, 1440]) {
     expect(axe.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     // Preserve the original h-72 photo containers instead of enforcing the rejected 4:3 redesign.
-    const photos = page.locator('#horses-trainers .grid > button img');
+    const photos = page.locator('#horses-trainers .club-carousel__slide > button img');
     for (const media of await photos.all()) {
       await expect(media).toHaveCSS('object-fit', 'cover');
       expect((await media.boundingBox())!.height).toBeCloseTo(288, 0);
@@ -55,7 +55,7 @@ for (const width of [320, 390, 768, 1440]) {
     await expect(page.locator('#services img')).toHaveCSS('object-fit', 'contain');
     await page.locator('#horses-trainers').scrollIntoViewIfNeeded();
     await page.screenshot({ path: test.info().outputPath(`catalog-${width}.png`) });
-    const open = page.locator('#horses-trainers .grid > button').first();
+    const open = page.locator('#horses-trainers .club-carousel__slide > button').first();
     await open.focus();
     await page.keyboard.press('Enter');
     const dialog = page.getByRole('dialog');
@@ -98,12 +98,12 @@ test('card choices survive form errors, preserve the comment and reach the lead 
   await page.locator('#services').getByRole('link', { name: 'Записаться на занятие', exact: true }).click();
   await expect(page.locator('#booking-heading')).toBeFocused();
   await expect(page.locator('#contacts').getByRole('button', { name: 'Персональное занятие', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await page.locator('#horses-trainers .grid > button').filter({ has: page.getByRole('heading', { name: 'Мирабель', exact: true }) }).click();
+  await page.locator('#horses-trainers .club-carousel__slide > button').filter({ has: page.getByRole('heading', { name: 'Мирабель', exact: true }) }).click();
   await page.getByRole('dialog').getByRole('link', { name: 'Записаться', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
   // The original tabs crossfade: wait for the trainer card, not the exiting horse grid.
-  await page.locator('#horses-trainers .grid > button').filter({ has: page.getByRole('heading', { name: 'Екатерина', exact: true }) }).click();
+  await page.locator('#horses-trainers .club-carousel__slide > button').filter({ has: page.getByRole('heading', { name: 'Екатерина', exact: true }) }).click();
   await page.getByRole('dialog').getByRole('link', { name: 'Записаться', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByLabel('Удобная дата или опыт')).toHaveValue('В субботу');

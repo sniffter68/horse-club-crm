@@ -1,22 +1,23 @@
+import { Carousel } from './Carousel';
 import { type ReactElement } from 'react';
 import { scrollToBooking } from '../booking';
 
 const steps = [
   {
-    number: '01', title: 'Встреча и экипировка', duration: '10 мин',
-    description: 'Подбираем бесплатный защитный шлем по размеру и за 5 минут объясняем простые правила общения с лошадью.',
+    number: '01', title: 'Что надеть', duration: 'До поездки',
+    description: 'Выберите длинные удобные брюки и закрытые кроссовки или ботинки на плоской подошве. Защитный шлем бесплатно подберём в клубе.',
   },
   {
-    number: '02', title: 'Знакомство с лошадью', duration: '10 мин',
-    description: 'Подбираем самую спокойную и дружелюбную лошадь. Вы погладите её, привыкнете к габаритам и угостите морковкой.',
+    number: '02', title: 'Прибытие за 15 минут', duration: '15 мин до занятия',
+    description: 'Приезжайте заранее, чтобы спокойно освоиться, познакомиться с тренером и подобрать экипировку. Объясним простые правила безопасности.',
   },
   {
-    number: '03', title: 'Посадка и шаг с тренером', duration: '20 мин',
-    description: 'Помогаем мягко сесть в седло. Тренер идёт рядом и держит лошадь на страховочной корде — она не побежит и не сделает резких движений.',
+    number: '03', title: 'Знакомство с лошадью', duration: 'С тренером',
+    description: 'Тренер познакомит вас со спокойной лошадью и покажет, как к ней подойти и погладить. Угощение предложите с разрешения наставника.',
   },
   {
-    number: '04', title: 'Самостоятельный шаг и фото', duration: '20 мин',
-    description: 'Когда вы почувствуете уверенность, научим базовым командам поводьями и сделаем атмосферные кадры на ваш смартфон.',
+    number: '04', title: 'Посадка в седло', duration: 'Первый шаг',
+    description: 'Поможем мягко сесть в седло и найти удобную посадку. Первые шаги сделаете под контролем тренера, постепенно привыкая к движению лошади.',
   },
 ];
 
@@ -43,20 +44,22 @@ export function FirstLessonSection(): ReactElement {
           </p>
         </div>
 
-        <ol role="list" className="mt-6 md:mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
-          {steps.map(step => (
-            <li key={step.number} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md sm:p-12">
-              <div className="flex items-center justify-between gap-4">
-                <span aria-hidden="true" className="font-serif text-3xl font-light text-luxury-brown/70">{step.number}</span>
-                <span className="rounded-full border border-black/5 bg-luxury-card px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5A483E]">{step.duration}</span>
-              </div>
-              <div className="mt-8">
-                <h3 className="mt-2 font-serif text-2xl font-normal leading-snug text-luxury-dark sm:text-3xl">{step.title}</h3>
-                <p className="mt-4 text-xs leading-relaxed text-[#6E645F] sm:text-sm">{step.description}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <div className="mt-6 md:mt-8">
+          <Carousel label="Впервые в клубе" ordered>
+            {steps.map(step => (
+              <article key={step.number} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md">
+                <div className="flex items-center justify-between gap-4">
+                  <span aria-hidden="true" className="font-serif text-3xl font-light text-luxury-brown/70">{step.number}</span>
+                  <span className="rounded-full border border-black/5 bg-luxury-card px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5A483E]">{step.duration}</span>
+                </div>
+                <div className="mt-8">
+                  <h3 className="mt-2 font-serif text-2xl font-normal leading-snug text-luxury-dark sm:text-3xl">{step.title}</h3>
+                  <p className="mt-4 text-xs leading-relaxed text-[#6E645F] sm:text-sm">{step.description}</p>
+                </div>
+              </article>
+            ))}
+          </Carousel>
+        </div>
 
         <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-luxury-bg/50 p-8 backdrop-blur-sm sm:p-10">
           <h3 className="font-serif text-xl font-normal text-luxury-dark sm:text-2xl">Как подготовиться к визиту</h3>
