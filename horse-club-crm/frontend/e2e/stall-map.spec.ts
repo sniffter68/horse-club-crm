@@ -4,7 +4,7 @@ const horse = { id: 'h1', name: 'Буран', sex: 'STALLION', birthYear: 2016, 
   owner: { name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567' } }
 const mare = { ...horse, id: 'h2', name: 'Искра', sex: 'MARE', ownerType: 'club' }
 const initial = [
-  { id: 's1', name: 'Денник 1', number: '1', zone: 'MAIN', side: 'LEFT', position: 1, status: 'OCCUPIED', horseId: 'h1', horse, notes: 'Двойной слой опилок', warnings: [{ neighborId: 's2', neighborNumber: '2', message: 'Внимание: нежелательное соседство (Жеребец рядом с кобылой)' }] },
+  { id: 's1', name: 'Денник 1', number: '1', zone: 'MAIN', side: 'LEFT', position: 1, status: 'OCCUPIED', horseId: 'h1', horse, notes: 'Двойной слой опилок', warnings: [{ neighborId: 's2', neighborNumber: '2', message: 'Жеребец рядом с кобылой (Буран и Искра)' }] },
   { id: 's2', name: 'Денник 2', number: '2', zone: 'MAIN', side: 'RIGHT', position: 1, status: 'OCCUPIED', horseId: 'h2', horse: mare, notes: null, warnings: [] },
   { id: 's3', name: 'Летник 1', number: 'Л-1', zone: 'SUMMER', side: 'LEFT', position: 1, status: 'AVAILABLE', horseId: null, horse: null, notes: null, warnings: [] },
 ]
@@ -39,8 +39,10 @@ test('map shows both rows, warnings, sign and isolated print layout', async ({ p
   await setup(page)
   await expect(page.getByRole('heading', { name: 'Карта денников' })).toBeVisible()
   await expect(page.getByText('Риск соседства', { exact: true })).toBeVisible()
+  await page.getByText('Риск соседства', { exact: true }).hover()
+  await expect(page.getByRole('tooltip')).toHaveText('Жеребец рядом с кобылой (Буран и Искра)')
   await page.getByRole('button', { name: 'Денник 1, Буран', exact: true }).click()
-  await expect(page.getByText('Внимание: нежелательное соседство', { exact: false })).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('Жеребец рядом с кобылой (Буран и Искра)')
   await page.getByRole('button', { name: 'Печать таблички на денник' }).click()
   const sign = page.getByRole('article', { name: 'Табличка на денник' })
   await expect(sign.getByRole('heading', { name: 'Буран' })).toBeVisible()
@@ -53,6 +55,18 @@ test('map shows both rows, warnings, sign and isolated print layout', async ({ p
   await expect(sign).toBeVisible()
   await page.screenshot({ path: 'test-results/stall-sign.png', fullPage: true })
 })
+test('risk tooltip explains opposite stallions and quarantine on keyboard focus', async ({ page }) => {
+  const state = await setup(page)
+  const reason = 'Нежелательное соседство: жеребец напротив жеребца (Буран и Гром)'
+  state.stalls[0].warnings[0].message = reason
+  state.stalls[2].status = 'QUARANTINE'
+  await page.getByRole('button', { name: 'Обновить', exact: true }).click()
+  await page.getByRole('button', { name: 'Денник 1, Буран', exact: true }).focus()
+  await expect(page.getByRole('tooltip')).toHaveText(reason)
+  await page.getByRole('button', { name: 'Денник Л-1, Карантин', exact: true }).focus()
+  await expect(page.getByRole('tooltip', { name: 'Карантинная зона', exact: true })).toBeVisible()
+})
+
 test('manager relocates a horse and the previous stall becomes free', async ({ page }) => {
   const state = await setup(page, 'MANAGER')
   await page.getByRole('button', { name: 'Денник Л-1, Свободен' }).click()

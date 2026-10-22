@@ -57,13 +57,17 @@ test('assignment returns symmetric stallion/mare warnings without blocking', asy
   assert.equal((await service.map())[1].warnings[0].neighborId, sid);
 });
 test('neighbors include opposite stall, exclude diagonal, other buildings, geldings and unknown sex', () => {
-  const base = { id: 'a', name: '1', number: '1', zone: 'MAIN', side: 'LEFT', position: 2, horse: { sex: 'STALLION' } };
+  const base = { id: 'a', name: '1', number: '1', zone: 'MAIN', side: 'LEFT', position: 2, horse: { name: 'Буран', sex: 'STALLION' } };
   const candidates = [
     { ...base, id: 'opposite', side: 'RIGHT' }, { ...base, id: 'next', position: 3, horse: { sex: 'MARE' } },
     { ...base, id: 'diagonal', side: 'RIGHT', position: 3 }, { ...base, id: 'summer', zone: 'SUMMER' },
     { ...base, id: 'gelding', position: 1, horse: { sex: 'GELDING' } }, { ...base, id: 'unknown', position: 1, horse: { sex: null } },
   ];
   assert.deepEqual(neighborhoodWarnings(base, candidates).map(w => w.neighborId), ['opposite', 'next']);
+  assert.equal(neighborhoodWarnings(base, [{ ...base, id: 'opposite', side: 'RIGHT', horse: { name: 'Гром', sex: 'STALLION' } }])[0].message,
+    'Нежелательное соседство: жеребец напротив жеребца (Буран и Гром)');
+  assert.equal(neighborhoodWarnings(base, [{ ...base, id: 'next', position: 3, horse: { name: 'Искра', sex: 'MARE' } }])[0].message,
+    'Жеребец рядом с кобылой (Буран и Искра)');
   assert.deepEqual(neighborhoodWarnings({ ...base, position: null }, candidates), []);
 });
 test('occupied, unavailable and missing destinations preserve the old placement', async () => {

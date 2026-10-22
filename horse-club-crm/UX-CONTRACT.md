@@ -1,4 +1,12 @@
-# UX Contract
+﻿# UX Contract
+
+## Предпочтения клиента для занятий
+
+Канонический владелец селекторов — Ant Design Select в общей форме клиента; автоподстановка обеих форм расписания и быстрой записи с дашборда — `schedule/useClientPreferences.ts`. Автоматический выбор следует смене клиента, ручной выбор и очистка сохраняются до закрытия формы. Редактирование существующего занятия сохраняет его ресурсы. API, миграция и тесты: `docs/client-preferences.md`. Проверка быстрой записи: `docs/dashboard-booking-preferences.md`.
+
+## Архив клиентов и абонементов
+
+Источник: [правила и API архива](docs/client-membership-archive.md), задача владельца от 21.10.2026. Общий владелец подтверждения — `clients/ArchiveAction.tsx` с Ant Modal/App message. Диалог получает полные счётчики истории с сервера, фокусирует отмену, блокирует закрытие и повтор во время запроса, сохраняет ошибку для повторной попытки. Сервер повторно решает hard/soft delete в транзакции. Кнопки мутаций следуют FULL SCHEDULE и ADMIN/MANAGER; кассовые права проверяются отдельно. Архивный клиент отмечен серым бейджем и восстанавливается из фильтра «Архив». Архивный абонемент остаётся в карточке и истории; предупреждение предлагает оформить возврат остатка в кассе. Список сохраняет фильтры и корректирует страницу после удаления. Визуальные токены не меняются. Проверки: `backend/test/archive.test.cjs`, `frontend/e2e/client-archive.spec.ts`, `clients-memberships.spec.ts`.
 
 ## Product context
 
@@ -33,7 +41,7 @@
 | Capability | Canonical owner | Source of truth | Allowed variants | Verification |
 |---|---|---|---|---|
 | Select/Listbox | Ant Design Select | Ant Design + this contract | authored | keyboard + popup |
-| Date | Ant/native typed inputs already in flows | schedule/forms | typed / native | locale + keyboard + E2E |
+| Date | `BookingDateTimePicker` (Ant Design) for training booking; existing Ant/native inputs elsewhere | owner request, 2026-10-22; schedule/forms | authored booking / typed / native elsewhere | `triad-booking.spec.ts`, `dashboard.spec.ts`, `s3-01.spec.ts` |
 | Form | Ant Design Form + Refine adapters | shared catalog form | create / edit | validation E2E |
 | Scrollbar | `frontend/src/index.css` | DESIGN.md | stable-gutter exception | computed style |
 | Toast | Ant Design App notification/message | app provider | success / warning / info / error | live region/browser |
@@ -60,6 +68,8 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
 - Responsive strategy: semantic table on desktop; existing labeled cards on mobile.
 
 ## Flow ledger
+
+Главная панель (`/`): Quick Actions проверяют `canWrite` соответствующего модуля; KPI проверяют `canRead`, сервер фильтрует данные и запросы независимо от клиента. Общий `EntryOverlay` владеет правой шторкой, фокусом и Escape; `StableEntryModal` поддерживает вариант `drawer` с общей защитой черновика, блокировкой повторного сохранения и inline-ошибками. Существующие формы кассы и расхода сохраняют ключ операции для безопасного повтора. Успех закрывает шторку, показывает общий toast и обновляет сводку без навигации. Select/DatePicker остаются Ant Design, дата и время трактуются как московские независимо от часового пояса браузера. Контракт API: `docs/dashboard.md`; проверки: `backend/test/dashboard.test.cjs`, `frontend/e2e/dashboard.spec.ts`.
 
 Модули и права (`/settings`): администратор управляет глобальными флагами и матрицей четырех ролей. Ant Design Switch/Segmented/Modal владеют вводом и подтверждением. Сохранение блокирует повторы, ошибка сохраняет выбор, права ADMIN закреплены. ModuleGuard и общий контекст скрывают недоступные разделы и закрывают прямые ссылки; READ_ONLY сохраняет просмотр и запрещает изменение на сервере. Контракт и тесты: `docs/module-access.md`, `backend/test/module-access.test.cjs`, `frontend/e2e/module-access.spec.ts`, `frontend/e2e/modules.live.spec.ts`.
 
@@ -188,6 +198,8 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
 
 ## Cash desk
 
+- Membership sale owner: `frontend/src/pages/memberships/create.tsx`, shared `EntryOverlay` drawer over `MembershipList`, `ClientSelectWithCreate` and Ant Form/Select/InputNumber/Segmented/DatePicker/App message. Domain/API source: `docs/membership-sales.md`. The service and lesson count recalculate the suggested amount; the final amount permits discounts. CASH/CARD selection, conditional cashbox feedback, persistent errors and safe operation-key retries share the cash desk behavior. Successful sale invalidates client/membership/payment queries and emits `cash-desk-paid`. The client ledger distinguishes the lesson credit from the RUB cash receipt. Evidence: membership-sale backend tests, client display tests and clients-memberships/cash-desk Playwright suites.
+
 - Expense owner: `frontend/src/pages/cash-desk/expenses.tsx`; API and financial semantics: `docs/expenses.md`, `backend/src/payments/finance.controller.ts` and migration `20261018090000_expenses`.
 - ADMIN/MANAGER create and read expenses; TRAINER cannot access expense APIs or their summary. Only ADMIN sees cancellation; the confirmation names the expense and explains the balance reversal. Cancellation retains the record and actor in the database.
 - Ant Form/InputNumber/Segmented/Select/DatePicker/Modal/App message and ResponsiveTable own the expense flow. Dates use the authored Russian calendar and Moscow conversion. Filters share the cash-book date range and persist method/category/page in URL state.
@@ -205,5 +217,48 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
 - Starting cash is shown separately and excluded from revenue. Payments may be accepted without an open shift; an active cashier shift attaches automatically.
 - Success closes the modal, announces change and invalidates balances; schedule and cash book reload on the shared event.
 - Browser verification: `frontend/e2e/cash-desk.spec.ts` (desktop/mobile, insufficient tender, SBP, uncertain retry, role denial).
-- Quick client creation: `clients/QuickCreateClientModal.tsx` reuses the catalog identity fields and payload rules. The client dropdown always offers «+ Новый клиент» and offers creation with the search text after an empty result. Name/phone search seeds the corresponding field.
-- While creating a client, the payment modal is hidden without unmounting or resetting its form. Cancel and API failures preserve the payment draft. Success inserts/selects the returned client, invalidates client queries and restores focus to the payment amount. Generic services and payment values are retained; a previous client's booking/membership must be reselected. Browser evidence covers cancellation, validation, failure, success and narrow viewports in `frontend/e2e/cash-desk.spec.ts`.
+- Quick client selection/creation owner: `frontend/src/components/ClientSelectWithCreate.tsx`, composed with `clients/QuickCreateClientModal.tsx` and Ant Select/Form/Modal. Every client-assignment form offers «+ Постоянный клиент» and «⚡ Разовый гость» to authorized writers, including after no results. Name/phone search seeds the corresponding field; a guest needs only a name. Server policy and deployment: `docs/quick-clients.md`.
+- Creation opens above the mounted parent form. Cancel and API failures preserve its draft. Success inserts/selects the returned client, invalidates client queries and restores focus to the selector. Generic services and payment values are retained; a previous client's booking/membership must be reselected. The search is transient, bounded, debounced, IME-safe and cancels stale requests; selected labels survive result refreshes without appearing in unrelated search results. One-time badges reuse `crm-tag--warning`; conversion updates type without changing related records. Browser evidence: `frontend/e2e/dashboard.spec.ts`, `frontend/e2e/cash-desk.spec.ts`.
+
+
+Учет разовых занятий: стоимость/предоплата переиспользуют `LessonPriceFields`; завершение из расписания и обеих лент дашборда — `CompleteLessonModal`. До подтверждения показываются стоимость, предоплата и остаток; исходный выбор — «Оставить неоплаченным (долг)». После успеха обновляются расписание/дашборд и касса; при ошибке сохраняются выбор и сообщение. При READ_ONLY кассы прием денег недоступен, завершение без оплаты разрешено при FULL расписания. Источник правил: `docs/lesson-payments.md`, DTO и транзакции LessonsService. Проверка: `frontend/e2e/lesson-payments.spec.ts`, `frontend/e2e/dashboard.spec.ts`.
+# Групповые экскурсии
+
+В календаре и сетке ресурсов события показывают только московское время начала/окончания и тренера. При отсутствии имени — «Без тренера», для экскурсии без тренера — «Экскурсия (N чел.)». Общий владелец разметки — `schedule/ScheduleEventContent.tsx`; саммари и доступное имя — `scheduleEventPresentation.ts`. Клиент, услуга, лошадь, нагрузка, статусы и финансовые действия доступны в существующей карточке по клику; подсказка содержит краткую сводку. Соседние и одновременные события не перекрывают друг друга; длинные имена обрезаются внутри плашки. Проверки: `frontend/e2e/lesson-payments.spec.ts`, `triad-booking.spec.ts`, `horse-workload.spec.ts`.
+
+Источник: `docs/group-excursions.md`. Общий владелец расчета формы — `LessonPriceFields`; определение услуги с оплатой за человека — `schedule/groupPricing.ts`. Расписание и быстрые действия используют одинаковые поля количества гостей, снимка ставки, итоговой стоимости и предоплаты. Для экскурсии клиент означает организатора группы; лошадь необязательна. Создание и перенос занятия используют `EntryOverlay` в варианте drawer. Сводка расчета и бейдж гостей принадлежат `LessonGroupSummary` / `LessonGroupBadge`. Проверки: `frontend/e2e/lesson-payments.spec.ts`, `backend/test/lesson-payments.test.cjs`.
+
+Удаление занятия: общий владелец — `schedule/DeleteLessonAction.tsx` в карточках расписания и журнала; источник доменных правил и развёртывания — `docs/lesson-deletion.md`. Ant Design Modal подтверждает безвозвратное удаление, называет московскую дату/время и клиентов, предупреждает об абонементе и PAID платежах. Фокус изначально на «Отмена». Во время запроса действия и закрытие блокируются, ошибка сохраняется в диалоге. Успех закрывает карточку, показывает общий success toast, инвалидирует ресурсы Refine и посылает `lesson-deleted` для немедленного обновления прямых HTTP-данных расписания/дашборда. ADMIN/MANAGER с FULL SCHEDULE видят кнопку; сервер остаётся источником прав. Журнал сохраняет фильтры и корректирует страницу после удаления. Проверки: `backend/test/lesson-deletion*.test.cjs`, `frontend/e2e/lesson-payments.spec.ts`.
+
+## Уведомления о новых заявках
+
+`LeadNotifications` в авторизованной шапке подключается к `/api/leads/events` только для ADMIN, согласно существующей политике `LeadManagementController` и `PendingLeads`. Событие приводит к общему Ant Design toast с действием «Открыть заявку», тихому звуку и системному уведомлению при разрешении браузера. Действие переводит на `/#pending-leads` и обновляет список. Разрешение запрашивается по кнопке; отказ объясняется в Popover. Переключатель звука хранится в localStorage и синхронизируется между вкладками. При блокировке autoplay доступно действие «Разрешить звук». Источник: задача владельца от 2026-10-21; реализация и ограничения: `docs/lead-notifications.md`; проверки: `frontend/e2e/lead-notifications.spec.ts`, `backend/test/lead-events.test.cjs`.
+
+
+## Постоянная сессия и уведомления (2026-10-21)
+
+По решению владельца уведомление о новой заявке не исчезает по таймеру: общий Ant Design notification использует duration: 0, закрывается крестиком или действием «Открыть заявку». Системное уведомление использует requireInteraction: true; клик фокусирует вкладку и открывает /#pending-leads. Визуальные токены не меняются.
+
+Канонический владелец обновления сессии — frontend/src/httpClient.ts и POST /api/auth/refresh. При 401 выполняется один тихий refresh и повтор исходного запроса; одновременные запросы разделяют refresh. Сбой сохраняет текущий экран и сессию, показывает ошибку, допускает повтор после восстановления связи. Только явный выход очищает сохранённую сессию и переводит на /login. Отсутствие сохранённого входа по-прежнему ведёт на /login, серверный отзыв прав не обходится. Контракт и ограничения: backend/src/auth/README.md; проверки: providers.test.ts, s3-01.spec.ts, auth.test.cjs, security-hardening.test.cjs.
+
+
+## Cash management (2026-10-21)
+
+Source: `docs/cash-management.md`; API owner: `CashController` / `CashManagementService`. ADMIN with FULL CASHBOX sees owner actions. `CashManagement` reuses Ant Design Modal for exact typed reset confirmation, EntryOverlay drawer for withdrawal, Form validation, inline Alert errors and shared App toast. Reset focuses the safe action, archives the journal, closes shifts and refreshes balances without navigation/reload; cash-desk-paid owns direct HTTP refresh and Refine payments is invalidated. Uncertain withdrawal retries retain payload and requestId; explicit 4xx allows correction. Browser coverage: `frontend/e2e/cash-desk.spec.ts` at 1440/390px.
+
+## Entity card editing and application scroll ownership (2026-10-21)
+
+Source: owner request; API/rollout: `docs/entity-editing.md`. `AppLayout` owns
+viewport height; `main.crm-main` owns page scrolling; Sidebar menu scrolls
+independently. The mobile navigation drawer remains the narrow-screen owner.
+`CatalogEditAction` / `CatalogDrawerForm` reuse catalog fields, Ant Design
+Select/DatePicker (ru_RU), `EntryOverlay` and `StableEntryModal` for card edits.
+Success stays in the owning card and refreshes list/detail queries; errors retain
+inputs. Existing route-based edits keep their list return behavior. Staff profile
+editing uses the same drawer, existing permissions and direct list refresh.
+Canonical toast owner: Ant Design App message. Runtime verification:
+`frontend/e2e/entity-edit.spec.ts`, `backend/test/entity-edit.test.cjs`.
+
+## Подтверждение даты и времени записи (2026-10-22)
+
+По задаче владельца общий `frontend/src/components/BookingDateTimePicker.tsx` задаёт русскую локаль, `needConfirm`, «Сейчас» и «ОК» для начала/окончания бронирования, быстрой записи из календаря и шторки дашборда. «ОК» применяет выбранную дату и время и закрывает календарь; Escape закрывает календарь, сохраняя открытую форму. Стандартное действие Ant Design «Сейчас» сразу применяет московское время и закрывает календарь. На узком экране footer остаётся закреплён при прокрутке. API и формат хранения не меняются. Проверки: frontend/e2e/triad-booking.spec.ts, dashboard.spec.ts, s3-01.spec.ts.

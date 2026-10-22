@@ -1,3 +1,4 @@
+import { openCalendarLesson } from './openCalendarLesson'
 import { test, expect, type Page, type Locator } from './fixtures'
 import type { Lesson } from '../src/pages/schedule/types'
 
@@ -69,7 +70,7 @@ for (const width of [1440, 390]) test(`excursion for 20 guests calculates total 
   await page.setViewportSize({ width, height: 1000 })
   const state = await setup(page, undefined, true)
   await page.goto('/schedule')
-  await page.getByRole('button', { name: 'Новое занятие', exact: true }).click()
+  await openCalendarLesson(page)
   const form = page.getByRole('dialog', { name: 'Быстрое бронирование' })
   await choose(page, form, 'Услуга', 'Экскурсия')
   await choose(page, form, 'Тренер', trainer.name)
@@ -104,7 +105,7 @@ for (const width of [1440, 390]) test(`cash prepayment and card completion appea
   await page.setViewportSize({ width, height: 1000 })
   const state = await setup(page)
   await page.goto('/schedule')
-  await page.getByRole('button', { name: 'Новое занятие', exact: true }).click()
+  await openCalendarLesson(page)
   const form = page.getByRole('dialog', { name: 'Быстрое бронирование' })
   await choose(page, form, 'Услуга', service.title)
   await choose(page, form, 'Тренер', trainer.name)

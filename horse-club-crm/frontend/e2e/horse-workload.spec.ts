@@ -1,3 +1,4 @@
+import { openCalendarLesson } from './openCalendarLesson'
 import { test, expect, type Locator, type Page } from './fixtures'
 
 const horse = { id: 'h1', name: 'Валдай', maxDailyMinutes: 120, isUnavailable: false }
@@ -43,7 +44,7 @@ async function selectOption(page: Page, modal: Locator, label: string, text: str
 
 async function openBooking(page: Page) {
   await page.goto('/schedule')
-  await page.getByRole('button', { name: 'Новое занятие', exact: true }).click()
+  await openCalendarLesson(page)
   const modal = page.getByRole('dialog', { name: 'Быстрое бронирование' })
   await selectOption(page, modal, 'Услуга', 'Выездка')
   await selectOption(page, modal, 'Тренер', 'Мария')

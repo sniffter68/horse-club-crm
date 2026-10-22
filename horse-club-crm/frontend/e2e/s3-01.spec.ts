@@ -1,4 +1,5 @@
-﻿import { test, expect, type Page } from './fixtures'
+import { openCalendarLesson } from './openCalendarLesson'
+import { test, expect, type Page } from './fixtures'
 
 import { checkBookingDatePicker } from './bookingDatePicker'
 
@@ -6,7 +7,7 @@ test('schedule quick booking date footer confirms Moscow time', async ({ page })
   await page.clock.setFixedTime(new Date('2026-10-09T06:00:00Z'))
   await login(page)
   await page.goto('/schedule')
-  await page.getByRole('button', { name: 'Новое занятие', exact: true }).click()
+  await openCalendarLesson(page)
   await checkBookingDatePicker(page, page.getByRole('dialog', { name: 'Быстрое бронирование' }), 'Время начала', '09.10.2026 09:00')
 })
 
@@ -42,7 +43,7 @@ test('schedule: slot booking preserves input and displays backend 409', async ({
   const conflict = 'Тренер уже занят в выбранное время'
   await page.route('**/api/lessons', route => route.fulfill({ status: 409, json: { message: conflict } }))
   await page.goto('/schedule')
-  await expect(page.getByRole('button', { name: 'Новое занятие', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Записать на тренировку', exact: true })).toBeEnabled()
   const column = page.locator('.fc-timegrid-col[data-date]').first()
   const bounds = await column.boundingBox()
   if (!bounds) throw new Error('Calendar day is not visible')

@@ -103,7 +103,7 @@ export function InfrastructureMapSection(): ReactElement {
             className="h-full w-full object-cover object-center"
           />
           {/* Деликатный градиент, чтобы снимок не уходил в полную тьму */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#1E1917]/90 via-[#1E1917]/25 to-[#1E1917]/60" />
+          <div className="absolute inset-0 bg-linear-to-t from-[#1E1917]/90 via-[#1E1917]/25 to-[#1E1917]/60" />
         </motion.div>
 
         {/* Верхняя планка */}

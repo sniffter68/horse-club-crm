@@ -1,0 +1,145 @@
+
+Running 9 tests using 1 worker
+
+(node:53384) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [mock] › e2e\horse-workload.spec.ts:56:3 › daily widget, event badge and overload guard at 1280px (6.9s)
+  ok 2 [mock] › e2e\horse-workload.spec.ts:56:3 › daily widget, event badge and overload guard at 320px (5.1s)
+  ok 3 [mock] › e2e\horse-workload.spec.ts:56:3 › daily widget, event badge and overload guard at 768px (6.9s)
+  x  4 [mock] › e2e\horse-workload.spec.ts:83:1 › changing booking date recalculates options and blocks overload on the destination day (9.5s)
+(node:28680) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  5 [mock] › e2e\horse-workload.spec.ts:91:1 › transfer excludes the original lesson, preserves participants and sends only time and duration (3.7s)
+(node:52060) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  6 [mock] › e2e\horse-workload.spec.ts:110:1 › API failure blocks selected horses, supports retry and empty daily state (9.9s)
+(node:12260) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 7 [mock] › e2e\horse-workload.spec.ts:131:1 › calendar date control refreshes the daily widget and navigation updates its date (2.5s)
+  x  8 [mock] › e2e\horse-workload.spec.ts:142:1 › slow date lookup disables save and a superseded response cannot replace the new date (9.2s)
+(node:11076) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 9 [mock] › e2e\triad-booking.spec.ts:193:49 › cancellation club explains policy and submits the initiator and reason (2.8s)
+
+
+  1) [mock] › e2e\horse-workload.spec.ts:83:1 › changing booking date recalculates options and blocks overload on the destination day 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('dialog', { name: 'Быстрое бронирование' }).getByTitle('Валдай — 100 / 120 мин', { exact: true })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByRole('dialog', { name: 'Быстрое бронирование' }).getByTitle('Валдай — 100 / 120 мин', { exact: true }) with timeout 5000ms
+      - waiting for getByRole('dialog', { name: 'Быстрое бронирование' }).getByTitle('Валдай — 100 / 120 мин', { exact: true })
+
+
+      84 |   const modal = await openBooking(page)
+      85 |   await modal.getByLabel('Время начала', { exact: true }).fill('2026-10-09T12:00')
+    > 86 |   await expect(modal.getByTitle('Валдай — 100 / 120 мин', { exact: true })).toBeVisible()
+         |                                                                             ^
+      87 |   await expect(modal.getByText('Внимание: суммарная нагрузка лошади составит 160 мин (лимит 120 мин)')).toBeVisible()
+      88 |   await expect(modal.getByRole('button', { name: 'Создать занятие', exact: true })).toBeDisabled()
+      89 | })
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\horse-workload.spec.ts:86:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\test-results\baseline-e2e\horse-workload-changing-bo-77520-load-on-the-destination-day-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\test-results\baseline-e2e\horse-workload-changing-bo-77520-load-on-the-destination-day-mock\error-context.md
+
+  2) [mock] › e2e\horse-workload.spec.ts:91:1 › transfer excludes the original lesson, preserves participants and sends only time and duration 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+        "durationMinutes": 120,
+    -   "startTime": "2026-10-08T09:00:00.000Z",
+    +   "startTime": "2026-10-08T07:00:00.000Z",
+      }
+
+      105 |   await modal.getByRole('button', { name: 'Сохранить перенос', exact: true }).click()
+      106 |   await expect(modal).not.toBeVisible()
+    > 107 |   expect(payload).toEqual({ startTime: '2026-10-08T09:00:00.000Z', durationMinutes: 120 })
+          |                   ^
+      108 | })
+      109 |
+      110 | test('API failure blocks selected horses, supports retry and empty daily state', async ({ page }) => {
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\horse-workload.spec.ts:107:19
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\test-results\baseline-e2e\horse-workload-transfer-ex-42d3a-ends-only-time-and-duration-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\test-results\baseline-e2e\horse-workload-transfer-ex-42d3a-ends-only-time-and-duration-mock\error-context.md
+
+  3) [mock] › e2e\horse-workload.spec.ts:110:1 › API failure blocks selected horses, supports retry and empty daily state 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('dialog', { name: 'Быстрое бронирование' }).getByText('Не удалось проверить нагрузку лошадей')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByRole('dialog', { name: 'Быстрое бронирование' }).getByText('Не удалось проверить нагрузку лошадей') with timeout 5000ms
+      - waiting for getByRole('dialog', { name: 'Быстрое бронирование' }).getByText('Не удалось проверить нагрузку лошадей')
+
+
+      115 |     : { json: workloads('2026-10-09') }))
+      116 |   await modal.getByLabel('Время начала', { exact: true }).fill('2026-10-09T12:00')
+    > 117 |   await expect(modal.getByText('Не удалось проверить нагрузку лошадей')).toBeVisible()
+          |                                                                          ^
+      118 |   await expect(modal.getByRole('button', { name: 'Создать занятие', exact: true })).toBeDisabled()
+      119 |   fail = false
+      120 |   await modal.getByRole('button', { name: 'Повторить проверку', exact: true }).click()
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\horse-workload.spec.ts:117:74
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\test-results\baseline-e2e\horse-workload-API-failure-49d0a-retry-and-empty-daily-state-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\test-results\baseline-e2e\horse-workload-API-failure-49d0a-retry-and-empty-daily-state-mock\error-context.md
+
+  4) [mock] › e2e\horse-workload.spec.ts:142:1 › slow date lookup disables save and a superseded response cannot replace the new date 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('dialog', { name: 'Быстрое бронирование' }).locator('.ant-spin-spinning')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByRole('dialog', { name: 'Быстрое бронирование' }).locator('.ant-spin-spinning') with timeout 5000ms
+      - waiting for getByRole('dialog', { name: 'Быстрое бронирование' }).locator('.ant-spin-spinning')
+
+
+      150 |   })
+      151 |   await modal.getByLabel('Время начала', { exact: true }).fill('2026-10-09T12:00')
+    > 152 |   await expect(modal.locator('.ant-spin-spinning')).toBeVisible()
+          |                                                     ^
+      153 |   await expect(modal.getByRole('button', { name: 'Создать занятие', exact: true })).toBeDisabled()
+      154 |   await modal.getByLabel('Время начала', { exact: true }).fill('2026-10-10T12:00')
+      155 |   await expect(modal.getByText('Доступно: 60 из 120 мин')).toBeVisible()
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\horse-workload.spec.ts:152:53
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\test-results\baseline-e2e\horse-workload-slow-date-l-2992e-cannot-replace-the-new-date-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\test-results\baseline-e2e\horse-workload-slow-date-l-2992e-cannot-replace-the-new-date-mock\error-context.md
+
+  4 failed
+    [mock] › e2e\horse-workload.spec.ts:83:1 › changing booking date recalculates options and blocks overload on the destination day 
+    [mock] › e2e\horse-workload.spec.ts:91:1 › transfer excludes the original lesson, preserves participants and sends only time and duration 
+    [mock] › e2e\horse-workload.spec.ts:110:1 › API failure blocks selected horses, supports retry and empty daily state 
+    [mock] › e2e\horse-workload.spec.ts:142:1 › slow date lookup disables save and a superseded response cannot replace the new date 
+  5 passed (1.0m)

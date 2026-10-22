@@ -1,0 +1,43 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Users\Валерий\AppData\Roaming\npm\node_modules\npm\bin\npm-cli.js
+1 info using npm@12.0.2
+2 info using node@v26.4.0
+3 silly config load:file:C:\Users\Валерий\AppData\Roaming\npm\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-os-plugin\.npmrc
+5 silly config load:file:C:\Users\Валерий\.npmrc
+6 silly config load:file:C:\Users\Валерий\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm install
+8 verbose argv "install" "--cache" ".\\.npm-cache"
+9 verbose logfile logs-max:10 dir:C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-os-plugin\.npm-cache\_logs\2026-09-14T07_32_09_101Z-
+10 verbose logfile C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-os-plugin\.npm-cache\_logs\2026-09-14T07_32_09_101Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4395630592 maxSize:1098907648 maxEntrySize:549453824
+13 silly idealTree buildDeps
+14 silly fetch manifest @figma/plugin-typings@^1.117.0
+15 silly packumentCache full:https://registry.npmjs.org/@figma%2fplugin-typings cache-miss
+16 http fetch GET 200 https://registry.npmjs.org/@figma%2fplugin-typings 469ms (cache miss)
+17 silly packumentCache full:https://registry.npmjs.org/@figma%2fplugin-typings set size:undefined disposed:false
+18 silly fetch manifest typescript@^5.9.2
+19 silly packumentCache full:https://registry.npmjs.org/typescript cache-miss
+20 http fetch GET 200 https://registry.npmjs.org/npm 576ms
+21 http fetch GET 200 https://registry.npmjs.org/typescript 565ms (cache miss)
+22 silly packumentCache full:https://registry.npmjs.org/typescript set size:undefined disposed:false
+23 silly placeDep ROOT @figma/plugin-typings@1.138.0 OK for: horse-club-os-figma-plugin@1.0.0 want: ^1.117.0
+24 silly placeDep ROOT typescript@5.9.3 OK for: horse-club-os-figma-plugin@1.0.0 want: ^5.9.2
+25 silly reify moves {}
+26 silly audit bulk request { '@figma/plugin-typings': [ '1.138.0' ], typescript: [ '5.9.3' ] }
+27 http cache @figma/plugin-typings@https://registry.npmjs.org/@figma/plugin-typings/-/plugin-typings-1.138.0.tgz 0ms (cache hit)
+28 http cache typescript@https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz 0ms (cache hit)
+29 silly tarball no local data for @figma/plugin-typings@https://registry.npmjs.org/@figma/plugin-typings/-/plugin-typings-1.138.0.tgz. Extracting by manifest.
+30 silly tarball no local data for typescript@https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz. Extracting by manifest.
+31 http fetch POST 200 https://registry.npmjs.org/-/npm/v1/security/advisories/bulk 246ms
+32 silly audit report {}
+33 http fetch GET 200 https://registry.npmjs.org/@figma/plugin-typings/-/plugin-typings-1.138.0.tgz 443ms (cache miss)
+34 http fetch GET 200 https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz 1659ms (cache miss)
+35 silly ADD node_modules/typescript
+36 silly ADD node_modules/@figma/plugin-typings
+37 verbose cwd C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-os-plugin
+38 verbose os Windows_NT 10.0.26200
+39 verbose node v26.4.0
+40 verbose npm  v12.0.2
+41 verbose exit 0
+42 info ok

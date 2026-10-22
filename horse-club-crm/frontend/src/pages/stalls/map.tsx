@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Alert, App, Button, Card, Empty, Form, Input, Modal, Select, Space, Spin, Statistic, Tag, Typography } from 'antd'
+import { Alert, App, Button, Card, Empty, Form, Input, Modal, Select, Space, Spin, Statistic, Tag, Tooltip, Typography } from 'antd'
 import { PrinterOutlined, WarningOutlined } from '@ant-design/icons'
 import { useOnError } from '@refinedev/core'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
@@ -52,14 +52,19 @@ export function StallMap() {
   const selected = stalls.find(stall => stall.id === selectedId)
   const printed = stalls.find(stall => stall.id === printId)
   const saved = () => { setSelectedId(undefined); void refresh() }
-  const tile = (stall?: MapStall) => stall ? <button type="button" className={`stall-tile stall-tile--${stall.status.toLowerCase()}`}
+  const riskReasons = (stall: MapStall) => [...new Set([
+    ...(stall.warnings ?? []).map(warning => warning.message),
+    ...(stall.zone === 'QUARANTINE' || stall.status === 'QUARANTINE' ? ['Карантинная зона'] : []),
+  ])]
+  const tile = (stall?: MapStall) => stall ? <Tooltip key={stall.id} trigger={['hover', 'focus']} title={riskReasons(stall).length ? <>{riskReasons(stall).map(reason => <div key={reason}>{reason}</div>)}</> : null}>
+    <button type="button" className={`stall-tile stall-tile--${stall.status.toLowerCase()}`}
     key={stall.id} onClick={event => { opener.current = event.currentTarget; setSelectedId(stall.id) }} aria-label={`Денник ${stall.number ?? stall.name}, ${stall.horse?.name ?? statuses[stall.status]}`}>
     <span className="stall-tile-heading"><strong>№ {stall.number ?? stall.name}</strong><Tag color={colors[stall.status]}>{statuses[stall.status]}</Tag></span>
     <span className="stall-horse-name">{stall.horse?.name ?? '—'}</span>
     {stall.horse && <><span>{stall.horse.sex ? sexes[stall.horse.sex] : 'Пол не указан'} · {stall.horse.ownerType === 'private' ? 'Частный постой' : 'Клубная'}</span>
       <span>{horseStatuses[stall.horse.status as keyof typeof horseStatuses] ?? stall.horse.status}</span></>}
-    {!!stall.warnings?.length && <span className="stall-warning"><WarningOutlined /> Риск соседства</span>}
-  </button> : <div aria-hidden="true" />
+    {!!riskReasons(stall).length && <span className="stall-warning"><WarningOutlined /> Риск соседства</span>}
+  </button></Tooltip> : <div aria-hidden="true" />
   return <section className="stall-map">
     <Space wrap className="stall-map-toolbar"><Typography.Title level={2}>Карта денников</Typography.Title>
       <Link to="/stalls">Список денников</Link><Button onClick={() => void refresh()} disabled={loading}>Обновить</Button>

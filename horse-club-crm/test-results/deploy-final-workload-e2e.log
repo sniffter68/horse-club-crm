@@ -1,0 +1,11 @@
+
+Running 9 tests using 1 worker
+
+(node:30472) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  1 [mock] › e2e\horse-workload.spec.ts:57:3 › daily widget, event badge and overload guard at 1280px (20.1s)
+(node:49180) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  2 [mock] › e2e\horse-workload.spec.ts:57:3 › daily widget, event badge and overload guard at 320px (20.1s)
+(node:39968) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)

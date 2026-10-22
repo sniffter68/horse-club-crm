@@ -4,7 +4,10 @@ import { checkBookingDatePicker } from './bookingDatePicker'
 for (const width of [1280, 375]) test(`booking date footer confirms selections at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 650 })
   await page.goto('/schedule')
-  await page.getByRole('button', { name: 'Новое бронирование', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Новое бронирование', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Новое занятие', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Записать на тренировку', exact: true })).toHaveCount(1)
+  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Бронирование тройного ресурса', exact: true })
   for (const label of ['Начало', 'Окончание']) {
     await checkBookingDatePicker(page, modal, label, '09.10.2026 09:00')
@@ -45,7 +48,7 @@ async function choose(page: Page, modal: Locator, field: string, starts: string)
 }
 async function openFilled(page: Page) {
   await page.goto('/schedule')
-  await page.getByRole('button', { name: 'Новое бронирование', exact: true }).click()
+  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Бронирование тройного ресурса', exact: true })
   await choose(page, modal, 'Клиент', 'Анна Орлова')
   await choose(page, modal, 'Лошадь', 'Валдай')
@@ -161,7 +164,7 @@ test('trainer reads resource schedule without mutation controls', async ({ page 
   await page.addInitScript(() => localStorage.setItem('horsecrm.role', 'TRAINER'))
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
   await page.goto('/schedule')
-  await expect(page.getByRole('button', { name: 'Новое бронирование' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Записать на тренировку' })).toHaveCount(0)
   await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   await expect(page.getByRole('dialog', { name: 'Карточка бронирования' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Редактировать бронирование' })).toHaveCount(0)
@@ -257,7 +260,7 @@ test('pending billing prevents closing, editing and duplicate status requests', 
 
 test('resource selectors support pointer selection after asynchronous balance loading', async ({ page }) => {
   await page.goto('/schedule')
-  await page.getByRole('button', { name: 'Новое бронирование', exact: true }).click()
+  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Бронирование тройного ресурса', exact: true })
   for (const [field, label] of [['Клиент', 'Анна Орлова'], ['Лошадь', 'Валдай'], ['Тренер', 'Мария Волкова'], ['Локация', 'Крытый манеж']]) {
     await modal.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: field, exact: true }) }).click()

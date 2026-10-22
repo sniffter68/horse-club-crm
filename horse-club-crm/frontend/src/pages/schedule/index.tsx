@@ -355,8 +355,7 @@ export function SchedulePage() {
       <Button onClick={() => setWorkloadOpen(true)}>Нагрузка лошадей</Button>
       <Select aria-label="Группировка расписания" value={grouping} style={{ width: compactLayout ? '100%' : 210 }} onChange={setGrouping}
         options={[{ value: 'calendar', label: 'Календарь' }, { value: 'trainers', label: 'По тренерам' }, { value: 'horses', label: 'По лошадям' }, { value: 'arenas', label: 'По локациям' }]} />
-      {canManage && <Button type="primary" disabled={!ready} onClick={() => openTriad()}>Новое бронирование</Button>}
-      {canManage && <Button disabled={!ready} onClick={() => openBooking(new Date(toInstant(`${workloadDate}T${schedule?.openTime ?? '09:00'}`)))}>Новое занятие</Button>}
+      {canManage && <Button type="primary" disabled={!ready} onClick={() => openTriad()}>Записать на тренировку</Button>}
     </Space>
     {(triadError || triadAvailability.error) && <Alert type="error" showIcon message="Не удалось загрузить бронирования или доступность ресурсов" description={triadError || triadAvailability.error}
       action={<Button onClick={() => setRevision(r => r + 1)}>Повторить загрузку</Button>} />}

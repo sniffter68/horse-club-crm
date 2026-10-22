@@ -1,0 +1,11 @@
+{
+  "name": "Horse Club OS CRM Generator",
+  "id": "horse-club-os-crm-generator-local",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["none"]
+  }
+}

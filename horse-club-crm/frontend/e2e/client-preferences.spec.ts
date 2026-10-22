@@ -1,3 +1,4 @@
+import { openCalendarLesson } from './openCalendarLesson'
 import { test, expect, type Page, type Locator } from './fixtures'
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -36,7 +37,7 @@ async function selected(dialog: Locator, label: string, text: string) {
 for (const width of [1440, 390]) test(`booking defaults follow client and preserve manual changes at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 })
   await page.goto('/schedule')
-  await page.getByRole('button', { name: 'Новое бронирование', exact: true }).click()
+  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Бронирование тройного ресурса' })
   await choose(page, dialog, 'Клиент', 'Клиент 5')
   await selected(dialog, 'Тренер', 'Тренер 1'); await selected(dialog, 'Лошадь', 'Лошадь 3')
@@ -59,7 +60,7 @@ for (const width of [1440, 390]) test(`booking defaults follow client and preser
 })
 
 test('lesson participant uses defaults even when the service has no membership', async ({ page }) => {
-  await page.goto('/schedule'); await page.getByRole('button', { name: 'Новое занятие', exact: true }).click()
+  await page.goto('/schedule'); await openCalendarLesson(page)
   const dialog = page.getByRole('dialog', { name: 'Быстрое бронирование' })
   await choose(page, dialog, 'Клиент', 'Клиент 5')
   await selected(dialog, 'Тренер', 'Тренер 1'); await selected(dialog, 'Лошадь участника', 'Лошадь 3')
@@ -73,7 +74,7 @@ test('slow client details never overwrite manual resources', async ({ page }) =>
   let release!: () => void
   const gate = new Promise<void>(resolve => { release = resolve })
   await page.route(`**/api/clients/${id(5)}`, async route => { await gate; await route.fulfill({ json: clients[0] }) })
-  await page.goto('/schedule'); await page.getByRole('button', { name: 'Новое бронирование', exact: true }).click()
+  await page.goto('/schedule'); await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Бронирование тройного ресурса' })
   await choose(page, dialog, 'Клиент', 'Клиент 5')
   await choose(page, dialog, 'Тренер', 'Тренер 2'); await choose(page, dialog, 'Лошадь', 'Лошадь 4')
@@ -85,7 +86,7 @@ test('slow client details never overwrite manual resources', async ({ page }) =>
 test('inactive trainers and horses in treatment are not automatically selected', async ({ page }) => {
   await page.route('**/api/trainers?*', route => route.fulfill({ json: trainers.map(row => ({ ...row, isActive: false })), headers: { 'x-total-count': '2' } }))
   await page.route('**/api/horses?*', route => route.fulfill({ json: horses.map(row => ({ ...row, healthStatus: 'TREATMENT' })), headers: { 'x-total-count': '2' } }))
-  await page.goto('/schedule'); await page.getByRole('button', { name: 'Новое бронирование', exact: true }).click()
+  await page.goto('/schedule'); await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Бронирование тройного ресурса' })
   await choose(page, dialog, 'Клиент', 'Клиент 5')
   await expect(dialog.getByText('Нет активного абонемента или депозита')).toBeVisible()

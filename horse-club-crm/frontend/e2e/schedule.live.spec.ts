@@ -1,3 +1,4 @@
+import { openCalendarLesson } from './openCalendarLesson'
 import { test, expect } from '@playwright/test'
 import { DateTime } from 'luxon'
 import { execFileSync } from 'node:child_process'
@@ -37,8 +38,8 @@ test('schedule: real booking, workload, filters, attendance and cancellation', a
     await page.getByRole('button', { name: 'Войти', exact: true }).click()
     await expect(page).toHaveURL(/\/clients/)
     await page.locator('aside a[href="/schedule"]').click()
-    await expect(page.getByRole('button', { name: 'Новое занятие', exact: true })).toBeEnabled()
-    await page.getByRole('button', { name: 'Новое занятие', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Записать на тренировку', exact: true })).toBeEnabled()
+    await openCalendarLesson(page)
     const modal = page.getByRole('dialog', { name: 'Быстрое бронирование' })
     for (const label of ['Клиент', 'Услуга', 'Тренер', 'Лошадь']) {
       await modal.getByLabel(label, { exact: true }).fill(name)
