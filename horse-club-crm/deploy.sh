@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+
+export TZ=Europe/Moscow
+trap 'status=$?; printf "Deployment failed: %s - commit %s - %s:%s - command: %s - exit %s\n" "$(date --iso-8601=seconds)" "${deploy_commit:-unknown}" "${BASH_SOURCE[0]}" "$LINENO" "$BASH_COMMAND" "$status" >&2; exit "$status"' ERR
 
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
+deploy_commit=$(git rev-parse --short HEAD)
+echo "Deployment started: $(date --iso-8601=seconds) - commit $deploy_commit"
 ENV_FILE="${ENV_FILE:-.env.production}"
 compose=(docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml)
 
@@ -41,4 +46,4 @@ NODE
 
 echo "===> 4. Recreating Caddy with current frontend and landing dist..."
 "${compose[@]}" up -d --force-recreate caddy
-echo "===> Deployment complete."
+echo "Deployment successful: $(date --iso-8601=seconds) - commit $deploy_commit"

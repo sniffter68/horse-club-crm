@@ -12,3 +12,4 @@ project-*.txt
 
 uploads/
 __pycache__/
+docs/deploy_history.log
