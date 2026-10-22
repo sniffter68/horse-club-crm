@@ -1,4 +1,15 @@
 import { test, expect, type Locator, type Page } from './fixtures'
+import { checkBookingDatePicker } from './bookingDatePicker'
+
+for (const width of [1280, 375]) test(`booking date footer confirms selections at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 650 })
+  await page.goto('/schedule')
+  await page.getByRole('button', { name: 'Новое бронирование', exact: true }).click()
+  const modal = page.getByRole('dialog', { name: 'Бронирование тройного ресурса', exact: true })
+  for (const label of ['Начало', 'Окончание']) {
+    await checkBookingDatePicker(page, modal, label, '09.10.2026 09:00')
+  }
+})
 
 const horse = { id: 'h1', name: 'Валдай', status: 'active', isUnavailable: false, maxRiderWeight: 85, maxDailyWorkloadMinutes: 120, requiredRestMinutes: 45, maxDailyMinutes: 120, minRestMinutes: 45 }
 const trainer = { id: 't1', name: 'Мария', fullName: 'Мария Волкова', specializations: ['Выездка'], isActive: true }
@@ -185,8 +196,8 @@ for (const kind of ['penalty', 'free', 'club']) test(`cancellation ${kind} expla
   await page.getByRole('dialog', { name: 'Карточка бронирования' }).getByRole('button', { name: 'Отменить', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Отмена бронирования' })
   if (kind === 'club') {
-    const initiator = modal.getByRole('combobox', { name: 'Инициатор отмены' })
-    await initiator.focus(); await initiator.press('ArrowDown'); await initiator.press('ArrowDown'); await initiator.press('Enter')
+    await modal.locator('.ant-select-selector').click()
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^Клуб$/ }).click()
     await expect(modal.getByText(/Привязанный абонемент продлится на 7 дней/)).toBeVisible()
   }
   if (kind === 'penalty') await expect(modal.getByRole('alert').filter({ hasText: 'менее 12 часов' })).toBeVisible()

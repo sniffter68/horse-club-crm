@@ -1,5 +1,15 @@
 ﻿import { test, expect, type Page } from './fixtures'
 
+import { checkBookingDatePicker } from './bookingDatePicker'
+
+test('schedule quick booking date footer confirms Moscow time', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-09T06:00:00Z'))
+  await login(page)
+  await page.goto('/schedule')
+  await page.getByRole('button', { name: 'Новое занятие', exact: true }).click()
+  await checkBookingDatePicker(page, page.getByRole('dialog', { name: 'Быстрое бронирование' }), 'Время начала', '09.10.2026 09:00')
+})
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/leads/events', route => route.fulfill({ contentType: 'text/event-stream', body: ': heartbeat\n\n' }))
   await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
@@ -20,13 +30,15 @@ test.beforeEach(async ({ page }) => {
 
 test('schedule: slot booking preserves input and displays backend 409', async ({ page }) => {
   await login(page)
+  const ids: Record<string, string> = Object.fromEntries(['clients', 'horses', 'trainers', 'services'].map((resource, index) => [resource, `0000000${index + 1}-1111-4111-8111-111111111111`]))
   for (const resource of ['clients', 'horses', 'trainers', 'services']) {
     await page.route(`**/api/${resource}?*`, route => route.fulfill({
-      json: [{ id: resource, name: resource, firstName: resource, title: resource, durationMinutes: 60, maxDailyMinutes: 240, isUnavailable: false }],
+      json: [{ id: ids[resource], name: resource, firstName: resource, title: resource, durationMinutes: 60, maxDailyMinutes: 240, isUnavailable: false }],
       headers: { 'x-total-count': '1' },
     }))
   }
-  await page.route('**/api/horses/workload?*', route => route.fulfill({ json: [{ horseId: 'horses', horseName: 'horses', maxDailyWorkloadMinutes: 240, currentWorkloadMinutes: 60, status: 'AVAILABLE' }] }))
+  await page.route(`**/api/clients/${ids.clients}`, route => route.fulfill({ json: { id: ids.clients, name: 'clients', memberships: [] } }))
+  await page.route('**/api/horses/workload?*', route => route.fulfill({ json: [{ horseId: ids.horses, horseName: 'horses', maxDailyWorkloadMinutes: 240, currentWorkloadMinutes: 60, status: 'AVAILABLE' }] }))
   const conflict = 'Тренер уже занят в выбранное время'
   await page.route('**/api/lessons', route => route.fulfill({ status: 409, json: { message: conflict } }))
   await page.goto('/schedule')
@@ -38,8 +50,8 @@ test('schedule: slot booking preserves input and displays backend 409', async ({
   const modal = page.getByRole('dialog', { name: 'Быстрое бронирование' })
   await expect(modal).toBeVisible()
   for (const [label, value] of [['Клиент', 'clients'], ['Услуга', 'services'], ['Тренер', 'trainers'], ['Лошадь участника', 'horses']]) {
-    await modal.getByLabel(label, { exact: true }).fill(value)
-    await page.getByTitle(value === 'horses' ? 'horses — 60 / 240 мин' : value, { exact: true }).last().click()
+    await modal.getByRole('combobox', { name: new RegExp(`${label}$`) }).fill(value)
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: value }).first().click()
   }
   await expect(modal.getByText('Доступно: 180 из 240 мин')).toBeVisible()
   await modal.getByRole('button', { name: 'Создать занятие', exact: true }).click()

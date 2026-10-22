@@ -3,6 +3,7 @@ import { ScheduleEventContent } from './ScheduleEventContent'
 import { DeleteLessonAction } from './DeleteLessonAction'
 import { eventSummary } from './scheduleEventPresentation'
 import { isPerPersonService } from './groupPricing'
+import { BookingDateTimeInput } from '../../components/BookingDateTimePicker'
 import { EntryOverlay } from '../../components/EntryOverlay'
 import { LessonGroupBadge, LessonGroupSummary, CompleteLessonModal, LessonPaymentBadge, LessonPriceFields } from './LessonPayments'
 import { isUuid } from '../../uuid'
@@ -412,7 +413,7 @@ export function SchedulePage() {
         <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} onChange={id => form.setFieldsValue({ participantsCount: 1, pricePerPerson: isPerPersonService(services.find(row => row.id === id)) ? Number(services.find(row => row.id === id)?.price ?? 0) : undefined, durationMinutes: services.find(row => row.id === id)?.durationMinutes, cost: Number(services.find(row => row.id === id)?.price ?? 0), prepaymentAmount: 0, prepaymentMethod: undefined })} /></Form.Item>
         <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" onChange={() => { setTrainerManual(true) }} disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
         <Form.Item name="arenaId" label="Манеж" extra="Необязательно для выездного или теоретического занятия."><Select disabled={Boolean(editingLesson)} allowClear showSearch optionFilterProp="label" options={arenaOptions} /></Form.Item>
-        <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><Input type="datetime-local" /></Form.Item>
+        <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><BookingDateTimeInput /></Form.Item>
         <Form.Item name="durationMinutes" label="Длительность, мин" rules={[{ required: true }, { type: 'integer', min: 1 }]}><InputNumber min={1} precision={0} /></Form.Item>
         {bookingWorkloads.error && <Alert type="error" showIcon message="Не удалось проверить нагрузку лошадей" description={bookingWorkloads.error}
           action={<Button onClick={() => setWorkloadRevision(value => value + 1)}>Повторить проверку</Button>} />}

@@ -2,10 +2,8 @@ import { useClientPreferences } from './useClientPreferences'
 import { activePreferredHorse } from '../clients/preferredResources'
 import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { useEffect, useRef, useState } from 'react'
-import { Alert, App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Spin, Typography } from 'antd'
-import dayjs, { type Dayjs } from 'dayjs'
-import 'dayjs/locale/ru'
-import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
+import { Alert, App, Button, Form, InputNumber, Modal, Select, Space, Spin, Typography } from 'antd'
+import { BookingDateTimeInput } from '../../components/BookingDateTimePicker'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import type { Arena, Client, Horse, Trainer } from '../catalogs/types'
 import type { ClientWithMemberships, MembershipSummary } from './types'
@@ -14,7 +12,6 @@ import { bookingFailure, clientName, disciplines, membershipBalance, type TriadB
 import { useTriadAvailability } from './useTriadAvailability'
 
 const required = { required: true, message: 'Заполните поле' }
-const dateBinding = { getValueProps: (value?: string) => ({ value: value ? dayjs(value) : null }), getValueFromEvent: (date: Dayjs | null) => date?.format('YYYY-MM-DDTHH:mm') }
 const formatMinutes = (value: number) => Number(value.toFixed(1)).toLocaleString('ru-RU')
 const stopPopupEscape = (event: { key: string; stopPropagation: () => void }) => { if (event.key === 'Escape') event.stopPropagation() }
 
@@ -118,13 +115,13 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
       {membershipState.error && <Alert type="error" showIcon message="Не удалось загрузить абонементы" description={membershipState.error}
         action={<Button onClick={() => setClientRevision(r => r + 1)}>Повторить</Button>} />}
       <div className="triad-form-grid">
-        <Form.Item name="startTime" label="Начало" {...dateBinding} rules={[required, { validator: async (_, value: string) => { toInstant(value) } }]}>
-          <DatePicker locale={ruDatePicker} onKeyDown={stopPopupEscape} popupClassName="triad-date-popup" showTime={{ format: 'HH:mm' }} format="DD.MM.YYYY HH:mm" placeholder="Дата и время начала" />
+        <Form.Item name="startTime" label="Начало" rules={[required, { validator: async (_, value: string) => { toInstant(value) } }]}>
+          <BookingDateTimeInput placeholder="Дата и время начала" />
         </Form.Item>
-        <Form.Item name="endTime" label="Окончание" {...dateBinding} dependencies={['startTime']} rules={[required, { validator: async (_, value: string) => {
+        <Form.Item name="endTime" label="Окончание" dependencies={['startTime']} rules={[required, { validator: async (_, value: string) => {
           const end = toInstant(value), start = toInstant(form.getFieldValue('startTime'))
           if (+new Date(end) <= +new Date(start)) throw new Error('Окончание должно быть позже начала')
-        } }]}><DatePicker locale={ruDatePicker} onKeyDown={stopPopupEscape} popupClassName="triad-date-popup" showTime={{ format: 'HH:mm' }} format="DD.MM.YYYY HH:mm" placeholder="Дата и время окончания" /></Form.Item>
+        } }]}><BookingDateTimeInput placeholder="Дата и время окончания" /></Form.Item>
       </div>
       <Form.Item name="horseId" label="Лошадь" rules={[required]} extra={horse ? `Допустимый вес: до ${horse.maxRiderWeight ?? 85} кг. Отдых между тренировками: ${horse.requiredRestMinutes ?? horse.minRestMinutes ?? 45} мин.` : undefined}>
         <Select onInputKeyDown={stopPopupEscape} onChange={preferences.horseChanged} id="triad_horseId" aria-label="Лошадь" showSearch allowClear optionFilterProp="label" placeholder="Выберите активную лошадь" loading={availability.loading} options={horses.filter(activePreferredHorse).map(h => {

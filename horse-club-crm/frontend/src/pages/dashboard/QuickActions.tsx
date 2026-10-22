@@ -3,10 +3,10 @@ import { LessonPriceFields } from '../schedule/LessonPayments'
 import { isUuid } from '../../uuid'
 import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, DatePicker, Form, InputNumber, Select, Spin, Typography } from 'antd'
+import { Alert, Button, Form, InputNumber, Select, Spin, Typography } from 'antd'
 import { CalendarOutlined, ClockCircleOutlined, HomeOutlined, MedicineBoxOutlined, MinusOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
+import { BookingDateTimePicker } from '../../components/BookingDateTimePicker'
 import { DateTime } from 'luxon'
 import { usePermissions } from '../../modulePermissions'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
@@ -96,7 +96,7 @@ function LessonDrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =
       action={<Button onClick={() => { retry(n => n + 1) }}>Повторить</Button>} />}
     <Form.Item name="clientId" label="Клиент" rules={required}><ClientSelectWithCreate aria-label="Клиент" showSearch allowClear placeholder="Имя или телефон" /></Form.Item>
     <Form.Item name="startTime" label="Дата и время (Москва)" initialValue={dayjs(DateTime.now().setZone('Europe/Moscow').startOf('hour').plus({ hours: 1 }).toFormat("yyyy-MM-dd'T'HH:mm"))} rules={required}>
-      <DatePicker onKeyDown={stopPopupEscape} locale={ruDatePicker} classNames={{ popup: { root: 'triad-date-popup' } }} showTime={{ format: 'HH:mm' }} format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+      <BookingDateTimePicker />
     </Form.Item>
     <Form.Item name="serviceId" label="Услуга" rules={required}><Select onInputKeyDown={stopPopupEscape} aria-label="Услуга" loading={catalogs.loading} showSearch optionFilterProp="label"
       options={catalogs.services.map(row => ({ value: row.id, label: row.title || row.name }))}

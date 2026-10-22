@@ -1,4 +1,23 @@
 import { test, expect, type Page, type Locator } from './fixtures'
+import { checkBookingDatePicker } from './bookingDatePicker'
+
+for (const width of [1440, 390]) test(`dashboard date footer confirms Moscow time at ${width}px`, async ({ page }) => {
+  await setup(page)
+  await page.setViewportSize({ width, height: 650 })
+  await page.goto('/')
+  await page.getByRole('button', { name: '+ Записать на тренировку', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
+  await checkBookingDatePicker(page, drawer, 'Дата и время (Москва)', '20.10.2026 11:00')
+  for (const [label, value] of [['Клиент', 'Анна Орлова'], ['Услуга', 'Выездка'], ['Тренер', 'Мария Волкова'], ['Лошадь', 'Валдай']]) {
+    await choose(page, drawer, label, value)
+  }
+  await page.route('**/api/lessons', async route => {
+    expect(route.request().postDataJSON().startTime).toBe('2026-10-20T08:00:00.000Z')
+    await route.fulfill({ status: 201, json: { id: 'confirmed-time' } })
+  })
+  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await expect(drawer).not.toBeVisible()
+})
 
 test.use({ timezoneId: 'America/New_York' })
 test.setTimeout(45000)
