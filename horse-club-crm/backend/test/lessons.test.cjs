@@ -216,7 +216,7 @@ test('creates one group lesson with separate riders, horses, memberships and pay
     clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] }) },
     horse: { findUnique: async ({ where }) => ({ name: where.id, maxDailyMinutes: 240 }) },
     service: { findUnique: async () => ({ durationMinutes: 60, price: 2000, title: 'Групповая тренировка', name: 'Групповая тренировка', maxCapacity: 4, allowMembership: true }) },
-    membership: { findUnique: async () => ({ clientId: 'client-1', remainedLessons: 5, validUntil: new Date('2099-01-01') }) },
+    membership: { findUnique: async () => ({ id: 'membership-1', status: 'active', clientId: 'client-1', remainedLessons: 5, validUntil: new Date('2099-01-01') }) },
     arena: { findUnique: async () => ({ name: 'Большой манеж', isUnavailable: false, capacity: 6 }) },
     lesson: {
       findMany: async () => [],
@@ -491,8 +491,8 @@ function createStatusHarness(newStatus, operations = [], options = {}) {
         status: LessonStatus.SCHEDULED,
         service: { allowMembership: options.allowMembership ?? false },
         bookings: [
-          { id: 'booking-1', clientId: 'client-1', membershipId: 'membership-2' },
-          { id: 'booking-2', clientId: 'client-2', membershipId: 'membership-1' },
+          { id: 'booking-1', clientId: 'client-1', membership: {clientId: 'client-1'}, membershipId: 'membership-2' },
+          { id: 'booking-2', clientId: 'client-2', membership: {clientId: 'client-2'}, membershipId: 'membership-1' },
           { id: 'booking-3', clientId: 'client-3', membershipId: 'membership-1' },
           { id: 'booking-4', clientId: 'client-4', membershipId: null },
         ],
@@ -518,13 +518,13 @@ function createStatusHarness(newStatus, operations = [], options = {}) {
   }));
 }
 
-test('COMPLETED and NO_SHOW debit every distinct linked membership', async () => {
+test('COMPLETED and NO_SHOW debit once per participant, including a shared membership', async () => {
   for (const status of [LessonStatus.COMPLETED, LessonStatus.NO_SHOW]) {
     const { result, debitCalls, refundCalls, tx } = await createStatusHarness(status);
     assert.equal(result.status, status);
-    assert.equal(debitCalls.length, 2);
+    assert.equal(debitCalls.length, 3);
     assert.deepEqual(debitCalls.map((call) => call[0]), [
-      'membership-1', 'membership-2',
+      'membership-1', 'membership-1', 'membership-2',
     ]);
     assert.ok(debitCalls.every((call) => call[1] === 'lesson-1' && call[3] === tx));
     assert.equal(refundCalls.length, 0);
@@ -543,7 +543,7 @@ test('COMPLETED automatically links and debits an active client membership', asy
   }]);
   assert.deepEqual(paymentUpdates,[{where:{bookingId:'booking-4',status:'PENDING'},data:{status:'CANCELLED'}}]);
   assert.deepEqual(debitCalls.map((call) => call[0]), [
-    'membership-1', 'membership-2', 'membership-3',
+    'membership-1', 'membership-1', 'membership-2', 'membership-3',
   ]);
 });
 

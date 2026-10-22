@@ -1,3 +1,4 @@
+import { canUseMembership, membershipAccessWhere } from '../memberships/membership-access';
 import type { AuthUser } from '../auth/auth.types';
 import type { CompleteLessonDto } from './dto/lesson-payment.dto';
 import { money, paymentStatus, postLessonReceipt } from './lesson-finance';
@@ -285,11 +286,11 @@ export class LessonsService {
         if (!participant.membershipId) continue;
         if (!service.allowMembership) throw new BadRequestException('Услуга не допускает оплату абонементом');
         const membership = await tx.membership.findUnique({ where: { id: participant.membershipId },
-          select: { clientId: true, remainedLessons: true, validUntil: true, deletedAt: true } });
-        if (!membership || membership.clientId !== participant.clientId) {
+          select: { id: true, clientId: true, remainedLessons: true, validUntil: true, deletedAt: true, status: true } });
+        if (!membership || !await canUseMembership(tx, membership, participant.clientId)) {
           throw new BadRequestException('Абонемент не принадлежит участнику');
         }
-        if (membership.deletedAt || membership.remainedLessons <= 0 || membership.validUntil < end) {
+        if (membership.deletedAt || membership.status !== 'active' || membership.remainedLessons <= 0 || membership.validUntil < end) {
           throw new BadRequestException('Абонемент недоступен на время занятия');
         }
       }
@@ -502,14 +503,14 @@ export class LessonsService {
       if (!lesson) throw new NotFoundException('Занятие не найдено');
 
       const reason = `Удаление занятия ${lessonId}; пользователь ${actor.id}; ${new Date().toISOString()}`;
-      const refunded = new Set(lesson.operations.filter(op => op.type === 'REFUND').map(op => op.membershipId));
+      const opKey = (op: { membershipId: string; attendeeClientId?: string | null }) => `${op.membershipId}:${op.attendeeClientId ?? ''}`;
+      const refunded = new Set(lesson.operations.filter(op => op.type === 'REFUND').map(opKey));
       // The ledger is authoritative: scheduled visits and already refunded visits
       // must never receive an extra credit. Include debits from former participants.
-      const membershipIds = [...new Set(lesson.operations
-        .filter(op => op.type === 'DEBIT' && !refunded.has(op.membershipId))
-        .map(op => op.membershipId))].sort();
-      for (const membershipId of membershipIds) {
-        await this.membershipLedgerService.refundLesson(membershipId, lessonId, reason, tx);
+      const debits = lesson.operations.filter(op => op.type === 'DEBIT' && !refunded.has(opKey(op)))
+        .sort((a, b) => a.membershipId.localeCompare(b.membershipId));
+      for (const debit of debits) {
+        await this.membershipLedgerService.refundLesson(debit.membershipId, lessonId, reason, tx, debit.attendeeClientId ?? undefined);
       }
       // Retain both DEBIT and REFUND history, including the original lesson ID.
       // SetNull alone would lose that context once the lesson is gone.
@@ -548,12 +549,12 @@ export class LessonsService {
         select: {
           status: true, cost: true, prepaymentAmount: true, finalPaymentAmount: true, startTime: true, serviceId: true,
           service: { select: { allowMembership: true } },
-          bookings: { select: { id: true, clientId: true, membershipId: true, costAmount: true, prepaymentAmount: true, finalPaymentAmount: true, isPaid: true, client: { select: { name: true } }, payments: { where: { status: 'PAID' }, select: { amount: true } } } },
+          bookings: { select: { id: true, clientId: true, membership: { select: { clientId: true } }, membershipId: true, costAmount: true, prepaymentAmount: true, finalPaymentAmount: true, isPaid: true, client: { select: { name: true } }, payments: { where: { status: 'PAID' }, select: { amount: true } } } },
           operations: {
             where: {
               type: { in: [MembershipOpType.DEBIT, MembershipOpType.REFUND] },
             },
-            select: { membershipId: true, type: true },
+            select: { membershipId: true, type: true, attendeeClientId: true },
           },
         },
       });
@@ -585,7 +586,7 @@ export class LessonsService {
         ) {
           const membership = await tx.membership.findFirst({
             where: {
-              clientId: booking.clientId,
+              AND: [membershipAccessWhere(booking.clientId)], status: 'active',
               deletedAt: null,
               remainedLessons: { gt: 0 },
               validUntil: { gte: new Date() },
@@ -607,51 +608,22 @@ export class LessonsService {
         resolvedMembershipIds.push(membershipId);
       }
 
-      const membershipIds = [
-        ...new Set(
-          resolvedMembershipIds.filter((id): id is string => id !== null),
-        ),
-      ].sort();
-      const debitedMembershipIds = new Set(
-        lesson.operations
-          .filter((operation) => operation.type === MembershipOpType.DEBIT)
-          .map((operation) => operation.membershipId),
-      );
-      const refundedMembershipIds = new Set(
-        lesson.operations
-          .filter((operation) => operation.type === MembershipOpType.REFUND)
-          .map((operation) => operation.membershipId),
-      );
-
-      if (
-        newStatus === LessonStatus.COMPLETED ||
-        newStatus === LessonStatus.NO_SHOW
-      ) {
-        for (const membershipId of membershipIds) {
-          if (!debitedMembershipIds.has(membershipId)) {
-            await this.membershipLedgerService.debitLesson(
-              membershipId,
-              lessonId,
-              newStatus === LessonStatus.COMPLETED
-                ? 'Занятие завершено'
-                : 'Неявка на занятие',
-              tx,
-            );
-          }
-        }
-      } else {
-        for (const membershipId of membershipIds) {
-          if (
-            debitedMembershipIds.has(membershipId) &&
-            !refundedMembershipIds.has(membershipId)
-          ) {
-            await this.membershipLedgerService.refundLesson(
-              membershipId,
-              lessonId,
-              'Отмена занятия',
-              tx,
-            );
-          }
+      const participantsToCharge = lesson.bookings.map((booking, index) => ({
+        membershipId: resolvedMembershipIds[index], clientId: booking.clientId,
+      })).filter((row): row is { membershipId: string; clientId: string } => Boolean(row.membershipId))
+        .sort((a, b) => a.membershipId.localeCompare(b.membershipId) || a.clientId.localeCompare(b.clientId));
+      for (const participant of participantsToCharge) {
+        // Historical operations without attendee identity belong to the purchaser.
+        const matching = lesson.operations.filter(op => op.membershipId === participant.membershipId
+          && (op.attendeeClientId === participant.clientId || (!op.attendeeClientId
+            && lesson.bookings.some(b => b.clientId === participant.clientId && b.membership?.clientId === participant.clientId))));
+        const debit = matching.find(op => op.type === MembershipOpType.DEBIT);
+        const refund = matching.find(op => op.type === MembershipOpType.REFUND);
+        if (newStatus === LessonStatus.COMPLETED || newStatus === LessonStatus.NO_SHOW) {
+          if (!debit) await this.membershipLedgerService.debitLesson(participant.membershipId, lessonId,
+            newStatus === LessonStatus.COMPLETED ? 'Занятие завершено' : 'Неявка на занятие', tx, participant.clientId);
+        } else if (debit && !refund) {
+          await this.membershipLedgerService.refundLesson(participant.membershipId, lessonId, 'Отмена занятия', tx, debit.attendeeClientId ?? undefined);
         }
       }
 

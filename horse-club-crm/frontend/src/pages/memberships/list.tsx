@@ -1,3 +1,4 @@
+import { SharedMembershipAccess, type SharedMember } from './SharedMembershipAccess'
 import { ArchiveAction } from '../clients/ArchiveAction'
 import { useState } from 'react'
 import { CreateButton, List as RefineList, useTable } from '@refinedev/antd'
@@ -12,6 +13,7 @@ import { usePermissions } from '../../modulePermissions'
 import { useCatalogPermissions } from '../catalogs/permissions'
 
 type Membership = {
+  members?: SharedMember[]
   deletedAt?: string | null;
   serviceTitle?: string; totalPrice?: string | number; paymentMethod?: string;
   id: string; totalLessons: number; remainedLessons: number; validUntil: string; isActive: boolean;
@@ -61,6 +63,7 @@ export function MembershipList() {
         ]} />
         <Progress percent={membership.totalLessons ? Math.round(membership.remainedLessons / membership.totalLessons * 100) : 0}
           format={() => `${membership.remainedLessons} / ${membership.totalLessons} занятий`} />
+        <SharedMembershipAccess membershipId={membership.id} ownerClientId={membership.client?.id} members={membership.members} active={membership.isActive} />
         <section><Typography.Title level={5}>Оплата</Typography.Title>
           {membership.payments.length ? <List dataSource={membership.payments} renderItem={payment => <List.Item>
             <Space><Tag color={payment.status === 'PAID' ? 'green' : 'gold'}>{payment.status}</Tag><strong>{money(payment.amount)}</strong>

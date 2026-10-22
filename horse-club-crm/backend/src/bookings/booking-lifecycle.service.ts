@@ -1,3 +1,4 @@
+import { canUseMembership, membershipAccessWhere } from '../memberships/membership-access';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type BookingStatus, type Membership, type MembershipType } from '@prisma/client';
 import { DateTime } from 'luxon';
@@ -39,13 +40,13 @@ export class BookingLifecycleService {
           if (initial.membershipId) membership = await this.lockMembership(tx, initial.membershipId);
           else if (action !== 'cancel' || cancellation!.cancelledBy === 'client') {
             const candidates = await tx.membership.findMany({ where: {
-              deletedAt: null, clientId: initial.clientId, type: { in: ['fixed_lessons', 'deposit'] }, status: 'active',
+              deletedAt: null, AND: [membershipAccessWhere(initial.clientId)], type: { in: ['fixed_lessons', 'deposit'] }, status: 'active',
               validFrom: { lte: lookupTime }, validTo: { gte: lookupTime },
               OR: [{ allowedDisciplines: { isEmpty: true } }, { allowedDisciplines: { has: initial.serviceType! } }],
             }, orderBy: [{ validTo: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }] });
             for (const candidate of candidates) {
               const current = await this.lockMembership(tx, candidate.id);
-              if (current && this.usable(current, initial.clientId, initial.serviceType!, lookupTime)
+              if (current && this.usable(current, initial.serviceType!, lookupTime)
                 && current.remainingUnits.gte(bookingCharge(current.type, initial.costAmount))) { membership = current; break; }
             }
           }
@@ -56,18 +57,18 @@ export class BookingLifecycleService {
           const status: BookingStatus = action === 'complete' ? 'completed' : action === 'no-show' ? 'no_show'
             : cancellation!.cancelledBy === 'club' ? 'cancelled_club' : cancellationStatus(initial.startTime, now);
           const billable = ['completed', 'no_show', 'penalty_cancellation'].includes(status);
-          if (membership && membership.clientId !== initial.clientId) throw new BookingValidationError('MEMBERSHIP_INVALID', 'Абонемент не принадлежит клиенту');
+          if (membership && !await canUseMembership(tx, membership, initial.clientId)) throw new BookingValidationError('MEMBERSHIP_INVALID', 'Абонемент не принадлежит клиенту');
           if (billable) {
             if (await tx.payment.count({ where: { bookingId: id, status: 'PAID' } })) throw new BookingValidationError('BOOKING_STATE_CONFLICT', 'Тренировка уже оплачена деньгами. Согласуйте способ оплаты перед списанием абонемента');
             if (!membership) throw new BookingValidationError('MEMBERSHIP_REQUIRED', 'Нет подходящего абонемента или депозита. Выдайте его клиенту и повторите действие');
-            if (!this.usable(membership, initial.clientId, initial.serviceType!, now)) throw new BookingValidationError('MEMBERSHIP_UNAVAILABLE', 'Абонемент недействителен или не подходит для этой дисциплины');
+            if (!this.usable(membership, initial.serviceType!, now)) throw new BookingValidationError('MEMBERSHIP_UNAVAILABLE', 'Абонемент недействителен или не подходит для этой дисциплины');
             const charge = bookingCharge(membership.type, initial.costAmount);
             if (membership.remainingUnits.lt(charge)) throw new BookingValidationError('MEMBERSHIP_INSUFFICIENT', 'Недостаточно занятий или средств на абонементе');
             await tx.membership.update({ where: { id: membership.id }, data: {
               remainingUnits: { decrement: charge }, status: membership.remainingUnits.eq(charge) ? 'exhausted' : 'active',
             } });
             await tx.ledgerTransaction.create({ data: {
-              clientId: initial.clientId, bookingId: id, membershipId: membership.id,
+              ownerClientId: membership.clientId, clientId: initial.clientId, bookingId: id, membershipId: membership.id,
               transactionType: status === 'completed' ? 'usage' : 'penalty_cancellation', amount: charge.negated(),
               description: status === 'completed' ? 'Завершение тренировки' : status === 'no_show' ? 'Неявка на тренировку' : 'Штрафная отмена менее чем за 12 часов',
             } });
@@ -92,8 +93,8 @@ export class BookingLifecycleService {
     throw new BookingValidationError('BOOKING_CONTENTION', 'Повторите действие');
   }
 
-  private usable(m: Membership, clientId: string, discipline: string, now: Date) {
-    return !m.deletedAt && m.clientId === clientId && ['fixed_lessons', 'deposit'].includes(m.type) && m.status === 'active'
+  private usable(m: Membership, discipline: string, now: Date) {
+    return !m.deletedAt && ['fixed_lessons', 'deposit'].includes(m.type) && m.status === 'active'
       && m.validFrom <= now && m.validTo >= now && (!m.allowedDisciplines.length || m.allowedDisciplines.includes(discipline));
   }
   private async lockMembership(tx: Prisma.TransactionClient, id: string) {

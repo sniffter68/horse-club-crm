@@ -1,3 +1,4 @@
+import { canUseMembership } from '../memberships/membership-access';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { BookingServiceType, Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
@@ -148,7 +149,11 @@ export class BookingsService {
           if (dto.membershipId) {
             await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Membership" WHERE "id" = ${dto.membershipId}::uuid FOR UPDATE`);
             const membership = await tx.membership.findUnique({ where: { id: dto.membershipId } });
-            if (!membership || membership.deletedAt || membership.clientId !== dto.clientId) throw new BookingValidationError('MEMBERSHIP_INVALID', 'Абонемент не принадлежит клиенту');
+            if (!membership || membership.deletedAt || !await canUseMembership(tx, membership, dto.clientId)) throw new BookingValidationError('MEMBERSHIP_INVALID', 'Абонемент не принадлежит клиенту');
+            if (membership.status !== 'active' || membership.validFrom > start || membership.validTo < end || membership.remainingUnits.lte(0)
+              || !['fixed_lessons', 'deposit'].includes(membership.type)
+              || (membership.allowedDisciplines.length > 0 && !membership.allowedDisciplines.includes(dto.serviceType)))
+              throw new BookingValidationError('MEMBERSHIP_UNAVAILABLE', 'Абонемент недействителен или не подходит для этой тренировки');
           }
           const data = {
             clientId: dto.clientId, trainerId: dto.trainerId, horseId: dto.horseId, arenaId: dto.arenaId,

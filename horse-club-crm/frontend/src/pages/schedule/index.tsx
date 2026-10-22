@@ -108,7 +108,7 @@ function ParticipantEditor({ index, form, horses, trainers, trainerManual, parti
     {service?.allowMembership && !isPerPersonService(service) && !readOnly && <Form.Item name={[index, 'membershipId']} label="Абонемент" extra="Активный абонемент с ближайшим сроком окончания выбирается автоматически.">
       <Select allowClear loading={membershipsLoading} placeholder={memberships.length ? 'Выберите абонемент' : 'Активных абонементов нет'} options={memberships.map(membership => ({
         value: membership.id,
-        label: `${membership.pricingPlan?.name || 'Абонемент'} · ${membership.remainedLessons} / ${membership.totalLessons} · до ${membershipDate.format(new Date(membership.validUntil))}`,
+        label: `${membership.isShared ? `Семейный (${membership.ownerName})` : membership.pricingPlan?.name || 'Абонемент'} · ост. ${membership.remainedLessons} зан. · до ${membershipDate.format(new Date(membership.validUntil))}`,
       }))} />
     </Form.Item>}
     {membershipsError && <Alert type="error" showIcon message="Не удалось загрузить абонементы" description={membershipsError} />}

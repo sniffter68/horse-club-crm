@@ -11,6 +11,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { ArchiveQueryDto } from '../common/dto/archive-query.dto';
 import { setRefineTotalHeaders } from '../common/refine';
 import { CreateMembershipDto } from './dto/create-membership.dto';
+import { MembershipMemberDto } from './dto/membership-member.dto';
 import { MembershipsService, type MembershipResponse } from './memberships.service';
 
 @RequireModule('SCHEDULE')
@@ -35,6 +36,14 @@ export class MembershipsController {
   }
   @Delete(':id')
   remove(@Param('id', new ParseUUIDPipe()) id: string) { return this.membershipsService.remove(id); }
+  @Post(':id/members')
+  addMember(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: MembershipMemberDto, @CurrentUser() actor: AuthUser) {
+    return this.membershipsService.addMember(id, dto.clientId, actor);
+  }
+  @Delete(':id/members/:clientId')
+  removeMember(@Param('id', new ParseUUIDPipe()) id: string, @Param('clientId', new ParseUUIDPipe()) clientId: string) {
+    return this.membershipsService.removeMember(id, clientId);
+  }
   @Get(':id')
   findOne(@Param('id', new ParseUUIDPipe()) id: string) { return this.membershipsService.findOne(id); }
 }

@@ -1,3 +1,4 @@
+import { canUseMembership } from './membership-access';
 import { isSerializationFailure } from '../common/serialization-failure';
 import {
   BadRequestException,
@@ -27,6 +28,7 @@ export class MembershipLedgerService {
     lessonId: string,
     reason: string,
     transaction?: TransactionClient,
+    attendeeClientId?: string,
   ): Promise<void> {
     const normalizedReason = this.validateReason(reason);
 
@@ -37,7 +39,7 @@ export class MembershipLedgerService {
           membershipId,
           lessonId,
           normalizedReason,
-          true,
+          true, false, attendeeClientId,
         );
       } else {
         await this.runSerializable(async (tx) => {
@@ -46,7 +48,7 @@ export class MembershipLedgerService {
             membershipId,
             lessonId,
             normalizedReason,
-            true,
+            true, false, attendeeClientId,
           );
         });
       }
@@ -65,6 +67,7 @@ export class MembershipLedgerService {
     lessonId: string,
     reason: string,
     transaction?: TransactionClient,
+    attendeeClientId?: string,
   ): Promise<void> {
     const normalizedReason = this.validateReason(reason);
 
@@ -75,7 +78,7 @@ export class MembershipLedgerService {
           membershipId,
           lessonId,
           normalizedReason,
-          true,
+          true, false, attendeeClientId,
         );
       } else {
         await this.runSerializable(async (tx) => {
@@ -84,7 +87,7 @@ export class MembershipLedgerService {
             membershipId,
             lessonId,
             normalizedReason,
-            true,
+            true, false, attendeeClientId,
           );
         });
       }
@@ -107,6 +110,7 @@ export class MembershipLedgerService {
         where: { id: bookingId },
         select: {
           id: true,
+          clientId: true,
           membershipId: true,
           lessonId: true,
           lesson: { select: { status: true, trainerId: true, startTime: true } },
@@ -149,7 +153,7 @@ export class MembershipLedgerService {
           booking.lessonId,
           'Возврат за отменённое занятие',
           false,
-          true,
+          true, booking.clientId,
         );
         return;
       }
@@ -161,7 +165,7 @@ export class MembershipLedgerService {
           booking.lessonId,
           attended ? 'Посещение занятия' : 'Неявка на занятие',
           false,
-          true,
+          true, booking.clientId,
         );
       }
     });
@@ -174,6 +178,7 @@ export class MembershipLedgerService {
     reason: string,
     throwOnDuplicate: boolean,
     lockAlreadyHeld = false,
+    attendeeClientId?: string,
   ): Promise<void> {
     // Транзакционная advisory-lock сериализует все изменения одного абонемента.
     // Она не зависит от физического имени таблицы или Prisma @@map/@map.
@@ -181,8 +186,20 @@ export class MembershipLedgerService {
       await this.lockMembership(tx, membershipId);
     }
 
+    const membership = await tx.membership.findUnique({
+      where: { id: membershipId },
+      select: { id: true, clientId: true, remainedLessons: true, validUntil: true, type: true, status: true, deletedAt: true },
+    });
+    if (!membership) {
+      throw new NotFoundException('Абонемент не найден');
+    }
+
+    if (attendeeClientId && !await canUseMembership(tx, membership, attendeeClientId)) {
+      throw new ForbiddenException('Клиент не имеет доступа к абонементу');
+    }
+    attendeeClientId ??= membership.clientId ?? undefined;
     const priorDebit = await tx.membershipOp.findFirst({
-      where: { membershipId, lessonId, type: 'DEBIT' },
+      where: { membershipId, lessonId, type: 'DEBIT', attendeeClientId: attendeeClientId ?? null },
       select: { id: true },
     });
     if (priorDebit) {
@@ -192,16 +209,8 @@ export class MembershipLedgerService {
       return;
     }
 
-    const membership = await tx.membership.findUnique({
-      where: { id: membershipId },
-      select: { remainedLessons: true, validUntil: true, type: true, status: true, deletedAt: true },
-    });
-    if (!membership) {
-      throw new NotFoundException('Абонемент не найден');
-    }
-
     const now = await this.databaseNow(tx);
-    if (membership.deletedAt || membership.type === 'deposit' || membership.type === 'boarding' || membership.status === 'frozen') {
+    if (membership.deletedAt || membership.type === 'deposit' || membership.type === 'boarding' || membership.status !== 'active') {
       throw new ConflictException('Абонемент недоступен для списания в прежнем журнале занятий');
     }
     if (membership.remainedLessons <= 0) {
@@ -230,6 +239,7 @@ export class MembershipLedgerService {
       data: {
         membershipId,
         lessonId,
+        attendeeClientId, ownerClientId: membership.clientId,
         type: 'DEBIT',
         amount: 1,
         reason,
@@ -244,6 +254,7 @@ export class MembershipLedgerService {
     reason: string,
     throwOnDuplicate: boolean,
     lockAlreadyHeld = false,
+    attendeeClientId?: string,
   ): Promise<void> {
     if (!lockAlreadyHeld) {
       await this.lockMembership(tx, membershipId);
@@ -251,14 +262,15 @@ export class MembershipLedgerService {
 
     const membership = await tx.membership.findUnique({
       where: { id: membershipId },
-      select: { id: true },
+      select: { id: true, clientId: true },
     });
     if (!membership) {
       throw new NotFoundException('Абонемент не найден');
     }
 
+    attendeeClientId ??= membership.clientId ?? undefined;
     const priorDebit = await tx.membershipOp.findFirst({
-      where: { membershipId, lessonId, type: 'DEBIT' },
+      where: { membershipId, lessonId, type: 'DEBIT', attendeeClientId: attendeeClientId ?? null },
       select: { id: true },
     });
     if (!priorDebit) {
@@ -271,7 +283,7 @@ export class MembershipLedgerService {
     }
 
     const priorRefund = await tx.membershipOp.findFirst({
-      where: { membershipId, lessonId, type: 'REFUND' },
+      where: { membershipId, lessonId, type: 'REFUND', attendeeClientId: attendeeClientId ?? null },
       select: { id: true },
     });
     if (priorRefund) {
@@ -289,6 +301,7 @@ export class MembershipLedgerService {
       data: {
         membershipId,
         lessonId,
+        attendeeClientId, ownerClientId: membership.clientId,
         type: 'REFUND',
         amount: 1,
         reason,
@@ -375,7 +388,7 @@ export class MembershipLedgerService {
     // поддержан для версий/адаптеров, возвращающих имя unique constraint.
     if (Array.isArray(target)) {
       return (
-        target.length === fields.length &&
+        (target.length === fields.length || target.length === fields.length + 1) &&
         fields.every((field) => target.includes(field))
       );
     }

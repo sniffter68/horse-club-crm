@@ -27,6 +27,8 @@ const paymentSummarySelect = {
 } satisfies Prisma.PaymentSelect;
 
 const clientMembershipSelect = {
+  clientId: true, client: { select: { name: true, firstName: true, lastName: true } },
+  members: { include: { client: { select: { id: true, name: true, firstName: true, lastName: true } } } },
   deletedAt: true, _count: { select: { bookings: true, operations: true, transactions: true, payments: true } }, totalPrice: true, type: true, title: true, initialUnits: true, remainingUnits: true, validFrom: true, validTo: true, status: true,
   id: true,
   totalLessons: true,
@@ -37,11 +39,12 @@ const clientMembershipSelect = {
   payments: { select: paymentSummarySelect, orderBy: { createdAt: 'desc' as const } },
 } satisfies Prisma.MembershipSelect;
 
-type ClientMembership = Prisma.MembershipGetPayload<{ select: typeof clientMembershipSelect }> & { isActive: boolean };
+type ClientMembership = Prisma.MembershipGetPayload<{ select: typeof clientMembershipSelect }> & { isActive: boolean; ownerClientId: string | null; isShared: boolean; ownerName: string };
 const clientDetailsInclude = Prisma.validator<Prisma.ClientDefaultArgs>()({
   include: {
     ...preferredResourcesInclude,
-    _count: { select: { bookings: true, memberships: true, payments: true, transactions: true, boardingContracts: true, boardingDailyLogs: true, ownedHorses: true, leadRequests: true } },
+    _count: { select: { sharedMemberships: true, bookings: true, memberships: true, payments: true, transactions: true, boardingContracts: true, boardingDailyLogs: true, ownedHorses: true, leadRequests: true } },
+    sharedMemberships: { include: { membership: { select: clientMembershipSelect } } },
     memberships: { select: clientMembershipSelect, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }] },
     boardingContracts: {
       include: {
@@ -176,8 +179,13 @@ export class ClientsService {
     const now = new Date();
     return {
       ...client,
-      memberships: client.memberships.map((membership) => ({
+      memberships: [...client.memberships, ...(client.deletedAt ? [] : client.sharedMemberships ?? [])
+        .map(member => member.membership)
+        .filter(m => !m.deletedAt && m.status === 'active' && Number(m.remainingUnits) > 0 && m.validFrom <= now && m.validTo >= now)].map((membership) => ({
         ...membership,
+        ownerClientId: membership.clientId,
+        isShared: membership.clientId !== id,
+        ownerName: membership.client?.name || [membership.client?.firstName, membership.client?.lastName].filter(Boolean).join(' '),
         isActive: !membership.deletedAt && membership.status === 'active' && membership.remainedLessons > 0 && membership.validUntil >= now,
       })),
     };
@@ -233,7 +241,7 @@ export class ClientsService {
       return await archiveTransaction(this.prisma, async tx => {
         const client = await tx.client.findUnique({ where: { id }, select: {
           id: true, deletedAt: true, boardingBalance: true,
-          _count: { select: { bookings: true, memberships: true, payments: true, transactions: true,
+          _count: { select: { sharedMemberships: true, bookings: true, memberships: true, payments: true, transactions: true,
             boardingContracts: true, boardingDailyLogs: true, ownedHorses: true, leadRequests: true } },
         } });
         if (!client) throw new NotFoundException('Клиент не найден');

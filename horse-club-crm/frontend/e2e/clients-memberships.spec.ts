@@ -1,5 +1,65 @@
 import { test, expect, type Page } from './fixtures'
 
+for (const width of [1280, 390]) test(`family membership access adds, retries and revokes at ${width}px`, async ({ page }) => {
+  test.setTimeout(45000)
+  await page.setViewportSize({ width, height: 900 })
+  const ownerId = '00000000-0000-4000-8000-000000000031'
+  const childId = '00000000-0000-4000-8000-000000000032'
+  const membershipId = '00000000-0000-4000-8000-000000000033'
+  const mother = { ...client, id: ownerId, name: 'Елена Смирнова', firstName: 'Елена', lastName: 'Смирнова' }
+  const child = { ...client, id: childId, name: 'Мария Смирнова', firstName: 'Мария', lastName: 'Смирнова', membership: null }
+  let members: { clientId: string; client: typeof child }[] = []
+  let reject = true
+  await page.route('**/api/clients?*', route => route.fulfill({ json: [mother, child], headers: { 'x-total-count': '2' } }))
+  await page.route(`**/api/clients/${ownerId}`, route => route.fulfill({ json: { ...mother, memberships: [{
+    id: membershipId, totalLessons: 8, remainedLessons: 4, validUntil: '2099-01-01T00:00:00Z', isActive: true,
+    members, payments: [], pricingPlan: { id: 'plan', name: 'Семейный — 8 занятий' },
+  }], boardingContracts: [], payments: [], bookings: [] } }))
+  await page.route(`**/api/memberships/${membershipId}/members`, async route => {
+    expect(route.request().postDataJSON()).toEqual({ clientId: childId })
+    if (reject) return route.fulfill({ status: 409, json: { message: 'Доступ изменился. Повторите действие.' } })
+    members = [{ clientId: childId, client: child }]
+    await route.fulfill({ status: 201, json: members[0] })
+  })
+  await page.route(`**/api/memberships/${membershipId}/members/${childId}`, async route => {
+    expect(route.request().method()).toBe('DELETE'); members = []
+    await route.fulfill({ json: { membershipId, clientId: childId } })
+  })
+  await page.goto('/clients')
+  await page.getByRole('button', { name: mother.name, exact: true }).first().click()
+  const dialog = page.getByRole('dialog', { name: 'Карточка клиента' })
+  const section = dialog.getByRole('region', { name: 'Совместный доступ' })
+  await section.getByRole('button', { name: 'Добавить клиента', exact: true }).click()
+  const search = section.getByRole('combobox', { name: 'Клиент для совместного доступа' })
+  await search.fill('Мария')
+  await expect(page.locator('.ant-select-dropdown:visible').getByText(/Мария Смирнова/)).toBeVisible()
+  await search.press('ArrowDown'); await search.press('Enter')
+  await section.getByRole('button', { name: 'Добавить клиента', exact: true }).click()
+  await expect(section.getByRole('alert')).toContainText('Доступ изменился')
+  reject = false
+  await section.getByRole('button', { name: 'Добавить клиента', exact: true }).click()
+  await expect(section.getByRole('button', { name: 'Отвязать клиента' })).toBeVisible()
+  await expect(section).toContainText('Мария Смирнова')
+  await page.screenshot({ path: `test-results/shared-family-${width}.png`, fullPage: true })
+  await section.getByRole('button', { name: 'Отвязать клиента' }).click()
+  await page.getByRole('button', { name: 'Отключить доступ', exact: true }).click()
+  await expect(section).toContainText('Дополнительных участников нет')
+})
+
+test('family membership beneficiary sees owner badge without owner mutation controls', async ({ page }) => {
+  const childId = '00000000-0000-4000-8000-000000000032'
+  const child = { ...client, id: childId, name: 'Мария Смирнова', firstName: 'Мария', lastName: 'Смирнова' }
+  await page.route('**/api/clients?*', route => route.fulfill({ json: [child], headers: { 'x-total-count': '1' } }))
+  await page.route(`**/api/clients/${childId}`, route => route.fulfill({ json: { ...child, memberships: [{
+    id: '00000000-0000-4000-8000-000000000033', isShared: true, ownerName: 'Елена Смирнова', totalLessons: 8,
+    remainedLessons: 4, validUntil: '2099-01-01T00:00:00Z', isActive: true, payments: [], pricingPlan: null,
+  }], boardingContracts: [], bookings: [], payments: [] } }))
+  await page.goto('/clients'); await page.getByRole('button', { name: child.name, exact: true }).first().click()
+  const dialog = page.getByRole('dialog', { name: 'Карточка клиента' })
+  await expect(dialog.getByText('Доступен семейный абонемент: Елена Смирнова (ост. 4 зан.)')).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Добавить клиента', exact: true })).toHaveCount(0)
+})
+
 const client = { id: 'client-a', name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова',
   phone: '+79991234567', isRider: true, isPayer: true, preferences: '', createdAt: '2026-10-01T10:00:00Z',
   membership: { id: 'm-a', planName: 'Клубный · 8 занятий', remainingUnits: 5, totalUnits: 8,

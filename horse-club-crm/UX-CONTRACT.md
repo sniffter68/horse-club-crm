@@ -1,5 +1,9 @@
 ﻿# UX Contract
 
+## Совместное использование абонементов
+
+Источник — задача владельца от 23.10.2026 и `docs/shared-family-memberships.md`. Канонический владелец управления участниками — `memberships/SharedMembershipAccess.tsx`; поиск — `ClientSelectWithCreate`, подтверждение отзыва — Ant Design Popconfirm, обратная связь — Alert/App message. Ошибка сохраняет выбор; успех обновляет клиентов и абонементы. READ_ONLY скрывает мутации. Обе формы записи показывают владельца семейного абонемента. Проверки — `clients-memberships.spec.ts`, `triad-booking.spec.ts`, `backend/test/shared-memberships.test.cjs`.
+
 ## Быстрый перевод денников (2026-10-22)
 
 Быстрый перевод денников описан в `docs/stall-map.md`. Шторка карточки — StableEntryModal/EntryOverlay; подтверждение перевода — Ant Design Modal, выбор — Select, ошибки — Alert, успех — App message. Свободные денники сверху, занятые явно предлагают рокировку; предупреждения рассчитывает backend для обоих мест. Подтверждение недоступно до расчета, UUID проверяются до запроса. Сбой сохраняет выбор, успех обновляет карту без навигации; READ_ONLY скрывает мутации. Проверка: `frontend/e2e/stall-map.spec.ts`.

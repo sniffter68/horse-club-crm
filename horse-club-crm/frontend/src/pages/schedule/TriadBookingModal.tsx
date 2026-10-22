@@ -148,7 +148,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
       </div>
       <Form.Item name="membershipId" label="Абонемент / депозит" extra="Списание произойдёт при завершении тренировки, неявке или штрафной отмене.">
         <Select onInputKeyDown={stopPopupEscape} id="triad_membershipId" aria-label="Абонемент / депозит" allowClear showSearch optionFilterProp="label" disabled={!clientId || busy} loading={membershipState.loading} placeholder="Без абонемента"
-          options={suitableMemberships.map(m => ({ value: m.id, label: `${m.title || m.pricingPlan?.name || 'Абонемент'} · ${membershipBalance(m).label}` }))} />
+          options={suitableMemberships.map(m => ({ value: m.id, label: `${m.isShared ? `Семейный (${m.ownerName})` : m.title || m.pricingPlan?.name || 'Абонемент'} · ${membershipBalance(m).label}` }))} />
       </Form.Item>
       <Space wrap className="triad-actions"><Button type="primary" htmlType="submit" loading={busy} aria-busy={busy} disabled={overweight || availability.loading || Boolean(availability.error)}>{booking ? 'Сохранить бронирование' : 'Создать бронирование'}</Button>
         <Button disabled={busy} onClick={close}>Отмена</Button></Space>

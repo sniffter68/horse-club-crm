@@ -100,7 +100,7 @@ test('production public leads are disabled by default for both landing and VK',a
 });
 
 test('foreign or forbidden membership is rejected before booking mutation',async()=>{
-  const tx={service:{findUnique:async()=>({maxCapacity:2,durationMinutes:30,allowMembership:true})},
+  const tx={membershipMember:{findUnique:async()=>null},service:{findUnique:async()=>({maxCapacity:2,durationMinutes:30,allowMembership:true})},
     membership:{findUnique:async()=>({clientId:'other',remainedLessons:5,validUntil:new Date('2099-01-01')})}};
   const service=new LessonsService({$transaction:async fn=>fn(tx)},{});
   const dto={trainerId:'t',serviceId:'s',startTime:'2026-10-01T10:00:00Z',participants:[{clientId:'client',membershipId:'m'}]};

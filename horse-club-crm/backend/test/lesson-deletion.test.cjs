@@ -23,7 +23,7 @@ function fixture({ debited = false, refunded = false, paid = false, failDelete =
     ledger: paid ? [{ id: 'purchase', bookingId: 'booking-1', cashDeskPaymentId: 'receipt', amount: 500, transactionType: 'purchase' }] : [],
     horseChanges: [{ bookingId: 'booking-1', reason: 'Замена лошади', actorId: 'trainer' }],
   };
-  const matches = (row, where) => Object.entries(where).every(([key, value]) => row[key] === value);
+  const matches = (row, where) => Object.entries(where).every(([key, value]) => (row[key] ?? null) === value);
   const tx = {
     $queryRaw: async () => [],
     lesson: {

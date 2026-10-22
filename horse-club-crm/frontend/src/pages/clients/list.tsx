@@ -1,3 +1,4 @@
+import { SharedMembershipAccess, type SharedMember } from '../memberships/SharedMembershipAccess'
 import { ArchiveAction } from './ArchiveAction'
 import { ClientForm } from './form'
 import { CatalogEditAction } from '../catalogs/EditDrawer'
@@ -18,6 +19,7 @@ import { ClientLedger, MembershipBalance, type ActiveMembership } from './member
 type ClientRow = Client & { membership: ActiveMembership | null }
 
 type ClientMembership = {
+  ownerClientId?: string | null; isShared?: boolean; ownerName?: string; members?: SharedMember[]
   deletedAt?: string | null
   id: string
   totalLessons: number
@@ -126,7 +128,10 @@ export function ClientList() {
                   <Typography.Text strong>{membership.pricingPlan?.name || 'Индивидуальный абонемент'}</Typography.Text>
                   <Tag color={membership.isActive ? 'green' : 'default'}>{membership.deletedAt ? 'В архиве' : membership.isActive ? 'Активен' : 'Неактивен'}</Tag>
                 </Space>
-                <ArchiveAction resource="memberships" id={membership.id} archived={Boolean(membership.deletedAt)} />
+                {membership.isShared ? <Tag className="crm-tag crm-tag--accent" style={{ whiteSpace: 'normal' }}>Доступен семейный абонемент: {membership.ownerName} (ост. {membership.remainedLessons} зан.)</Tag> : <>
+                  <ArchiveAction resource="memberships" id={membership.id} archived={Boolean(membership.deletedAt)} />
+                  <SharedMembershipAccess membershipId={membership.id} ownerClientId={client.id} members={membership.members} active={membership.isActive} onChanged={() => void query.refetch()} />
+                </>}
                 <Progress
                   percent={membership.totalLessons > 0 ? Math.round(membership.remainedLessons / membership.totalLessons * 100) : 0}
                   format={() => `${membership.remainedLessons} / ${membership.totalLessons} занятий`}

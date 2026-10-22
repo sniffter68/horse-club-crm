@@ -11,10 +11,10 @@ import { parseRefineQuery, type PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateMembershipDto } from './dto/create-membership.dto';
 
-const membershipInclude = { client: true, pricingPlan: true } satisfies Prisma.MembershipInclude;
+const membershipInclude = { client: true, pricingPlan: true, members: { include: { client: { select: { id: true, name: true, firstName: true, lastName: true } } } } } satisfies Prisma.MembershipInclude;
 const membershipDetailsInclude = {
   ...membershipInclude,
-  _count: { select: { bookings: true, payments: true, transactions: true, operations: true } },
+  _count: { select: { members: true, bookings: true, payments: true, transactions: true, operations: true } },
   operations: {
     orderBy: { createdAt: 'desc' as const },
     include: { lesson: { include: { service: true, trainer: true, arena: true } } },
@@ -182,7 +182,7 @@ export class MembershipsService {
     return archiveTransaction(this.prisma, async tx => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${id}, 0))::text`;
       const membership = await tx.membership.findUnique({ where: { id }, include: {
-        _count: { select: { bookings: true, payments: true, transactions: true, operations: true } },
+        _count: { select: { members: true, bookings: true, payments: true, transactions: true, operations: true } },
       } });
       if (!membership) throw new NotFoundException('Абонемент не найден');
       // Even issuance CREDIT is immutable journal history. Never remove its projection.
@@ -195,6 +195,35 @@ export class MembershipsService {
       return { id, softDeleted, message: softDeleted
         ? 'Абонемент аннулирован и перенесен в архив. При наличии остатка оформите возврат в кассе'
         : 'Абонемент удален безвозвратно' };
+    });
+  }
+
+  async addMember(id: string, clientId: string, actor: AuthUser) {
+    return archiveTransaction(this.prisma, async tx => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${id}, 0))::text`;
+      const membership = await tx.membership.findUnique({ where: { id } });
+      if (!membership) throw new NotFoundException('Абонемент не найден');
+      if (!membership.clientId) throw new BadRequestException('У абонемента не указан владелец');
+      if (membership.clientId === clientId) throw new BadRequestException('Владелец уже имеет доступ к абонементу');
+      const now = new Date();
+      if (membership.deletedAt || membership.status !== 'active' || membership.validFrom > now || membership.validTo < now || membership.remainingUnits.lte(0) || membership.type === 'boarding')
+        throw new ConflictException('Совместный доступ можно добавить только к активному абонементу');
+      const client = await tx.client.findUnique({ where: { id: clientId } });
+      if (!client || client.deletedAt) throw new BadRequestException('Выберите действующего клиента');
+      if (await tx.membershipMember.findUnique({ where: { membershipId_clientId: { membershipId: id, clientId } } }))
+        throw new ConflictException('Клиент уже имеет совместный доступ');
+      return tx.membershipMember.create({ data: { membershipId: id, clientId, createdById: actor.id },
+        include: { client: { select: { id: true, name: true, firstName: true, lastName: true } } } });
+    });
+  }
+
+  async removeMember(id: string, clientId: string) {
+    return archiveTransaction(this.prisma, async tx => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${id}, 0))::text`;
+      if (!await tx.membership.findUnique({ where: { id } })) throw new NotFoundException('Абонемент не найден');
+      // Revocation remains available after expiry. Committed financial history is retained.
+      await tx.membershipMember.deleteMany({ where: { membershipId: id, clientId } });
+      return { membershipId: id, clientId };
     });
   }
 

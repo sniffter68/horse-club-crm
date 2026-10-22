@@ -339,6 +339,7 @@ model Client {
   bookings          Booking[]
   leadRequests      LeadRequest[]
   memberships       Membership[]
+  sharedMemberships MembershipMember[]
   boardingContracts BoardingContract[]
   payments          Payment[]
   isLead            Boolean            @default(false)
@@ -403,6 +404,7 @@ model Lesson {
 }
 
 model Membership {
+  members MembershipMember[]
   deletedAt DateTime? @db.Timestamptz(6)
   @@index([deletedAt])
   serviceId String? @db.Uuid
@@ -542,6 +544,7 @@ model Arena {
 }
 
 model LedgerTransaction {
+  ownerClientId String? @db.Uuid
   cashDeskPaymentId String? @unique @db.Uuid
   cashDeskPayment Payment? @relation("CashDeskLedger", fields: [cashDeskPaymentId], references: [id], onDelete: Restrict)
   boardingContractId String? @db.Uuid
@@ -848,6 +851,8 @@ model VkNotification {
 }
 
 model MembershipOp {
+  attendeeClientId String? @db.Uuid
+  ownerClientId String? @db.Uuid
   transaction  LedgerTransaction?
   id           String           @id @default(uuid()) @db.Uuid
   membershipId String           @db.Uuid
@@ -861,8 +866,21 @@ model MembershipOp {
 
   // PostgreSQL допускает несколько строк с lessonId = NULL, но запрещает
   // повтор одного типа операции для конкретной пары абонемент/занятие.
-  @@unique([membershipId, lessonId, type])
+  @@unique([membershipId, lessonId, type, attendeeClientId])
   @@index([lessonId])
+}
+
+model MembershipMember {
+  id String @id @default(uuid()) @db.Uuid
+  membershipId String @db.Uuid
+  clientId String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  createdById String @db.Uuid
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  @@unique([membershipId, clientId])
+  @@index([clientId])
 }
 
 model ClubSchedule {

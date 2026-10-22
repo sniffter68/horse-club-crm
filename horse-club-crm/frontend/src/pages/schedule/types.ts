@@ -14,6 +14,7 @@ export interface Lesson extends LessonMoney {
   bookings: { id: string; client: Client; horse: Horse | null; membership: MembershipSummary | null; costAmount?: number | string; payments?: { status: string; amount: number | string }[] }[];
 }
 export interface MembershipSummary {
+  isShared?: boolean; ownerName?: string; ownerClientId?: string | null;
   type?: 'fixed_lessons' | 'deposit' | 'boarding'; title?: string; initialUnits?: number | string; remainingUnits?: number | string;
   validFrom?: string; validTo?: string; status?: 'active' | 'frozen' | 'expired' | 'exhausted';
   id: string; totalLessons: number; remainedLessons: number; validUntil: string; isActive?: boolean;

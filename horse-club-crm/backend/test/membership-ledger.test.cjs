@@ -13,7 +13,7 @@ function createPrisma({
   initialOps = [],
 } = {}) {
   const state = {
-    membership: { id: membershipId, remainedLessons: balance, validUntil },
+    membership: { id: membershipId, status: 'active', remainedLessons: balance, validUntil },
     booking: { id: 'booking-1', membershipId, lessonId: 'lesson-1', attended: false,
       lesson: { status: lessonStatus } },
     ops: [...initialOps],

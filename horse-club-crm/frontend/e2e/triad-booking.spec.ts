@@ -56,6 +56,26 @@ async function openFilled(page: Page) {
   await choose(page, modal, 'Локация', 'Крытый манеж')
   return modal
 }
+
+test('family membership payment option names the owner and submits beneficiary booking', async ({ page }) => {
+  await page.route('**/api/clients/c*', route => route.fulfill({ json: { ...client, memberships: [{
+    id: '00000000-0000-4000-8000-000000000033', type: 'fixed_lessons', title: '8 занятий',
+    totalLessons: 8, remainedLessons: 4, validUntil: '2099-01-01', isShared: true, ownerName: 'Елена Смирнова',
+  }] } }))
+  let payload: Record<string, unknown> | undefined
+  await page.route('**/api/bookings', async route => {
+    payload = route.request().postDataJSON()
+    await route.fulfill({ status: 201, json: booking })
+  })
+  const modal = await openFilled(page)
+  const payment = modal.getByRole('combobox', { name: 'Абонемент / депозит', exact: true })
+  await payment.focus(); await payment.press('ArrowDown')
+  await expect(page.locator('.ant-select-dropdown:visible').getByText(/Семейный \(Елена Смирнова\).*4 \/ 8/)).toBeVisible()
+  await payment.press('Enter')
+  await modal.getByRole('button', { name: 'Создать бронирование', exact: true }).click()
+  await expect(modal).toHaveCount(0)
+  expect(payload).toMatchObject({ clientId: 'c1', membershipId: '00000000-0000-4000-8000-000000000033' })
+})
 test('creates a real triad payload, preserves precision and refreshes the calendar', async ({ page }) => {
   let created = false
   await page.route('**/api/bookings', async route => {
