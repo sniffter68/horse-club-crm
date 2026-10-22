@@ -23,6 +23,12 @@ test('PostgreSQL stall seed, relocation races, database invariants and rollback'
     await service.assign(stallIds[0], horseIds[0]);
     await service.assign(stallIds[1], horseIds[1]);
     assert.equal((await service.findOne(stallIds[0])).warnings.length, 1);
+    const transfer = { sourceStallId: stallIds[0], targetStallId: stallIds[1], horseId: horseIds[0], swapIfOccupied: true };
+    await service.transfer(transfer, horseIds[2]);
+    assert.equal((await p.stall.findUniqueOrThrow({ where: { id: stallIds[1] } })).horseId, horseIds[0]);
+    assert.equal((await p.stall.findUniqueOrThrow({ where: { id: stallIds[0] } })).horseId, horseIds[1]);
+    assert.equal(await p.stallTransferLog.count({ where: { horseId: horseIds[0] } }), 1);
+    await service.transfer({ ...transfer, sourceStallId: stallIds[1], targetStallId: stallIds[0] }, horseIds[2]);
     await service.assign(stallIds[2], horseIds[0]);
     assert.equal((await p.stall.findUniqueOrThrow({ where: { id: stallIds[0] } })).status, 'AVAILABLE');
     await service.assign(stallIds[2], null);
@@ -48,6 +54,7 @@ test('PostgreSQL stall seed, relocation races, database invariants and rollback'
     await assert.rejects(faulty.assign(target, horseIds[0]), /injected final write failure/);
     assert.equal((await p.stall.findUniqueOrThrow({ where: { id: before.id } })).horseId, horseIds[0]);
   } finally {
+    await p.stallTransferLog.deleteMany({ where: { horseId: { in: horseIds } } });
     await p.stall.deleteMany({ where: { id: { in: stallIds } } });
     await p.horse.deleteMany({ where: { id: { in: horseIds } } });
     await p.$disconnect();

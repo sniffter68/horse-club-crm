@@ -795,6 +795,18 @@ model Payment {
   @@index([membershipId])
 }
 
+// Placement snapshots survive removal of users, horses and stalls.
+model StallTransferLog {
+  id String @id @default(uuid()) @db.Uuid
+  actorId String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  sourceStallId String @db.Uuid
+  targetStallId String @db.Uuid
+  horseId String @db.Uuid
+  swappedHorseId String? @db.Uuid
+  @@index([createdAt])
+}
+
 // Immutable audit survives cash resets. Actor identity is snapshotted for retention.
 model CashAuditLog {
   id String @id @default(uuid()) @db.Uuid

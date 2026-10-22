@@ -8,6 +8,7 @@ import { useCatalogPermissions } from '../catalogs/permissions'
 import { StableEntryModal } from '../stable/shared'
 import { horseStatuses } from '../stable/types'
 import { StallSign } from './sign'
+import { StallTransfer } from './transfer'
 import { sexes, statuses, zones, type MapHorse, type MapStall } from './mapTypes'
 import './map.css'
 
@@ -83,12 +84,13 @@ export function StallMap() {
       {Object.entries(zones).map(([key, label]) => {
         const building = visible.filter(s => s.zone === key)
         if (!building.length) return null
-        const positions = [...new Set(building.flatMap(s => s.position === null ? [] : [s.position]))].sort((a, b) => a - b)
+        const rowPosition = (s: MapStall) => s.rowPosition ?? s.position
+        const positions = [...new Set(building.flatMap(s => rowPosition(s) === null ? [] : [rowPosition(s)!]))].sort((a, b) => a - b)
         return <section key={key} aria-label={label}><Typography.Title level={3}>{label}</Typography.Title>
           <div className="stall-aisle-header"><span>Левый ряд</span><span>Проход</span><span>Правый ряд</span></div>
           <div className="stall-aisle">{positions.map(position => <div className="stall-aisle-row" key={position}>
-            {tile(building.find(s => s.position === position && s.side === 'LEFT'))}<div className="stall-passage" aria-hidden="true">{position}</div>
-            {tile(building.find(s => s.position === position && s.side === 'RIGHT'))}</div>)}</div>
+            {tile(building.find(s => rowPosition(s) === position && s.side === 'LEFT'))}<div className="stall-passage" aria-hidden="true">{position}</div>
+            {tile(building.find(s => rowPosition(s) === position && s.side === 'RIGHT'))}</div>)}</div>
           {building.some(s => s.position === null) && <><Typography.Title level={4}>Расположение не указано</Typography.Title>
             <p>Укажите сторону и позицию в редакторе денника, чтобы включить проверку соседства.</p>
             <div className="stall-unplaced">{building.filter(s => s.position === null).map(s => tile(s))}</div></>}
@@ -110,6 +112,7 @@ function StallDetails({ stall, horses, stalls, canManage, onClose, onSaved, onPr
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const lock = useRef(false)
+  const [transferOpen, setTransferOpen] = useState(false)
   const { message } = App.useApp()
   const { mutate: onError } = useOnError()
   useEffect(() => { if (canManage) form.setFields([{ name: 'status', value: stall.status, touched: false }, { name: 'notes', value: stall.notes ?? '', touched: false }]) }, [canManage, form, stall])
@@ -129,7 +132,10 @@ function StallDetails({ stall, horses, stalls, canManage, onClose, onSaved, onPr
     {stall.horse && !stall.horse.sex && <Alert type="info" message="Укажите пол лошади в её карточке для проверки соседства." />}
     <Button icon={<PrinterOutlined />} onClick={onPrint}>Печать таблички на денник</Button>
     {canManage && <div className="stall-assignment">
-      {stall.horse ? <Button disabled={dirty} loading={busy} onClick={() => void assign(null)}>Убрать лошадь из денника</Button> : <>
+      {stall.horse ? <Space wrap>
+        <Button disabled={dirty || busy} onClick={() => setTransferOpen(true)}>Перевести в денник</Button>
+        <Button disabled={dirty} loading={busy} onClick={() => void assign(null)}>Убрать лошадь из денника</Button>
+      </Space> : <>
         <label htmlFor="stall-horse">Лошадь для заселения</label>
         <Select id="stall-horse" aria-label="Лошадь для заселения" value={horseId} onChange={setHorseId} allowClear disabled={busy || stall.status !== 'AVAILABLE'}
           options={horses.map(h => { const current = stalls.find(s => s.horseId === h.id); return { value: h.id, label: `${h.name}${current ? ` · переселить из ${current.number ?? current.name}` : ' · без денника'}` } })} />
@@ -143,9 +149,10 @@ function StallDetails({ stall, horses, stalls, canManage, onClose, onSaved, onPr
       <Form.Item name="notes" label="Заметки для конюха" rules={[{ max: 5000, message: 'Не более 5000 символов' }]}><Input.TextArea autoSize={{ minRows: 3, maxRows: 10 }} maxLength={5000} /></Form.Item>
     </> : <p className="stall-sign-notes">{stall.notes || 'Нет заметок'}</p>}
     {stall.horse?.feedingNotes && <><Typography.Title level={5}>Рацион кормления</Typography.Title><p className="stall-sign-notes">{stall.horse.feedingNotes}</p></>}
+    {canManage && stall.horse && <StallTransfer open={transferOpen} source={stall} stalls={stalls} onClose={() => setTransferOpen(false)} onSaved={onSaved} />}
   </>
   if (!canManage) return <Modal open title={`Денник № ${stall.number ?? stall.name}`} onCancel={onClose} footer={<Button onClick={onClose}>Закрыть</Button>}>{content}</Modal>
-  return <StableEntryModal title={`Денник № ${stall.number ?? stall.name}`} form={form} submitLabel="Сохранить денник"
+  return <StableEntryModal variant="drawer" title={`Денник № ${stall.number ?? stall.name}`} form={form} submitLabel="Сохранить денник"
     onClose={() => !lock.current && onClose()} onSaved={onSaved}
     save={values => { if (lock.current) return Promise.reject(new Error('Дождитесь завершения заселения')); return httpClient.patch(`${API_URL}/stalls/${stall.id}`, values) }}>
     {content}

@@ -6,7 +6,8 @@ import { parseRefineQuery, type PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateStallDto } from './dto/create-stall.dto';
 import type { UpdateStallDto } from './dto/update-stall.dto';
-import { neighborhoodWarnings } from './neighborhood';
+import { neighborhoodWarnings, stallRowPosition } from './neighborhood';
+import type { TransferStallDto } from './dto/transfer-stall.dto';
 
 const stallInclude = Prisma.validator<Prisma.StallDefaultArgs>()({
   include: {
@@ -63,11 +64,59 @@ export class StallsService {
   async map() {
     const stalls = await this.prisma.stall.findMany({ include: { horse: stallInclude.include.horse },
       orderBy: [{ zone: 'asc' }, { position: 'asc' }, { side: 'asc' }] });
-    return stalls.map(stall => ({ ...stall, warnings: neighborhoodWarnings(stall, stalls) }));
+    return stalls.map(stall => ({ ...stall, rowPosition: stallRowPosition(stall, stalls), warnings: neighborhoodWarnings(stall, stalls) }));
   }
 
   assignmentHorses() {
     return this.prisma.horse.findMany({ select: { id: true, name: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] });
+  }
+
+  private validateTransfer(stalls: Array<{ id: string; horseId: string | null; status: string; isUnavailable: boolean }>, dto: TransferStallDto) {
+    if (dto.sourceStallId === dto.targetStallId) throw new BadRequestException('Выберите другой денник');
+    const source = stalls.find(stall => stall.id === dto.sourceStallId);
+    const target = stalls.find(stall => stall.id === dto.targetStallId);
+    if (!source || !target) throw new NotFoundException('Денник не найден');
+    if (source.horseId !== dto.horseId) throw new ConflictException('Размещение изменилось. Обновите карту.');
+    if (dto.expectedTargetHorseId !== undefined && target.horseId !== dto.expectedTargetHorseId)
+      throw new ConflictException('Целевой денник изменился. Обновите карту и повторите.');
+    if (target.isUnavailable || ['MAINTENANCE', 'QUARANTINE'].includes(target.status) ||
+      (target.horseId && (source.isUnavailable || source.status !== 'OCCUPIED')))
+      throw new ConflictException('Денник недоступен для заселения');
+    if (target.horseId && !dto.swapIfOccupied) throw new ConflictException('Денник занят. Подтвердите рокировку.');
+    return { source, target };
+  }
+
+  async transferPreview(dto: TransferStallDto) {
+    const stalls = await this.prisma.stall.findMany({ include: { horse: stallInclude.include.horse } });
+    const { target } = this.validateTransfer(stalls, dto);
+    const source = stalls.find(stall => stall.id === dto.sourceStallId)!;
+    const destination = stalls.find(stall => stall.id === target.id)!;
+    const projected = stalls.map(stall => stall.id === source.id ? { ...stall, horse: destination.horse }
+      : stall.id === target.id ? { ...stall, horse: source.horse } : stall);
+    return projected.filter(stall => [source.id, target.id].includes(stall.id)).map(stall => ({
+      stallId: stall.id, number: stall.number ?? stall.name, warnings: neighborhoodWarnings(stall, projected),
+    }));
+  }
+
+  async transfer(dto: TransferStallDto, actorId: string) {
+    await this.serializable(async tx => {
+      const stalls = await tx.stall.findMany({ where: { id: { in: [dto.sourceStallId, dto.targetStallId] } } });
+      this.validateTransfer(stalls, dto);
+      const source = stalls.find(stall => stall.id === dto.sourceStallId)!;
+      const target = stalls.find(stall => stall.id === dto.targetStallId)!;
+      // Release unique horse IDs first; each write also satisfies the occupancy CHECK constraint.
+      await tx.stall.update({ where: { id: source.id }, data: { horseId: null, status: 'AVAILABLE' } });
+      if (target.horseId) {
+        await tx.stall.update({ where: { id: target.id }, data: { horseId: null, status: 'AVAILABLE' } });
+        await tx.stall.update({ where: { id: source.id }, data: { horseId: target.horseId, status: 'OCCUPIED' } });
+        await tx.horse.update({ where: { id: target.horseId }, data: { stallNumber: source.number ?? source.name } });
+      }
+      await tx.stall.update({ where: { id: target.id }, data: { horseId: dto.horseId, status: 'OCCUPIED' } });
+      await tx.horse.update({ where: { id: dto.horseId }, data: { stallNumber: target.number ?? target.name } });
+      await tx.stallTransferLog.create({ data: { actorId, sourceStallId: source.id, targetStallId: target.id,
+        horseId: dto.horseId, swappedHorseId: target.horseId } });
+    });
+    return this.map();
   }
 
   async assign(id: string, horseId: string | null) {

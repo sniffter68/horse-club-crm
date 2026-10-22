@@ -10,7 +10,7 @@ const { StallsController } = require('../dist/stalls/stalls.controller');
 const { JwtAuthGuard } = require('../dist/auth/guards/jwt-auth.guard');
 const { RolesGuard } = require('../dist/auth/guards/roles.guard');
 const { RoleAccessGuard } = require('../dist/auth/role-access.guard');
-const { neighborhoodWarnings } = require('../dist/stalls/neighborhood');
+const { neighborhoodWarnings, stallRowPosition } = require('../dist/stalls/neighborhood');
 const sid = '00000000-0000-4000-8000-000000000001';
 const hid = '00000000-0000-4000-8000-000000000002';
 function fixture() {
@@ -18,7 +18,9 @@ function fixture() {
     position: n, status: 'AVAILABLE', horseId: null, isUnavailable: false }));
   const horses = [{ id: hid, name: 'Буран', sex: 'STALLION', stallNumber: null }, { id: 'mare', name: 'Искра', sex: 'MARE' }];
   const hydrate = stall => stall && { ...stall, horse: horses.find(h => h.id === stall.horseId) ?? null };
+  const audit = [];
   const prisma = {
+    stallTransferLog: { create: async ({ data }) => { audit.push(data); return data; } },
     stall: {
       findUnique: async ({ where }) => hydrate(stalls.find(s => s.id === where.id)),
       findMany: async () => stalls.map(hydrate),
@@ -32,13 +34,65 @@ function fixture() {
     },
     $transaction: async (operation, options) => {
       assert.equal(options.isolationLevel, 'Serializable');
-      const snapshot = structuredClone({ stalls, horses });
+      const snapshot = structuredClone({ stalls, horses, audit });
       try { return await operation(prisma); }
-      catch (error) { stalls.splice(0, stalls.length, ...snapshot.stalls); horses.splice(0, horses.length, ...snapshot.horses); throw error; }
+      catch (error) { stalls.splice(0, stalls.length, ...snapshot.stalls); horses.splice(0, horses.length, ...snapshot.horses); audit.splice(0, audit.length, ...snapshot.audit); throw error; }
     },
   };
-  return { stalls, horses, prisma, service: new StallsService(prisma) };
+  return { stalls, horses, prisma, audit, service: new StallsService(prisma) };
 }
+test('numbered rows warn both adjacent stallions and preserve opposite pairs', () => {
+  const make = (n, sex = 'STALLION') => ({ id: `s${n}`, number: String(n), name: String(n), zone: 'MAIN',
+    side: n % 2 ? 'LEFT' : 'RIGHT', position: n, horse: { name: n === 1 ? 'Адмирал Ушаков' : n === 3 ? 'Кролик' : `Horse ${n}`, sex } });
+  const stalls = [make(1), make(2), make(3), { ...make(5), horse: null }, make(7)];
+  assert.deepEqual(stalls.map(stall => stallRowPosition(stall, stalls)), [1, 1, 2, 3, 4]);
+  assert.deepEqual(neighborhoodWarnings(stalls[0], stalls).map(w => w.neighborId), ['s2', 's3']);
+  assert.match(neighborhoodWarnings(stalls[2], stalls)[0].message, /рядом с жеребцом/);
+  assert.equal(neighborhoodWarnings(stalls[2], stalls)[0].neighborId, 's1');
+  assert.deepEqual(neighborhoodWarnings(stalls[4], stalls), []);
+  assert.deepEqual(neighborhoodWarnings(stalls[1], stalls).map(w => w.neighborId), ['s1']);
+});
+
+test('transfer and swap update both legacy numbers and write audit atomically', async () => {
+  const { service, stalls, horses, audit, prisma } = fixture();
+  await service.assign(sid, hid);
+  const dto = { sourceStallId: sid, targetStallId: 's2', horseId: hid, swapIfOccupied: false };
+  await service.transfer(dto, 'actor');
+  assert.equal(stalls[0].horseId, null); assert.equal(stalls[1].horseId, hid);
+  assert.equal(audit[0].actorId, 'actor'); assert.equal(audit[0].swappedHorseId, null);
+  stalls[0].horseId = 'mare'; stalls[0].status = 'OCCUPIED';
+  const swap = { ...dto, sourceStallId: 's2', targetStallId: sid, swapIfOccupied: true };
+  const before = structuredClone(stalls);
+  const preview = await service.transferPreview(swap);
+  assert.ok(preview.every(stall => stall.warnings.length === 1));
+  assert.deepEqual(stalls, before);
+  await service.transfer(swap, 'actor');
+  assert.equal(stalls[0].horseId, hid); assert.equal(stalls[1].horseId, 'mare');
+  assert.equal(horses[0].stallNumber, '1'); assert.equal(horses[1].stallNumber, '2');
+  assert.equal(audit[1].swappedHorseId, 'mare');
+  prisma.stallTransferLog.create = async () => { throw new Error('audit unavailable'); };
+  const snapshot = structuredClone({ stalls, horses, audit });
+  await assert.rejects(service.transfer({ ...dto, swapIfOccupied: true }, 'actor'), /audit unavailable/);
+  assert.deepEqual({ stalls, horses, audit }, snapshot);
+});
+
+test('transfer rejects stale source/target, same stall, unavailable and unconfirmed swap', async () => {
+  const { service, stalls } = fixture();
+  await service.assign(sid, hid);
+  const dto = { sourceStallId: sid, targetStallId: 's2', horseId: hid, swapIfOccupied: false };
+  await assert.rejects(service.transfer({ ...dto, horseId: 'mare' }, 'actor'), e => e.getStatus() === 409);
+  await assert.rejects(service.transfer({ ...dto, targetStallId: sid }, 'actor'), e => e.getStatus() === 400);
+  await assert.rejects(service.transfer({ ...dto, targetStallId: 'missing' }, 'actor'), e => e.getStatus() === 404);
+  for (const status of ['MAINTENANCE', 'QUARANTINE']) {
+    stalls[1].status = status;
+    await assert.rejects(service.transfer(dto, 'actor'), e => e.getStatus() === 409);
+  }
+  stalls[1].status = 'OCCUPIED'; stalls[1].horseId = 'mare';
+  await assert.rejects(service.transfer(dto, 'actor'), e => e.getStatus() === 409);
+  await assert.rejects(service.transfer({ ...dto, swapIfOccupied: true, expectedTargetHorseId: null }, 'actor'), e => e.getStatus() === 409);
+  assert.equal(stalls[0].horseId, hid);
+});
+
 test('assignment, relocation and eviction keep one physical placement', async () => {
   const { service, stalls, horses } = fixture();
   await service.assign(sid, hid);
@@ -69,6 +123,7 @@ test('neighbors include opposite stall, exclude diagonal, other buildings, geldi
   assert.equal(neighborhoodWarnings(base, [{ ...base, id: 'next', position: 3, horse: { name: 'Искра', sex: 'MARE' } }])[0].message,
     'Жеребец рядом с кобылой (Буран и Искра)');
   assert.deepEqual(neighborhoodWarnings({ ...base, position: null }, candidates), []);
+  assert.deepEqual(neighborhoodWarnings(base, [{ ...base, id: 'diagonal', side: 'RIGHT', position: 3 }]), []);
 });
 test('occupied, unavailable and missing destinations preserve the old placement', async () => {
   const { service, stalls } = fixture();
@@ -97,10 +152,12 @@ test('failed final write rolls relocation back; serialization conflicts retry', 
   await service.assign('s2', hid); assert.equal(attempts, 2);
 });
 test('stall HTTP API validates assignment and restricts mutations to ADMIN/MANAGER', async () => {
-  const { service } = fixture();
+  const { service, stalls } = fixture();
+  const targetId = '00000000-0000-4000-8000-000000000003';
+  stalls[1].id = targetId;
   const module = await Test.createTestingModule({ controllers: [StallsController], providers: [RolesGuard, { provide: StallsService, useValue: service }] })
     .overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
-    .overrideGuard(JwtAuthGuard).useValue({ canActivate(context) { const req = context.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return true; } })
+    .overrideGuard(JwtAuthGuard).useValue({ canActivate(context) { const req = context.switchToHttp().getRequest(); req.user = { id: hid, role: req.headers['x-role'] }; return true; } })
     .overrideGuard(RoleAccessGuard).useValue({ canActivate: () => true }).compile();
   const app = module.createNestApplication();
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
@@ -116,6 +173,15 @@ test('stall HTTP API validates assignment and restricts mutations to ADMIN/MANAG
     for (const body of [{ status: null }, { zone: null }, { number: null }, { name: null }, { position: 0 }, { side: 'UP' }])
       await request(server).patch(`/stalls/${sid}`).set('x-role', 'ADMIN').send(body).expect(400);
     await request(server).patch(path).set('x-role', 'MANAGER').send({ horseId: hid }).expect(200);
+    const dto = { sourceStallId: sid, targetStallId: targetId, horseId: hid, swapIfOccupied: false };
+    for (const role of ['TRAINER', 'STABLE_WORKER']) {
+      await request(server).post('/stalls/transfer').set('x-role', role).send(dto).expect(403);
+      await request(server).post('/stalls/transfer/preview').set('x-role', role).send(dto).expect(403);
+    }
+    for (const body of [{}, { ...dto, horseId: '' }, { ...dto, sourceStallId: 'bad' }, { ...dto, targetStallId: null }, { ...dto, swapIfOccupied: 'true' }])
+      await request(server).post('/stalls/transfer').set('x-role', 'ADMIN').send(body).expect(400);
+    await request(server).post('/stalls/transfer/preview').set('x-role', 'MANAGER').send(dto).expect(201);
+    await request(server).post('/stalls/transfer').set('x-role', 'ADMIN').send(dto).expect(201);
     await request(server).patch(path).set('x-role', 'ADMIN').send({ horseId: null }).expect(200);
     await request(server).patch(`/stalls/${sid}`).set('x-role', 'TRAINER').send({ notes: 'x' }).expect(403);
     await request(server).post('/stalls').set('x-role', 'TRAINER').send({ number: '5' }).expect(403);

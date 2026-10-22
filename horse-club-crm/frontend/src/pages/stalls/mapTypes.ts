@@ -10,6 +10,8 @@ export interface MapStall {
   id: string; name: string; number: string | null; zone: keyof typeof zones; side: 'LEFT' | 'RIGHT';
   position: number | null; status: keyof typeof statuses; horseId: string | null; horse: MapHorse | null;
   notes: string | null; warnings: Array<{ neighborId: string; neighborNumber: string; message: string }>;
+  isUnavailable?: boolean;
+  rowPosition?: number | null;
 }
 export function feedingRows(notes: string | null) {
   const rows = ['Утро', 'День', 'Вечер', 'Сено, подкормки и особенности'].map(label => ({ label, value: '' }))

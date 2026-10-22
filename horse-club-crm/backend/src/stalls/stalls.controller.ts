@@ -12,6 +12,9 @@ import { setRefineTotalHeaders } from '../common/refine';
 import { CreateStallDto } from './dto/create-stall.dto';
 import { UpdateStallDto } from './dto/update-stall.dto';
 import { AssignStallDto } from './dto/assign-stall.dto';
+import { TransferStallDto } from './dto/transfer-stall.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthUser } from '../auth/auth.types';
 import { StallsService, type StallWithContracts } from './stalls.service';
 
 @ApiTags('Stalls')
@@ -43,6 +46,16 @@ export class StallsController {
   @Roles(Role.ADMIN, Role.MANAGER)
   assign(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: AssignStallDto) {
     return this.service.assign(id, dto.horseId);
+  }
+
+  @Post('transfer/preview')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  transferPreview(@Body() dto: TransferStallDto) { return this.service.transferPreview(dto); }
+
+  @Post('transfer')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  transfer(@Body() dto: TransferStallDto, @CurrentUser() user: AuthUser) {
+    return this.service.transfer(dto, user.id);
   }
 
   @Get(':id')
