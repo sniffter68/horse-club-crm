@@ -4,11 +4,12 @@ require('reflect-metadata');
 const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
 const { welcomeMenu } = require('../dist/vk-bot/vk-bot.keyboard');
 
-const body = 'Вы подключены к боту конного клуба. Здесь будут приходить напоминания о тренировках и статус бронирований.';
+const body = 'Приглашаем вас в конный клуб. Для доступа к персональному меню сообщите администратору ваш VK ID: 42.\n' + require('../dist/vk-bot/vk-bot.config').clubCard();
 function harness(get = async () => [{ id: 42, first_name: ' Анна ', last_name: 'Орлова' }]) {
   const sent = [], queries = [], warnings = [];
   // Greeting must work for new users without consulting CRM profiles.
   const bot = new VkBotService({}, {}, {}, {});
+  bot.identity = { identify: async () => ({ type: 'UNKNOWN' }) };
   bot.vk = { api: {
     users: { get: async params => { queries.push(params); return get(params); } },
     messages: { send: async params => sent.push(params) },
@@ -60,7 +61,7 @@ test('cache shares concurrent lookups, expires and isolates users', async () => 
   await Promise.all([h.send('Начать'), h.send('Начать')]);
   assert.equal(h.queries.length, 1);
   await h.send('Начать', undefined, 43);
-  assert.equal(h.sent[2].message, `Здравствуйте, Иван! ${body}`);
+  assert.equal(h.sent[2].message, `Здравствуйте, Иван! ${body.replace('VK ID: 42', 'VK ID: 43')}`);
   h.bot.firstNames.get(42).expiresAt = 0;
   await h.send('Начать');
   assert.equal(h.queries.length, 3);

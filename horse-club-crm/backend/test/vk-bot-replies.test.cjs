@@ -15,6 +15,7 @@ function harness(rows, resource) {
     client: { findUnique: async () => ({ id: 'owner' }) }, trainer: { findUnique: async () => null },
     [resource]: { findMany: async query => { queries.push(query); return rows.slice(query.skip, query.skip + query.take); } },
   }, {}, {}, {});
+  service.identity = require('./helpers/vk-identity.cjs').identityFixture(service.prisma);
   service.vk = { api: { messages: { send: async params => sent.push(params) } } };
   const send = async (text, payload) => service.handleMessage({ message: { from_id: 42, peer_id: 42, out: 0, text,
     ...(payload ? { payload: JSON.stringify(payload) } : {}),
@@ -58,7 +59,7 @@ test('no active memberships has a clear empty response and the main menu', async
   const { send, sent } = harness([], 'membership');
   await send('Мой баланс');
   assert.equal(sent[0].message, 'У вас пока нет активных абонементов.');
-  assert.match(String(sent[0].keyboard), /Мои тренировки/);
+  assert.match(String(sent[0].keyboard), /Ближайшая тренировка/);
 });
 
 test('training card includes localized date, weekday, horse, trainer and arena', async () => {
@@ -66,10 +67,11 @@ test('training card includes localized date, weekday, horse, trainer and arena',
   await send('Мои тренировки');
   assert.equal(sent[0].message, '📅 Предстоящие тренировки:\n• 17 октября (сб) в 11:00\n  Лошадь: Гранит\n  Тренер: Анна Сергеевна\n  Манеж: Крытый манеж');
   assert.equal(queries[0].where.clientId, 'owner');
-  assert.equal(queries[0].where.lesson.status, 'SCHEDULED');
-  assert.ok(queries[0].where.lesson.startTime.gte instanceof Date);
-  assert.deepEqual(queries[0].include, { horse: true, lesson: { include: { trainer: true, arena: true } } });
-  assert.deepEqual(queries[0].orderBy, [{ lesson: { startTime: 'asc' } }, { id: 'asc' }]);
+  assert.equal(queries[0].where.status, 'scheduled');
+  assert.equal(queries[0].where.OR[1].lesson.status, 'SCHEDULED');
+  assert.ok(queries[0].where.startTime.gte instanceof Date);
+  assert.deepEqual(queries[0].include, { horse: true, trainer: true, arena: true, lesson: { include: { trainer: true, arena: true } } });
+  assert.deepEqual(queries[0].orderBy, [{ startTime: 'asc' }, { id: 'asc' }]);
 });
 
 test('training cards handle an unassigned horse and missing arena', async () => {

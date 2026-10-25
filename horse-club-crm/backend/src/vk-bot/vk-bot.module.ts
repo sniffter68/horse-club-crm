@@ -5,9 +5,10 @@ import { VkBotService } from './vk-bot.service';
 import { MembershipsModule } from '../memberships/memberships.module';
 import { LeadsModule } from '../leads/leads.module';
 import { VkLinkService } from './vk-link.service';
-import { VkLinkController } from './vk-link.controller';
+import { VkIdentityController } from './vk-identity.controller';
+import { VkIdentityModule } from './vk-identity.module';
 import { VkDeliveryModule } from './vk-delivery.module';
 import { VkRemindersModule } from './vk-reminders.module';
 import { AuthModule } from '../auth/auth.module';
-@Module({ imports: [PrismaModule, AuthModule, MembershipsModule, LeadsModule, VkDeliveryModule, VkRemindersModule], controllers: [VkBotController, VkLinkController], providers: [VkBotService, VkLinkService] })
+@Module({ imports: [VkIdentityModule, PrismaModule, AuthModule, MembershipsModule, LeadsModule, VkDeliveryModule, VkRemindersModule], controllers: [VkBotController, VkIdentityController], providers: [VkBotService, VkLinkService] })
 export class VkBotModule {}

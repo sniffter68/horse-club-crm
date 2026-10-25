@@ -6,6 +6,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsUUID, IsBoolean, IsDateString, Matches, IsEmail, IsNumber, IsOptional, IsString, Max, Min, MaxLength, MinLength } from 'class-validator';
 
 export class CreateClientDto {
+  @IsOptional() @IsString() @MaxLength(256) vkId?: string | null;
+  @IsOptional() @IsString() @MaxLength(64) vkScreenName?: string | null;
+
   @ApiPropertyOptional({ format: 'uuid', nullable: true })
   @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional()

@@ -12,13 +12,13 @@ const keys = ['VK_COMMUNITY_TOKEN', 'VK_BOT_TOKEN', 'VK_SECRET_KEY', 'VK_CONFIRM
 const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 let app, bot, controller, sent, failures;
 const path = '/api/vk-bot/callback';
-const greeting = 'Здравствуйте! Вы подключены к боту конного клуба. Здесь будут приходить напоминания о тренировках и статус бронирований.';
+const greeting = 'Здравствуйте! Приглашаем вас в конный клуб. Для доступа к персональному меню сообщите администратору ваш VK ID: 42.\n' + require('../dist/vk-bot/vk-bot.config').clubCard();
 const event = (text = 'Начать') => ({ type: 'message_new', secret: 'test-secret', event_id: 'new-1',
   object: { message: { from_id: 42, peer_id: 42, text, out: 0 } } });
 
 before(async () => {
   delete process.env.VK_COMMUNITY_TOKEN; delete process.env.VK_BOT_TOKEN;
-  bot = new VkBotService({}, {}, {}, {});
+  bot = new VkBotService({}, {}, {}, {}, { identify: async () => ({ type: 'UNKNOWN' }) });
   const module = await Test.createTestingModule({ controllers: [VkBotController],
     providers: [{ provide: VkBotService, useValue: bot }] }).compile();
   controller = module.get(VkBotController);
@@ -63,20 +63,21 @@ test('unknown events return ok with valid secret and with optional secret unset'
   assert.equal(sent[0].message, greeting);
 });
 
-for (const text of ['Начать', 'start']) test(`${text} greets directly without a database lookup`, async () => {
+for (const text of ['Начать', 'start']) test(`${text} greets after identity lookup`, async () => {
   const response = await request(app.getHttpServer()).post(path).send(event(text)).expect(200);
   assert.equal(response.text, 'ok'); assert.equal(sent.length, 1);
   assert.equal(sent[0].message, greeting); assert.equal(sent[0].peer_id, 42);
   assert.ok(Number.isInteger(sent[0].random_id)); assert.notEqual(sent[0].random_id, 0);
 });
 
-test('ordinary messages are acknowledged without replying or failing', async () => {
+test('ordinary messages are acknowledged and receive an identity menu', async () => {
   for (const text of ['Добрый вечер! Все в силе?', 'Привет', '1234']) {
     const response = await request(app.getHttpServer()).post(path).send(event(text)).expect(200);
     assert.equal(response.text, 'ok');
   }
   await nextTurn();
-  assert.deepEqual(sent, []);
+  assert.equal(sent.length, 3);
+  assert.ok(sent.every(row => /Приглашаем/.test(row.message)));
   assert.deepEqual(failures, []);
 });
 

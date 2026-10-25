@@ -5,7 +5,7 @@ import {
   Res, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { RequireModule } from '../auth/module-access.guard';
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Role } from '@prisma/client';
 import type { Client } from '@prisma/client';
 import type { Response } from 'express';
@@ -23,7 +23,7 @@ import { UpdateClientDto } from './dto/update-client.dto';
 @RequireModule('SCHEDULE')
 @ApiTags('Clients')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
 @UseInterceptors(SanitizeRbacInterceptor)
 @SanitizeTrainerFields('medicalNotes')
 @Controller('clients')

@@ -1,3 +1,4 @@
+import { VkIdentityService } from '../vk-bot/vk-identity.service';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Client } from '@prisma/client';
@@ -102,7 +103,7 @@ export type ClientLedgerOperation = Omit<LedgerRow, 'amount'> & { amount: number
 
 @Injectable()
 export class ClientsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly identity: VkIdentityService = new VkIdentityService(prisma)) {}
 
   private ensureSpecialCategoryAllowed(medicalNotes: string | undefined): void {
     if (medicalNotes?.trim() && process.env.ENABLE_MEDICAL_NOTES !== 'true') {
@@ -212,7 +213,14 @@ export class ClientsService {
     const firstName = dto.firstName ?? dto.name;
     const lastName = dto.lastName ?? '';
     try {
-      return await this.prisma.client.create({ include: preferredResourcesInclude, data: { ...dto, firstName, lastName, name: [firstName, lastName].filter(Boolean).join(' ') } });
+      const { vkId: input, vkScreenName: screen, ...fields } = dto;
+      const data = { ...fields, firstName, lastName, name: [firstName, lastName].filter(Boolean).join(' ') };
+      if (input === undefined && screen === undefined) return await this.prisma.client.create({ include: preferredResourcesInclude, data });
+      const profile = await this.identity.normalize(input !== undefined ? input : screen ?? null);
+      return await this.identity.atomic(async tx => {
+        await this.identity.assertAvailable(tx, profile.vkId, 'CLIENT');
+        return tx.client.create({ include: preferredResourcesInclude, data: { ...data, ...profile, vkUserId: profile.vkId ? BigInt(profile.vkId) : null } });
+      });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Клиент');
     }
@@ -224,7 +232,16 @@ export class ClientsService {
       const current = await this.findOne(id);
       const firstName = dto.firstName ?? (dto.name !== undefined ? dto.name : current.firstName);
       const lastName = dto.lastName ?? (dto.name !== undefined && dto.firstName === undefined ? '' : current.lastName);
-      return await this.prisma.client.update({ where: { id }, include: preferredResourcesInclude, data: { ...dto, firstName, lastName, name: [firstName, lastName].filter(Boolean).join(' ') } });
+      const { vkId: input, vkScreenName: screen, ...fields } = dto;
+      const data = { ...fields, firstName, lastName, name: [firstName, lastName].filter(Boolean).join(' ') };
+      if (input === undefined && screen === undefined) return await this.prisma.client.update({ where: { id }, include: preferredResourcesInclude, data });
+      const profile = await this.identity.normalize(input !== undefined ? input : screen ?? null);
+      return await this.identity.atomic(async tx => {
+        await this.identity.assertAvailable(tx, profile.vkId, 'CLIENT', id);
+        const previous = await tx.client.findUnique({ where: { id } });
+        if (previous?.vkUserId && previous.vkUserId !== (profile.vkId ? BigInt(profile.vkId) : null)) await tx.vkNotification.deleteMany({ where: { peerId: previous.vkUserId, sentAt: null } });
+        return tx.client.update({ where: { id }, include: preferredResourcesInclude, data: { ...data, ...profile, vkUserId: profile.vkId ? BigInt(profile.vkId) : null } });
+      });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Клиент');
     }

@@ -11,6 +11,7 @@ function harness(role) {
     membership: { findMany: async () => [] }, booking: { findMany: async () => [] },
     lesson: { findMany: async () => [] },
   }, {}, {}, {});
+  bot.identity = require('./helpers/vk-identity.cjs').identityFixture(bot.prisma);
   bot.vk = { api: {
     users: { get: async () => { queries.push('VK profile'); return [{ first_name: 'Анна' }]; } },
     messages: { send: async params => sent.push(params) },
@@ -23,7 +24,7 @@ function harness(role) {
 }
 
 for (const role of ['guest', 'client', 'trainer']) {
-  test(`ordinary messages from ${role} produce no automatic replies or profile lookups`, async () => {
+  test(`ordinary messages from ${role} are identified and receive their role menu`, async () => {
     const h = harness(role);
     for (const text of [
       'Добрый вечер! Все в силе?', 'Привет', 'Здравствуйте!', 'Спасибо!', 'Да',
@@ -34,8 +35,9 @@ for (const role of ['guest', 'client', 'trainer']) {
     await h.send('Добрый вечер!', '{invalid');
     await h.send('Добрый вечер!', JSON.stringify({ command: 'unknown' }));
     await h.send('Добрый вечер!', JSON.stringify({ offset: 10 }));
-    assert.deepEqual(h.sent, []);
-    assert.deepEqual(h.queries, []);
+    assert.ok(h.sent.length > 0);
+    assert.ok(h.queries.includes('client') || h.queries.includes('trainer'));
+    for (const row of h.sent) assert.match(row.message, role === 'guest' ? /Приглашаем/ : /Здравствуйте/);
   });
 }
 
@@ -46,8 +48,8 @@ for (const [role, text, payload, expected] of [
   ['guest', '', { command: 'guide' }, /Шлем/],
   ['guest', '', { command: 'первичная заявка' }, /Ознакомьтесь с согласием/],
   ['guest', 'Первичная заявка', undefined, /Ознакомьтесь с согласием/],
-  ['guest', 'Привязать профиль', undefined, /привязать/],
-  ['guest', '/start 1234', undefined, /привязать ВАШ_ТЕЛЕФОН 1234/],
+  ['guest', 'Привязать профиль', undefined, /VK ID/],
+  ['guest', '/start 1234', undefined, /VK ID/],
   ['client', '', { command: 'balance' }, /нет активных абонементов/],
   ['client', '', { command: 'bookings' }, /тренировок пока нет/],
   ['trainer', '', { command: 'today' }, /занятий нет/],

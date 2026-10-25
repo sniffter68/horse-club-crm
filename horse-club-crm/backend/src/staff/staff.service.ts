@@ -1,3 +1,4 @@
+import { VkIdentityService } from '../vk-bot/vk-identity.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Role, StaffProfile } from '@prisma/client';
 import { DateTime } from 'luxon';
@@ -30,14 +31,17 @@ export function payrollAmounts(shiftsCount: number, profile: Pick<StaffProfile, 
 
 @Injectable()
 export class StaffService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly identity: VkIdentityService = new VkIdentityService(prisma)) {}
   private manage(user: AuthUser) { if (![Role.ADMIN, Role.MANAGER].includes(user.role as 'ADMIN' | 'MANAGER')) throw new ForbiddenException('Доступно администратору и менеджеру'); }
   private async atomic<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       try { return await this.prisma.$transaction(work, { isolationLevel: 'Serializable' }); }
       catch (error) {
         if (isSerializationFailure(error) && attempt < 4) continue;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException('Такая запись уже существует');
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          if (String(error.meta?.target).includes('vk')) throw new ConflictException('Этот VK ID уже привязан к другому клиенту или сотруднику');
+          throw new ConflictException('Такая запись уже существует');
+        }
         throw error;
       }
     }
@@ -52,24 +56,32 @@ export class StaffService {
     return this.prisma.$transaction(async tx => {
       const id = await this.scope(tx, user, query.staffId);
       const where = { id };
-      return { data: await tx.staffProfile.findMany({ where, orderBy: [{ fullName: 'asc' }, { id: 'asc' }], skip: ((query.page ?? 1) - 1) * (query.pageSize ?? 20), take: query.pageSize ?? 20 }), total: await tx.staffProfile.count({ where }) };
+      return { data: await tx.staffProfile.findMany({ where, include: { user: { select: { vkId: true } } }, orderBy: [{ fullName: 'asc' }, { id: 'asc' }], skip: ((query.page ?? 1) - 1) * (query.pageSize ?? 20), take: query.pageSize ?? 20 }), total: await tx.staffProfile.count({ where }) };
     });
   }
   candidates(user: AuthUser) {
     this.manage(user);
-    return this.prisma.user.findMany({ where: { staffProfile: null }, select: { id: true, email: true, trainer: { select: { fullName: true, name: true } } }, orderBy: { email: 'asc' }, take: 500 });
+    return this.prisma.user.findMany({ where: { staffProfile: null }, select: { id: true, email: true, vkId: true, trainer: { select: { fullName: true, name: true } } }, orderBy: { email: 'asc' }, take: 500 });
   }
-  saveProfile(dto: StaffProfileDto | UpdateStaffProfileDto, user: AuthUser, id?: string) {
+  async saveProfile(dto: StaffProfileDto | UpdateStaffProfileDto, user: AuthUser, id?: string) {
     this.manage(user);
     if (id && dto.userId !== undefined) throw new BadRequestException('Привязку учетной записи изменить нельзя');
     if (['fullName', 'roleTitle', 'isActive'].some(key => (dto as Record<string, unknown>)[key] === null)) throw new BadRequestException('Обязательные поля не могут быть null');
+    const { vkId: input, ...profile } = dto;
+    const normalized = input !== undefined ? await this.identity.normalize(input) : undefined;
     return this.atomic(async tx => {
+      if (normalized) {
+        const target = id ? await tx.staffProfile.findUnique({ where: { id } }) : null;
+        const userId = target?.userId ?? dto.userId;
+        if (!userId) throw new NotFoundException('Сотрудник не найден');
+        await this.identity.applyStaff(tx, userId, normalized.vkId);
+      }
       if (id) {
         if (!await tx.staffProfile.findUnique({ where: { id } })) throw new NotFoundException('Сотрудник не найден');
-        return tx.staffProfile.update({ where: { id }, data: dto });
+        return tx.staffProfile.update({ where: { id }, data: profile });
       }
       if (!dto.userId || !await tx.user.findUnique({ where: { id: dto.userId } })) throw new BadRequestException('Учетная запись не найдена');
-      return tx.staffProfile.create({ data: dto as StaffProfileDto });
+      return tx.staffProfile.create({ data: profile as StaffProfileDto });
     });
   }
   shifts(query: ShiftQueryDto, user: AuthUser) {

@@ -29,7 +29,7 @@ test('client preferences API: create, list, detail, replace, omit, reset and UUI
     findMany: async ({ include }) => [response(include)], count: async () => 1,
   }, $transaction: queries => Promise.all(queries) });
   const module = await Test.createTestingModule({ controllers: [ClientsController], providers: [{ provide: ClientsService, useValue: service }] })
-    .overrideGuard(JwtAuthGuard).useValue({ canActivate: () => true })
+    .overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true }).overrideGuard(JwtAuthGuard).useValue({ canActivate: () => true })
     .overrideGuard(RolesGuard).useValue({ canActivate: () => true })
     .overrideInterceptor(SanitizeRbacInterceptor).useValue({ intercept: (_, next) => next.handle() }).compile();
   const app = module.createNestApplication();

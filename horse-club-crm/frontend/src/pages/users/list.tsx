@@ -6,7 +6,7 @@ import type { Role } from '../../authStorage'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { VkAdminRecipient } from '../../components/VkProfileLink'
 
-type User = { id: string; email: string; role: Role; createdAt: string; vkUserId?: string | null }
+type User = { id: string; email: string; role: Role; createdAt: string; vkId?: string | null; vkUserId?: string | null }
 const roleColor: Record<Role, string> = { ADMIN: 'red', MANAGER: 'blue', TRAINER: 'green', STABLE_WORKER: 'orange' }
 
 export function UserList() {
@@ -22,7 +22,7 @@ export function UserList() {
       { key: 'email', dataIndex: 'email', title: 'Email', sorter: true },
       { key: 'role', dataIndex: 'role', title: 'Роль', sorter: true, render: (value: Role) => <Tag color={roleColor[value]}>{value}</Tag> },
       { key: 'createdAt', dataIndex: 'createdAt', title: 'Дата создания', sorter: true, render: (value: string) => new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) },
-      ...(role === 'ADMIN' ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: User) => row.role === 'ADMIN' ? <VkAdminRecipient id={row.id} name={row.email} vkUserId={row.vkUserId} /> : '—' }] : []),
+      ...(role === 'ADMIN' ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: User) => <VkAdminRecipient id={row.id} name={row.email} vkId={row.vkId} vkUserId={row.vkUserId} /> }] : []),
     ]} />
   </List>
 }

@@ -1,3 +1,4 @@
+import { VkIdentityService } from './vk-identity.service';
 import { BadRequestException, ForbiddenException, HttpException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import { DateTime } from 'luxon';
@@ -31,7 +32,8 @@ export class VkBotService {
   private readonly vk: VK | undefined;
   private readonly firstNames = new Map<number, { value: Promise<string | undefined>; expiresAt: number }>();
   constructor(private readonly prisma: PrismaService, private readonly links: VkLinkService,
-    private readonly ledger: MembershipLedgerService, private readonly leads: LeadsService) {
+    private readonly ledger: MembershipLedgerService, private readonly leads: LeadsService,
+    private readonly identity: VkIdentityService = new VkIdentityService(prisma)) {
     const token = process.env.VK_COMMUNITY_TOKEN?.trim() || process.env.VK_BOT_TOKEN?.trim();
     if (token) this.vk = new VK({ token, apiVersion: '5.199', apiTimeout: 5000, apiRetryLimit: 0 });
   }
@@ -68,12 +70,11 @@ export class VkBotService {
     let keyboard = welcome;
     let name = 'Гость';
     try {
-      const [client, trainer] = await Promise.all([
-        this.prisma.client.findUnique({ where: { vkUserId: BigInt(clientPeerId) } }),
-        this.prisma.trainer.findUnique({ where: { vkUserId: BigInt(clientPeerId) } }),
-      ]);
-      name = client?.name || trainer?.name || name;
-      if (client || trainer) keyboard = menu(Boolean(trainer));
+      const identity = await this.identity.identify(String(clientPeerId));
+      if (identity.type !== 'UNKNOWN') {
+        name = identity.name || name;
+        keyboard = menu(identity.type === 'STAFF');
+      }
     } catch { this.logger.warn('Не удалось загрузить профиль для запроса помощи VK'); }
     const adminPeerId = Number(process.env.VK_ADMIN_PEER_ID);
     const configuredGroupId = process.env.VK_GROUP_ID?.trim() || '';
@@ -115,19 +116,10 @@ export class VkBotService {
         }
       } catch { /* Ordinary text routes without a payload. */ }
     }
-    // Leave ordinary community messages for the live administrator conversation.
-    const textCommand = /^(?:заявка|согласен|привязать|\/start)(?:\s|$)/i.test(text.trim());
-    const menuCommand = ['начать', 'help', 'about', 'guide', 'первичная заявка', 'привязать профиль',
-      'today', 'расписание на сегодня', 'balance', 'мой баланс', 'баланс абонемента',
-      'bookings', 'мои тренировки'].includes(command);
-    if (!textCommand && !menuCommand) return;
-    if (command === 'начать') {
-      const firstName = await this.getFirstName(sender);
-      await this.send(peer, eventId, `Здравствуйте${firstName ? `, ${firstName}` : ''}! Вы подключены к боту конного клуба. Здесь будут приходить напоминания о тренировках и статус бронирований.`, welcome);
-      return;
-    }
     if (command === 'help') { await this.requestAdministrator(peer, eventId); return; }
     try {
+      // Shared with GET /vk/identify; embedded webhook avoids a loopback HTTP request.
+      const identity = await this.identity.identify(String(sender));
       const consent = /^согласен\s+([a-zA-Z0-9._-]{1,64})$/i.exec(text.trim());
       if (consent) {
         if (consent[1] !== consentVersion()) throw new BadRequestException('Редакция согласия изменилась. Запросите актуальную ссылку командой «Первичная заявка»');
@@ -139,24 +131,18 @@ export class VkBotService {
         });
         await this.send(peer, eventId, 'Согласие принято. Теперь отправьте: заявка Имя; +79991234567', welcome); return;
       }
-      const shortCode = /^\/start\s+(\d{4})$/i.exec(text.trim());
-      if (shortCode) {
-        await this.send(peer, eventId, `Для подтверждения телефона отправьте: привязать ВАШ_ТЕЛЕФОН ${shortCode[1]}. Код действует 5 минут.`, welcome); return;
+      const client = identity.type === 'CLIENT' ? { id: identity.clientId, firstName: identity.name } : null;
+      const staff = identity.type === 'STAFF' ? identity : null;
+      const trainer = staff?.role === 'TRAINER' && staff.trainerId ? { id: staff.trainerId, name: staff.name } : null;
+      const keyboard = staff || client ? menu(Boolean(staff)) : welcome;
+      if (command === 'начать' && !client && !staff) {
+        const firstName = await this.getFirstName(sender);
+        await this.send(peer, eventId, `Здравствуйте${firstName ? `, ${firstName}` : ''}! Приглашаем вас в конный клуб. Для доступа к персональному меню сообщите администратору ваш VK ID: ${sender}.\n${clubCard()}`, welcome);
+        return;
       }
-      const binding = /^(?:привязать|\/start)\s+(.+?)\s+(\d{4}|[a-f0-9]{32})$/i.exec(text.trim());
-      if (binding) {
-        const kind = await this.links.bind(sender, binding[1], binding[2]);
-        const profile = kind === 'TRAINER' ? await this.prisma.trainer.findUnique({ where: { vkUserId: BigInt(sender) } })
-          : await this.prisma.client.findUnique({ where: { vkUserId: BigInt(sender) } });
-        await this.send(peer, eventId, `Профиль успешно привязан. Здравствуйте, ${profile?.name || (profile && 'firstName' in profile ? profile.firstName : '') || 'всадник'}! Ваша роль: ${kind === 'TRAINER' ? 'тренер' : 'клиент'}.`, menu(kind === 'TRAINER')); return;
-      }
-      const [client, trainer] = await Promise.all([
-        this.prisma.client.findUnique({ where: { vkUserId: BigInt(sender) } }), this.prisma.trainer.findUnique({ where: { vkUserId: BigInt(sender) } }),
-      ]);
-      const keyboard = client || trainer ? menu(Boolean(trainer)) : welcome;
       if (command === 'about') { await this.send(peer, eventId, clubCard(), keyboard); return; }
       if (command === 'guide') { await this.send(peer, eventId, riderGuide(), keyboard); return; }
-      if (!client && !trainer) {
+      if (!client && !staff) {
         const lead = /^заявка\s+([^;]{1,100});\s*(.+)$/i.exec(text.trim());
         if (lead) {
           const accepted = await this.prisma.vkConsent.findUnique({ where: { vkUserId: BigInt(sender) } });
@@ -165,15 +151,21 @@ export class VkBotService {
           }
           if (!lead[1].trim()) throw new BadRequestException('Укажите имя');
           await this.leads.create({ consentAccepted: true, consentVersion: accepted.consentVersion, firstName: lead[1].trim(), phone: normalizePhone(lead[2]) }, 'VK');
-          await this.send(peer, eventId, 'Заявка принята. Администратор свяжется с вами и выдаст код привязки.', welcome); return;
+          await this.send(peer, eventId, 'Заявка принята. Администратор свяжется с вами и привяжет ваш VK ID в CRM.', welcome); return;
         }
         await this.send(peer, eventId, command === 'первичная заявка' ? `Ознакомьтесь с согласием: ${consentUrl()}\nЗатем отдельным сообщением отправьте: согласен ${consentVersion()}`
-          : 'Здравствуйте! Получите у администратора код и отправьте: привязать +79991234567 КОД. Если вы ещё не записаны в клуб, выберите «Первичная заявка».', welcome);
+          : `Здравствуйте! Приглашаем вас в конный клуб. Для привязки профиля сообщите администратору ваш VK ID: ${sender}.\n${clubCard()}`, welcome);
         return;
       }
-      if (trainer && ['today', 'расписание на сегодня'].includes(command)) { await this.today(trainer.id, peer, eventId, offset); return; }
+      if (trainer && ['today', 'расписание на сегодня', 'riders', 'список всадников'].includes(command)) { await this.today(trainer.id, peer, eventId, offset); return; }
+      if (client && command === 'book') { await this.requestAdministrator(peer, eventId); return; }
+      if (identity.type === 'CLIENT' && command === 'next-booking') {
+        const booking = identity.nextBooking;
+        await this.send(peer, eventId, booking ? `📅 Ближайшая тренировка: ${trainingDate(booking.startTime)}\nТренер: ${booking.trainer.name}\nЛошадь: ${booking.horse?.name || 'пока не назначена'}` : 'Предстоящих тренировок пока нет.', keyboard);
+        return;
+      }
       if (client && ['balance', 'мой баланс', 'баланс абонемента'].includes(command)) {
-        const rows = await this.prisma.membership.findMany({ where: { deletedAt: null, clientId: client.id, validUntil: { gte: new Date() }, remainedLessons: { gt: 0 } },
+        const rows = await this.prisma.membership.findMany({ where: { deletedAt: null, clientId: client.id, status: 'active', validFrom: { lte: new Date() }, validUntil: { gte: new Date() }, remainedLessons: { gt: 0 } },
           include: { pricingPlan: { select: { name: true } } }, orderBy: [{ validUntil: 'asc' }, { id: 'asc' }], skip: offset, take: 11 });
         const lines = rows.slice(0, 10).map(row => {
           const title = row.title?.trim() || row.pricingPlan?.name.trim() || 'Абонемент';
@@ -182,10 +174,10 @@ export class VkBotService {
         await this.send(peer, eventId, lines.length ? `💳 Ваши абонементы:\n${lines.join('\n')}` : 'У вас пока нет активных абонементов.', rows.length > 10 ? this.next('balance', offset) : menu(false)); return;
       }
       if (client && ['bookings', 'мои тренировки'].includes(command)) {
-        const rows = await this.prisma.booking.findMany({ where: { clientId: client.id, lesson: { status: 'SCHEDULED', startTime: { gte: new Date() } } },
-          include: { horse: true, lesson: { include: { trainer: true, arena: true } } }, orderBy: [{ lesson: { startTime: 'asc' } }, { id: 'asc' }], skip: offset, take: 11 });
-        const cards = rows.slice(0, 10).filter(row => row.lesson !== null).map(row => {
-          const lesson = row.lesson!;
+        const rows = await this.prisma.booking.findMany({ where: { clientId: client.id, status: 'scheduled', startTime: { gte: new Date() }, OR: [{ lessonId: null }, { lesson: { status: 'SCHEDULED' } }] },
+          include: { horse: true, trainer: true, arena: true, lesson: { include: { trainer: true, arena: true } } }, orderBy: [{ startTime: 'asc' }, { id: 'asc' }], skip: offset, take: 11 });
+        const cards = rows.slice(0, 10).map(row => {
+          const lesson = row.lesson ?? row;
           return [`• ${trainingDate(lesson.startTime)}`,
             `  Лошадь: ${row.horse?.name.trim() || 'пока не назначена'}`,
             `  Тренер: ${lesson.trainer.name.trim() || 'пока не назначен'}`,
@@ -194,7 +186,7 @@ export class VkBotService {
         });
         await this.send(peer, eventId, cards.length ? `📅 Предстоящие тренировки:\n${cards.join('\n\n')}` : 'Предстоящих тренировок пока нет.', rows.length > 10 ? this.next('bookings', offset) : menu(false)); return;
       }
-      await this.send(peer, eventId, `Здравствуйте, ${trainer?.name || client?.firstName || 'всадник'}! Выберите действие. Время: ${zone()}.`, menu(Boolean(trainer)));
+      await this.send(peer, eventId, `Здравствуйте, ${staff?.name || client?.firstName || 'всадник'}! Выберите действие. Время: ${zone()}.`, keyboard);
     } catch (error) {
       if (error instanceof HttpException && error.getStatus() < 500) { await this.send(peer, `${eventId}:error`, error.message); return; }
       throw error;
@@ -226,7 +218,8 @@ export class VkBotService {
     if (action !== 'attendance' || typeof bookingId !== 'string' || !isUUID(bookingId) || typeof attended !== 'boolean') throw new BadRequestException('Неизвестная команда');
     let answer = 'Посещение отмечено';
     try {
-      const trainer = await this.prisma.trainer.findUnique({ where: { vkUserId: BigInt(object.user_id) } });
+      const profile = await this.identity.identify(String(object.user_id));
+      const trainer = profile.type === 'STAFF' && profile.role === 'TRAINER' && profile.trainerId ? { id: profile.trainerId } : null;
       if (!trainer) throw new ForbiddenException('Действие доступно только тренеру');
       await this.ledger.markAttendance(bookingId, attended, { trainerId: trainer.id, noShow: !attended });
       if (!attended) answer = 'Неявка отмечена';

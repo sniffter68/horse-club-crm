@@ -1,4 +1,4 @@
-export type Staff = { id: string; userId: string; fullName: string; phone?: string | null; scheduleColor?: string | null; roleTitle: string; shiftRate: string | null; lessonRate: string | null; groupLessonRate: string | null; lessonPercentage: string | null; isActive: boolean }
+export type Staff = { user?: { vkId: string | null }; id: string; userId: string; fullName: string; phone?: string | null; scheduleColor?: string | null; roleTitle: string; shiftRate: string | null; lessonRate: string | null; groupLessonRate: string | null; lessonPercentage: string | null; isActive: boolean }
 export const shiftStatuses = { SCHEDULED: 'Запланирована', COMPLETED: 'Отработана', ABSENT: 'Неявка', SICK: 'Больничный' }
 export type ShiftStatus = keyof typeof shiftStatuses
 export const shiftColors = { SCHEDULED: 'blue', COMPLETED: 'green', ABSENT: 'red', SICK: 'orange' }

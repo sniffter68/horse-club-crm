@@ -13,7 +13,7 @@ let app, bot, lookup, sent;
 const original = Object.fromEntries(['VK_SECRET_KEY', 'VK_GROUP_ID', 'VK_CONFIRMATION_CODE', 'VK_BOT_TOKEN', 'VK_COMMUNITY_TOKEN'].map(key => [key, process.env[key]]));
 before(async () => {
   process.env.VK_SECRET_KEY = 'test-secret'; process.env.VK_GROUP_ID = '123'; process.env.VK_CONFIRMATION_CODE = 'confirmation-code'; delete process.env.VK_BOT_TOKEN; delete process.env.VK_COMMUNITY_TOKEN;
-  const module = await Test.createTestingModule({ controllers: [VkBotController], providers: [VkBotService,
+  const module = await Test.createTestingModule({ controllers: [VkBotController], providers: [VkBotService, { provide: require('../dist/vk-bot/vk-identity.service').VkIdentityService, useValue: { identify: async vkId => { lookup.push({ where: { vkId } }); return { type: 'CLIENT', clientId: 'client', name: 'Анна' }; } } },
     { provide: VkLinkService, useValue: { bind: async (sender, phone, code) => {
       assert.equal(sender, 42); assert.equal(phone, '+79991234567'); assert.equal(code, '1234'); return 'CLIENT';
     } } }, { provide: MembershipLedgerService, useValue: {} }, { provide: LeadsService, useValue: {} },
@@ -42,12 +42,12 @@ const message = { ...event, type: 'message_new', event_id: 'event-1', object: { 
 test('/start binding command returns personalized role greeting through the callback', async () => {
   await request(app.getHttpServer()).post('/api/vk/callback').send({ ...message,
     object: { message: { ...message.object.message, text: '/start +79991234567 1234' } } }).expect(200);
-  assert.match(sent[0].message, /Анна.*роль: клиент/);
+  assert.match(sent[0].message, /Здравствуйте, Анна/);
   assert.match(String(sent[0].keyboard), /Мой баланс/);
 });
 test('message routes by BigInt vkUserId and repeats use stable random_id', async () => {
   for (let i = 0; i < 2; i++) assert.equal((await request(app.getHttpServer()).post('/api/vk/callback').send(message).expect(200)).text, 'ok');
-  assert.equal(lookup[0].where.vkUserId, 42n);
+  assert.equal(lookup[0].where.vkId, '42');
   assert.match(sent[0].message, /Анна/); assert.equal(sent[0].peer_id, 42);
   assert.equal(sent[0].random_id, sent[1].random_id);
 });

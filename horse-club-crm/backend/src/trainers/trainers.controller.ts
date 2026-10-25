@@ -1,3 +1,5 @@
+import { VkIdentityService } from '../vk-bot/vk-identity.service';
+import { UpdateUserProfileDto } from '../users/dto/update-user-profile.dto';
 import {
   Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query,
   Res, UseGuards, UseInterceptors,
@@ -26,7 +28,12 @@ import { ModuleAccessGuard, RequireModule, RequireModuleForFields } from '../aut
 @SanitizeTrainerFields('baseRate')
 @Controller('trainers')
 export class TrainersController {
-  constructor(private readonly trainersService: TrainersService) {}
+  constructor(private readonly trainersService: TrainersService, private readonly identity: VkIdentityService) {}
+  @Patch(':id/vk')
+  @RequireModule('SCHEDULE')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  setVk(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserProfileDto) { return this.identity.setTrainer(id, dto.vkId); }
+
 
   @Get()
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)

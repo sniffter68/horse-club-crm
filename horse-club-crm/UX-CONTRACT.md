@@ -116,11 +116,11 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
 
 ### VK profile controls
 
-- Canonical owner: `frontend/src/components/VkProfileLink.tsx`; reused by client and trainer catalogs, Ant Design Modal/Popconfirm primitives.
-- ADMIN/MANAGER: generate a five-minute invitation, copy the code/phone confirmation command, open the community bot, refresh linked status, explicitly confirm unlink. TRAINER has read-only catalog access.
-- ADMIN lead recipients: configured in «Пользователи»; numeric VK ID or empty value to disable notifications.
-- Pessimistic mutations preserve previous status on failure; persistent alerts allow retry. Invitation requests cancel on close/unmount. Modal Escape returns focus to its trigger, and expired codes cannot be copied.
-- API/domain contract and deployment requirements: `backend/VK.md`. Runtime/browser evidence: `frontend/e2e/vk-link.spec.ts`.
+- Canonical owner: `frontend/src/components/VkProfileLink.tsx`; shared field, badge, profile link and `EntryOverlay` drawer in clients, staff and users.
+- ADMIN/MANAGER enter a VK ID or profile URL; the backend resolves aliases and rejects duplicate identities. Empty input unlinks the account. READ_ONLY hides mutations and the API enforces module write access.
+- Saving is pessimistic: input and errors remain available on failure; success refreshes the card and closes the drawer. Escape restores focus to the trigger. Pending personal deliveries to the old identity are revoked.
+- The embedded webhook and service-token API share direct VK identification. Phone/code verification is retired.
+- Business/API contract: `docs/vk-direct-identity.md`, `backend/VK.md`. Runtime evidence: `frontend/e2e/vk-link.spec.ts`.
 
 ## Validation
 

@@ -8,9 +8,11 @@ const publicRows = (helpLabel = '💬 Связаться с администра
 
 function menuKeyboard(trainer = false, helpLabel?: string) {
   return Keyboard.keyboard([
-    trainer ? [Keyboard.textButton({ label: 'Расписание на сегодня', payload: { command: 'today' } })] : [
-      Keyboard.textButton({ label: '📅 Мои тренировки', payload: { command: 'bookings' } }),
+    trainer ? [Keyboard.textButton({ label: 'Расписание на сегодня', payload: { command: 'today' } }),
+      Keyboard.textButton({ label: 'Список всадников', payload: { command: 'riders' } })] : [
+      Keyboard.textButton({ label: '📅 Ближайшая тренировка', payload: { command: 'next-booking' } }),
       Keyboard.textButton({ label: '💳 Мой баланс', payload: { command: 'balance' } }),
+      Keyboard.textButton({ label: 'Записаться', payload: { command: 'book' } }),
     ],
     ...publicRows(helpLabel),
   ]);
@@ -22,12 +24,14 @@ export function mainMenu(trainer = false) {
 
 export function welcomeMenu() {
   return menuKeyboard(false, '💬 Позвать администратора').row()
-    .textButton({ label: 'Привязать профиль' }).textButton({ label: 'Первичная заявка' });
+    .textButton({ label: 'Первичная заявка' });
 }
 
 export function normalizeVkCommand(value: string): string {
   const command = value.trim().toLowerCase().replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, '');
   if (command === 'start') return 'начать';
+  if (command === 'записаться') return 'book';
+  if (command === 'ближайшая тренировка') return 'next-booking';
   if (['о клубе', 'контакты'].includes(command)) return 'about';
   if (['памятка', 'памятка всадника'].includes(command)) return 'guide';
   if (['помощь', 'администратор', 'позвать администратора', 'связаться с администратором'].includes(command)) return 'help';

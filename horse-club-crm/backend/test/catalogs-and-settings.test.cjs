@@ -77,7 +77,7 @@ let app;
 before(async () => {
   const moduleRef = await Test.createTestingModule({
     controllers: [ClientsController, SettingsController],
-    providers: [
+    providers: [{ provide: require('../dist/vk-bot/vk-identity.service').VkIdentityService, useValue: {} },
       ClientsService,
       SettingsService,
       { provide: require('../dist/settings/module-access.service').ModuleAccessService, useValue: { forRole: async () => ['SCHEDULE', 'STABLES', 'VETERINARY', 'CASHBOX', 'STAFF_PAYROLL'].map(module => ({ module, isEnabled: true, accessLevel: 'FULL' })) } },

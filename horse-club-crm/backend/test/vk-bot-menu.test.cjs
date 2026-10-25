@@ -31,6 +31,7 @@ function harness({ client = null, trainer = null, admins = [], fail = false, pro
     membership: { findMany: async () => [] }, booking: { findMany: async () => [] },
     $transaction: async fn => { transactions++; return fn(tx); },
   }, {}, {}, {});
+  bot.identity = require('./helpers/vk-identity.cjs').identityFixture(bot.prisma);
   bot.vk = { api: { messages: { send: async params => sent.push(params) } } };
   for (const level of ['log', 'warn', 'error']) bot.logger[level] = value => logs.push({ level, value });
   const send = async (text, payload, eventId = `menu-${sent.length}`) => bot.handleMessage({ message: {
@@ -43,14 +44,14 @@ test('main reply keyboard has the requested three rows and stable payloads', () 
   const result = keyboard(mainMenu());
   assert.equal(result.one_time, false); assert.notEqual(result.inline, true);
   assert.deepEqual(result.buttons.map(row => row.map(button => button.action.label)), [
-    ['📅 Мои тренировки', '💳 Мой баланс'], ['ℹ️ О клубе', '📖 Памятка всадника'], ['💬 Связаться с администратором'],
+    ['📅 Ближайшая тренировка', '💳 Мой баланс', 'Записаться'], ['ℹ️ О клубе', '📖 Памятка всадника'], ['💬 Связаться с администратором'],
   ]);
-  assert.deepEqual(result.buttons.flat().map(button => JSON.parse(button.action.payload).command), ['bookings', 'balance', 'about', 'guide', 'help']);
+  assert.deepEqual(result.buttons.flat().map(button => JSON.parse(button.action.payload).command), ['next-booking', 'balance', 'book', 'about', 'guide', 'help']);
   const guest = keyboard(welcomeMenu());
   assert.deepEqual(guest.buttons.slice(0, 2), result.buttons.slice(0, 2));
   assert.equal(guest.buttons[2][0].action.label, '💬 Позвать администратора');
   assert.equal(JSON.parse(guest.buttons[2][0].action.payload).command, 'help');
-  assert.deepEqual(guest.buttons[3].map(button => button.action.label), ['Привязать профиль', 'Первичная заявка']);
+  assert.deepEqual(guest.buttons[3].map(button => button.action.label), ['Первичная заявка']);
   assert.equal(keyboard(mainMenu(true)).buttons[0][0].action.label, 'Расписание на сегодня');
 });
 
@@ -60,7 +61,7 @@ for (const text of ['ℹ️ О клубе', 'О клубе', '  КОНТАКТЫ
   assert.equal(sent[0].message, clubCard());
   assert.match(sent[0].message, /Союз любителей конного спорта/);
   assert.match(sent[0].message, /ежедневно с 09:00 до 21:00/);
-  assert.match(String(sent[0].keyboard), /Привязать профиль/);
+  assert.match(String(sent[0].keyboard), /Первичная заявка/);
 });
 
 for (const text of ['📖 Памятка всадника', 'Памятка всадника', 'памятка']) test(`guide accepts ${text} for unlinked guests`, async () => {

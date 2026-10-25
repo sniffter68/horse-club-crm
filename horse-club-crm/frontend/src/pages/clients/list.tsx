@@ -83,7 +83,7 @@ export function ClientList() {
       },
       { key: 'clientType', title: 'Тип', render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : row.clientType === 'ONE_TIME' ? <OneTimeBadge /> : 'Постоянный' },
       { key: 'phone', dataIndex: 'phone', title: 'Телефон', sorter: true, render: (value: string | null) => <span className="data-mono">{value || '—'}</span> },
-      { key: 'vk', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name || row.firstName} kind="CLIENT" vkUserId={row.vkUserId} /> },
+      { key: 'vk', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name || row.firstName} kind="CLIENT" vkId={row.vkId} vkUserId={row.vkUserId} /> },
       { key: 'membership', title: 'Абонемент', hidden: !canManage, width: 300, render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : <MembershipBalance membership={row.membership} clientId={row.id} /> },
       { key: 'roles', title: 'Роли', render: (_: unknown, row) => <Space>{row.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{row.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
       { key: 'preferences', dataIndex: 'preferences', title: 'Заметки', width: 260, ellipsis: true, render: (value: string | null) => value || '—' },
@@ -107,6 +107,7 @@ export function ClientList() {
         {canManage && <Button onClick={() => setLedgerClient(client)}>История баланса</Button>}
         {!client.deletedAt && client.clientType === 'ONE_TIME' && <Space><OneTimeBadge />{canManage && <ConvertClient client={client} />}</Space>}
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
+          { key: 'vk', label: 'VK', span: 2, children: <VkProfileLink id={client.id} name={client.name || client.firstName} kind="CLIENT" vkId={client.vkId} vkUserId={client.vkUserId} readOnly={!canManage} /> },
           { key: 'name', label: 'ФИО', span: 2, children: <span className="client-name">{[client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || '—'}</span> },
           { key: 'phone', label: 'Телефон', children: client.phone ? <a className="data-mono" href={`tel:${client.phone}`}>{client.phone}</a> : '—' },
           { key: 'email', label: 'Email', children: client.email ? <a href={`mailto:${client.email}`}>{client.email}</a> : '—' },

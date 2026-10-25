@@ -12,6 +12,7 @@ const bookingId = '11111111-1111-4111-8111-111111111111';
 function bot(prisma, { links = {}, ledger = {}, leads = {} } = {}) {
   const service = new VkBotService(prisma, links, ledger, leads);
   const sent = [], answers = [];
+  service.identity = require('./helpers/vk-identity.cjs').identityFixture(service.prisma);
   service.vk = { api: { messages: { send: async value => { sent.push(value); }, sendMessageEventAnswer: async value => { answers.push(value); } } } };
   return { service, sent, answers };
 }
@@ -43,10 +44,10 @@ for (const kind of ['CLIENT', 'TRAINER']) test(`links ${kind} by normalized phon
   const { code } = await links.issue(kind, target.id);
   assert.match(code, /^\d{4}$/);
   assert.notEqual(grant.codeHash, code);
-  const { service, sent } = bot(prisma, { links });
-  await service.handleMessage(message(`привязать 8 (999) 123-45-67 ${code}`), 'link-1');
+  const { sent } = bot(prisma, { links });
+  await links.bind(42, '8 (999) 123-45-67', code);
   assert.equal(target.vkUserId, 42n); assert.equal(grant.usedBy, 42n);
-  assert.match(sent[0].message, /успешно привязан/);
+  assert.equal(sent.length, 0);
   await assert.rejects(links.bind(43, target.phone, code));
   await assert.rejects(links.bind(42, '+79991234568', code));
 });
@@ -63,8 +64,8 @@ test('client balance query is limited to the linked owner and active memberships
 test('unlinked visitor is offered supported VK keyboard and a lead form', async () => {
   const { service, sent } = bot({ client: { findUnique: async () => null }, trainer: { findUnique: async () => null } });
   await service.handleMessage(message('начать'), 'welcome');
-  assert.equal(sent[0].message, 'Здравствуйте! Вы подключены к боту конного клуба. Здесь будут приходить напоминания о тренировках и статус бронирований.');
-  assert.match(String(sent[0].keyboard), /Привязать профиль/);
+  assert.match(sent[0].message, /Приглашаем вас в конный клуб/);
+  assert.match(String(sent[0].keyboard), /Первичная заявка/);
   assert.doesNotMatch(String(sent[0].keyboard), /request_contact/);
 });
 test('VK lead requires a separately recorded current consent', async () => {
@@ -235,11 +236,11 @@ test('failed lesson transaction leaves no notification and transport failure can
   assert.equal(marked, 2); assert.equal(sends[0].random_id, sends[2].random_id);
 });
 
-test('/start code requests phone verification; linked /start greets the client', async () => {
+test('legacy /start text no longer requests a phone; direct identity opens client menu', async () => {
   const { service, sent } = bot({ client: { findUnique: async () => ({ firstName: 'Анна' }) }, trainer: { findUnique: async () => null } });
   for (const text of ['/start 1234']) {
     await service.handleMessage(message(text), `code-${text}`);
-    assert.match(sent.at(-1).message, /привязать ВАШ_ТЕЛЕФОН 1234/);
+    assert.match(sent.at(-1).message, /Здравствуйте, Анна/);
   }
   await service.handleMessage(message('/start'), 'start');
   assert.match(sent.at(-1).message, /Здравствуйте, Анна/);
@@ -276,7 +277,7 @@ test('VK management endpoints validate input and enforce ADMIN/MANAGER permissio
   const { UsersController } = require('../dist/users/users.controller');
   const { UsersService } = require('../dist/users/users.service');
   const calls = [];
-  const module = await Test.createTestingModule({ controllers: [VkLinkController, UsersController], providers: [RolesGuard,
+  const module = await Test.createTestingModule({ controllers: [VkLinkController, UsersController], providers: [RolesGuard, { provide: require('../dist/vk-bot/vk-identity.service').VkIdentityService, useValue: {} },
     { provide: VkLinkService, useValue: { issue: async (...args) => { calls.push(args); return { code: '0123' }; },
       unlink: async (...args) => { calls.push(args); return { success: true }; } } },
     { provide: UsersService, useValue: { setVkRecipient: async (...args) => { calls.push(args); return { vkUserId: args[1] }; } } },
@@ -314,12 +315,10 @@ test('administrator recipient configuration rejects non-admin users and revokes 
   const tx = { user: { findUnique: async () => user, update: async ({ data, select }) => {
     assert.equal(select.passwordHash, undefined); return Object.assign(user, data);
   } }, vkNotification: { deleteMany: async args => deleted.push(args) } };
-  const service = new UsersService({ $transaction: async fn => fn(tx) });
+  const service = new UsersService({ ...tx, $transaction: async fn => fn(tx) });
   await assert.rejects(service.setVkRecipient(bookingId, '42'), /только администратор/);
   user = { role: 'ADMIN', vkUserId: 42n };
   await service.setVkRecipient(bookingId, null);
   assert.equal(user.vkUserId, null);
-  assert.deepEqual(deleted[0].where, { peerId: 42n, sentAt: null,
-    OR: [{ key: { startsWith: 'lead:' } }, { key: { startsWith: 'help:' } }],
-  });
+  assert.deepEqual(deleted[0].where, { peerId: { in: [42n] }, sentAt: null });
 });

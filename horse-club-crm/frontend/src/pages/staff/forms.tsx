@@ -6,6 +6,7 @@ import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { StableEntryModal } from '../stable/shared'
 import { currency } from '../cash-desk/shared'
 import { shiftStatuses, type Payroll, type Shift, type ShiftStatus, type Staff } from './types'
+import { VkProfileField, VkProfileLink } from '../../components/VkProfileLink'
 import { PhoneField } from '../../components/PhoneField'
 import { phonePayload } from '../../components/formatPhone'
 import { isUuid } from '../../uuid'
@@ -15,7 +16,7 @@ const moneyProps = { min: 0, max: 9999999999.99, precision: 2, style: { width: '
 
 export function ProfileModal({ staff, onClose, onSaved }: { staff?: Staff; onClose: () => void; onSaved: () => void }) {
   const [form] = Form.useForm()
-  const [candidates, setCandidates] = useState<Array<{ id: string; email: string; trainer?: { fullName: string; name: string } }>>([])
+  const [candidates, setCandidates] = useState<Array<{ id: string; email: string; vkId?: string | null; trainer?: { fullName: string; name: string } }>>([])
   const [error, setError] = useState<string>()
   useEffect(() => {
     if (staff) return
@@ -26,14 +27,18 @@ export function ProfileModal({ staff, onClose, onSaved }: { staff?: Staff; onClo
   return <StableEntryModal variant="drawer" title={staff ? `Редактирование сотрудника: ${staff.fullName}` : 'Добавить сотрудника'} form={form} submitLabel="Сохранить" resources={['staff']} onClose={onClose} onSaved={onSaved} successMessage="Данные сотрудника обновлены"
     save={values => {
       if (!isUuid(staff ? staff.id : values.userId)) throw new Error('Некорректный идентификатор сотрудника')
-      const payload = { ...values, phone: phonePayload(values.phone) }
+      const payload = { ...values, vkId: values.vkId?.trim() || null, phone: phonePayload(values.phone) }
       return staff ? httpClient.patch(`${API_URL}/staff/${staff.id}`, payload) : httpClient.post(`${API_URL}/staff`, payload)
     }}>
     {error && <Alert type="error" message={error} />}
     {!staff && <Form.Item name="userId" label="Учетная запись" rules={required}><Select aria-label="Учетная запись" showSearch optionFilterProp="label" options={candidates.map(user => ({ value: user.id, label: user.email }))} onChange={id => {
-      const trainer = candidates.find(user => user.id === id)?.trainer
+      const selected = candidates.find(user => user.id === id)
+      form.setFieldValue('vkId', selected?.vkId || '')
+      const trainer = selected?.trainer
       if (trainer) form.setFieldValue('fullName', trainer.fullName || trainer.name)
     }} /></Form.Item>}
+    {staff && <VkProfileLink id={staff.userId} name={staff.fullName} vkId={staff.user?.vkId} kind="STAFF" readOnly />}
+    <VkProfileField initialValue={staff?.user?.vkId} />
     <Form.Item name="fullName" label="ФИО" initialValue={staff?.fullName} rules={required}><Input aria-label="ФИО" maxLength={150} /></Form.Item>
     <Form.Item name="roleTitle" label="Должность" initialValue={staff?.roleTitle} rules={required}><Input aria-label="Должность" maxLength={150} /></Form.Item>
     <PhoneField initialValue={staff?.phone} />
