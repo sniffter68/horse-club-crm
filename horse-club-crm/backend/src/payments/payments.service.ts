@@ -1,3 +1,4 @@
+import { archiveTransaction } from '../common/archive-transaction';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PaymentStatus, Prisma } from '@prisma/client';
 import type { RefineQueryDto } from '../common/dto/refine-query.dto';
@@ -78,8 +79,10 @@ export class PaymentsService {
 
   async create(dto: CreatePaymentDto): Promise<PaymentWithRelations> {
     try {
-      const data = await this.resolveData(dto);
-      return await this.prisma.payment.create({ data, include: paymentInclude.include });
+      return await archiveTransaction(this.prisma, async tx => {
+        const data = await this.resolveData(dto, tx);
+        return tx.payment.create({ data, include: paymentInclude.include });
+      });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Платёж');
     }
@@ -87,21 +90,23 @@ export class PaymentsService {
 
   async update(id: string, dto: UpdatePaymentDto): Promise<PaymentWithRelations> {
     try {
-      const current = await this.prisma.payment.findUnique({ where: { id } });
-      if (!current) throw new NotFoundException('Платёж не найден');
-      if (current.archivedAt || current.cashierId) throw new ConflictException('Проведённый кассовый платёж нельзя редактировать');
-      const data = await this.resolveData({
-        clientId: dto.clientId ?? current.clientId,
-        bookingId: dto.bookingId === undefined ? current.bookingId : dto.bookingId,
-        boardingContractId: dto.boardingContractId === undefined ? current.boardingContractId : dto.boardingContractId,
-        membershipId: dto.membershipId === undefined ? current.membershipId : dto.membershipId,
-        amount: dto.amount ?? current.amount.toNumber(),
-        method: dto.method ?? current.method,
-        status: dto.status ?? current.status,
-        paidAt: dto.paidAt === undefined ? current.paidAt?.toISOString() ?? null : dto.paidAt,
-        description: dto.description === undefined ? current.description : dto.description,
+      return await archiveTransaction(this.prisma, async tx => {
+        const current = await tx.payment.findUnique({ where: { id }, include: { refundExpense: { select: { id: true } } } });
+        if (!current) throw new NotFoundException('Платёж не найден');
+        if (current.archivedAt || current.cashierId || current.refundExpense || current.status === 'PAID' || current.status === 'REFUNDED') throw new ConflictException('Проведённый кассовый платёж нельзя редактировать');
+        const data = await this.resolveData({
+          clientId: dto.clientId ?? current.clientId,
+          bookingId: dto.bookingId === undefined ? current.bookingId : dto.bookingId,
+          boardingContractId: dto.boardingContractId === undefined ? current.boardingContractId : dto.boardingContractId,
+          membershipId: dto.membershipId === undefined ? current.membershipId : dto.membershipId,
+          amount: dto.amount ?? current.amount.toNumber(),
+          method: dto.method ?? current.method,
+          status: dto.status ?? current.status,
+          paidAt: dto.paidAt === undefined ? current.paidAt?.toISOString() ?? null : dto.paidAt,
+          description: dto.description === undefined ? current.description : dto.description,
+        }, tx);
+        return await tx.payment.update({ where: { id }, data, include: paymentInclude.include });
       });
-      return await this.prisma.payment.update({ where: { id }, data, include: paymentInclude.include });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Платёж');
     }
@@ -109,15 +114,17 @@ export class PaymentsService {
 
   async remove(id: string): Promise<PaymentWithRelations> {
     try {
-      const current = await this.prisma.payment.findUnique({ where: { id } });
-      if (current?.archivedAt || current?.cashierId) throw new ConflictException('Проведённый кассовый платёж нельзя удалить');
-      return await this.prisma.payment.delete({ where: { id }, include: paymentInclude.include });
+      return await archiveTransaction(this.prisma, async tx => {
+        const current = await tx.payment.findUnique({ where: { id }, include: { refundExpense: { select: { id: true } } } });
+        if (current?.archivedAt || current?.cashierId || current?.refundExpense || current?.status === 'PAID' || current?.status === 'REFUNDED') throw new ConflictException('Проведённый кассовый платёж нельзя удалить');
+        return await tx.payment.delete({ where: { id }, include: paymentInclude.include });
+      });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Платёж');
     }
   }
 
-  private async resolveData(dto: CreatePaymentDto): Promise<PaymentData> {
+  private async resolveData(dto: CreatePaymentDto, tx: Prisma.TransactionClient): Promise<PaymentData> {
     const linkedRecords = [dto.bookingId, dto.boardingContractId, dto.membershipId].filter(Boolean);
     if (linkedRecords.length > 1) {
       throw new BadRequestException('Платёж можно связать только с одним основанием');
@@ -125,31 +132,34 @@ export class PaymentsService {
     let clientId = dto.clientId;
     let amount = dto.amount;
     if (dto.boardingContractId) {
-      const contract = await this.prisma.boardingContract.findUnique({
-        where: { id: dto.boardingContractId }, select: { clientId: true, monthlyRate: true },
+      const contract = await tx.boardingContract.findUnique({
+        where: { id: dto.boardingContractId }, select: { clientId: true, monthlyRate: true, cancelledAt: true, status: true },
       });
       if (!contract) throw new NotFoundException('Договор постоя не найден');
+      if (contract.cancelledAt || contract.status === 'TERMINATED') throw new ConflictException('Договор постоя отменён');
       if (!contract.clientId) throw new ConflictException('Клубное размещение не предусматривает начислений');
       if (clientId && clientId !== contract.clientId) throw new ConflictException('Клиент не соответствует договору постоя');
       clientId = contract.clientId;
       amount ??= contract.monthlyRate.toNumber();
     }
     if (dto.bookingId) {
-      const booking = await this.prisma.booking.findUnique({
+      const booking = await tx.booking.findUnique({
         where: { id: dto.bookingId },
-        select: { clientId: true, costAmount: true, lesson: { select: { service: { select: { price: true } } } } },
+        select: { clientId: true, status: true, costAmount: true, lesson: { select: { service: { select: { price: true } } } } },
       });
       if (!booking) throw new NotFoundException('Запись на занятие не найдена');
+      if (booking.status?.startsWith('cancelled')) throw new ConflictException('Занятие отменено');
       if (clientId && clientId !== booking.clientId) throw new ConflictException('Клиент не соответствует записи на занятие');
       clientId = booking.clientId;
       amount ??= booking.lesson?.service.price.toNumber() ?? booking.costAmount.toNumber();
     }
     if (dto.membershipId) {
-      const membership = await this.prisma.membership.findUnique({
+      const membership = await tx.membership.findUnique({
         where: { id: dto.membershipId },
-        select: { clientId: true, pricingPlan: { select: { price: true } } },
+        select: { clientId: true, cancelledAt: true, deletedAt: true, pricingPlan: { select: { price: true } } },
       });
       if (!membership) throw new NotFoundException('Абонемент не найден');
+      if (membership.cancelledAt || membership.deletedAt) throw new ConflictException('Абонемент аннулирован');
       if (!membership.clientId) throw new ConflictException('У абонемента не указан клиент');
       if (clientId && clientId !== membership.clientId) throw new ConflictException('Клиент не соответствует абонементу');
       clientId = membership.clientId;
@@ -157,7 +167,7 @@ export class PaymentsService {
     }
     if (!clientId) throw new BadRequestException('Укажите клиента или выберите связанную запись');
     if (amount === undefined || amount <= 0) throw new BadRequestException('Сумма платежа должна быть больше нуля');
-    const client = await this.prisma.client.findUnique({ where: { id: clientId }, select: { id: true } });
+    const client = await tx.client.findUnique({ where: { id: clientId }, select: { id: true } });
     if (!client) throw new NotFoundException('Клиент не найден');
     const status = dto.status ?? PaymentStatus.PENDING;
     return {

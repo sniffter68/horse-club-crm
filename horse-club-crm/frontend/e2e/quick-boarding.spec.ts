@@ -4,12 +4,13 @@ test.use({ timezoneId: 'America/New_York' })
 const horse = { id: 'h1', name: 'Кролик', breed: '', riderLevel: '', maxDailyMinutes: 240, minRestMinutes: 15, isUnavailable: false }
 const stall = { id: 's1', name: 'Денник №1', description: '', isUnavailable: false, createdAt: '2026-01-01T00:00:00Z' }
 const client = { id: 'c1', name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567' }
-const contract = { id: 'bc1', status: 'ACTIVE', startsAt: '2026-01-01T09:00:00Z', endsAt: null,
+const contract = { id: '11111111-1111-4111-8111-111111111111', status: 'ACTIVE', startsAt: '2026-01-01T09:00:00Z', endsAt: null,
   monthlyRate: 25000, horse, stall, client, payments: [{ id: 'p1', amount: 25000, status: 'PENDING' }] }
 const available = { horses: [{ id: 'h1', name: 'Кролик' }, { id: 'h2', name: 'Валдай' }],
   stalls: [{ id: 's1', name: 'Денник №1' }, { id: 's2', name: 'Денник №2' }] }
 
 async function setup(page: Page, { occupied = false, unavailable = false, role = 'ADMIN', privateHorse = false } = {}) {
+  await page.route('**/api/boarding-contracts/*/refund-quote', route => route.fulfill({ json: { amount: '0', cancelled: false } }))
   await page.route('**/api/settings/access/me*', route => route.fulfill({ json: { role, userId: 'u1', trainerId: 't1', permissions: { horseReplaceOwn: true, horseReplaceAny: role !== 'TRAINER', healthRead: true, healthWrite: role !== 'TRAINER', financeRead: role !== 'TRAINER', boardingAccess: true } } }))
   await page.clock.setFixedTime(new Date('2026-10-08T09:00:00Z'))
   await page.addInitScript(role => {
@@ -37,7 +38,7 @@ async function setup(page: Page, { occupied = false, unavailable = false, role =
     boarding = { ...contract, client: payload.clientId ? client : null, monthlyRate: payload.monthlyRate }
     await route.fulfill({ json: boarding })
   })
-  await page.route('**/api/boarding-contracts/bc1/terminate', async route => {
+  await page.route('**/api/boarding-contracts/11111111-1111-4111-8111-111111111111/cancel', async route => {
     state.released++; state.occupied = false
     await route.fulfill({ json: { ...contract, status: 'TERMINATED', endsAt: '2026-10-08T09:00:00Z' } })
   })
@@ -79,10 +80,10 @@ for (const width of [1280, 320]) test(`horse placement and confirmed release upd
   expect(state.posts).toEqual([{ horseId: 'h1', stallId: 's1', clientId: 'c1', status: 'ACTIVE', monthlyRate: 25000, startsAt: '2026-10-08T09:00:00.000Z' }])
   await card.getByRole('button', { name: 'Освободить денник', exact: true }).click()
   const release = page.getByRole('dialog', { name: 'Освободить денник?', exact: true })
-  await release.getByRole('button', { name: 'Оставить', exact: true }).click()
+  await release.getByRole('button', { name: 'Отмена', exact: true }).click()
   expect(state.released).toBe(0)
   await card.getByRole('button', { name: 'Освободить денник', exact: true }).click()
-  await release.getByRole('button', { name: 'Освободить', exact: true }).click()
+  await release.getByRole('button', { name: 'Освободить денник', exact: true }).click()
   await expect(card.getByRole('button', { name: '+ Разместить в денник', exact: true })).toBeVisible()
   expect(state.released).toBe(1)
   await card.getByRole('button', { name: 'Close', exact: true }).click()
@@ -161,17 +162,17 @@ test('409 preserves client and rate, refreshes availability and permits selectin
 test('failed release retains occupied state and confirmation for retry, even for an unavailable stall', async ({ page }) => {
   const state = await setup(page, { occupied: true, unavailable: true })
   let fail = true
-  await page.route('**/api/boarding-contracts/bc1/terminate', async route => {
+  await page.route('**/api/boarding-contracts/11111111-1111-4111-8111-111111111111/cancel', async route => {
     if (fail) { fail = false; await route.fulfill({ status: 503, json: { message: 'Повторите позже' } }) }
     else { state.occupied = false; state.released++; await route.fulfill({ json: { ...contract, status: 'TERMINATED' } }) }
   })
   const card = await openCard(page, 'stall')
   await card.getByRole('button', { name: 'Освободить денник', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Освободить денник?', exact: true })
-  await modal.getByRole('button', { name: 'Освободить', exact: true }).click()
+  await modal.getByRole('button', { name: 'Освободить денник', exact: true }).click()
   await expect(modal.getByRole('alert')).toContainText('Повторите позже')
   expect(state.occupied).toBe(true)
-  await modal.getByRole('button', { name: 'Освободить', exact: true }).click()
+  await modal.getByRole('button', { name: 'Освободить денник', exact: true }).click()
   await expect(modal).not.toBeVisible()
   await expect(card.getByText('Денник свободен', { exact: true })).toBeVisible()
   expect(state.stallReads).toBeGreaterThan(1)

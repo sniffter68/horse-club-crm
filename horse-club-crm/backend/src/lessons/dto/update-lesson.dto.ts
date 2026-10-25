@@ -1,4 +1,5 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { CancelServiceDto } from '../../payments/dto/cancel-service.dto';
+import { ApiProperty, PartialType, IntersectionType } from '@nestjs/swagger';
 import { LessonStatus } from '@prisma/client';
 import { IsIn, IsISO8601, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -25,7 +26,7 @@ const FINAL_LESSON_STATUSES = [
   LessonStatus.CANCELLED,
 ] as const;
 
-export class UpdateLessonStatusDto extends CompleteLessonDto {
+export class UpdateLessonStatusDto extends IntersectionType(CompleteLessonDto, PartialType(CancelServiceDto)) {
   @ApiProperty({ enum: FINAL_LESSON_STATUSES })
   @IsIn(FINAL_LESSON_STATUSES)
   status!: LessonStatus;

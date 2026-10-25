@@ -157,7 +157,7 @@ test('new lead targets only ADMIN VK recipients, deduplicates delivery and names
 function notificationLessons() {
   let lesson;
   const queued = new Map();
-  const tx = {
+  const tx = { payment: { findMany: async () => [], updateMany: async () => ({}) }, cashAuditLog: { create: async () => ({}) },
     service: { findUnique: async () => ({ durationMinutes: 60, price: 0, title: 'Выездка', maxCapacity: 4, allowMembership: false }) },
     clubSchedule: { findUnique: async () => ({ openTime: '08:00', closeTime: '22:00', daysOfWeekOff: [] }) },
     lesson: {
@@ -169,7 +169,7 @@ function notificationLessons() {
           { id: 'booking', clientId: 'client', membershipId: null, horseId: null, client: { name: 'Анна', vkUserId: 43n } },
           { id: 'booking2', clientId: 'client2', membershipId: null, horseId: null, client: { name: 'Борис', vkUserId: null } },
         ] }; return lesson; },
-      update: async ({ data }) => { lesson = { ...lesson, ...data }; return lesson; },
+      update: async ({ data }) => { const { bookings: _bookings, ...fields } = data; lesson = { ...lesson, ...fields }; return lesson; },
     },
     vkNotification: { upsert: async ({ create }) => { if (!queued.has(create.key)) queued.set(create.key, create); } },
   };
@@ -198,8 +198,8 @@ test('creation, repeated transfers and cancellation enqueue trainer and linked c
   assert.equal(queued.size, 8); // The same target time is a new change after moving back.
   await service.rescheduleLesson('lesson', '2026-10-08T10:00:00Z', 60);
   assert.equal(queued.size, 8); // Unchanged interval produces no push.
-  await service.updateLessonStatus('lesson', 'CANCELLED');
-  await service.updateLessonStatus('lesson', 'CANCELLED');
+  await service.updateLessonStatus('lesson', 'CANCELLED', {}, { id: 'admin', email: 'a@test', role: 'ADMIN' });
+  await service.updateLessonStatus('lesson', 'CANCELLED', {}, { id: 'admin', email: 'a@test', role: 'ADMIN' });
   assert.equal(queued.size, 10); assert.match([...queued.values()].at(-1).message, /отменена/);
 });
 

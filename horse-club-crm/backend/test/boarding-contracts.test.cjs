@@ -51,7 +51,7 @@ test('club update preserves omitted client, supports explicit null, and cannot i
 
 test('manual payments cannot be linked to club placement', async () => {
   const { PaymentsService } = require('../dist/payments/payments.service');
-  const service = new PaymentsService({ boardingContract: { findUnique: async () => ({ clientId: null, monthlyRate: { toNumber: () => 0 } }) },
+  const service = new PaymentsService({ $transaction: async fn => fn({ boardingContract: { findUnique: async () => ({ clientId: null }) } }), boardingContract: { findUnique: async () => ({ clientId: null, monthlyRate: { toNumber: () => 0 } }) },
     payment: { create: async () => assert.fail('club payment must not be created') } });
   await assert.rejects(service.create({ boardingContractId: 'contract', clientId: activeContract.clientId, amount: 100, method: 'CASH' }), error => error.status === 409);
 });
@@ -178,18 +178,18 @@ test('quick placement excludes active/suspended and future reservations but allo
 test('quick release preserves rate/parties/payments, closes unavailable stalls and is idempotent', async () => {
   let writes = 0;
   const contract = { ...activeContract, id: 'contract', startsAt: new Date('2026-01-01Z'), endsAt: null, payments: [{ id: 'payment', status: 'PENDING' }], stall: { isUnavailable: true } };
-  const tx = { boardingContract: {
+  const tx = { payment: { findMany: async () => [], updateMany: async () => ({}) }, cashAuditLog: { create: async () => ({}) }, boardingContract: {
     findUnique: async () => contract,
-    update: async ({ data }) => { writes++; assert.deepEqual(Object.keys(data).sort(), ['endsAt', 'status']); Object.assign(contract, data); return contract; },
+    update: async ({ data }) => { writes++; assert.deepEqual(Object.keys(data).sort(), ['cancelledAt', 'endsAt', 'status']); Object.assign(contract, data); return contract; },
   } };
   const service = new BoardingContractsService({ $transaction: async (fn, options) => {
     assert.equal(options.isolationLevel, 'Serializable'); return fn(tx);
   } });
   const before = Date.now();
-  await service.terminate(contract.id);
+  await service.terminate(contract.id, { refund: false }, { id: 'admin', email: 'a@test', role: 'ADMIN' });
   const end = contract.endsAt;
   assert.equal(contract.status, 'TERMINATED'); assert.ok(end.getTime() >= before && end.getTime() <= Date.now());
-  await service.terminate(contract.id);
+  await service.terminate(contract.id, { refund: false }, { id: 'admin', email: 'a@test', role: 'ADMIN' });
   assert.equal(writes, 1); assert.equal(contract.endsAt, end); assert.equal(contract.monthlyRate, 25000);
   assert.deepEqual(contract.payments, [{ id: 'payment', status: 'PENDING' }]);
 });
@@ -245,7 +245,7 @@ test('quick boarding HTTP endpoints validate dates and restrict changes to ADMIN
     const path = `/boarding-contracts/${activeContract.horseId}/terminate`;
     await request(app.getHttpServer()).post(path).set('x-role', 'TRAINER').expect(403);
     await request(app.getHttpServer()).post('/boarding-contracts/invalid/terminate').set('x-role', 'ADMIN').expect(400);
-    await request(app.getHttpServer()).post(path).set('x-role', 'MANAGER').expect(201);
+    await request(app.getHttpServer()).post(path).set('x-role', 'MANAGER').send({ refund: false }).expect(201);
     assert.deepEqual(calls, ['2026-10-08T09:00:00Z', activeContract.horseId]);
   } finally { await app.close(); }
 });

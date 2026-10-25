@@ -125,7 +125,7 @@ test('summary applies paid/date/cashier filters and paginates operations without
   await assert.rejects(() => service.summary({ from: '2026-10-10', to: '2026-10-09' }), e => e.status === 400);
 });
 test('cash receipts cannot be edited or removed through legacy CRUD', async () => {
-  const service = new PaymentsService({ payment: { findUnique: async () => ({ cashierId: 'u1' }) } });
+  const service = new PaymentsService({ $transaction: async fn => fn({ payment: { findUnique: async () => ({ cashierId: 'u1' }) } }) });
   await assert.rejects(() => service.update('p1', {}), e => e.status === 409);
   await assert.rejects(() => service.remove('p1'), e => e.status === 409);
 });

@@ -18,6 +18,7 @@ test('boarding payment derives client and monthly rate without fiscal integratio
     client: { findUnique: async () => ({ id: 'client-1' }) },
     payment: { create: async args => { createArgs = args; return { id: 'payment-1', ...args.data }; } },
   };
+  prisma.$transaction = async fn => fn(prisma);
   await new PaymentsService(prisma).create({
     boardingContractId: '8e5e03af-cb29-4689-be60-a07188174e26',
     method: 'TRANSFER',
@@ -31,7 +32,7 @@ test('boarding payment derives client and monthly rate without fiscal integratio
 });
 
 test('payment cannot reference a booking and boarding contract simultaneously', async () => {
-  const service = new PaymentsService({});
+  const service = new PaymentsService({ $transaction: async fn => fn({}) });
   await assert.rejects(
     () => service.create({
       bookingId: '9dc6e50b-2779-4f9f-a4dd-a01199a4c239',
@@ -43,7 +44,7 @@ test('payment cannot reference a booking and boarding contract simultaneously', 
 });
 
 test('manual payment requires a client and positive amount', async () => {
-  const service = new PaymentsService({});
+  const service = new PaymentsService({ $transaction: async fn => fn({}) });
   await assert.rejects(
     () => service.create({ method: 'CARD', amount: 1000 }),
     error => error.status === 400 && error.message === 'Укажите клиента или выберите связанную запись',

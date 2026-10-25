@@ -1,3 +1,4 @@
+import { ServiceCancellationAction } from '../../components/ServiceCancellationAction'
 import { useRef, useState } from 'react'
 import { Alert, App, Button, Modal, Space, Spin, Typography } from 'antd'
 import { useInvalidate } from '@refinedev/core'
@@ -11,7 +12,7 @@ type Preview = { name?: string; title?: string; deletedAt?: string | null; _coun
   totalLessons?: number; remainedLessons?: number; totalPrice?: string | number; boardingBalance?: string | number;
   payments?: Array<{ amount: string | number; status: string }> }
 
-export function ArchiveAction({ id, resource, archived, onChanged }: {
+function ClientArchiveAction({ id, resource, archived, onChanged }: {
   id: string; resource: 'clients' | 'memberships'; archived?: boolean; onChanged?: () => void;
 }) {
   const { canManage } = useCatalogPermissions(resource)
@@ -83,4 +84,8 @@ export function ArchiveAction({ id, resource, archived, onChanged }: {
       {error && <Alert role="alert" type="error" showIcon message={error} />}
     </Modal>
   </>
+}
+
+export function ArchiveAction(props: Parameters<typeof ClientArchiveAction>[0]) {
+  return props.resource === 'memberships' ? (props.archived ? null : <ServiceCancellationAction resource="memberships" id={props.id} label="Удалить / аннулировать" onChanged={props.onChanged} />) : <ClientArchiveAction {...props} />
 }

@@ -366,7 +366,7 @@ test('creation retries P2034 and list query uses interval intersection filters',
     arenaId: 'arena-1',
     status: LessonStatus.SCHEDULED,
   });
-  assert.deepEqual(listArgs.where, {
+  assert.deepEqual(listArgs.where, { deletedAt: null,
     trainerId: 'trainer-1',
     arenaId: 'arena-1',
     status: LessonStatus.SCHEDULED,
@@ -484,17 +484,17 @@ function createStatusHarness(newStatus, operations = [], options = {}) {
   const refundCalls = [];
   const bookingUpdates = [];
   const paymentUpdates = [];
-  const tx = {
-    payment: { count: async () => options.paid ? 1 : 0, updateMany: async args => { paymentUpdates.push(args); return { count: 1 }; } },
+  const tx = { cashAuditLog: { create: async () => ({}) },
+    payment: { findMany: async () => [], count: async () => options.paid ? 1 : 0, updateMany: async args => { paymentUpdates.push(args); return { count: 1 }; } },
     lesson: {
       findUnique: async () => ({
-        status: LessonStatus.SCHEDULED,
+        startTime: new Date(), status: LessonStatus.SCHEDULED,
         service: { allowMembership: options.allowMembership ?? false },
         bookings: [
-          { id: 'booking-1', clientId: 'client-1', membership: {clientId: 'client-1'}, membershipId: 'membership-2' },
-          { id: 'booking-2', clientId: 'client-2', membership: {clientId: 'client-2'}, membershipId: 'membership-1' },
-          { id: 'booking-3', clientId: 'client-3', membershipId: 'membership-1' },
-          { id: 'booking-4', clientId: 'client-4', membershipId: null },
+          { id: 'booking-1', client: { name: 'Client' }, clientId: 'client-1', membership: {client: { name: 'Client' }, clientId: 'client-1'}, membershipId: 'membership-2' },
+          { id: 'booking-2', client: { name: 'Client' }, clientId: 'client-2', membership: {client: { name: 'Client' }, clientId: 'client-2'}, membershipId: 'membership-1' },
+          { id: 'booking-3', client: { name: 'Client' }, clientId: 'client-3', membershipId: 'membership-1' },
+          { id: 'booking-4', client: { name: 'Client' }, clientId: 'client-4', membershipId: null },
         ],
         operations,
       }),
@@ -513,7 +513,7 @@ function createStatusHarness(newStatus, operations = [], options = {}) {
     refundLesson: async (...args) => refundCalls.push(args),
   };
   const service = new LessonsService(prisma, ledger);
-  return service.updateLessonStatus('lesson-1', newStatus).then((result) => ({
+  return service.updateLessonStatus('lesson-1', newStatus, {}, { id: 'admin', email: 'a@test', role: 'ADMIN' }).then((result) => ({
     result, debitCalls, refundCalls, bookingUpdates, paymentUpdates, tx,
   }));
 }

@@ -1,8 +1,9 @@
+import { CancelServiceDto } from '../payments/dto/cancel-service.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { RequireModule } from '../auth/module-access.guard';
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Role } from '@prisma/client';
 import type { Response } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -17,7 +18,7 @@ import { MembershipsService, type MembershipResponse } from './memberships.servi
 @RequireModule('SCHEDULE')
 @ApiTags('Memberships')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.MANAGER)
 @Controller(['memberships', 'client-memberships'])
 export class MembershipsController {
@@ -34,8 +35,18 @@ export class MembershipsController {
     setRefineTotalHeaders(res, plans.length);
     return plans;
   }
+  @Get(':id/refund-quote')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  refundQuote(@Param('id', new ParseUUIDPipe()) id: string) { return this.membershipsService.refundQuote(id); }
+
+  @Post(':id/cancel')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  cancel(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CancelServiceDto, @CurrentUser() actor: AuthUser) {
+    return this.membershipsService.remove(id, dto, actor);
+  }
+
   @Delete(':id')
-  remove(@Param('id', new ParseUUIDPipe()) id: string) { return this.membershipsService.remove(id); }
+  remove(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CancelServiceDto, @CurrentUser() actor: AuthUser) { return this.membershipsService.remove(id, dto, actor); }
   @Post(':id/members')
   addMember(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: MembershipMemberDto, @CurrentUser() actor: AuthUser) {
     return this.membershipsService.addMember(id, dto.clientId, actor);

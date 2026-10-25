@@ -1,3 +1,6 @@
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthUser } from '../auth/auth.types';
+import { CancelServiceDto } from '../payments/dto/cancel-service.dto';
 import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -39,8 +42,8 @@ export class BoardingContractsController {
 
   @Post(':id/terminate')
   @Roles(Role.ADMIN, Role.MANAGER)
-  terminate(@Param('id', new ParseUUIDPipe()) id: string): Promise<BoardingContractWithRelations> {
-    return this.service.terminate(id);
+  terminate(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CancelServiceDto, @CurrentUser() actor: AuthUser): Promise<BoardingContractWithRelations> {
+    return this.service.terminate(id, dto, actor);
   }
 
   @Get(':id')
@@ -64,9 +67,19 @@ export class BoardingContractsController {
     return this.service.update(id, dto);
   }
 
+  @Get(':id/refund-quote')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  refundQuote(@Param('id', new ParseUUIDPipe()) id: string) { return this.service.refundQuote(id); }
+
+  @Post(':id/cancel')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  cancel(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CancelServiceDto, @CurrentUser() actor: AuthUser) {
+    return this.service.remove(id, dto, actor);
+  }
+
   @Delete(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
-  remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<BoardingContractWithRelations> {
-    return this.service.remove(id);
+  remove(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CancelServiceDto, @CurrentUser() actor: AuthUser): Promise<BoardingContractWithRelations> {
+    return this.service.remove(id, dto, actor);
   }
 }

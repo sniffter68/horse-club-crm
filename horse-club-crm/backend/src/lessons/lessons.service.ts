@@ -1,3 +1,5 @@
+import { refundService, serviceRefundQuote } from '../payments/service-refund';
+import type { CancelServiceDto } from '../payments/dto/cancel-service.dto';
 import { canUseMembership, membershipAccessWhere } from '../memberships/membership-access';
 import type { AuthUser } from '../auth/auth.types';
 import type { CompleteLessonDto } from './dto/lesson-payment.dto';
@@ -89,6 +91,8 @@ export class LessonsService {
     private readonly membershipLedgerService: MembershipLedgerService,
     private readonly bookingRules: BookingRulesService = new BookingRulesService(),
   ) {}
+
+  refundQuote(id: string) { return this.prisma.$transaction(tx => serviceRefundQuote(tx, 'lessons', id)).then(({ amount, refundMethod, cancelled }) => ({ amount, refundMethod, cancelled })); }
 
   async validateNoConflicts(
     trainerId: string,
@@ -425,7 +429,7 @@ export class LessonsService {
     }
 
     return this.prisma.lesson.findMany({
-      where: {
+      where: { deletedAt: null,
         ...(query.trainerId ? { trainerId: query.trainerId } : {}),
         ...(query.horseId ? { bookings: { some: { horseId: query.horseId } } } : {}),
         ...(query.arenaId ? { arenaId: query.arenaId } : {}),
@@ -494,43 +498,9 @@ export class LessonsService {
     return lesson;
   }
 
-  async deleteLesson(lessonId: string, actor: AuthUser) {
-    return this.runSerializable(async (tx) => {
-      const lesson = await tx.lesson.findUnique({
-        where: { id: lessonId },
-        include: { bookings: { include: { membership: true, client: true } }, operations: true },
-      });
-      if (!lesson) throw new NotFoundException('Занятие не найдено');
-
-      const reason = `Удаление занятия ${lessonId}; пользователь ${actor.id}; ${new Date().toISOString()}`;
-      const opKey = (op: { membershipId: string; attendeeClientId?: string | null }) => `${op.membershipId}:${op.attendeeClientId ?? ''}`;
-      const refunded = new Set(lesson.operations.filter(op => op.type === 'REFUND').map(opKey));
-      // The ledger is authoritative: scheduled visits and already refunded visits
-      // must never receive an extra credit. Include debits from former participants.
-      const debits = lesson.operations.filter(op => op.type === 'DEBIT' && !refunded.has(opKey(op)))
-        .sort((a, b) => a.membershipId.localeCompare(b.membershipId));
-      for (const debit of debits) {
-        await this.membershipLedgerService.refundLesson(debit.membershipId, lessonId, reason, tx, debit.attendeeClientId ?? undefined);
-      }
-      // Retain both DEBIT and REFUND history, including the original lesson ID.
-      // SetNull alone would lose that context once the lesson is gone.
-      const operations = await tx.membershipOp.findMany({ where: { lessonId }, select: { id: true, reason: true } });
-      for (const operation of operations) {
-        await tx.membershipOp.update({ where: { id: operation.id },
-          data: { lessonId: null, reason: operation.reason.includes(reason) ? operation.reason : `${operation.reason}\n${reason}` } });
-      }
-      // Cash receipts and purchase ledger entries retain their booking, actor,
-      // amount and timestamps. Only unpaid charges are cancelled, never refunded.
-      await tx.payment.updateMany({ where: { booking: { lessonId }, status: 'PENDING' }, data: { status: 'CANCELLED' } });
-      for (const booking of lesson.bookings) {
-        await tx.booking.updateMany({ where: { id: booking.id, lessonId }, data: {
-          lessonId: null, legacyLessonBinding: true, status: 'cancelled_club',
-          cancellationReason: [booking.cancellationReason, `${reason}; исходный статус ${booking.status}`].filter(Boolean).join('\n'),
-        } });
-      }
-      await tx.lesson.delete({ where: { id: lessonId } });
-      return { success: true, message: 'Занятие успешно удалено' };
-    });
+  async deleteLesson(lessonId: string, actor: AuthUser, dto?: CancelServiceDto) {
+    await this.updateLessonStatus(lessonId, LessonStatus.CANCELLED, {}, actor, dto);
+    return { success: true, message: 'Занятие успешно удалено' };
   }
 
   async updateLessonStatus(
@@ -538,6 +508,7 @@ export class LessonsService {
     newStatus: LessonStatus,
     payment: CompleteLessonDto = {},
     actor?: AuthUser,
+    cancellation?: Partial<CancelServiceDto>,
   ): Promise<LessonDetails> {
     if (!ALLOWED_FINAL_STATUSES.has(newStatus)) {
       throw new BadRequestException('Недопустимый статус занятия');
@@ -547,7 +518,7 @@ export class LessonsService {
       const lesson = await tx.lesson.findUnique({
         where: { id: lessonId },
         select: {
-          status: true, cost: true, prepaymentAmount: true, finalPaymentAmount: true, startTime: true, serviceId: true,
+          status: true, cancelledAt: true, cost: true, prepaymentAmount: true, finalPaymentAmount: true, startTime: true, serviceId: true,
           service: { select: { allowMembership: true } },
           bookings: { select: { id: true, clientId: true, membership: { select: { clientId: true } }, membershipId: true, costAmount: true, prepaymentAmount: true, finalPaymentAmount: true, isPaid: true, client: { select: { name: true } }, payments: { where: { status: 'PAID' }, select: { amount: true } } } },
           operations: {
@@ -561,13 +532,14 @@ export class LessonsService {
       if (!lesson) {
         throw new NotFoundException('Занятие не найдено');
       }
-      if (lesson.status === newStatus) {
+      if (newStatus === LessonStatus.CANCELLED) await refundService(tx, 'lessons', lessonId, cancellation, actor);
+      if (lesson.status === newStatus && (newStatus !== LessonStatus.CANCELLED || lesson.cancelledAt)) {
         return tx.lesson.findUniqueOrThrow({
           where: { id: lessonId },
           ...lessonDetails,
         });
       }
-      if (lesson.status === LessonStatus.CANCELLED) {
+      if (lesson.status === LessonStatus.CANCELLED && newStatus !== LessonStatus.CANCELLED) {
         throw new ConflictException(
           'Отменённое занятие нельзя перевести в другой статус',
         );
@@ -612,18 +584,28 @@ export class LessonsService {
         membershipId: resolvedMembershipIds[index], clientId: booking.clientId,
       })).filter((row): row is { membershipId: string; clientId: string } => Boolean(row.membershipId))
         .sort((a, b) => a.membershipId.localeCompare(b.membershipId) || a.clientId.localeCompare(b.clientId));
-      for (const participant of participantsToCharge) {
+      const uniqueParticipants = [...new Map(participantsToCharge.map(p => [`${p.membershipId}:${p.clientId}`, p])).values()];
+      for (const participant of uniqueParticipants) {
         // Historical operations without attendee identity belong to the purchaser.
         const matching = lesson.operations.filter(op => op.membershipId === participant.membershipId
           && (op.attendeeClientId === participant.clientId || (!op.attendeeClientId
             && lesson.bookings.some(b => b.clientId === participant.clientId && b.membership?.clientId === participant.clientId))));
         const debit = matching.find(op => op.type === MembershipOpType.DEBIT);
-        const refund = matching.find(op => op.type === MembershipOpType.REFUND);
         if (newStatus === LessonStatus.COMPLETED || newStatus === LessonStatus.NO_SHOW) {
           if (!debit) await this.membershipLedgerService.debitLesson(participant.membershipId, lessonId,
             newStatus === LessonStatus.COMPLETED ? 'Занятие завершено' : 'Неявка на занятие', tx, participant.clientId);
-        } else if (debit && !refund) {
-          await this.membershipLedgerService.refundLesson(participant.membershipId, lessonId, 'Отмена занятия', tx, debit.attendeeClientId ?? undefined);
+        }
+      }
+
+      if (newStatus === LessonStatus.CANCELLED) {
+        // Include former participants: the journal, rather than current bookings,
+        // determines which visits must be credited back.
+        const key = (op: { membershipId: string; attendeeClientId: string | null }) => `${op.membershipId}:${op.attendeeClientId ?? ''}`;
+        const refunded = new Set(lesson.operations.filter(op => op.type === MembershipOpType.REFUND).map(key));
+        for (const debit of lesson.operations.filter(op => op.type === MembershipOpType.DEBIT)) {
+          if (refunded.has(key(debit))) continue;
+          await this.membershipLedgerService.refundLesson(debit.membershipId, lessonId, cancellation?.reason || 'Отмена занятия', tx, debit.attendeeClientId ?? undefined);
+          refunded.add(key(debit));
         }
       }
 
@@ -669,7 +651,7 @@ export class LessonsService {
       }
       const updated = await tx.lesson.update({
         where: { id: lessonId },
-        data: { status: newStatus, ...financialData },
+        data: { status: newStatus, ...financialData, ...(newStatus === 'CANCELLED' ? { cancelledAt: new Date(), deletedAt: new Date(), bookings: { updateMany: { where: {}, data: { status: 'cancelled_club', cancellationReason: cancellation?.reason ?? 'Отмена занятия' } } } } : {}) },
         ...lessonDetails,
       });
       if (newStatus === LessonStatus.CANCELLED) await this.notifyLesson(tx, updated, 'cancelled', 'Тренировка отменена');

@@ -1,3 +1,5 @@
+import { refundService, serviceRefundQuote } from '../payments/service-refund';
+import type { CancelServiceDto } from '../payments/dto/cancel-service.dto';
 import { createHash, randomUUID } from 'node:crypto';
 import { DateTime } from 'luxon';
 import type { AuthUser } from '../auth/auth.types';
@@ -46,6 +48,8 @@ export type MembershipResponse = MembershipRecord & { isActive: boolean };
 export class MembershipsService {
   private readonly logger = new Logger(MembershipsService.name);
   constructor(private readonly prisma: PrismaService) {}
+
+  refundQuote(id: string) { return this.prisma.$transaction(tx => serviceRefundQuote(tx, 'memberships', id)).then(({ amount, refundMethod, cancelled }) => ({ amount, refundMethod, cancelled })); }
 
   async findAll(query: ArchiveQueryDto): Promise<PaginatedResult<MembershipResponse>> {
     const options = parseRefineQuery(query, ['id', 'totalLessons', 'remainedLessons', 'validUntil', 'createdAt', 'updatedAt'], 'createdAt');
@@ -178,23 +182,12 @@ export class MembershipsService {
     }
   }
 
-  async remove(id: string) {
+  async remove(id: string, dto?: CancelServiceDto, actor?: AuthUser) {
     return archiveTransaction(this.prisma, async tx => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${id}, 0))::text`;
-      const membership = await tx.membership.findUnique({ where: { id }, include: {
-        _count: { select: { members: true, bookings: true, payments: true, transactions: true, operations: true } },
-      } });
-      if (!membership) throw new NotFoundException('Абонемент не найден');
-      // Even issuance CREDIT is immutable journal history. Never remove its projection.
-      const softDeleted = Boolean(membership.deletedAt) || membership.cashboxPosted
-        || membership.remainedLessons !== membership.totalLessons
-        || !membership.remainingUnits.equals(membership.initialUnits)
-        || Object.values(membership._count).some(count => count > 0);
-      if (softDeleted) await tx.membership.update({ where: { id }, data: { deletedAt: membership.deletedAt ?? new Date() } });
-      else await tx.membership.delete({ where: { id } });
-      return { id, softDeleted, message: softDeleted
-        ? 'Абонемент аннулирован и перенесен в архив. При наличии остатка оформите возврат в кассе'
-        : 'Абонемент удален безвозвратно' };
+      await refundService(tx, 'memberships', id, dto, actor);
+      await tx.membership.update({ where: { id }, data: { deletedAt: new Date(), cancelledAt: new Date(), status: 'exhausted' } });
+      return { id, softDeleted: true, message: 'Абонемент аннулирован и перенесен в архив' };
     });
   }
 

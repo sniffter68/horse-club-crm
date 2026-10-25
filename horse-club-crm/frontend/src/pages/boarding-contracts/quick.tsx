@@ -1,8 +1,9 @@
+import { ServiceCancellationAction } from '../../components/ServiceCancellationAction'
 import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { EntryOverlay } from '../../components/EntryOverlay'
 import { useEffect, useRef, useState } from 'react'
 import { useInvalidate, useOnError } from '@refinedev/core'
-import { Alert, App, Button, Checkbox, DatePicker, Empty, Form, InputNumber, Modal, Select as EntitySelect, Skeleton, Space, Typography } from 'antd'
+import { Alert, App, Button, Checkbox, DatePicker, Empty, Form, InputNumber, Select as EntitySelect, Skeleton, Space, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { useCatalogPermissions } from '../catalogs/permissions'
@@ -31,45 +32,17 @@ export function QuickBoardingActions({ context, contracts, currentContract, disa
   context: PlacementContext; contracts: ContractSummary[]; currentContract?: ContractSummary | null; disabled?: boolean
 }) {
   const { canManage } = useCatalogPermissions('boarding-contracts')
-  const refresh = useBoardingRefresh()
-  const { mutate: onError } = useOnError()
-  const { message } = App.useApp()
   const [place, setPlace] = useState(false)
-  const [release, setRelease] = useState<ContractSummary>()
-  const [busy, setBusy] = useState(false)
-  const lock = useRef(false)
-  const [error, setError] = useState<string>()
   const current = currentContract === undefined ? contracts.find(contract => isCurrentBoarding(contract)) : currentContract
-  const terminate = async () => {
-    if (!release || lock.current) return
-    lock.current = true
-    setBusy(true)
-    setError(undefined)
-    try {
-      await httpClient.post(`${API_URL}/boarding-contracts/${release.id}/terminate`)
-      setRelease(undefined)
-      void message.success('Денник освобождён. Договор постоя завершён')
-      await refresh()
-    } catch (cause) {
-      const failure = toHttpError(cause)
-      setError(failure.message)
-      if (failure.statusCode === 401) onError(failure)
-    } finally { lock.current = false; setBusy(false) }
-  }
   if (!canManage) return null
   return <div className="quick-boarding-actions">
-    {current ? <Button size="small" disabled={disabled} onClick={() => { setError(undefined); setRelease(current) }}>Освободить денник</Button>
+    {current ? <ServiceCancellationAction resource="boarding-contracts" id={current.id} label="Освободить денник" disabled={disabled} />
       : context.kind === 'STALL' && context.isUnavailable ? <Typography.Text type="secondary">Заселение недоступно: денник закрыт.</Typography.Text>
         : <Button className="quick-boarding-primary" type="primary" size="small" disabled={disabled} onClick={() => setPlace(true)}>
           {context.kind === 'HORSE' ? '+ Разместить в денник' : '+ Заселить лошадь'}
         </Button>}
     {place && <QuickPlacement context={context} onClose={() => setPlace(false)} />}
-    <Modal title="Освободить денник?" open={Boolean(release)} onCancel={() => { if (!busy) setRelease(undefined) }}
-      onOk={() => void terminate()} okText="Освободить" cancelText="Оставить" confirmLoading={busy}
-      closable={!busy} keyboard={!busy} maskClosable={!busy} cancelButtonProps={{ disabled: busy }}>
-      <Typography.Paragraph>Завершить текущий постой · {context.name}? Договор и начисления сохранятся в истории.</Typography.Paragraph>
-      {error && <Alert type="error" showIcon message="Не удалось освободить денник" description={error} />}
-    </Modal>
+
   </div>
 }
 

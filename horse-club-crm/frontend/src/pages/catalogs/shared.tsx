@@ -1,3 +1,4 @@
+import { ServiceCancellationAction } from '../../components/ServiceCancellationAction'
 import type { ReactNode } from 'react'
 import { useContext, useEffect, useState } from 'react'
 import { CatalogDrawerForm } from './EditDrawer'
@@ -36,7 +37,8 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
     render: (_: unknown, record: T) => <Space wrap>
       <EditButton resource={resource} recordItemId={record.id} size="small" aria-label="Редактировать">Редактировать</EditButton>
       {extraActions?.(record)}
-      {resource !== 'clients' && (resource !== 'horse-health-logs' || role !== 'TRAINER') && <DeleteButton resource={resource} recordItemId={record.id} size="small" aria-label="Удалить"
+      {resource === 'boarding-contracts' && <ServiceCancellationAction resource="boarding-contracts" id={String(record.id)} label="Отменить постой" />}
+      {resource !== 'boarding-contracts' && resource !== 'clients' && (resource !== 'horse-health-logs' || role !== 'TRAINER') && <DeleteButton resource={resource} recordItemId={record.id} size="small" aria-label="Удалить"
         confirmTitle="Удалить запись?" confirmOkText="Удалить" confirmCancelText="Отмена">Удалить</DeleteButton>}
     </Space>,
   }] : []

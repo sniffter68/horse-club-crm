@@ -1,3 +1,6 @@
+import type { AuthUser } from '../auth/auth.types';
+import { refundService, serviceRefundQuote } from '../payments/service-refund';
+import type { CancelServiceDto } from '../payments/dto/cancel-service.dto';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { BoardingContractStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import { isSerializationFailure } from '../common/serialization-failure';
@@ -40,6 +43,8 @@ const SERIALIZATION_RETRIES = 3;
 export class BoardingContractsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  refundQuote(id: string) { return this.prisma.$transaction(tx => serviceRefundQuote(tx, 'boarding-contracts', id)).then(({ amount, refundMethod, cancelled }) => ({ amount, refundMethod, cancelled })); }
+
   async availability(startsAt: string) {
     const start = this.date(startsAt, 'Некорректная дата начала');
     // Quick placement has no end date, so future reservations also conflict.
@@ -58,17 +63,22 @@ export class BoardingContractsService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
-  async terminate(id: string): Promise<BoardingContractWithRelations> {
+  async terminate(id: string, dto?: CancelServiceDto, actor?: AuthUser): Promise<BoardingContractWithRelations> {
+    return this.cancel(id, dto, actor, true);
+  }
+
+  async cancel(id: string, dto?: CancelServiceDto, actor?: AuthUser, currentOnly = false): Promise<BoardingContractWithRelations> {
     return this.runSerializable(async tx => {
       const current = await tx.boardingContract.findUnique({ where: { id }, include: contractInclude.include });
       if (!current) throw new NotFoundException('Договор постоя не найден');
-      if (current.status === BoardingContractStatus.TERMINATED) return current;
+      if (current.cancelledAt || current.status === 'TERMINATED') return current;
       const now = new Date();
-      if (!RESERVING_STATUSES.includes(current.status) || current.startsAt >= now || (current.endsAt && current.endsAt <= now)) {
+      if (currentOnly && (!RESERVING_STATUSES.includes(current.status) || current.startsAt >= now || (current.endsAt && current.endsAt <= now))) {
         throw new ConflictException('Освободить денник можно только по текущему активному или приостановленному договору');
       }
-      // Keep the original parties, rate, payments and history, even for an unavailable stall.
-      return tx.boardingContract.update({ where: { id }, data: { status: BoardingContractStatus.TERMINATED, endsAt: now }, include: contractInclude.include });
+      await refundService(tx, 'boarding-contracts', id, dto, actor);
+      return tx.boardingContract.update({ where: { id }, data: { status: BoardingContractStatus.TERMINATED, cancelledAt: now,
+        ...(current.startsAt < now ? { endsAt: now } : {}) }, include: contractInclude.include });
     });
   }
 
@@ -143,6 +153,7 @@ export class BoardingContractsService {
       return await this.runSerializable(async tx => {
         const current = await tx.boardingContract.findUnique({ where: { id } });
         if (!current) throw new NotFoundException('Договор постоя не найден');
+        if (current.cancelledAt || dto.status === 'TERMINATED') throw new ConflictException('Используйте отмену договора с выбором возврата');
         const data: ContractData = {
           clientId: dto.clientId === undefined ? current.clientId : dto.clientId,
           horseId: dto.horseId ?? current.horseId,
@@ -162,12 +173,8 @@ export class BoardingContractsService {
     }
   }
 
-  async remove(id: string): Promise<BoardingContractWithRelations> {
-    try {
-      return await this.prisma.boardingContract.delete({ where: { id }, include: contractInclude.include });
-    } catch (error: unknown) {
-      return rethrowCatalogMutation(error, 'Договор постоя');
-    }
+  async remove(id: string, dto?: CancelServiceDto, actor?: AuthUser): Promise<BoardingContractWithRelations> {
+    return this.cancel(id, dto, actor);
   }
 
   private createData(dto: CreateBoardingContractDto): ContractData {

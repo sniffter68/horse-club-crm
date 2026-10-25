@@ -182,7 +182,7 @@ export class DashboardService {
           where: { status: LeadRequestStatus.PENDING },
         }),
         canRead('CASHBOX') ? this.prisma.membership.count({
-          where: { validUntil: { gte: now }, remainedLessons: { gt: 0 } },
+          where: { deletedAt: null, status: 'active', validUntil: { gte: now }, remainedLessons: { gt: 0 } },
         }) : Promise.resolve(0),
         this.prisma.leadRequest.findMany({
           where: { status: LeadRequestStatus.PENDING },

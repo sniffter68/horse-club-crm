@@ -19,7 +19,7 @@ function fixture(kind, overrides = {}) {
   const record = { id: 'record', deletedAt: null, boardingBalance: new Prisma.Decimal(0),
     totalLessons: 8, remainedLessons: 8, initialUnits: new Prisma.Decimal(8), remainingUnits: new Prisma.Decimal(8),
     cashboxPosted: false, _count: counts, ...overrides };
-  const tx = { $queryRaw: async () => [], [kind]: {
+  const tx = { payment: { findMany: async () => [], updateMany: async () => ({ count: 0 }) }, cashAuditLog: { create: async () => ({}) }, $queryRaw: async () => [], [kind]: {
     findUnique: async () => record,
     delete: async args => { calls.push(['delete', args]); return record; },
     update: async args => { calls.push(['update', args]); return { ...record, ...args.data }; },
@@ -32,26 +32,26 @@ function fixture(kind, overrides = {}) {
 
 test('empty client is physically deleted inside a serializable transaction', async () => {
   const f = fixture('client');
-  assert.equal((await f.service.remove('record')).softDeleted, false);
+  assert.equal((await f.service.remove('record', { refund: false }, { id: 'admin', email: 'a@test', role: 'ADMIN' })).softDeleted, false);
   assert.deepEqual(f.calls, [['delete', { where: { id: 'record' } }]]);
 });
 for (const relation of ['bookings', 'memberships', 'payments', 'transactions', 'boardingContracts', 'boardingDailyLogs', 'ownedHorses', 'leadRequests']) {
   test(`client with ${relation} is archived without deleting history`, async () => {
     const f = fixture('client'); f.record._count[relation] = 1;
-    assert.equal((await f.service.remove('record')).softDeleted, true);
+    assert.equal((await f.service.remove('record', { refund: false }, { id: 'admin', email: 'a@test', role: 'ADMIN' })).softDeleted, true);
     assert.equal(f.calls.length, 1); assert.equal(f.calls[0][0], 'update');
     assert.ok(f.calls[0][1].data.deletedAt instanceof Date);
   });
 }
 test('archived client cannot later be hard deleted and restoration only clears archive marker', async () => {
   const deletedAt = new Date(); const f = fixture('client', { deletedAt });
-  assert.equal((await f.service.remove('record')).softDeleted, true);
+  assert.equal((await f.service.remove('record', { refund: false }, { id: 'admin', email: 'a@test', role: 'ADMIN' })).softDeleted, true);
   assert.equal(f.calls[0][1].data.deletedAt, deletedAt);
   assert.equal((await f.service.restore('record')).deletedAt, null);
 });
 test('nonzero client balance prevents hard deletion', async () => {
   const f = fixture('client', { boardingBalance: new Prisma.Decimal('0.01') });
-  assert.equal((await f.service.remove('record')).softDeleted, true);
+  assert.equal((await f.service.remove('record', { refund: false }, { id: 'admin', email: 'a@test', role: 'ADMIN' })).softDeleted, true);
 });
 test('missing client and membership return 404', async () => {
   for (const kind of ['client', 'membership']) {
@@ -65,26 +65,26 @@ test('serialization retry rechecks history instead of replaying hard delete', as
     if (++attempts === 1) { f.record._count.payments = 1; throw { code: 'P2034' }; }
     return fn(f.tx);
   };
-  assert.equal((await f.service.remove('record')).softDeleted, true);
+  assert.equal((await f.service.remove('record', { refund: false }, { id: 'admin', email: 'a@test', role: 'ADMIN' })).softDeleted, true);
   assert.equal(attempts, 2); assert.equal(f.calls[0][0], 'update');
 });
-test('empty unused membership is physically deleted', async () => {
+test('empty unused membership is soft-deleted with cancellation audit', async () => {
   const f = fixture('membership');
-  assert.equal((await f.service.remove('record')).softDeleted, false);
-  assert.equal(f.calls[0][0], 'delete');
+  assert.equal((await f.service.remove('record', { refund: false }, { id: 'admin', email: 'a@test', role: 'ADMIN' })).softDeleted, true);
+  assert.equal(f.calls[0][0], 'update');
 });
 for (const relation of ['bookings', 'payments', 'transactions', 'operations']) {
   test(`membership with ${relation} preserves balances and history`, async () => {
     const f = fixture('membership'); f.record._count[relation] = 1;
-    const result = await f.service.remove('record');
-    assert.equal(result.softDeleted, true); assert.match(result.message, /кассе/);
-    assert.deepEqual(Object.keys(f.calls[0][1].data), ['deletedAt']);
+    const result = await f.service.remove('record', { refund: false }, { id: 'admin', email: 'a@test', role: 'ADMIN' });
+    assert.equal(result.softDeleted, true); assert.match(result.message, /аннулирован/);
+    assert.deepEqual(Object.keys(f.calls[0][1].data), ['deletedAt', 'cancelledAt', 'status']);
   });
 }
 test('used or cash-posted membership is archived even without remaining relation rows', async () => {
   for (const overrides of [{ remainedLessons: 7 }, { cashboxPosted: true }, { remainingUnits: new Prisma.Decimal(7) }, { deletedAt: new Date() }]) {
     const f = fixture('membership', overrides);
-    assert.equal((await f.service.remove('record')).softDeleted, true);
+    assert.equal((await f.service.remove('record', { refund: false }, { id: 'admin', email: 'a@test', role: 'ADMIN' })).softDeleted, true);
   }
 });
 test('list archive filters apply equally to counts and records, preserving searches', async () => {
@@ -108,7 +108,7 @@ test('archived memberships are inactive and cannot be debited through the legacy
     deletedAt: new Date(), status: 'active', remainedLessons: 8, validUntil: new Date('2099-01-01'),
   }) } });
   assert.equal((await service.findOne('m')).isActive, false);
-  const tx = { $queryRaw: async () => [{ now: new Date() }], membershipOp: { findFirst: async () => null },
+  const tx = { payment: { findMany: async () => [], updateMany: async () => ({ count: 0 }) }, cashAuditLog: { create: async () => ({}) }, $queryRaw: async () => [{ now: new Date() }], membershipOp: { findFirst: async () => null },
     membership: { findUnique: async () => ({ deletedAt: new Date(), remainedLessons: 8, type: 'fixed_lessons', status: 'active' }) } };
   await assert.rejects(new MembershipLedgerService({}).debitLesson('m', 'l', 'test', tx), { status: 409 });
 });

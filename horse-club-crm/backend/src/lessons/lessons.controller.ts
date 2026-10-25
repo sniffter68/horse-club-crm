@@ -1,3 +1,4 @@
+import { CancelServiceDto } from '../payments/dto/cancel-service.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
 import { CompleteLessonDto } from './dto/lesson-payment.dto';
@@ -42,11 +43,21 @@ import { LessonsService } from './lessons.service';
 export class LessonsController {
   constructor(private readonly lessonsService: LessonsService) {}
 
+  @Get(':id/refund-quote')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  refundQuote(@Param('id', new ParseUUIDPipe()) id: string) { return this.lessonsService.refundQuote(id); }
+
+  @Post(':id/cancel')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  cancel(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CancelServiceDto, @CurrentUser() actor: AuthUser) {
+    return this.lessonsService.deleteLesson(id, actor, dto);
+  }
+
   @Delete(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOkResponse({ description: 'Занятие удалено; списания возвращены, кассовая история сохранена.' })
-  remove(@Param('id', new ParseUUIDPipe()) lessonId: string, @CurrentUser() actor: AuthUser) {
-    return this.lessonsService.deleteLesson(lessonId, actor);
+  remove(@Param('id', new ParseUUIDPipe()) lessonId: string, @CurrentUser() actor: AuthUser, @Body() dto?: CancelServiceDto) {
+    return this.lessonsService.deleteLesson(lessonId, actor, dto);
   }
 
   @Post()
@@ -80,7 +91,7 @@ export class LessonsController {
     @Body() dto: UpdateLessonStatusDto,
     @CurrentUser() actor: AuthUser,
   ): Promise<LessonDetails> {
-    return this.lessonsService.updateLessonStatus(lessonId, dto.status, dto, actor);
+    return this.lessonsService.updateLessonStatus(lessonId, dto.status, dto, actor, dto.status === 'CANCELLED' ? dto : undefined);
   }
 
   @Post(':id/complete')

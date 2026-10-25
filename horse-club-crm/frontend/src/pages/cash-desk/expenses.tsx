@@ -11,7 +11,7 @@ import { cashTime, currency } from './shared'
 
 const expenseCategories = { FEED: 'Сено и корма', BEDDING: 'Опилки', VET_FARRIER: 'Коваль/Ветврач', AMMUNITION: 'Амуниция', MAINTENANCE: 'Хознужды/Ремонт', SALARY: 'Зарплата', OTHER: 'Прочее' }
 const categoryOptions = Object.entries(expenseCategories).map(([value, label]) => ({ value, label }))
-type Expense = { id: string; isEncashment?: boolean; amount: string; date: string; category: keyof typeof expenseCategories; description: string; paymentMethod: 'CASH' | 'CARD'; createdBy: { email: string } }
+type Expense = { id: string; operationType?: string; refundPaymentId?: string; isEncashment?: boolean; amount: string; date: string; category: keyof typeof expenseCategories; description: string; paymentMethod: 'CASH' | 'CARD'; createdBy: { email: string } }
 type Values = { amount: number; paymentMethod: 'CASH' | 'CARD'; category: keyof typeof expenseCategories; description: string; date: Dayjs }
 
 export function ExpenseModal({ onClose, variant = 'modal' }: { onClose: () => void; variant?: 'modal' | 'drawer' }) {
@@ -106,12 +106,12 @@ export function ExpenseHistory({ from, to, shiftId, refresh, admin }: { from?: s
     <ResponsiveTable<Expense> rowKey="id" loading={loading} dataSource={error ? [] : result?.data ?? []} scroll={{ x: 'max-content' }} locale={{ emptyText: 'За выбранный период расходов нет' }}
       pagination={{ current: page, pageSize: 20, total: error ? 0 : result?.total ?? 0, showSizeChanger: false, onChange: value => update('expensePage', String(value)), showTotal: total => `Всего: ${total}` }} columns={[
         { key: 'date', title: 'Дата', render: (_, row) => cashTime(row.date) },
-        { key: 'category', title: 'Статья расхода', render: (_, row) => expenseCategories[row.category] },
+        { key: 'category', title: 'Статья расхода', render: (_, row) => row.operationType === 'REFUND' ? <Tag className="crm-tag crm-tag--warning">Возврат</Tag> : expenseCategories[row.category] },
         { dataIndex: 'description', title: 'На что', key: 'description' },
         { key: 'method', title: 'Способ оплаты', render: (_, row) => <Tag>{row.paymentMethod === 'CASH' ? 'Наличные' : 'Безнал'}</Tag> },
         { key: 'amount', title: 'Сумма', render: (_, row) => <Typography.Text type="danger">−{currency(row.amount)}</Typography.Text> },
         { key: 'author', title: 'Автор записи', render: (_, row) => row.createdBy.email },
-        ...(admin ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Expense) => row.isEncashment ? <Tag>Инкассация</Tag> : <Button danger onClick={() => cancel(row)}>Удалить расход</Button> }] : []),
+        ...(admin ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Expense) => row.refundPaymentId ? <Tag>Возврат по услуге</Tag> : row.isEncashment ? <Tag>Инкассация</Tag> : <Button danger onClick={() => cancel(row)}>Удалить расход</Button> }] : []),
       ]} />
   </Card>
 }

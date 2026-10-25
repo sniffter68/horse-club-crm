@@ -1,3 +1,4 @@
+import { ServiceCancellationAction } from '../../components/ServiceCancellationAction'
 import { useClientPreferences } from './useClientPreferences'
 import { ScheduleEventContent } from './ScheduleEventContent'
 import { DeleteLessonAction } from './DeleteLessonAction'
@@ -18,7 +19,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import luxonPlugin from '@fullcalendar/luxon3'
 import ruLocale from '@fullcalendar/core/locales/ru'
-import { Alert, App, Button, Card, Descriptions, Form, Grid, Input, InputNumber, Modal, Popconfirm, Progress, Select, Space, Spin, Tag, Typography, type FormInstance } from 'antd'
+import { Alert, App, Button, Card, Descriptions, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Spin, Tag, Typography, type FormInstance } from 'antd'
 import { useOnError } from '@refinedev/core'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { useCatalogPermissions } from '../catalogs/permissions'
@@ -479,7 +480,7 @@ export function SchedulePage() {
           <Button disabled={saving || !ready || detail.status !== 'SCHEDULED'} onClick={() => openReschedule(detail)}>Перенести занятие</Button>
           <Button disabled={saving || detail.status === 'CANCELLED' || detail.status === 'COMPLETED'} onClick={() => { setCompleting(detail); setDetail(undefined) }}>Отметить присутствие</Button>
           <Button disabled={saving || detail.status === 'CANCELLED' || detail.status === 'NO_SHOW'} onClick={() => void changeStatus('NO_SHOW')}>Неявка</Button>
-          <Popconfirm title="Отменить занятие?" description="Списанные занятия абонемента будут возвращены." okText="Да" cancelText="Нет" onConfirm={() => changeStatus('CANCELLED')}><Button danger disabled={saving || detail.status === 'CANCELLED'}>Отменить занятие</Button></Popconfirm>
+          <ServiceCancellationAction resource="lessons" id={detail.id} label="Отменить занятие" disabled={saving || detail.status === 'CANCELLED'} onChanged={() => setDetail(undefined)} />
           <DeleteLessonAction key={detail.id} lesson={detail} disabled={saving} onBusyChange={busy => { savingRef.current = busy; setSaving(busy) }} onDeleted={() => setDetail(undefined)} />
         </Space>}
       </Space>}

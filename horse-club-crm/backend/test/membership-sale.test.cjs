@@ -185,7 +185,7 @@ test('HTTP sale validates input, prevents actor spoofing and denies TRAINER', as
   let role = 'MANAGER', receivedActor;
   const module = await Test.createTestingModule({ controllers: [MembershipsController], providers: [RolesGuard, {
     provide: MembershipsService, useValue: { create: async (dto, user) => { receivedActor = user; return { id: 'membership', ...dto }; } },
-  }] }).overrideGuard(JwtAuthGuard).useValue({ canActivate: context => {
+  }] }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true }).overrideGuard(JwtAuthGuard).useValue({ canActivate: context => {
     context.switchToHttp().getRequest().user = { ...actor, role }; return true;
   } }).compile();
   const app = module.createNestApplication();

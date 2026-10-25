@@ -58,6 +58,7 @@ async function setup(page: Page, prepaid?: number, group = false) {
     return route.fulfill({ json: { totalCash: cash, totalCard: card, totalRevenue: cash + card, balanceCash: cash, balanceCard: card, balanceTotal: cash + card, totalExpenses: 0, totalExpensesCash: 0, totalExpensesCard: 0, netTotal: cash + card, operationsCount: state.receipts.length,
       operations: state.receipts.map(r => ({ ...r, service: { title: r.description }, client, paidAt: '2026-10-20T08:00:00Z', cashier: { email: 'qa@example.com' }, status: 'PAID' })) } })
   })
+  await page.route(`**/api/lessons/${id(4)}/refund-quote`, route => route.fulfill({ json: { amount: String(prepaid ?? 0), refundMethod: 'CASH', cancelled: false } }))
   return state
 }
 
@@ -210,8 +211,9 @@ for (const width of [1440, 390]) test(`lesson deletion confirms client, membersh
   const state = await setup(page, 500)
   state.lesson!.bookings[0].membership = { id: id(8), totalLessons: 8, remainedLessons: 7, validUntil: '2026-12-31T00:00:00Z' }
   let deletions = 0
-  await page.route(`**/api/lessons/${id(4)}`, async route => {
-    expect(route.request().method()).toBe('DELETE')
+  await page.route(`**/api/lessons/${id(4)}/cancel`, async route => {
+    expect(route.request().method()).toBe('POST')
+    expect(route.request().postDataJSON()).toMatchObject({ refund: true, refundMethod: 'CASH' })
     deletions++; state.lesson = undefined
     await route.fulfill({ json: { success: true, message: 'Занятие успешно удалено' } })
   })
@@ -223,7 +225,7 @@ for (const width of [1440, 390]) test(`lesson deletion confirms client, membersh
   await expect(confirm).toContainText('20 окт. 2026, 12:00')
   await expect(confirm).toContainText(client.name)
   await expect(confirm).toContainText('Списанное занятие будет возвращено на баланс абонемента')
-  await expect(confirm).toContainText('500 ₽. Кассовые чеки сохранятся в истории кассы')
+  await expect(confirm).toContainText('Сумма к возврату:')
   await expect(confirm.getByRole('button', { name: 'Отмена', exact: true })).toBeFocused()
   await confirm.getByRole('button', { name: 'Отмена', exact: true }).click()
   expect(deletions).toBe(0)
@@ -235,7 +237,7 @@ for (const width of [1440, 390]) test(`lesson deletion confirms client, membersh
   await confirm.getByRole('button', { name: 'Удалить занятие', exact: true }).click()
   await expect(confirm).not.toBeVisible()
   await expect(detail).not.toBeVisible()
-  await expect(page.getByText('Занятие удалено из расписания', { exact: true })).toBeVisible()
+  await expect(page.getByText('Услуга отменена. Кассовая история сохранена', { exact: true })).toBeVisible()
   await expect(page.locator('.fc-event')).toHaveCount(0)
   expect(deletions).toBe(1)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -245,7 +247,7 @@ test('lesson deletion preserves the dialog on error and blocks duplicate request
   const state = await setup(page, 0)
   let deletions = 0
   let finish: (() => void) | undefined
-  await page.route(`**/api/lessons/${id(4)}`, async route => {
+  await page.route(`**/api/lessons/${id(4)}/cancel`, async route => {
     deletions++
     if (deletions === 1) return route.fulfill({ status: 500, json: { message: 'Не удалось сохранить изменения' } })
     await new Promise<void>(resolve => { finish = resolve })
@@ -276,4 +278,49 @@ for (const mode of ['TRAINER', 'READ_ONLY']) test(`lesson deletion is hidden for
   await page.goto('/schedule'); await page.locator('.fc-event').first().click()
   await expect(page.getByRole('dialog', { name: 'Карточка занятия' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Удалить занятие', exact: true })).toHaveCount(0)
+})
+
+for (const refund of [true, false]) test(`paid cancellation sends financial choice refund=${refund}`, async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const state = await setup(page, 500)
+  let payload: Record<string, unknown> | undefined
+  await page.route(`**/api/lessons/${id(4)}/refund-quote`, route => route.fulfill({ json: { amount: '500', refundMethod: 'BANK', cancelled: false } }))
+  await page.route(`**/api/lessons/${id(4)}/cancel`, async route => {
+    payload = route.request().postDataJSON()
+    state.lesson = undefined
+    await route.fulfill({ json: { success: true } })
+  })
+  await page.goto('/schedule'); await page.locator('.fc-event').first().click()
+  await page.getByRole('button', { name: 'Удалить занятие', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Удалить занятие?', exact: true })
+  const checkbox = dialog.getByRole('checkbox', { name: 'Оформить возврат в кассу' })
+  await expect(checkbox).toBeChecked()
+  await expect(dialog).toContainText('С расчетного счета')
+  if (refund) {
+    await dialog.getByRole('combobox', { name: 'Способ возврата' }).focus()
+    await page.keyboard.press('ArrowDown')
+    await expect(page.locator('.ant-select-dropdown:visible')).toContainText('Из наличной кассы')
+    await page.keyboard.press('Escape')
+  } else {
+    await checkbox.uncheck()
+    await expect(dialog).toContainText('Средства будут удержаны клубом')
+  }
+  await dialog.getByRole('textbox', { name: 'Причина отмены/возврата' }).fill('По просьбе клиента')
+  await dialog.getByRole('button', { name: 'Удалить занятие', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  expect(payload).toMatchObject({ refund, reason: 'По просьбе клиента' })
+  if (refund) expect(payload?.refundMethod).toBe('BANK')
+})
+
+test('refund requires cashbox FULL and retaining funds remains available', async ({ page }) => {
+  await setup(page, 500)
+  await page.addInitScript(() => localStorage.setItem('horsecrm.role', 'MANAGER'))
+  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'MANAGER', modules:
+    ['SCHEDULE', 'STABLES', 'VETERINARY', 'CASHBOX', 'STAFF_PAYROLL'].map(module => ({ module, isEnabled: true, accessLevel: module === 'CASHBOX' ? 'READ_ONLY' : 'FULL' })) } }))
+  await page.goto('/schedule'); await page.locator('.fc-event').first().click()
+  await page.getByRole('button', { name: 'Удалить занятие', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Удалить занятие?', exact: true })
+  await expect(dialog.getByRole('button', { name: 'Удалить занятие', exact: true })).toBeDisabled()
+  await dialog.getByRole('checkbox', { name: 'Оформить возврат в кассу' }).uncheck()
+  await expect(dialog.getByRole('button', { name: 'Удалить занятие', exact: true })).toBeEnabled()
 })

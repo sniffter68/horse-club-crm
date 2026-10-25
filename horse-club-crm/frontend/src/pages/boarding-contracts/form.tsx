@@ -12,7 +12,6 @@ const statusOptions: Array<{ value: BoardingContractStatus; label: string }> = [
   { value: 'DRAFT', label: 'Черновик' },
   { value: 'ACTIVE', label: 'Активен' },
   { value: 'SUSPENDED', label: 'Приостановлен' },
-  { value: 'TERMINATED', label: 'Завершён' },
   { value: 'EXPIRED', label: 'Истёк' },
 ]
 
