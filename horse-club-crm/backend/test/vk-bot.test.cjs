@@ -43,7 +43,7 @@ test('/start binding command returns personalized role greeting through the call
   await request(app.getHttpServer()).post('/api/vk/callback').send({ ...message,
     object: { message: { ...message.object.message, text: '/start +79991234567 1234' } } }).expect(200);
   assert.match(sent[0].message, /Здравствуйте, Анна/);
-  assert.match(String(sent[0].keyboard), /Мой баланс/);
+  assert.match(String(sent[0].keyboard), /Мой абонемент/);
 });
 test('message routes by BigInt vkUserId and repeats use stable random_id', async () => {
   for (let i = 0; i < 2; i++) assert.equal((await request(app.getHttpServer()).post('/api/vk/callback').send(message).expect(200)).text, 'ok');

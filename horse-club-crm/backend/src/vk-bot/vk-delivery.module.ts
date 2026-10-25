@@ -1,3 +1,4 @@
+import { vkGroupToken } from './vk-bot.config';
 import { Injectable, Logger, Module, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { VK } from 'vk-io';
@@ -34,12 +35,12 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
   private vk?: VK;
   private readonly logger = new Logger(VkNotifications.name);
   constructor(private readonly prisma: PrismaService) {
-    const token = process.env.VK_COMMUNITY_TOKEN?.trim() || process.env.VK_BOT_TOKEN?.trim();
+    const token = vkGroupToken();
     if (token) this.vk = new VK({ token, apiVersion: '5.199', apiTimeout: 5000, apiRetryLimit: 0 });
   }
   onModuleInit() {
     if (!this.vk) {
-      this.logger.warn({ event: 'vk_delivery_disabled', message: 'Доставка VK отключена: задайте VK_COMMUNITY_TOKEN или VK_BOT_TOKEN. Уведомления остаются в очереди.' });
+      this.logger.warn({ event: 'vk_delivery_disabled', message: 'Доставка VK отключена: задайте VK_GROUP_TOKEN. Уведомления остаются в очереди.' });
       return;
     }
     this.timer = setInterval(() => { void this.flush(); }, 1000);

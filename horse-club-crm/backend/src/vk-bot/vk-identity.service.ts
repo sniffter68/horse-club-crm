@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException, 
 import { Prisma } from '@prisma/client';
 import { VK } from 'vk-io';
 import { PrismaService } from '../prisma/prisma.service';
+import { vkGroupToken } from './vk-bot.config';
+import { membershipAccessWhere } from '../memberships/membership-access';
 
 export function parseVkProfile(input: string): { vkId?: string; vkScreenName?: string } {
   let value = input.trim();
@@ -32,7 +34,7 @@ export class VkIdentityService {
     if (input === null || !input.trim()) return { vkId: null, vkScreenName: null };
     const parsed = parseVkProfile(input);
     if (parsed.vkId) return { vkId: parsed.vkId, vkScreenName: null };
-    const token = process.env.VK_COMMUNITY_TOKEN?.trim() || process.env.VK_BOT_TOKEN?.trim();
+    const token = vkGroupToken();
     if (!token) throw new ServiceUnavailableException('Поиск страницы VK не настроен. Укажите числовой VK ID');
     let users;
     try {
@@ -103,8 +105,8 @@ export class VkIdentityService {
     const now = new Date();
     const [activeMembershipsCount, nextBooking] = await Promise.all([
       this.prisma.membership.count({ where: { deletedAt: null, status: 'active', validFrom: { lte: now }, validTo: { gte: now }, remainingUnits: { gt: 0 },
-        OR: [{ clientId: client.id }, { members: { some: { clientId: client.id } } }] } }),
-      this.prisma.booking.findFirst({ where: { clientId: client.id, status: 'scheduled', startTime: { gte: now }, OR: [{ lessonId: null }, { lesson: { status: 'SCHEDULED' } }] },
+        ...membershipAccessWhere(client.id) } }),
+      this.prisma.booking.findFirst({ where: { clientId: client.id, status: 'scheduled', startTime: { gte: now }, OR: [{ lessonId: null }, { lesson: { status: 'SCHEDULED', deletedAt: null } }] },
         orderBy: [{ startTime: 'asc' }, { id: 'asc' }], select: { id: true, startTime: true, endTime: true, trainer: { select: { name: true } }, horse: { select: { name: true } } } }),
     ]);
     return { type: 'CLIENT' as const, clientId: client.id, name: client.name, activeMembershipsCount, nextBooking };

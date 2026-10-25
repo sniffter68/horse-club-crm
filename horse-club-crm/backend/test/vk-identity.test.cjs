@@ -148,7 +148,7 @@ test('bot identifies actual from_id and immediately opens the correct menu witho
     await bot.handleMessage({ message: { from_id: 9876, peer_id: 9876, text: 'Здравствуйте', out: 0 } }, 'direct-message');
     assert.deepEqual(calls, ['9876']);
     assert.match(sent[0].message, profile.type === 'UNKNOWN' ? /Приглашаем/ : new RegExp(profile.name));
-    assert.match(String(sent[0].keyboard), profile.type === 'STAFF' ? /Список всадников/ : profile.type === 'CLIENT' ? /Записаться/ : /Первичная заявка/);
+    assert.match(String(sent[0].keyboard), profile.type === 'STAFF' ? /Мои всадники/ : profile.type === 'CLIENT' ? /Мой абонемент/ : /Услуги и цены/);
     assert.doesNotMatch(sent[0].message, /код|ВАШ_ТЕЛЕФОН/);
   }
 });

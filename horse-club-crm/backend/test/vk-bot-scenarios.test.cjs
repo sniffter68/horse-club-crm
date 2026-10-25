@@ -55,17 +55,17 @@ test('client balance query is limited to the linked owner and active memberships
   let query;
   const { service, sent } = bot({
     client: { findUnique: async () => ({ id: 'owner' }) }, trainer: { findUnique: async () => null },
-    membership: { findMany: async args => { query = args; return [{ id: 'membership', remainedLessons: 4, validUntil: new Date('2030-01-01T00:00:00Z') }]; } },
+    membership: { findMany: async args => { query = args; return [{ id: 'membership', clientId: 'owner', title: '', remainingUnits: 4, validTo: new Date('2030-01-01T00:00:00Z') }]; } },
   });
   await service.handleMessage(message('Мой баланс'), 'balance-1');
-  assert.equal(query.where.clientId, 'owner'); assert.equal(query.where.remainedLessons.gt, 0);
-  assert.ok(query.where.validUntil.gte instanceof Date); assert.match(sent[0].message, /4 занятия/);
+  assert.equal(query.where.OR[0].clientId, 'owner'); assert.equal(query.where.remainingUnits.gt, 0);
+  assert.ok(query.where.validTo.gte instanceof Date); assert.match(sent[0].message, /4 занятия/);
 });
 test('unlinked visitor is offered supported VK keyboard and a lead form', async () => {
   const { service, sent } = bot({ client: { findUnique: async () => null }, trainer: { findUnique: async () => null } });
   await service.handleMessage(message('начать'), 'welcome');
   assert.match(sent[0].message, /Приглашаем вас в конный клуб/);
-  assert.match(String(sent[0].keyboard), /Первичная заявка/);
+  assert.match(String(sent[0].keyboard), /Услуги и цены/);
   assert.doesNotMatch(String(sent[0].keyboard), /request_contact/);
 });
 test('VK lead requires a separately recorded current consent', async () => {
@@ -104,6 +104,7 @@ test('today uses club day bounds and includes lessons without bookings', async (
   let query;
   const { service, sent } = bot({
     client: { findUnique: async () => null }, trainer: { findUnique: async () => ({ id: 'trainer' }) },
+    booking: { findMany: async () => [] },
     lesson: { findMany: async args => { query = args; return [{ id: 'lesson', startTime: new Date(), bookings: [] }]; } },
   });
   try {

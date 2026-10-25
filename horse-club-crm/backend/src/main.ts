@@ -6,9 +6,11 @@ import { PrismaService } from './prisma/prisma.service';
 import { requestLimits } from './common/request-limits';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { serveUploads } from './upload/upload.storage';
+import { validateVkConfig, vkGroupToken } from './vk-bot/vk-bot.config';
 
 async function bootstrap(): Promise<void> {
-  if (process.env.NODE_ENV === 'production' && (process.env.VK_COMMUNITY_TOKEN?.trim() || process.env.VK_BOT_TOKEN?.trim()) && !process.env.PUBLIC_LANDING_URL?.trim()) {
+  validateVkConfig();
+  if (process.env.NODE_ENV === 'production' && vkGroupToken() && !process.env.PUBLIC_LANDING_URL?.trim()) {
     throw new Error('PUBLIC_LANDING_URL is required when VK bot is enabled');
   }
   const app = await NestFactory.create<NestExpressApplication>(AppModule);

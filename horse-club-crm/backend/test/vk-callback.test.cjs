@@ -8,16 +8,16 @@ const { VkBotController } = require('../dist/vk-bot/vk-bot.controller');
 const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
 const { VkNotifications } = require('../dist/vk-bot/vk-delivery.module');
 
-const keys = ['VK_COMMUNITY_TOKEN', 'VK_BOT_TOKEN', 'VK_SECRET_KEY', 'VK_CONFIRMATION_CODE', 'VK_GROUP_ID'];
+const keys = ['VK_GROUP_TOKEN', 'VK_COMMUNITY_TOKEN', 'VK_BOT_TOKEN', 'VK_SECRET_KEY', 'VK_CONFIRMATION_CODE', 'VK_GROUP_ID'];
 const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 let app, bot, controller, sent, failures;
 const path = '/api/vk-bot/callback';
-const greeting = 'Здравствуйте! Приглашаем вас в конный клуб. Для доступа к персональному меню сообщите администратору ваш VK ID: 42.\n' + require('../dist/vk-bot/vk-bot.config').clubCard();
+const greeting = 'Здравствуйте! Приглашаем вас в конный клуб.\nЕсли вы уже наш клиент, попросите администратора привязать ваш VK к профилю в CRM.\n' + require('../dist/vk-bot/vk-bot.config').clubCard();
 const event = (text = 'Начать') => ({ type: 'message_new', secret: 'test-secret', event_id: 'new-1',
   object: { message: { from_id: 42, peer_id: 42, text, out: 0 } } });
 
 before(async () => {
-  delete process.env.VK_COMMUNITY_TOKEN; delete process.env.VK_BOT_TOKEN;
+  delete process.env.VK_GROUP_TOKEN; delete process.env.VK_COMMUNITY_TOKEN; delete process.env.VK_BOT_TOKEN;
   bot = new VkBotService({}, {}, {}, {}, { identify: async () => ({ type: 'UNKNOWN' }) });
   const module = await Test.createTestingModule({ controllers: [VkBotController],
     providers: [{ provide: VkBotService, useValue: bot }] }).compile();
@@ -27,7 +27,7 @@ before(async () => {
 });
 beforeEach(() => {
   process.env.VK_SECRET_KEY = 'test-secret'; process.env.VK_CONFIRMATION_CODE = 'plain-code';
-  delete process.env.VK_GROUP_ID; delete process.env.VK_COMMUNITY_TOKEN; delete process.env.VK_BOT_TOKEN;
+  delete process.env.VK_GROUP_ID; delete process.env.VK_GROUP_TOKEN; delete process.env.VK_COMMUNITY_TOKEN; delete process.env.VK_BOT_TOKEN;
   sent = []; failures = [];
   bot.vk = { api: { messages: { send: async params => { sent.push(params); return 1; } } } };
 });
@@ -38,29 +38,27 @@ after(async () => {
   }
 });
 
-test('confirmation is plain text without group, token or matching secret', async () => {
-  const response = await request(app.getHttpServer()).post(path).send({ type: 'confirmation', secret: 'wrong' }).expect(200);
+test('confirmation returns a plain string with a matching body secret', async () => {
+  const response = await request(app.getHttpServer()).post(path).send({ type: 'confirmation', secret: 'test-secret' }).expect(200);
   assert.equal(response.text, 'plain-code'); assert.match(response.headers['content-type'], /text\/plain/);
-  delete process.env.VK_SECRET_KEY;
-  assert.equal((await request(app.getHttpServer()).post(path).send({ type: 'confirmation' }).expect(200)).text, 'plain-code');
+  await request(app.getHttpServer()).post(path).send({ type: 'confirmation', secret: 'wrong' }).expect(403);
 });
 
 test('missing confirmation code reports configuration failure', async () => {
   delete process.env.VK_CONFIRMATION_CODE;
-  await request(app.getHttpServer()).post(path).send({ type: 'confirmation' }).expect(503);
+  await request(app.getHttpServer()).post(path).send({ type: 'confirmation', secret: 'test-secret' }).expect(503);
 });
 
 for (const secret of [undefined, null, '', 'wrong', 123]) test(`rejects non-confirmation secret ${JSON.stringify(secret)}`, async () => {
-  await request(app.getHttpServer()).post(path).set('x-vk-secret', 'test-secret').send({ ...event(), secret }).expect(403);
+  await request(app.getHttpServer()).post(path).send({ ...event(), secret }).expect(403);
   assert.equal(sent.length, 0);
 });
 
-test('unknown events return ok with valid secret and with optional secret unset', async () => {
+test('unknown events return ok with a valid secret; missing secret configuration fails closed', async () => {
   assert.equal((await request(app.getHttpServer()).post(path).send({ type: 'unknown', secret: 'test-secret' }).expect(200)).text, 'ok');
   delete process.env.VK_SECRET_KEY;
-  const message = event(); delete message.secret;
-  assert.equal((await request(app.getHttpServer()).post(path).send(message).expect(200)).text, 'ok');
-  assert.equal(sent[0].message, greeting);
+  await request(app.getHttpServer()).post(path).send(event()).expect(503);
+  assert.equal(sent.length, 0);
 });
 
 for (const text of ['Начать', 'start']) test(`${text} greets after identity lookup`, async () => {

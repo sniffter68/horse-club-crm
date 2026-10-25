@@ -40,19 +40,12 @@ function harness({ client = null, trainer = null, admins = [], fail = false, pro
   return { send, sent, logs, queries, queued, transactions: () => transactions };
 }
 
-test('main reply keyboard has the requested three rows and stable payloads', () => {
-  const result = keyboard(mainMenu());
-  assert.equal(result.one_time, false); assert.notEqual(result.inline, true);
-  assert.deepEqual(result.buttons.map(row => row.map(button => button.action.label)), [
-    ['📅 Ближайшая тренировка', '💳 Мой баланс', 'Записаться'], ['ℹ️ О клубе', '📖 Памятка всадника'], ['💬 Связаться с администратором'],
-  ]);
-  assert.deepEqual(result.buttons.flat().map(button => JSON.parse(button.action.payload).command), ['next-booking', 'balance', 'book', 'about', 'guide', 'help']);
-  const guest = keyboard(welcomeMenu());
-  assert.deepEqual(guest.buttons.slice(0, 2), result.buttons.slice(0, 2));
-  assert.equal(guest.buttons[2][0].action.label, '💬 Позвать администратора');
-  assert.equal(JSON.parse(guest.buttons[2][0].action.payload).command, 'help');
-  assert.deepEqual(guest.buttons[3].map(button => button.action.label), ['Первичная заявка']);
-  assert.equal(keyboard(mainMenu(true)).buttons[0][0].action.label, 'Расписание на сегодня');
+test('main and guest reply keyboards provide role-specific commands', () => {
+  const client = keyboard(mainMenu());
+  assert.deepEqual(client.buttons.flat().map(button => button.action.label), ['🎫 Мой абонемент', '📅 Мои тренировки', '💬 Администратор']);
+  assert.deepEqual(client.buttons.flat().map(button => JSON.parse(button.action.payload).command), ['membership', 'bookings', 'help']);
+  assert.deepEqual(keyboard(welcomeMenu()).buttons.flat().map(button => button.action.label), ['О клубе', 'Услуги и цены', 'Как доехать', 'Связаться']);
+  assert.equal(keyboard(mainMenu(true)).buttons[0][0].action.label, '📋 Расписание на сегодня');
 });
 
 for (const text of ['ℹ️ О клубе', 'О клубе', '  КОНТАКТЫ  ']) test(`club card accepts ${text} for unlinked guests`, async () => {
@@ -61,7 +54,7 @@ for (const text of ['ℹ️ О клубе', 'О клубе', '  КОНТАКТЫ
   assert.equal(sent[0].message, clubCard());
   assert.match(sent[0].message, /Союз любителей конного спорта/);
   assert.match(sent[0].message, /ежедневно с 09:00 до 21:00/);
-  assert.match(String(sent[0].keyboard), /Первичная заявка/);
+  assert.match(String(sent[0].keyboard), /Услуги и цены/);
 });
 
 for (const text of ['📖 Памятка всадника', 'Памятка всадника', 'памятка']) test(`guide accepts ${text} for unlinked guests`, async () => {

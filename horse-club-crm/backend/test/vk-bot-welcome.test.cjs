@@ -4,7 +4,7 @@ require('reflect-metadata');
 const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
 const { welcomeMenu } = require('../dist/vk-bot/vk-bot.keyboard');
 
-const body = 'Приглашаем вас в конный клуб. Для доступа к персональному меню сообщите администратору ваш VK ID: 42.\n' + require('../dist/vk-bot/vk-bot.config').clubCard();
+const body = 'Приглашаем вас в конный клуб.\nЕсли вы уже наш клиент, попросите администратора привязать ваш VK к профилю в CRM.\n' + require('../dist/vk-bot/vk-bot.config').clubCard();
 function harness(get = async () => [{ id: 42, first_name: ' Анна ', last_name: 'Орлова' }]) {
   const sent = [], queries = [], warnings = [];
   // Greeting must work for new users without consulting CRM profiles.

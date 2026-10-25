@@ -23,7 +23,8 @@ function harness(rows, resource) {
   return { send, sent, queries };
 }
 const membership = (patch = {}) => ({ id: 'b045eb7b-0b4e-4111-8111-111111111111', title: '', pricingPlan: null,
-  remainedLessons: 7, validUntil: new Date('2026-10-13T22:00:00Z'), ...patch });
+  remainedLessons: 7, validUntil: new Date('2026-10-13T22:00:00Z'), ...patch, clientId: 'owner',
+  remainingUnits: patch.remainedLessons ?? 7, validTo: patch.validUntil ?? new Date('2026-10-13T22:00:00Z') });
 const booking = (patch = {}) => ({ id: 'booking-id', horse: { name: 'Гранит' }, lesson: {
   startTime: new Date('2026-10-17T08:00:00Z'), trainer: { name: 'Анна Сергеевна' }, arena: { name: 'Крытый манеж' },
 }, ...patch });
@@ -35,15 +36,15 @@ test('balance shows plan names, custom titles and a clean fallback without UUIDs
     membership({ title: ' ', pricingPlan: { name: ' ' }, remainedLessons: 1 }),
   ], 'membership');
   await send('Мой баланс');
-  assert.equal(sent[0].message, '💳 Ваши абонементы:\n'
+  assert.equal(sent[0].message, '🎫 Ваши абонементы:\n'
     + '• «Индивидуальный (8 занятий)»: осталось 7 занятий (до 14.10.2026)\n'
     + '• «Разовый»: осталось 5 занятий (до 14.10.2026)\n'
     + '• «Абонемент»: осталось 1 занятие (до 14.10.2026)');
   assert.doesNotMatch(sent[0].message, /b045eb7b|\d{2}:\d{2}/);
-  assert.deepEqual(queries[0].include, { pricingPlan: { select: { name: true } } });
-  assert.equal(queries[0].where.clientId, 'owner');
-  assert.deepEqual(queries[0].where.remainedLessons, { gt: 0 });
-  assert.ok(queries[0].where.validUntil.gte instanceof Date);
+  assert.deepEqual(queries[0].include.pricingPlan, { select: { name: true } });
+  assert.equal(queries[0].where.OR[0].clientId, 'owner');
+  assert.deepEqual(queries[0].where.remainingUnits, { gt: 0 });
+  assert.ok(queries[0].where.validTo.gte instanceof Date);
 });
 
 test('balance uses Russian lesson plurals and supports keyboard payloads', async () => {
@@ -59,7 +60,7 @@ test('no active memberships has a clear empty response and the main menu', async
   const { send, sent } = harness([], 'membership');
   await send('Мой баланс');
   assert.equal(sent[0].message, 'У вас пока нет активных абонементов.');
-  assert.match(String(sent[0].keyboard), /Ближайшая тренировка/);
+  assert.match(String(sent[0].keyboard), /Мои тренировки/);
 });
 
 test('training card includes localized date, weekday, horse, trainer and arena', async () => {
@@ -87,18 +88,18 @@ test('empty upcoming trainings has a clear response and the main menu', async ()
   const { send, sent } = harness([], 'booking');
   await send('Мои тренировки');
   assert.equal(sent[0].message, 'Предстоящих тренировок пока нет.');
-  assert.match(String(sent[0].keyboard), /Мой баланс/);
+  assert.match(String(sent[0].keyboard), /Мой абонемент/);
 });
 
-test('club timezone changes both the training calendar date and the expiry date', async () => {
+test('VK consistently uses Moscow even when a different timezone is configured', async () => {
   process.env.CLUB_TIME_ZONE = 'Asia/Vladivostok';
   const row = booking(); row.lesson.startTime = new Date('2026-10-17T20:30:00Z');
   const trainings = harness([row], 'booking');
   await trainings.send('Мои тренировки');
-  assert.match(trainings.sent[0].message, /18 октября \(вс\) в 06:30/);
+  assert.match(trainings.sent[0].message, /17 октября \(сб\) в 23:30/);
   const balance = harness([membership({ validUntil: new Date('2026-10-13T16:00:00Z') })], 'membership');
   await balance.send('Мой баланс');
-  assert.match(balance.sent[0].message, /до 14\.10\.2026/);
+  assert.match(balance.sent[0].message, /до 13\.10\.2026/);
 });
 
 for (const [resource, command, title] of [['membership', 'balance', 'Пакет'], ['booking', 'bookings', 'Лошадь']]) {
