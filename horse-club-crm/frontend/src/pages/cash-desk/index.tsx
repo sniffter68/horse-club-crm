@@ -55,13 +55,13 @@ function CashDeskBook() {
         const { data: active } = await httpClient.get<CashShift | null>(`${API_URL}/payments/shifts/current`, { signal: controller.signal })
         if (controller.signal.aborted) return
         setShift(active)
-        if (period === 'shift' && !active) { setSummary(undefined); return }
-        if (period === 'custom' && (!from || !to)) { setSummary(undefined); return }
+        const noPeriod = (period === 'shift' && !active) || (period === 'custom' && (!from || !to))
         const range = periodRange(period, from, to)
         const { data } = await httpClient.get<CashSummary>(`${API_URL}/finance/summary`, { params: { ...range, ...(period === 'shift' && active ? { from: active.openedAt, shiftId: active.id } : {}), page, pageSize: 20 }, signal: controller.signal })
         if (!controller.signal.aborted) {
           if (page > 1 && data.operationsCount <= (page - 1) * 20) changeParams({ page: String(Math.max(1, Math.ceil(data.operationsCount / 20))) })
-          else setSummary(data)
+          else setSummary(noPeriod ? { ...data, totalCash: '0', totalCard: '0', totalRevenue: '0', totalUnspecified: '0',
+            totalExpenses: '0', totalExpensesCash: '0', totalExpensesCard: '0', netTotal: '0', operationsCount: 0, operations: [] } : data)
         }
       } catch (cause) { if (!controller.signal.aborted) setError(toHttpError(cause).message) }
       finally { if (!controller.signal.aborted) setLoading(false) }
@@ -102,7 +102,7 @@ function CashDeskBook() {
       ['Остаток на счете (безнал)', summary?.balanceCard],
       ['Всего расходов за период', summary?.totalExpenses],
     ].map(([title, value]) => <Col xs={24} md={8} key={title}><Card className="kpi-card"><Statistic title={title} value={error || !summary ? '—' : currency(value)} loading={loading} /></Card></Col>)}</Row>
-    <Typography.Text type="secondary">Остатки накопительно на конец периода; для текущей смены — движение средств этой смены без размена. Доходы и расходы ниже — за выбранный период.</Typography.Text>
+    <Typography.Text type="secondary">Текущий баланс кассы и счета по всему клубу, как на дашборде. Остатки не зависят от выбранного периода и смены. Доходы и расходы ниже — за выбранный период.</Typography.Text>
     <Row gutter={[16, 16]}>{[
       [period === 'shift' ? 'Наличные за смену' : 'Наличные за период', summary?.totalCash],
       [period === 'shift' ? 'Безналичные за смену' : 'Безналичные за период', summary?.totalCard],

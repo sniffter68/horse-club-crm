@@ -26,6 +26,19 @@ export function expenseTotals(groups: Array<{ paymentMethod: string; _sum: { amo
   return { cash, card, total: cash.plus(card) };
 }
 
+// Club-wide funds at the current instant. Period, cashier and shift filters
+// belong to turnover only; both dashboard and cash desk use this ledger snapshot.
+export async function currentCashBalance(tx: Prisma.TransactionClient, asOf = new Date()) {
+  const [incomeGroups, expenseGroups] = await Promise.all([
+    tx.payment.groupBy({ by: ['method'], where: { archivedAt: null, status: 'PAID',
+      OR: [{ paidAt: { lt: asOf } }, { paidAt: null, createdAt: { lt: asOf } }] }, _sum: { amount: true }, _count: { _all: true } }),
+    tx.expense.groupBy({ by: ['paymentMethod'], where: { archivedAt: null, cancelledAt: null, date: { lt: asOf } }, _sum: { amount: true } }),
+  ]);
+  const income = aggregatePaymentMethods(incomeGroups), expenses = expenseTotals(expenseGroups);
+  return { balanceCash: income.totalCash.minus(expenses.cash), balanceCard: income.totalCard.minus(expenses.card),
+    balanceUnspecified: income.totalUnspecified, balanceTotal: income.totalRevenue.minus(expenses.total) };
+}
+
 @Injectable()
 export class FinanceService {
   constructor(private readonly prisma: PrismaService) {}
@@ -93,18 +106,15 @@ export class FinanceService {
     return this.prisma.$transaction(async tx => {
       const incomeGroups = await tx.payment.groupBy({ by: ['method'], where: paymentWhere(gte), _sum: { amount: true }, _count: { _all: true } });
       const expenseGroups = await tx.expense.groupBy({ by: ['paymentMethod'], where: expenseWhere(gte), _sum: { amount: true } });
-      const allIncomeGroups = await tx.payment.groupBy({ by: ['method'], where: paymentWhere(), _sum: { amount: true }, _count: { _all: true } });
-      const allExpenseGroups = await tx.expense.groupBy({ by: ['paymentMethod'], where: expenseWhere(), _sum: { amount: true } });
+      const balance = await currentCashBalance(tx);
       const income = aggregatePaymentMethods(incomeGroups), expenses = expenseTotals(expenseGroups);
-      const allIncome = aggregatePaymentMethods(allIncomeGroups), allExpenses = expenseTotals(allExpenseGroups);
-      const balanceCash = allIncome.totalCash.minus(allExpenses.cash), balanceCard = allIncome.totalCard.minus(allExpenses.card);
       const operations = await tx.payment.findMany({ where: paymentWhere(gte), include: {
         client: { select: { id: true, name: true, firstName: true, lastName: true, phone: true } }, cashier: { select: { id: true, email: true } }, service: true,
         booking: { include: { lesson: { include: { service: true } } } }, membership: { include: { pricingPlan: true } },
       }, orderBy: [{ paidAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.pageSize, take: query.pageSize });
       return { ...income, totalExpensesCash: expenses.cash, totalExpensesCard: expenses.card, totalExpenses: expenses.total,
         netCash: income.totalCash.minus(expenses.cash), netCard: income.totalCard.minus(expenses.card), netTotal: income.totalRevenue.minus(expenses.total),
-        balanceCash, balanceCard, balanceUnspecified: allIncome.totalUnspecified, balanceTotal: allIncome.totalRevenue.minus(allExpenses.total),
+        ...balance,
         operations, page: query.page, pageSize: query.pageSize };
     }, { isolationLevel: 'RepeatableRead' });
   }

@@ -3,7 +3,7 @@ import { AccessLevel, LeadRequestStatus, LessonStatus, Prisma, Role, SystemModul
 import { DateTime } from 'luxon';
 import { ModuleAccessService } from '../settings/module-access.service';
 import { aggregatePaymentMethods } from '../payments/cash-desk.math';
-import { expenseTotals } from '../payments/finance.service';
+import { currentCashBalance, expenseTotals } from '../payments/finance.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const CLUB_SCHEDULE_ID = 1;
@@ -271,7 +271,7 @@ export class DashboardService {
         select: { id: true, cost: true, paymentStatus: true, prepaymentAmount: true, finalPaymentAmount: true, startTime: true, endTime: true, trainer: { select: { name: true } }, service: { select: { name: true, title: true } },
           bookings: { select: { membershipId: true, costAmount: true, payments: { select: { amount: true, status: true } }, client: { select: { name: true } }, horse: { select: { name: true } } } } },
         orderBy: [{ startTime: 'asc' }, { id: 'asc' }], take: 10 }) : undefined,
-      canRead('CASHBOX') ? this.cashboxSummary(start, end) : undefined,
+      canRead('CASHBOX') ? this.cashboxSummary(start, end, now) : undefined,
     ]);
     const count = (status: string) => lessonGroups?.find(row => row.status === status)?._count._all ?? 0;
     const health = (status: string) => horses?.find(row => row.healthStatus === status)?._count._all ?? 0;
@@ -285,18 +285,16 @@ export class DashboardService {
     };
   }
 
-  private cashboxSummary(start: Date, end: Date) {
+  private cashboxSummary(start: Date, end: Date, now: Date) {
     // Reuse cash-desk accounting rules: paid receipts minus non-cancelled expenses.
     // RepeatableRead keeps the four aggregates on the same ledger snapshot.
     return this.prisma.$transaction(async tx => {
-      const [todayIncome, todayExpenses, allIncome, allExpenses] = await Promise.all([
-        tx.payment.groupBy({ by: ['method'], where: { status: 'PAID', OR: [{ paidAt: { gte: start, lt: end } }, { paidAt: null, createdAt: { gte: start, lt: end } }] }, _sum: { amount: true }, _count: { _all: true } }),
-        tx.expense.groupBy({ by: ['paymentMethod'], where: { cancelledAt: null, date: { gte: start, lt: end } }, _sum: { amount: true } }),
-        tx.payment.groupBy({ by: ['method'], where: { status: 'PAID', OR: [{ paidAt: { lt: end } }, { paidAt: null, createdAt: { lt: end } }] }, _sum: { amount: true }, _count: { _all: true } }),
-        tx.expense.groupBy({ by: ['paymentMethod'], where: { cancelledAt: null, date: { lt: end } }, _sum: { amount: true } }),
+      const [todayIncome, todayExpenses, balance] = await Promise.all([
+        tx.payment.groupBy({ by: ['method'], where: { archivedAt: null, status: 'PAID', OR: [{ paidAt: { gte: start, lt: end } }, { paidAt: null, createdAt: { gte: start, lt: end } }] }, _sum: { amount: true }, _count: { _all: true } }),
+        tx.expense.groupBy({ by: ['paymentMethod'], where: { archivedAt: null, cancelledAt: null, date: { gte: start, lt: end } }, _sum: { amount: true } }),
+        currentCashBalance(tx, now),
       ]);
-      const income = aggregatePaymentMethods(allIncome), expenses = expenseTotals(allExpenses);
-      return { cash: income.totalCash.minus(expenses.cash).toFixed(2), card: income.totalCard.minus(expenses.card).toFixed(2),
+      return { cash: balance.balanceCash.toFixed(2), card: balance.balanceCard.toFixed(2),
         revenueToday: aggregatePaymentMethods(todayIncome).totalRevenue.toFixed(2), expensesToday: expenseTotals(todayExpenses).total.toFixed(2) };
     }, { isolationLevel: 'RepeatableRead' });
   }

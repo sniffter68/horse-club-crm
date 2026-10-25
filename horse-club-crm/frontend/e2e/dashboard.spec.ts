@@ -24,6 +24,50 @@ test.setTimeout(45000)
 const modules = ['SCHEDULE', 'CASHBOX', 'STABLES', 'VETERINARY', 'STAFF_PAYROLL']
 const client = { id: '00000001-1111-4111-8111-111111111111', name: 'Анна Орлова', phone: '+79991234567' }
 
+for (const width of [1440, 390]) test(`cash card opens matching club balances without an open shift at ${width}px`, async ({ page }) => {
+  await setup(page)
+  await page.setViewportSize({ width, height: 900 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.route('**/api/payments/shifts/current', route => route.fulfill({ json: null }))
+  await page.route('**/api/finance/expenses?*', route => route.fulfill({ json: { data: [], total: 0 } }))
+  let fail = false
+  await page.route('**/api/finance/summary?*', route => fail
+    ? route.fulfill({ status: 500, json: { message: 'Повторите загрузку' } })
+    : route.fulfill({ json: { balanceCash: '1000', balanceCard: '2000', balanceTotal: '3000',
+      totalCash: '0', totalCard: '0', totalRevenue: '0', totalExpenses: '0', totalExpensesCash: '0', totalExpensesCard: '0',
+      netTotal: '0', operationsCount: 0, operations: [] } }))
+  await page.goto('/')
+  const link = page.getByRole('link', { name: 'Баланс кассы — открыть кассу' })
+  await expect(link).toContainText(/1\s*000,00/)
+  await expect(link).toContainText(/2\s*000,00/)
+  await link.hover()
+  await expect(link).toHaveCSS('cursor', 'pointer')
+  if (width === 1440) { await link.focus(); await link.press('Enter') }
+  else await link.click()
+  await expect(page).toHaveURL(/\/cash-desk$/)
+  const cash = page.locator('.kpi-card').filter({ hasText: 'Остаток в кассе (наличные)' })
+  const bank = page.locator('.kpi-card').filter({ hasText: 'Остаток на счете (безнал)' })
+  for (const period of ['Сегодня', 'Вчера', 'Текущая смена', 'Выбрать даты']) {
+    await page.getByText(period, { exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Обновить', exact: true })).not.toHaveClass(/ant-btn-loading/)
+    await expect(cash).toContainText(/1\s*000,00/)
+    await expect(bank).toContainText(/2\s*000,00/)
+  }
+  await expect(page.getByText('Откройте смену, чтобы учитывать её платежи отдельно')).not.toBeVisible()
+  await page.getByText('Текущая смена', { exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Обновить', exact: true })).not.toHaveClass(/ant-btn-loading/)
+  await expect(page.getByText('Откройте смену, чтобы учитывать её платежи отдельно')).toBeVisible()
+  await expect(page.getByText('За выбранный период платежей нет', { exact: true })).toBeVisible()
+  await page.screenshot({ path: `test-results/cash-balance-no-shift-${width}.png` })
+  fail = true
+  await page.getByRole('button', { name: 'Обновить', exact: true }).click()
+  await expect(page.getByText('Не удалось загрузить кассу')).toBeVisible()
+  await expect(cash).toContainText('—')
+  fail = false
+  await page.getByRole('button', { name: 'Обновить', exact: true }).click()
+  await expect(cash).toContainText(/1\s*000,00/)
+});
+
 async function setup(page: Page, role = 'ADMIN') {
   await page.clock.setFixedTime(new Date('2026-10-20T08:00:00Z'))
   await page.addInitScript(role => {

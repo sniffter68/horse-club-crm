@@ -3,6 +3,8 @@ import type { LessonMoney } from '../schedule/types'
 import { Button, Card, Col, Empty, List, Progress, Row, Space, Statistic, Tag, Typography } from 'antd'
 import { usePermissions } from '../../modulePermissions'
 import { QuickActions } from './QuickActions'
+import { Link } from 'react-router-dom'
+import { ArrowRightOutlined } from '@ant-design/icons'
 import { currency } from '../cash-desk/shared'
 import type { ShiftStatus } from '../staff/types'
 
@@ -32,14 +34,14 @@ export function OperationalDashboard({ summary, loading, refresh, complete, upda
         <Progress aria-label="Прогресс тренировок" percent={lessons?.total ? Math.round(lessons.completed / lessons.total * 100) : 0} />
         <Typography.Text type="secondary">Отменено: {lessons?.cancelled ?? 0}</Typography.Text>
       </Card></Col>}
-      {modules.canRead('CASHBOX') && <Col xs={24} sm={12} xl={6}><Card title="Баланс кассы" className="dashboard-day-card dashboard-day-card--cash" loading={loading}>
+      {modules.canRead('CASHBOX') && <Col xs={24} sm={12} xl={6}><Link to="/cash-desk" className="dashboard-cash-link" aria-label="Баланс кассы — открыть кассу"><Card title="Баланс кассы" extra={<ArrowRightOutlined aria-hidden />} className="dashboard-day-card dashboard-day-card--cash" loading={loading}>
         {cash ? <Space direction="vertical" size={4}>
           <span>Наличные в кассе <strong data-testid="dashboard-cash">{currency(cash.cash)}</strong></span>
           <span>На счете <strong>{currency(cash.card)}</strong></span>
           <Typography.Text type="secondary">Выручка сегодня: {currency(cash.revenueToday)}</Typography.Text>
           <Typography.Text type="secondary">Расходы сегодня: {currency(cash.expensesToday)}</Typography.Text>
         </Space> : <Typography.Text type="secondary">Данные кассы недоступны</Typography.Text>}
-      </Card></Col>}
+      </Card></Link></Col>}
       {modules.canRead('STABLES') && <Col xs={24} sm={12} xl={6}><Card className="dashboard-day-card dashboard-day-card--horses" loading={loading}>
         <Statistic title="Поголовье и здоровье" value={horses?.total ?? 0} />
         <Space wrap><Tag color="success">В работе: {horses?.healthy ?? 0}</Tag><Tag color={horses?.treatment ? 'warning' : 'default'}>На лечении: {horses?.treatment ?? 0}</Tag><Tag color={horses?.quarantine ? 'error' : 'default'}>Карантин: {horses?.quarantine ?? 0}</Tag></Space>
