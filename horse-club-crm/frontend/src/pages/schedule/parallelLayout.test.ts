@@ -15,4 +15,16 @@ describe('parallel lesson lanes', () => {
     const rows = parallelLayout([entry('a', 0, 30), entry('b', 15, 60), entry('c', 30, 45), entry('d', 60, 90)])
     expect(rows.map(({ lane, lanes }) => [lane, lanes])).toEqual([[0, 2], [1, 2], [0, 2], [0, 1]])
   })
+  it('reuses freed lanes inside a long enclosing lesson and is independent of input order', () => {
+    const entries = [entry('long', 0, 120), entry('a', 15, 45), entry('b', 30, 60), entry('c', 60, 90)]
+    const rows = parallelLayout(entries)
+    expect(parallelLayout([...entries].reverse())).toEqual(rows)
+    expect(rows.map(({ lane, lanes }) => [lane, lanes])).toEqual([[0, 3], [1, 3], [2, 3], [1, 3]])
+    for (const a of rows) for (const b of rows) {
+      if (a !== b && a.entry.startTime < b.entry.endTime && a.entry.endTime > b.entry.startTime) {
+        expect(a.lane).not.toBe(b.lane)
+      }
+    }
+    expect(rows.map(row => row.entry.id)).toEqual(['long', 'a', 'b', 'c'])
+  })
 })

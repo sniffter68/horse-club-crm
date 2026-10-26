@@ -259,14 +259,16 @@ html[data-theme='dark'] .fc {
 .horse-workload-badge { margin: 0; font-size: 11px; line-height: 1.5; white-space: normal; }
 .horse-workload-badge:focus-visible { outline: 2px solid var(--crm-saddle); outline-offset: 2px; }
 .schedule-calendar .fc-event { overflow: hidden; cursor: pointer; }
-.schedule-calendar .fc-timegrid-slot { height: 48px; }
+.schedule-calendar .fc-timegrid-slot { height: 84px; }
 .schedule-calendar .fc-event-main, .schedule-calendar .fc-event-main-frame { min-width: 0; height: 100%; overflow: hidden; }
 .schedule-calendar .fc-event:focus-visible { outline: 2px solid var(--crm-saddle); outline-offset: 1px; }
 .schedule-calendar .fc-event:hover { filter: brightness(1.08); }
-.schedule-event-content { box-sizing: border-box; width: 100%; max-height: 100%; min-width: 0; padding: 6px; border-radius: 6px; overflow: hidden; text-align: start; font-size: 12px; line-height: 1.25; }
+.schedule-event-content { box-sizing: border-box; width: 100%; max-height: 100%; min-width: 0; padding: 6px; border-radius: 6px; overflow: hidden; text-align: start; font-size: 12px; line-height: 1.2; }
 .schedule-event-content > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .schedule-event-time { font-weight: 600; font-variant-numeric: tabular-nums; }
 .schedule-event-trainer { opacity: .9; }
+.schedule-event-rider { font-weight: 600; }
+.schedule-event-payment span { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: top; padding-inline: 4px; border-radius: 4px; background: #f7f4f0; color: #3a2f2b; }
 html[data-theme='dark'] .horse-workload-panel { background: var(--crm-paper); }
 @media (max-width: 767px) {
   .schedule-toolbar { width: 100%; }

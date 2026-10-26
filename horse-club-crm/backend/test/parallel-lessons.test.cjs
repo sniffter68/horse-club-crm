@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 require('reflect-metadata');
 const { LessonsService } = require('../dist/lessons/lessons.service');
 
-function fixture() {
+function fixture(maxCapacity = 1) {
   const rows = [];
   const horse = id => ({ id, name: id, status: 'active', healthStatus: 'HEALTHY', maxRiderWeight: 100,
     requiredRestMinutes: 45, maxDailyMinutes: 240, maxDailyWorkloadMinutes: 240 });
@@ -19,7 +19,7 @@ function fixture() {
     horse: { findMany: async ({ where }) => where.id.in.map(horse), findUnique: async ({ where }) => horse(where.id) },
     client: { findMany: async ({ where }) => where.id.in.map(id => ({ id, weightKg: null })) },
     booking: { findMany: async () => [] },
-    service: { findUnique: async () => ({ durationMinutes: 60, maxCapacity: 1, price: 1500, name: 'Индивидуальное', allowMembership: true }) },
+    service: { findUnique: async () => ({ durationMinutes: 60, maxCapacity, price: 1500, name: 'Индивидуальное', allowMembership: true }) },
     membership: { findUnique: async ({ where }) => ({ id: where.id, clientId: where.id === 'membership-1' ? 'client-1' : 'client-2',
       remainedLessons: 5, status: 'active', validUntil: new Date('2030-01-01') }) },
     lesson: {
@@ -61,4 +61,16 @@ for (const resource of ['horse', 'client']) test(`creating overlapping ${resourc
   await assert.rejects(service.createLesson({ ...dto, horseId: resource === 'horse' ? 'horse-1' : 'horse-2',
     clientId: resource === 'client' ? 'client-1' : 'client-2' }), e => e.getStatus() === 409 && e.getResponse().code === (resource === 'horse' ? 'HORSE_BUSY' : 'CLIENT_BUSY'));
   assert.equal(rows.length, 1);
+});
+
+for (const capacity of [1, 3]) test(`three overlapping lessons remain independent with service capacity ${capacity}`, async () => {
+  const { service, rows } = fixture(capacity);
+  for (let i = 1; i <= 3; i++) {
+    await service.createLesson({ ...dto, clientId: `client-${i}`, horseId: `horse-${i}`, cost: i * 1000 });
+  }
+  assert.equal(new Set(rows.map(row => row.id)).size, 3);
+  assert.deepEqual(rows.map(row => row.bookings.map(b => b.clientId)), [['client-1'], ['client-2'], ['client-3']]);
+  assert.deepEqual(rows.map(row => Number(row.cost)), [1000, 2000, 3000]);
+  assert.ok(rows.every(row => row.status === 'SCHEDULED' && row.paymentStatus === 'UNPAID'));
+  assert.deepEqual(rows.map(row => row.bookings[0].payments.create.clientId), ['client-1', 'client-2', 'client-3']);
 });

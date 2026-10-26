@@ -7,6 +7,48 @@ const client = { id: id(1), name: 'Анна Орлова', firstName: 'Анна'
 const trainer = { id: id(2), name: 'Мария' }
 const service = { id: id(3), title: 'Разовая тренировка', name: 'Разовая тренировка', price: '1500', durationMinutes: 60, maxCapacity: 1, allowMembership: false }
 
+for (const width of [1440, 390]) for (const count of [2, 3]) test(`independent lessons split into ${count} lanes at ${width}px`, async ({ page }) => {
+  test.setTimeout(60000)
+  await page.setViewportSize({ width, height: 1000 })
+  const state = await setup(page, 0)
+  const lessons = Array.from({ length: count }, (_, i) => ({
+    ...state.lesson!, id: id(60 + i), prepaymentAmount: i === 0 ? 1500 : 0, paymentStatus: i === 0 ? 'PAID' : 'UNPAID',
+    bookings: [{ ...state.lesson!.bookings[0], id: id(70 + i),
+      client: { ...client, id: id(80 + i), name: `Всадник ${i + 1}`, firstName: 'Всадник', lastName: String(i + 1) },
+      horse: { id: id(90 + i), name: `Конь ${i + 1}` }, payments: [] }],
+  }))
+  await page.route('**/api/lessons?*', route => route.fulfill({ json: lessons }))
+  await page.goto('/schedule')
+  const verify = async (cards: Locator) => {
+    await expect(cards).toHaveCount(count)
+    const boxes = await Promise.all(Array.from({ length: count }, (_, i) => cards.nth(i).boundingBox()))
+    const sorted = boxes.map(box => box!).sort((a, b) => a.x - b.x)
+    for (let i = 1; i < count; i++) expect(sorted[i - 1].x + sorted[i - 1].width).toBeLessThanOrEqual(sorted[i].x + 1)
+    for (let i = 0; i < count; i++) {
+      const card = cards.filter({ has: page.locator('.schedule-event-rider', { hasText: `Всадник ${i + 1}` }) })
+      await expect(card.locator('.schedule-event-horse')).toHaveText(`Конь ${i + 1}`)
+      await expect(card.locator('.schedule-event-payment')).toHaveText(i === 0 ? 'Оплачено' : 'Не оплачено')
+      await card.focus(); await card.press('Enter')
+      const detail = page.getByRole('dialog', { name: 'Карточка занятия', exact: true })
+      await expect(detail).toContainText(`Всадник ${i + 1}`)
+      await expect(detail).toContainText(`Конь ${i + 1}`)
+      await expect(detail).not.toContainText(`Всадник ${(i + 1) % count + 1}`)
+      await detail.locator('.ant-modal-close').click()
+      await expect(detail).not.toBeVisible()
+    }
+  }
+  await verify(page.locator('.fc-event'))
+  if (width === 1440) {
+    await page.getByRole('button', { name: 'День', exact: true }).click()
+    await verify(page.locator('.fc-event'))
+  }
+  const grouping = page.getByRole('combobox', { name: 'Группировка расписания' })
+  await grouping.scrollIntoViewIfNeeded()
+  await grouping.focus(); await grouping.press('ArrowDown'); await grouping.press('ArrowDown'); await grouping.press('Enter')
+  await verify(page.locator('.resource-booking'))
+  await page.screenshot({ path: `test-results/independent-lessons-${count}-${width}.png`, animations: 'disabled' })
+})
+
 async function setup(page: Page, prepaid?: number, group = false) {
   const selectedService = group ? { ...service, title: 'Экскурсия', name: 'Экскурсия', isPerPerson: true, price: '500' } : service
   await page.clock.setFixedTime(new Date('2026-10-20T08:00:00Z'))
@@ -160,7 +202,7 @@ test('completion retains payment choice on error and fully prepaid lessons need 
   expect(state.receipts).toHaveLength(0)
 })
 
-for (const width of [1440, 1024, 768]) test(`calendar cards contain only time and trainer at ${width}px`, async ({ page }) => {
+for (const width of [1440, 1024, 768]) test(`calendar cards show rider horse and payment at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 })
   const state = await setup(page, 500)
   const longName = 'Мария Александровна Оченьдлиннаяфамилия Тренера'
@@ -169,7 +211,7 @@ for (const width of [1440, 1024, 768]) test(`calendar cards contain only time an
   await page.route('**/api/lessons?*', route => route.fulfill({ json: [state.lesson, { ...state.lesson, id: id(40), startTime: state.lesson!.endTime, endTime: '2026-10-20T10:00:00Z' }] }))
   await page.goto('/schedule')
   const event = page.locator('.fc-event').first()
-  await expect(event.locator('.schedule-event-content > div')).toHaveText(['12:00 - 12:30', longName])
+  await expect(event.locator('.schedule-event-content > div')).toHaveText(['12:00 - 12:30', longName, client.name, 'Без лошади', 'Предоплата: 500 ₽ / Остаток: 1 000 ₽'])
   await expect(event.locator('.ant-tag, .horse-workload-badge')).toHaveCount(0)
   await expect(event).toHaveAttribute('title', new RegExp(`${longName}.*Анна Орлова.*Без лошади.*Предоплата`))
   expect(await event.evaluate(el => {

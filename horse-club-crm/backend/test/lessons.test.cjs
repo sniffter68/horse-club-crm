@@ -225,20 +225,17 @@ test('creates one group lesson with separate riders, horses, memberships and pay
   ]);
 });
 
-test('adds a later rider to the matching scheduled lesson instead of reporting a trainer conflict', async () => {
-  let updateArgs;
-  const matchingLesson = {
-    id: 'existing-lesson',
-    bookings: [{ clientId: 'client-1', horseId: 'horse-1' }],
-  };
+test('creates a separate lesson even when the service allows multiple riders', async () => {
+  let createArgs;
   const tx = {
     clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [1] }) },
     horse: { findUnique: async ({ where }) => ({ name: where.id, maxDailyMinutes: 240 }) },
     service: { findUnique: async () => ({ durationMinutes: 60, price: 1500, title: 'Конкур', name: 'Конкур', maxCapacity: 3 }) },
     lesson: {
-      findFirst: async () => matchingLesson,
+      findFirst: async () => { throw new Error('Must not look for a lesson to merge'); },
       findMany: async () => [],
-      update: async args => { updateArgs = args; return { id: matchingLesson.id, bookings: [] }; },
+      create: async args => { createArgs = args; return { id: 'new-lesson', bookings: [] }; },
+      update: async () => { throw new Error('Must not modify another lesson'); },
     },
   };
   const service = new LessonsService({ $transaction: async callback => callback(tx) }, unusedLedger);
@@ -247,9 +244,8 @@ test('adds a later rider to the matching scheduled lesson instead of reporting a
     clientId: 'client-2', horseId: 'horse-2',
   });
 
-  assert.equal(result.id, 'existing-lesson');
-  assert.equal(updateArgs.where.id, 'existing-lesson');
-  assert.deepEqual(updateArgs.data.bookings.create, [{
+  assert.equal(result.id, 'new-lesson');
+  assert.deepEqual(createArgs.data.bookings.create, [{
     trainerId: 'trainer-1', arenaId: null, legacyLessonBinding: true, costAmount: 1500,
     startTime: new Date('2026-09-08T10:00:00.000Z'), endTime: new Date('2026-09-08T11:00:00.000Z'),
     clientId: 'client-2', horseId: 'horse-2', payments: { create: {

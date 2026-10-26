@@ -263,8 +263,11 @@ for (const kind of ['penalty', 'free', 'club']) test(`cancellation ${kind} expla
   await page.getByRole('dialog', { name: 'Карточка бронирования' }).getByRole('button', { name: 'Отменить', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Отмена бронирования' })
   if (kind === 'club') {
-    await modal.locator('.ant-select-selector').click()
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^Клуб$/ }).click()
+    const initiator = modal.getByRole('combobox')
+    await initiator.focus()
+    await initiator.press('ArrowDown')
+    await initiator.press('ArrowDown')
+    await initiator.press('Enter')
     await expect(modal.getByText(/Привязанный абонемент продлится на 7 дней/)).toBeVisible()
   }
   if (kind === 'penalty') await expect(modal.getByRole('alert').filter({ hasText: 'менее 12 часов' })).toBeVisible()

@@ -13,5 +13,8 @@ export function ScheduleEventContent({ entry }: { entry: ScheduleEntry }) {
   return <div ref={ref} className="schedule-event-content" title={summary}>
     <div className="schedule-event-time">{eventTime(entry)}</div>
     <div className="schedule-event-trainer">{eventTrainer(entry)}</div>
+    <div className="schedule-event-rider">{entry.riders.join(', ') || 'Нет участников'}</div>
+    <div className="schedule-event-horse">{entry.horses.map(horse => horse.name).join(', ') || 'Без лошади'}</div>
+    {entry.paymentSummary && <div className="schedule-event-payment"><span>{entry.paymentSummary}</span></div>}
   </div>
 }

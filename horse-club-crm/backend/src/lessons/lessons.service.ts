@@ -261,7 +261,6 @@ export class LessonsService {
       if (prepayment.gt(unitCost)) throw new BadRequestException('Предоплата не может превышать стоимость');
       if (prepayment.gt(0) && !dto.prepaymentMethod) throw new BadRequestException('Выберите способ предоплаты');
       const totalCost = money(unitCost.mul(participants.filter(p => !p.membershipId).length));
-      let arenaCapacity: number | undefined;
       if (dto.arenaId) {
         const arena = await tx.arena.findUnique({
           where: { id: dto.arenaId },
@@ -269,7 +268,6 @@ export class LessonsService {
         });
         if (!arena) throw new NotFoundException('Манеж не найден');
         if (arena.isUnavailable) throw new ConflictException(`Манеж "${arena.name}" недоступен`);
-        arenaCapacity = arena.capacity;
         if ((perPerson ? participantsCount : participants.length) > arena.capacity) {
           throw new BadRequestException(`Вместимость манежа "${arena.name}" — ${arena.capacity} участников`);
         }
@@ -300,47 +298,16 @@ export class LessonsService {
       }
       const schedule = await this.getClubSchedule(tx);
       this.assertClubWorkingHours(start, end, schedule);
-      const matchingLesson = participants.length && !perPerson && service.maxCapacity > 1
-        ? await tx.lesson.findFirst({
-            where: {
-              trainerId: dto.trainerId,
-              serviceId: dto.serviceId,
-              arenaId: dto.arenaId ?? null,
-              startTime: start,
-              endTime: end,
-              status: LessonStatus.SCHEDULED,
-              pricePerPerson: null,
-            },
-            select: {
-              id: true, cost: true, prepaymentAmount: true, finalPaymentAmount: true,
-              bookings: { select: { clientId: true, horseId: true, membershipId: true, costAmount: true } },
-            },
-          })
-        : null;
-      if (matchingLesson) {
-        const totalParticipants = matchingLesson.bookings.length + participants.length;
-        if (totalParticipants > service.maxCapacity) {
-          throw new ConflictException(`В занятии уже достигнута вместимость услуги: ${service.maxCapacity}`);
-        }
-        if (arenaCapacity !== undefined && totalParticipants > arenaCapacity) {
-          throw new ConflictException(`В занятии уже достигнута вместимость манежа: ${arenaCapacity}`);
-        }
-        if (matchingLesson.bookings.some(booking => clientIds.includes(booking.clientId))) {
-          throw new ConflictException('Клиент уже записан на это занятие');
-        }
-        if (matchingLesson.bookings.some(booking => booking.horseId && horseIds.includes(booking.horseId))) {
-          throw new ConflictException('Лошадь уже назначена участнику этого занятия');
-        }
-      }
-      await this.bookingRules.validate(tx, { trainerId: dto.trainerId, arenaId: dto.arenaId, participants, start, end,
-        excludeLessonId: matchingLesson?.id, existingRiders: matchingLesson?.bookings.length });
+      // Each create request owns its lesson, participants, status and payments.
+      // Group participants are supplied explicitly; never append to another lesson.
+      await this.bookingRules.validate(tx, { trainerId: dto.trainerId, arenaId: dto.arenaId, participants, start, end });
       await this.validateNoConflictsWithClient(
         tx,
         dto.trainerId,
         horseIds,
         start,
         end,
-        matchingLesson?.id,
+        undefined,
         dto.arenaId,
       );
       for (const horseId of horseIds) {
@@ -373,23 +340,6 @@ export class LessonsService {
             } } }
           : {}),
       }));
-
-      if (matchingLesson) {
-        const previousCost = new Prisma.Decimal(matchingLesson.cost ?? matchingLesson.bookings
-          .filter(b => !b.membershipId).reduce((sum, b) => sum.plus(b.costAmount ?? 0), new Prisma.Decimal(0)));
-        const combinedCost = money(previousCost.plus(totalCost));
-        const combinedPrepayment = new Prisma.Decimal(matchingLesson.prepaymentAmount ?? 0).plus(prepayment);
-        const updated = await tx.lesson.update({
-          where: { id: matchingLesson.id },
-          data: { cost: combinedCost, prepaymentAmount: combinedPrepayment,
-            paymentStatus: paymentStatus(combinedCost, combinedPrepayment.plus(matchingLesson.finalPaymentAmount ?? 0)),
-            bookings: { create: bookingCreateData } },
-          ...lessonDetails,
-        });
-        await this.recordPrepayment(tx, updated, clientIds[0], prepayment, dto.prepaymentMethod, actor);
-        await this.notifyLesson(tx, updated, `booking:${[...clientIds].sort().join(',')}`, 'Новая запись на тренировку', clientIds);
-        return updated;
-      }
 
       const created = await tx.lesson.create({
         data: {

@@ -205,15 +205,18 @@ test('creation, repeated transfers and cancellation enqueue trainer and linked c
   assert.equal(queued.size, 10); assert.match([...queued.values()].at(-1).message, /отменена/);
 });
 
-test('group additions notify the trainer and newly added clients without notifying existing clients again', async () => {
-  const { service, tx, queued, lesson } = notificationLessons();
+test('parallel lesson notifies its trainer and client under its own id', async () => {
+  const { service, tx, queued } = notificationLessons();
   await service.createLesson(lessonInput);
-  tx.lesson.findFirst = async () => ({ id: 'lesson', bookings: [{ clientId: 'client' }] });
-  tx.lesson.update = async () => ({ ...lesson(), bookings: [...lesson().bookings,
-    { clientId: 'new-client', client: { vkUserId: 44n } }] });
+  const create = tx.lesson.create;
+  tx.lesson.create = async args => ({ ...await create(args), id: 'parallel-lesson', bookings: [
+    { clientId: 'new-client', client: { name: 'New rider', vkUserId: 44n } },
+  ] });
+  tx.lesson.findFirst = async () => { throw new Error('Never merge separate requests'); };
   await service.createLesson({ ...lessonInput, clientId: 'new-client' });
-  const additions = [...queued.values()].filter(row => row.key.includes(':booking:'));
+  const additions = [...queued.values()].filter(row => row.key.includes('lesson:parallel-lesson:'));
   assert.deepEqual(additions.map(row => row.peerId), [42n, 44n]);
+  assert.equal(queued.size, 4);
 });
 
 test('failed lesson transaction leaves no notification and transport failure cannot undo a committed booking', async () => {

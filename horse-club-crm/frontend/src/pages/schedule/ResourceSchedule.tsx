@@ -39,7 +39,9 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
             const from = +new Date(e.endTime), to = from + rest * 60000
             return rest > 0 && from < end && to > start ? [{ from, to, rest, id: e.id }] : []
           }) : []
-          return <section key={resource.id} className={`resource-column resource-column--${grouping}`} aria-label={resource.name}>
+          const minCardWidth = 132
+          const parallelWidth = Math.max(0, ...placed.map(row => row.lanes)) * minCardWidth
+          return <section key={resource.id} className={`resource-column resource-column--${grouping}`} style={parallelWidth > 260 ? { minWidth: parallelWidth } : undefined} aria-label={resource.name}>
             <header className="resource-header"><strong>{resource.name}</strong>
               {grouping === 'horses' && (workload ? <><span className="resource-data">{Number(workload.currentWorkloadMinutes.toFixed(1))} / {workload.maxDailyWorkloadMinutes} мин</span><Progress size="small" percent={Math.min(100, workload.currentWorkloadMinutes / workload.maxDailyWorkloadMinutes * 100)} showInfo={false} strokeColor="var(--crm-saddle)" /></> : <span>Нагрузка недоступна</span>)}
               {grouping === 'arenas' && <span className="resource-data">Пик за день: {occupancy?.find(a => a.arenaId === resource.id)?.occupied ?? peakOccupancy(rows, start, end)} / {arena?.maxRidersCapacity ?? arena?.capacity ?? '—'} всадников</span>}
