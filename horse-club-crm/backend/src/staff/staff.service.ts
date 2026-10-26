@@ -72,7 +72,7 @@ export class StaffService {
   async saveProfile(dto: StaffProfileDto | UpdateStaffProfileDto, user: AuthUser, id?: string) {
     this.manage(user);
     if (id && dto.userId !== undefined) throw new BadRequestException('Привязку учетной записи изменить нельзя');
-    if (['fullName', 'roleTitle', 'position', 'role', 'isActive', 'createCrmAccess'].some(key => (dto as Record<string, unknown>)[key] === null)) throw new BadRequestException('Обязательные поля не могут быть null');
+    if (['fullName', 'roleTitle', 'position', 'role', 'email', 'isActive', 'createCrmAccess'].some(key => (dto as Record<string, unknown>)[key] === null)) throw new BadRequestException('Обязательные поля не могут быть null');
     if (dto.role === Role.ADMIN && user.role !== Role.ADMIN) throw new ForbiddenException('Назначать администратора может только администратор');
     const { vkId, vkScreenName, email, role, position, createCrmAccess, temporaryPassword, ...profile } = dto;
     const input = vkId !== undefined ? vkId : vkScreenName;

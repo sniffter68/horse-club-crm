@@ -76,6 +76,7 @@ test('employee creation protects administrator privileges, self-access and passw
   const manager = { id: randomUUID(), role: 'MANAGER' };
   await assert.rejects(service.saveProfile({ fullName: 'Admin', role: 'ADMIN' }, manager), e => e.status === 403);
   await assert.rejects(service.saveProfile({ fullName: 'Trainer', role: 'TRAINER', createCrmAccess: true }, admin), e => e.status === 400);
+  await assert.rejects(service.saveProfile({ fullName: 'Trainer', role: 'TRAINER', email: null }, admin), e => e.status === 400);
   await assert.rejects(service.saveProfile({ fullName: 'Trainer', role: 'TRAINER', temporaryPassword: 'я'.repeat(40) }, admin), e => e.status === 400);
   const row = await service.saveProfile({ fullName: 'Admin', role: 'ADMIN' }, admin);
   await assert.rejects(service.archive(row.id, manager), e => e.status === 403);
