@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Button, DatePicker, Form, Input, InputNumber, Select, Switch, TimePicker, Typography } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, InputNumber, Select, Checkbox, Switch, TimePicker, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
@@ -9,6 +9,9 @@ import { shiftStatuses, type Payroll, type Shift, type ShiftStatus, type Staff }
 import { VkProfileField, VkProfileLink } from '../../components/VkProfileLink'
 import { PhoneField } from '../../components/PhoneField'
 import { phonePayload } from '../../components/formatPhone'
+import { usePermissions } from '@refinedev/core'
+import type { Role } from '../../authStorage'
+import { staffRoles } from './types'
 import { isUuid } from '../../uuid'
 
 const required = [{ required: true, message: 'Заполните поле' }]
@@ -16,7 +19,10 @@ const moneyProps = { min: 0, max: 9999999999.99, precision: 2, style: { width: '
 
 export function ProfileModal({ staff, onClose, onSaved }: { staff?: Staff; onClose: () => void; onSaved: () => void }) {
   const [form] = Form.useForm()
-  const [candidates, setCandidates] = useState<Array<{ id: string; email: string; vkId?: string | null; trainer?: { fullName: string; name: string } }>>([])
+  const { data: role } = usePermissions<Role>({})
+  const access = Form.useWatch('createCrmAccess', form)
+  const linkedUser = Form.useWatch('userId', form)
+  const [candidates, setCandidates] = useState<Array<{ id: string; role?: string; email: string; vkId?: string | null; trainer?: { fullName: string; name: string } }>>([])
   const [error, setError] = useState<string>()
   useEffect(() => {
     if (staff) return
@@ -24,22 +30,35 @@ export function ProfileModal({ staff, onClose, onSaved }: { staff?: Staff; onClo
     void httpClient.get(`${API_URL}/staff/candidates`, { signal: controller.signal }).then(res => setCandidates(res.data)).catch(cause => { if (!controller.signal.aborted) setError(toHttpError(cause).message) })
     return () => controller.abort()
   }, [staff])
-  return <StableEntryModal variant="drawer" title={staff ? `Редактирование сотрудника: ${staff.fullName}` : 'Добавить сотрудника'} form={form} submitLabel="Сохранить" resources={['staff']} onClose={onClose} onSaved={onSaved} successMessage="Данные сотрудника обновлены"
+  return <StableEntryModal variant="drawer" title={staff ? `Редактирование сотрудника: ${staff.fullName}` : 'Добавить сотрудника'} form={form} submitLabel="Сохранить" resources={['staff', 'trainers', 'schedule', 'dashboard-stats']} onClose={onClose} onSaved={onSaved} successMessage="Данные сотрудника обновлены"
     save={values => {
-      if (!isUuid(staff ? staff.id : values.userId)) throw new Error('Некорректный идентификатор сотрудника')
+      if ((staff && !isUuid(staff.id)) || (values.userId && !isUuid(values.userId))) throw new Error('Некорректный идентификатор сотрудника')
       const payload = { ...values, vkId: values.vkId?.trim() || null, phone: phonePayload(values.phone) }
+      if (!values.createCrmAccess) delete payload.temporaryPassword
+      if (values.userId) {
+        delete payload.createCrmAccess
+        delete payload.temporaryPassword
+        delete payload.email
+      }
       return staff ? httpClient.patch(`${API_URL}/staff/${staff.id}`, payload) : httpClient.post(`${API_URL}/staff`, payload)
     }}>
     {error && <Alert type="error" message={error} />}
-    {!staff && <Form.Item name="userId" label="Учетная запись" rules={required}><Select aria-label="Учетная запись" showSearch optionFilterProp="label" options={candidates.map(user => ({ value: user.id, label: user.email }))} onChange={id => {
+    {!staff && <Form.Item name="userId" label="Существующая учетная запись (необязательно)"><Select allowClear aria-label="Учетная запись" showSearch optionFilterProp="label" options={candidates.map(user => ({ value: user.id, label: user.email }))} onChange={id => {
       const selected = candidates.find(user => user.id === id)
       form.setFieldValue('vkId', selected?.vkId || '')
+      form.setFieldValue('role', selected?.role ?? 'OTHER')
       const trainer = selected?.trainer
       if (trainer) form.setFieldValue('fullName', trainer.fullName || trainer.name)
     }} /></Form.Item>}
     {staff && <VkProfileLink id={staff.userId} name={staff.fullName} vkId={staff.user?.vkId} kind="STAFF" readOnly />}
     <VkProfileField initialValue={staff?.user?.vkId} />
     <Form.Item name="fullName" label="ФИО" initialValue={staff?.fullName} rules={required}><Input aria-label="ФИО" maxLength={150} /></Form.Item>
+    <Form.Item name="role" label="Роль" initialValue={staff?.user?.role ?? 'OTHER'} rules={required}><Select aria-label="Роль" options={Object.entries(staffRoles).filter(([value]) => role === 'ADMIN' || value !== 'ADMIN').map(([value, label]) => ({ value, label }))} /></Form.Item>
+    {!linkedUser && <>
+      <Form.Item name="createCrmAccess" valuePropName="checked" initialValue={staff?.user?.crmAccess ?? false}><Checkbox>Создать доступ в CRM</Checkbox></Form.Item>
+      <Form.Item name="email" label="Email" initialValue={staff?.user?.email?.endsWith('@staff.invalid') ? undefined : staff?.user?.email} rules={[{ type: 'email', message: 'Укажите корректный email' }, ...(access ? required : [])]}><Input aria-label="Email" autoComplete="off" /></Form.Item>
+      {access && <Form.Item name="temporaryPassword" label="Временный пароль" rules={[...(!staff || !staff.user?.crmAccess ? required : []), { min: 8, message: 'Не менее 8 символов' }]}><Input.Password aria-label="Временный пароль" autoComplete="new-password" maxLength={72} /></Form.Item>}
+    </>}
     <Form.Item name="roleTitle" label="Должность" initialValue={staff?.roleTitle} rules={required}><Input aria-label="Должность" maxLength={150} /></Form.Item>
     <PhoneField initialValue={staff?.phone} />
     <Form.Item name="scheduleColor" label="Цвет в расписании" initialValue={staff?.scheduleColor} rules={[{ pattern: /^#[0-9a-fA-F]{6}$/, message: 'Укажите цвет в формате #724C39' }]}><Input aria-label="Цвет в расписании" maxLength={7} placeholder="#724C39" /></Form.Item>
@@ -54,6 +73,7 @@ export function ShiftModal({ variant = 'modal', leading, staff, shift, selectedD
   const [form] = Form.useForm<{ staffId: string; dates: Dayjs[]; times: [Dayjs, Dayjs]; status: ShiftStatus; notes?: string }>()
   return <StableEntryModal variant={variant} title={shift ? 'Изменить смену' : 'Запланировать смену'} form={form} submitLabel={shift ? 'Сохранить смену' : 'Запланировать смену'} resources={['staff']} onClose={onClose} onSaved={onSaved}
     save={values => {
+      if (!isUuid(shift?.id ?? values.staffId)) throw new Error('Некорректный идентификатор сотрудника или смены')
       const payload = { startTime: values.times[0].format('HH:mm'), endTime: values.times[1].format('HH:mm'), notes: values.notes }
       if (payload.startTime >= payload.endTime) return Promise.reject(new Error('Окончание смены должно быть позже начала в тот же день'))
       return shift ? httpClient.patch(`${API_URL}/staff/shifts/${shift.id}`, { ...payload, status: values.status }) : httpClient.post(`${API_URL}/staff/shifts`, { ...payload, staffId: values.staffId, dates: values.dates.map(date => date.format('YYYY-MM-DD')) })

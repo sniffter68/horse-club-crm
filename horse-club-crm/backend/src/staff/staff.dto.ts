@@ -1,8 +1,8 @@
 import { Transform, Type } from 'class-transformer';
-import { WorkShiftStatus, ExpensePaymentMethod } from '@prisma/client';
+import { Role, WorkShiftStatus, ExpensePaymentMethod } from '@prisma/client';
 import { PartialType } from '@nestjs/swagger';
 import { PreserveInput } from '../auth/decorators/preserve-input.decorator';
-import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsEmail, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 const empty = ({ value }: { value: unknown }) => value === '' ? undefined : value;
 const emptyNumber = ({ value, obj, key }: { value: unknown; obj: Record<string, unknown>; key: string }) => obj[key] === '' ? undefined : value;
@@ -14,9 +14,15 @@ export class StaffProfileDto {
   @IsOptional() @IsString() @MaxLength(40) phone?: string | null;
   @IsOptional() @Matches(/^#[0-9a-fA-F]{6}$/) scheduleColor?: string | null;
 
-  @IsUUID() userId!: string;
+  @Transform(empty) @IsOptional() @IsUUID() userId?: string;
+  @Transform(empty) @IsOptional() @IsEnum(Role) role?: Role;
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(150) position?: string;
+  @Transform(empty) @IsOptional() @IsEmail() email?: string;
+  @IsOptional() @IsString() @MaxLength(256) vkScreenName?: string | null;
+  @PreserveInput() @IsOptional() @IsBoolean() createCrmAccess?: boolean;
+  @IsOptional() @IsString() @MinLength(8) @MaxLength(72) temporaryPassword?: string;
   @Transform(({ value }) => typeof value === 'string' ? value.trim() : value) @IsString() @MinLength(1) @MaxLength(150) fullName!: string;
-  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value) @IsString() @MinLength(1) @MaxLength(150) roleTitle!: string;
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value) @IsOptional() @IsString() @MinLength(1) @MaxLength(150) roleTitle?: string;
   @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(9999999999.99) shiftRate?: number | null;
   @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(9999999999.99) lessonRate?: number | null;
   @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(9999999999.99) groupLessonRate?: number | null;
@@ -63,4 +69,13 @@ export class PayoutDto {
   @IsUUID() calculationId!: string;
   @IsEnum(ExpensePaymentMethod) paymentMethod!: ExpensePaymentMethod;
   @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(9999999999.99) expectedTotal!: number;
+}
+
+export class StaffQueryDto extends ShiftQueryDto {
+  @Transform(empty) @IsOptional() @IsEnum(Role) role?: Role;
+  @Transform(empty) @IsOptional() @IsIn(['active', 'archived']) activity?: 'active' | 'archived';
+  @Transform(empty) @IsOptional() @IsIn(['on', 'off']) duty?: 'on' | 'off';
+}
+export class DutyDto {
+  @Transform(empty) @IsOptional() @IsUUID() staffId?: string;
 }

@@ -12,7 +12,7 @@ async function login(page: Page, email: string) {
 test('admin plans and completes a shift, adjusts payroll, pays CASH and sees salary expense and lower balance', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 950 })
   await login(page, 'staff-admin@test.local')
-  await page.goto('/staff')
+  await page.goto('/staff?tab=shifts')
   await page.getByRole('button', { name: 'Запланировать смену', exact: true }).click()
   const shiftDialog = page.getByRole('dialog', { name: 'Запланировать смену', exact: true })
   await shiftDialog.getByRole('combobox', { name: 'Сотрудник', exact: true }).press('ArrowDown')
@@ -82,7 +82,7 @@ test('rates use the shared form: validation, create, edit, retry, narrow layout 
   const createdUser = await page.request.post('/api/users', { headers: { Origin: new URL(page.url()).origin }, data: { email, password: 'staff-test-password', role: 'TRAINER' } })
   expect(createdUser.ok(), await createdUser.text()).toBeTruthy()
   await page.goto('/staff?tab=rates')
-  await page.getByRole('button', { name: 'Добавить сотрудника', exact: true }).click()
+  await page.getByRole('button', { name: '+ Добавить сотрудника', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Добавить сотрудника', exact: true })
   await dialog.getByRole('button', { name: 'Сохранить ставки', exact: true }).click()
   await expect(dialog.getByText('Заполните поле')).toHaveCount(3)
@@ -117,7 +117,7 @@ test('rates use the shared form: validation, create, edit, retry, narrow layout 
 test('trainer sees only own schedule and payroll on mobile, no management controls, foreign requests get 403', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await login(page, 'staff-trainer@test.local')
-  await page.goto('/staff')
+  await page.goto('/staff?tab=shifts')
   await expect(page.getByText('В этом месяце смен нет')).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Настройки ставок', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Запланировать смену', exact: true })).toHaveCount(0)

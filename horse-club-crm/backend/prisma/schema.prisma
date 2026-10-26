@@ -12,6 +12,9 @@ enum Role {
   MANAGER
   TRAINER
   STABLE_WORKER
+  GROOM
+  VET
+  OTHER
 }
 
 enum SystemModule {
@@ -201,6 +204,7 @@ model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
   tokenVersion Int      @default(1)
+  crmAccess Boolean @default(true)
   passwordHash String
   role         Role
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
@@ -732,6 +736,9 @@ model StaffProfile {
 }
 
 model WorkShift {
+  startedAt DateTime? @db.Timestamptz(6)
+  endedAt DateTime? @db.Timestamptz(6)
+  endedById String? @db.Uuid
   id String @id @default(uuid()) @db.Uuid
   staffId String @db.Uuid
   staff StaffProfile @relation(fields: [staffId], references: [id], onDelete: Restrict)

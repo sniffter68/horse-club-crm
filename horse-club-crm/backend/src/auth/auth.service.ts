@@ -37,11 +37,11 @@ export class AuthService implements OnModuleInit {
     }
     const user = await this.prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, role: true, passwordHash: true, tokenVersion: true },
+      select: { id: true, email: true, role: true, passwordHash: true, crmAccess: true, tokenVersion: true },
     });
     // Perform bcrypt work for unknown emails as well.
     const valid = await compare(password, user?.passwordHash ?? this.dummyHash);
-    if (!user || !valid) {
+    if (!user || user.crmAccess === false || !valid) {
       throw new UnauthorizedException('Invalid email or password');
     }
     return { id: user.id, email: user.email, role: user.role, authVersion: String(user.tokenVersion) };
@@ -77,8 +77,8 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Invalid session');
     }
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub },
-      select: { id: true, email: true, role: true, tokenVersion: true } });
-    if (!user || String(user.tokenVersion) !== payload.authVersion || user.role !== payload.role) {
+      select: { id: true, email: true, role: true, crmAccess: true, tokenVersion: true } });
+    if (!user || user.crmAccess === false || String(user.tokenVersion) !== payload.authVersion || user.role !== payload.role) {
       throw new UnauthorizedException('Session revoked');
     }
     return { access_token: await this.jwt.signAsync({ sub: user.id, email: user.email,

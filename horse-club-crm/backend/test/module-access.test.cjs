@@ -46,10 +46,10 @@ after(async () => { await app?.close(); });
 beforeEach(() => { settings = []; saved = []; });
 const api = () => request(app.getHttpServer());
 
-test('default matrix contains all four roles and five enabled modules', async () => {
+test('default matrix contains all seven roles and five enabled modules', async () => {
   const result = await api().get('/settings/modules').set('x-role', 'ADMIN').expect(200);
   assert.equal(result.body.modules.length, 5); assert.ok(result.body.modules.every(r => r.isEnabled));
-  assert.equal(result.body.permissions.length, 20);
+  assert.equal(result.body.permissions.length, 35);
   for (const row of result.body.permissions) assert.equal(row.accessLevel, defaultModuleAccess(row.role, row.module));
   const worker = await api().get('/settings/my-permissions').set('x-role', 'STABLE_WORKER').expect(200);
   assert.equal(worker.body.modules.filter(r => r.accessLevel === 'READ_ONLY').length, 2);
@@ -75,7 +75,7 @@ test('disabled module blocks real API even for admin and reenabling restores it'
 test('admin rights cannot be downgraded and invalid nested DTOs cannot write', async () => {
   for (const accessLevel of ['READ_ONLY', 'HIDDEN']) await api().put('/settings/modules/permissions').set('x-role', 'ADMIN')
     .send({ permissions: [{ role: 'ADMIN', module: 'SCHEDULE', accessLevel }] }).expect(400);
-  for (const body of [{ permissions: [] }, { permissions: [{ role: 'OTHER', module: 'SCHEDULE', accessLevel: 'FULL' }] },
+  for (const body of [{ permissions: [] }, { permissions: [{ role: 'INVALID_ROLE', module: 'SCHEDULE', accessLevel: 'FULL' }] },
     { permissions: [{ role: 'TRAINER', module: 'BAD', accessLevel: 'FULL' }] },
     { permissions: [{ role: 'TRAINER', module: 'SCHEDULE', accessLevel: 'bad' }] }])
     await api().put('/settings/modules/permissions').set('x-role', 'ADMIN').send(body).expect(400);

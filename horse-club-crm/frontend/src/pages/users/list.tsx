@@ -7,7 +7,7 @@ import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { VkAdminRecipient } from '../../components/VkProfileLink'
 
 type User = { id: string; email: string; role: Role; createdAt: string; vkId?: string | null; vkUserId?: string | null }
-const roleColor: Record<Role, string> = { ADMIN: 'red', MANAGER: 'blue', TRAINER: 'green', STABLE_WORKER: 'orange' }
+const roleColor: Record<Role, string> = { ADMIN: 'red', MANAGER: 'blue', TRAINER: 'green', GROOM: 'orange', VET: 'purple', OTHER: 'default', STABLE_WORKER: 'orange' }
 
 export function UserList() {
   const { data: role } = usePermissions<Role>({})

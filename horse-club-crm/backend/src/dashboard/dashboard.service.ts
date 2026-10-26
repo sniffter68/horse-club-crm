@@ -262,7 +262,7 @@ export class DashboardService {
       canRead('SCHEDULE') ? this.prisma.lesson.groupBy({ by: ['status'], where: lessonDay, _count: { _all: true } }) : undefined,
       canRead('STABLES') ? this.prisma.horse.groupBy({ by: ['healthStatus'], _count: { _all: true } }) : undefined,
       canRead('STAFF_PAYROLL') ? this.prisma.workShift.findMany({
-        where: { date: new Date(DateTime.fromJSDate(start, { zone: CLUB_TIME_ZONE }).toISODate()! + 'T00:00:00Z'), status: { in: ['SCHEDULED', 'COMPLETED'] } },
+        where: { date: new Date(DateTime.fromJSDate(start, { zone: CLUB_TIME_ZONE }).toISODate()! + 'T00:00:00Z'), status: 'SCHEDULED', startedAt: { lte: now }, endedAt: null, staff: { isActive: true } },
         select: { id: true, staffId: true, startTime: true, endTime: true, status: true, staff: { select: { fullName: true, roleTitle: true } } },
         orderBy: [{ startTime: 'asc' }, { id: 'asc' }],
       }) : undefined,

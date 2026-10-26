@@ -56,7 +56,10 @@ test('Moscow midnight and the full calendar day drive all daily aggregates, rega
     assert.equal(summary.activeShifts, 1); assert.equal(summary.pendingVetAlerts, 4);
     const shift = calls.find(row => row.model === 'workShift').args.where;
     assert.equal(shift.date.toISOString(), `${date}T00:00:00.000Z`);
-    assert.deepEqual(shift.status.in, ['SCHEDULED', 'COMPLETED']);
+    assert.equal(shift.status, 'SCHEDULED');
+    assert.equal(shift.endedAt, null);
+    assert.equal(shift.startedAt.lte.toISOString(), instant);
+    assert.equal(shift.staff.isActive, true);
     const vet = calls.find(row => row.model === 'vetEvent').args.where;
     assert.equal(vet.eventDate.lt.toISOString(), end);
     assert.deepEqual(vet.status.in, ['scheduled', 'overdue']);

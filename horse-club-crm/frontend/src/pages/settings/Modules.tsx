@@ -15,8 +15,8 @@ const descriptions: Record<SystemModule, string> = {
   VETERINARY: 'Процедуры, журнал здоровья и ветеринарные карты.', CASHBOX: 'Платежи, расходы, кассовые смены и отчеты.',
   STAFF_PAYROLL: 'График смен, ставки и расчет начислений сотрудникам.',
 }
-const roles: Role[] = ['ADMIN', 'MANAGER', 'TRAINER', 'STABLE_WORKER']
-const roleLabels: Record<Role, string> = { ADMIN: 'Администратор', MANAGER: 'Управляющий', TRAINER: 'Тренер', STABLE_WORKER: 'Конюх / Сотрудник' }
+const roles: Role[] = ['ADMIN', 'MANAGER', 'TRAINER', 'STABLE_WORKER', 'GROOM', 'VET', 'OTHER']
+const roleLabels: Record<Role, string> = { GROOM: 'Конюх', VET: 'Ветеринар', OTHER: 'Другое', ADMIN: 'Администратор', MANAGER: 'Управляющий', TRAINER: 'Тренер', STABLE_WORKER: 'Конюх / Сотрудник' }
 const options: { value: AccessLevel; label: string }[] = [
   { value: 'FULL', label: 'Полный' }, { value: 'READ_ONLY', label: 'Просмотр' }, { value: 'HIDDEN', label: 'Скрыт' },
 ]

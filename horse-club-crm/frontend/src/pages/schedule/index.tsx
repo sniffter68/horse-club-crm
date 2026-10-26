@@ -133,7 +133,7 @@ export function SchedulePage() {
       catalog<Arena>('arenas', controller.signal),
     ]).then(([settings, clientRows, horseRows, trainerRows, serviceRows, arenaRows]) => {
       if (controller.signal.aborted) return
-      setSchedule(settings.data); setClients(clientRows); setHorses(horseRows); setTrainers(trainerRows); setServices(serviceRows); setArenas(arenaRows); setReady(true)
+      setSchedule(settings.data); setClients(clientRows); setHorses(horseRows); setTrainers(trainerRows.filter(row => row.isActive !== false)); setServices(serviceRows); setArenas(arenaRows); setReady(true)
     }).catch(cause => { if (!controller.signal.aborted) report(cause) })
     return () => controller.abort()
   }, [report, revision])

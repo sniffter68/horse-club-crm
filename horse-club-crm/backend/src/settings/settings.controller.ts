@@ -36,7 +36,7 @@ export class SettingsController {
   async myPermissions(@CurrentUser() user: AuthUser) { return { role: user.role, modules: await this.modules.forRole(user.role) }; }
 
   @Get('access/me')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER, Role.GROOM, Role.VET, Role.OTHER)
   async currentAccess(@CurrentUser() user: AuthUser) {
     return { userId: user.id, trainerId: user.trainerId ?? null, role: user.role, permissions: await this.access.permissions(user.role) };
   }
@@ -50,7 +50,7 @@ export class SettingsController {
   updateAccess(@Param('role', new ParseEnumPipe(Role)) role: Role, @Body() dto: UpdateRoleAccessDto) { return this.access.update(role, dto); }
 
   @Get('club-schedule')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER, Role.GROOM, Role.VET, Role.OTHER)
   @ApiOkResponse({ description: 'Глобальный график работы клуба.' })
   getSchedule() {
     return this.settingsService.getSchedule();

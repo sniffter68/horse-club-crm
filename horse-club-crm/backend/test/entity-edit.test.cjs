@@ -71,7 +71,7 @@ test('trainer and staff profile edits persist contact, color and rates through e
   await new TrainersService({ trainer: { update: async ({ data }) => { trainer = data; return data; } } })
     .update('trainer', { phone: '+79991234567', scheduleColor: '#724C39', baseRate: 2000 });
   assert.equal(trainer.scheduleColor, '#724C39');
-  const tx = { staffProfile: { findUnique: async () => ({ id: 'staff' }), update: async ({ data }) => { staff = data; return data; } } };
+  const tx = { user: { findUnique: async () => ({ id: 'user', role: 'OTHER' }), update: async () => ({}) }, staffProfile: { findUnique: async () => ({ id: 'staff', userId: 'user', fullName: 'Сотрудник', roleTitle: 'Сотрудник', isActive: true }), update: async ({ data }) => { staff = data; return data; } } };
   await new StaffService({ $transaction: async work => work(tx) })
     .saveProfile({ phone: '+79991234567', scheduleColor: '#724C39', shiftRate: 2000 }, { role: 'ADMIN' }, 'staff');
   assert.equal(staff.shiftRate, 2000);
