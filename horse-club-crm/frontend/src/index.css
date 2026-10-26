@@ -418,11 +418,15 @@ html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); borde
 .dashboard-day-card { height: 100%; border-radius: 16px; }
 .dashboard-day-card--lessons { background: color-mix(in srgb, var(--crm-saddle) 5%, var(--crm-paper)); }
 .dashboard-day-card--cash { background: color-mix(in srgb, #3E5F48 6%, var(--crm-paper)); }
-.dashboard-cash-link { display: block; height: 100%; color: inherit; cursor: pointer; border-radius: 16px; }
-.dashboard-cash-link .ant-card { transition: border-color 160ms ease, box-shadow 160ms ease; }
-.dashboard-cash-link:hover .ant-card, .dashboard-cash-link:active .ant-card { border-color: var(--crm-saddle); box-shadow: 0 2px 8px color-mix(in srgb, var(--crm-saddle) 12%, transparent); }
-.dashboard-cash-link:focus-visible { outline: 2px solid var(--crm-saddle); outline-offset: 3px; }
-@media (prefers-reduced-motion: reduce) { .dashboard-cash-link .ant-card { transition: none; } }
+.dashboard-metric-link { display: block; height: 100%; color: inherit; cursor: pointer; border-radius: 16px; }
+.dashboard-metric-link .ant-card { transition: border-color 160ms ease, box-shadow 160ms ease; }
+.dashboard-metric-link .ant-card-head-title { white-space: normal; }
+.dashboard-metric-link .ant-card-extra { flex-shrink: 0; }
+.dashboard-metric-link .ant-card-extra .anticon { transition: transform 160ms ease; }
+.dashboard-metric-link:hover .ant-card, .dashboard-metric-link:active .ant-card { border-color: var(--crm-saddle); box-shadow: 0 2px 8px color-mix(in srgb, var(--crm-saddle) 12%, transparent); }
+.dashboard-metric-link:hover .ant-card-extra .anticon, .dashboard-metric-link:focus-visible .ant-card-extra .anticon { transform: translateX(3px); }
+.dashboard-metric-link:focus-visible { outline: 2px solid var(--crm-saddle); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .dashboard-metric-link .ant-card, .dashboard-metric-link .ant-card-extra .anticon { transition: none; } .dashboard-metric-link:hover .ant-card-extra .anticon, .dashboard-metric-link:focus-visible .ant-card-extra .anticon { transform: none; } }
 .dashboard-day-card--horses { background: color-mix(in srgb, #8C6527 6%, var(--crm-paper)); }
 .dashboard-day-card--staff { background: color-mix(in srgb, #76518a 5%, var(--crm-paper)); }
 .dashboard-day-card .ant-statistic-content { font-family: Georgia, serif; font-variant-numeric: tabular-nums; }

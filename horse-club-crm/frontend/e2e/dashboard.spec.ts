@@ -91,6 +91,49 @@ test.setTimeout(45000)
 const modules = ['SCHEDULE', 'CASHBOX', 'STABLES', 'VETERINARY', 'STAFF_PAYROLL']
 const client = { id: '00000001-1111-4111-8111-111111111111', name: 'Анна Орлова', phone: '+79991234567' }
 
+for (const width of [1440, 390]) test(`dashboard metric cards navigate by keyboard and pointer at ${width}px`, async ({ page }) => {
+  await setup(page)
+  await page.setViewportSize({ width, height: 900 })
+  await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } }))
+  for (const resource of ['lessons', 'bookings', 'bookings/horse-issues', 'horses/workload']) {
+    await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: [] }))
+  }
+  await page.route('**/api/staff/shifts?*', route => route.fulfill({ json: { data: [], total: 0 } }))
+  for (const [name, path, destination] of [
+    ['Тренировки сегодня — открыть расписание', '/schedule', '.schedule-page'],
+    ['Поголовье и здоровье — открыть список лошадей', '/horses', 'h4'],
+    ['Персонал на смене — открыть персонал и смены', '/staff', '.staff-page'],
+  ]) {
+    await page.goto('/')
+    const link = page.getByRole('link', { name, exact: true })
+    await expect(page.locator('.dashboard-metric-link')).toHaveCount(4)
+    await page.screenshot({ path: `test-results/dashboard-metric-cards-${width}.png`, fullPage: true })
+    await expect(link).toHaveAttribute('href', path)
+    await expect(link.locator('.ant-card-extra .anticon')).toBeVisible()
+    await link.hover()
+    await expect(link).toHaveCSS('cursor', 'pointer')
+    await expect(link.locator('.ant-card-extra .anticon')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 3, 0)')
+    if (width === 1440) {
+      await link.focus()
+      await expect(link).toBeFocused()
+      await expect(link).toHaveCSS('outline-style', 'solid')
+      await link.press('Enter')
+    } else {
+      // Click the card body rather than its title or arrow.
+      await link.locator('.ant-card-body').click({ position: { x: 12, y: 12 } })
+    }
+    await expect(page).toHaveURL(new RegExp(`${path}(\\?.*)?$`))
+    await expect(page.locator(destination).first()).toBeVisible()
+  }
+  await page.goto('/')
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const link = page.getByRole('link', { name: 'Тренировки сегодня — открыть расписание' })
+  await link.hover()
+  const arrow = link.locator('.ant-card-extra .anticon')
+  await expect(arrow).toHaveCSS('transform', 'none')
+  expect(await arrow.evaluate(node => parseFloat(getComputedStyle(node).transitionDuration))).toBeLessThanOrEqual(0.001)
+})
+
 for (const width of [1440, 390]) test(`cash card opens matching club balances without an open shift at ${width}px`, async ({ page }) => {
   await setup(page)
   await page.setViewportSize({ width, height: 900 })

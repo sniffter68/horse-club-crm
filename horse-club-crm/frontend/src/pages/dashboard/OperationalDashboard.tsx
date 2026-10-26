@@ -29,12 +29,12 @@ export function OperationalDashboard({ summary, loading, refresh, complete, upda
   return <Space direction="vertical" size="large" style={{ width: '100%' }}>
     <QuickActions onSaved={refresh} shifts={(summary?.onDutyStaff ?? []).map(row => ({ ...row, date: '' }))} />
     <Row gutter={[16, 16]} aria-label="Показатели дня">
-      {modules.canRead('SCHEDULE') && <Col xs={24} sm={12} xl={6}><Card className="dashboard-day-card dashboard-day-card--lessons" loading={loading}>
-        <Statistic title="Тренировки сегодня" value={lessons?.completed ?? 0} suffix={`/ ${lessons?.total ?? 0}`} />
+      {modules.canRead('SCHEDULE') && <Col xs={24} sm={12} xl={6}><Link to="/schedule" className="dashboard-metric-link" aria-label="Тренировки сегодня — открыть расписание"><Card title="Тренировки сегодня" extra={<ArrowRightOutlined aria-hidden />} className="dashboard-day-card dashboard-day-card--lessons" loading={loading}>
+        <Statistic value={lessons?.completed ?? 0} suffix={`/ ${lessons?.total ?? 0}`} />
         <Progress aria-label="Прогресс тренировок" percent={lessons?.total ? Math.round(lessons.completed / lessons.total * 100) : 0} />
         <Typography.Text type="secondary">Отменено: {lessons?.cancelled ?? 0}</Typography.Text>
-      </Card></Col>}
-      {modules.canRead('CASHBOX') && <Col xs={24} sm={12} xl={6}><Link to="/cash-desk" className="dashboard-cash-link" aria-label="Баланс кассы — открыть кассу"><Card title="Баланс кассы" extra={<ArrowRightOutlined aria-hidden />} className="dashboard-day-card dashboard-day-card--cash" loading={loading}>
+      </Card></Link></Col>}
+      {modules.canRead('CASHBOX') && <Col xs={24} sm={12} xl={6}><Link to="/cash-desk" className="dashboard-metric-link" aria-label="Баланс кассы — открыть кассу"><Card title="Баланс кассы" extra={<ArrowRightOutlined aria-hidden />} className="dashboard-day-card dashboard-day-card--cash" loading={loading}>
         {cash ? <Space direction="vertical" size={4}>
           <span>Наличные в кассе <strong data-testid="dashboard-cash">{currency(cash.cash)}</strong></span>
           <span>На счете <strong>{currency(cash.card)}</strong></span>
@@ -42,17 +42,17 @@ export function OperationalDashboard({ summary, loading, refresh, complete, upda
           <Typography.Text type="secondary">Расходы сегодня: {currency(cash.expensesToday)}</Typography.Text>
         </Space> : <Typography.Text type="secondary">Данные кассы недоступны</Typography.Text>}
       </Card></Link></Col>}
-      {modules.canRead('STABLES') && <Col xs={24} sm={12} xl={6}><Card className="dashboard-day-card dashboard-day-card--horses" loading={loading}>
-        <Statistic title="Поголовье и здоровье" value={horses?.total ?? 0} />
+      {modules.canRead('STABLES') && <Col xs={24} sm={12} xl={6}><Link to="/horses" className="dashboard-metric-link" aria-label="Поголовье и здоровье — открыть список лошадей"><Card title="Поголовье и здоровье" extra={<ArrowRightOutlined aria-hidden />} className="dashboard-day-card dashboard-day-card--horses" loading={loading}>
+        <Statistic value={horses?.total ?? 0} />
         <Space wrap><Tag color="success">В работе: {horses?.healthy ?? 0}</Tag><Tag color={horses?.treatment ? 'warning' : 'default'}>На лечении: {horses?.treatment ?? 0}</Tag><Tag color={horses?.quarantine ? 'error' : 'default'}>Карантин: {horses?.quarantine ?? 0}</Tag></Space>
         {modules.canRead('VETERINARY') && <div><Typography.Text type={summary?.pendingVetAlerts ? 'warning' : 'secondary'}>Ветпроцедуры требуют внимания: {summary?.pendingVetAlerts ?? 0}</Typography.Text></div>}
-      </Card></Col>}
-      {modules.canRead('STAFF_PAYROLL') && <Col xs={24} sm={12} xl={6}><Card className="dashboard-day-card dashboard-day-card--staff" loading={loading}>
-        <Statistic title="Персонал на смене" value={summary?.activeShifts ?? 0} />
+      </Card></Link></Col>}
+      {modules.canRead('STAFF_PAYROLL') && <Col xs={24} sm={12} xl={6}><Link to="/staff" className="dashboard-metric-link" aria-label="Персонал на смене — открыть персонал и смены"><Card title="Персонал на смене" extra={<ArrowRightOutlined aria-hidden />} className="dashboard-day-card dashboard-day-card--staff" loading={loading}>
+        <Statistic value={summary?.activeShifts ?? 0} />
         <div className="dashboard-on-duty">{summary?.onDutyStaff?.length ? summary.onDutyStaff.map(person => <div key={person.id}>
           <strong>{person.fullName}</strong><br /><Typography.Text type="secondary">{person.roleTitle} · {person.startTime}–{person.endTime}</Typography.Text>
         </div>) : <Typography.Text type="secondary">Смен на сегодня нет</Typography.Text>}</div>
-      </Card></Col>}
+      </Card></Link></Col>}
     </Row>
     {modules.canRead('SCHEDULE') && <Card title="Ближайшие тренировки на сегодня" loading={loading}>
       {summary?.upcomingLessons?.length ? <List dataSource={summary.upcomingLessons} renderItem={lesson => <List.Item className="dashboard-timeline-item">
