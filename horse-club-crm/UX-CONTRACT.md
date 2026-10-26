@@ -1,5 +1,9 @@
 ﻿# UX Contract
 
+## Параллельные индивидуальные занятия
+
+Источник — задача владельца от 26.10.2026, `docs/parallel-individual-lessons.md`. Владельцы: `ScheduleEventContent` для карточек, `parallelLayout` для колонок ресурсов, `useScheduleConflicts` и `ScheduleConflictNotice` для подсказок обеих форм. Пересечение тренера не блокирует сохранение; пересечение лошади блокирует. Сервер также проверяет занятость клиента. Учитывается выбранный интервал независимо от фильтров, редактируемая запись исключается, устаревшие запросы отменяются. Визуальные токены не меняются. Проверки: `parallel-lessons.test.cjs`, `booking-rules.test.cjs`, `parallelLayout.test.ts`, `triad-booking.spec.ts`.
+
 ## Совместное использование абонементов
 
 Источник — задача владельца от 23.10.2026 и `docs/shared-family-memberships.md`. Канонический владелец управления участниками — `memberships/SharedMembershipAccess.tsx`; поиск — `ClientSelectWithCreate`, подтверждение отзыва — Ant Design Popconfirm, обратная связь — Alert/App message. Ошибка сохраняет выбор; успех обновляет клиентов и абонементы. READ_ONLY скрывает мутации. Обе формы записи показывают владельца семейного абонемента. Проверки — `clients-memberships.spec.ts`, `triad-booking.spec.ts`, `backend/test/shared-memberships.test.cjs`.

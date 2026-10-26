@@ -51,6 +51,12 @@ export function scheduleEntries(lessons: Lesson[], bookings: TriadBooking[]): Sc
       discipline: disciplines[b.serviceType], status: b.status, active: ['scheduled', 'completed'].includes(b.status), completed: b.status === 'completed' })),
   ]
 }
+export function scheduleConflicts(entries: ScheduleEntry[], trainerId?: string, horseIds: string[] = []) {
+  return {
+    trainers: entries.filter(e => e.trainerId === trainerId),
+    horses: [...new Map(entries.flatMap(e => e.horses.filter(h => horseIds.includes(h.id)).map(h => [h.id, h] as const))).values()],
+  }
+}
 export function peakOccupancy(entries: ScheduleEntry[], from: number, to: number): number {
   const events = entries.filter(e => e.active && +new Date(e.startTime) < to && +new Date(e.endTime) > from).flatMap(e => [
     { at: Math.max(from, +new Date(e.startTime)), delta: e.riders.length }, { at: Math.min(to, +new Date(e.endTime)), delta: -e.riders.length },
@@ -75,6 +81,8 @@ export function membershipBalance(m: MembershipSummary): { remaining: number; to
   return { remaining, total, until, label, active }
 }
 const reasons: Record<string, { field?: keyof TriadValues; message: string }> = {
+  HORSE_BUSY: { field: 'horseId', message: 'Лошадь уже занята в это время. Выберите другую лошадь или интервал.' },
+  CLIENT_BUSY: { field: 'clientId', message: 'Клиент уже записан на занятие в это время.' },
   HORSE_OVERLOADED: { field: 'horseId', message: 'Превышен суточный лимит нагрузки лошади. Выберите другую лошадь или дату.' },
   HORSE_REST_VIOLATION: { field: 'horseId', message: 'Лошади нужен отдых между тренировками. Измените время или выберите другую лошадь.' },
   RIDER_WEIGHT_EXCEEDED: { field: 'horseId', message: 'Вес всадника превышает допустимый лимит для выбранной лошади.' },

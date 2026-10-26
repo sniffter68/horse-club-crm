@@ -93,14 +93,25 @@ test('rest accepts exactly 45 minutes and rejects a one-second deficit on either
     else await rules.validate(f.tx, f.input);
   }
 });
-test('trainer overlap rejects, adjacent intervals pass', async () => {
+test('trainer overlap and adjacent intervals allow independent riders', async () => {
   const base = fixture().booking;
-  for (const [startTime, rejects] of [[at('10:29'), true], [at('10:30'), false]]) {
-    const f = fixture({ bookings: [{ ...base, trainerId: 'trainer', horseId: 'other', startTime, endTime: at('11:00') }] });
-    if (rejects) await assert.rejects(rules.validate(f.tx, f.input), failure('TRAINER_BUSY'));
-    else await rules.validate(f.tx, f.input);
+  for (const startTime of [at('10:00'), at('10:29'), at('10:30')]) {
+    const f = fixture({ bookings: [{ ...base, clientId: 'other-client', trainerId: 'trainer', horseId: 'other', startTime, endTime: at('11:00') }] });
+    await rules.validate(f.tx, f.input);
   }
 });
+
+test('horse and client overlaps remain hard conflicts across direct and legacy records', async () => {
+  for (const legacy of [false, true]) {
+    for (const resource of ['horse', 'client']) {
+      const row = { trainerId: 'other-trainer', arenaId: 'other-arena', startTime: at('10:00'), endTime: at('10:30'),
+        horseId: resource === 'horse' ? 'horse' : 'other-horse', clientId: resource === 'client' ? 'client' : 'other-client' };
+      const f = fixture(legacy ? { lessons: [{ ...row, bookings: [{ horseId: row.horseId, clientId: row.clientId }] }] } : { bookings: [row] });
+      await assert.rejects(rules.validate(f.tx, f.input), failure(resource === 'horse' ? 'HORSE_BUSY' : 'CLIENT_BUSY'));
+    }
+  }
+});
+
 test('arena uses simultaneous peak occupancy, not the total number of intersecting records', async () => {
   const base = { ...fixture().booking, horseId: 'other', arenaId: 'arena' };
   const bookings = [{ ...base, startTime: at('10:00'), endTime: at('10:15') }, { ...base, startTime: at('10:15'), endTime: at('10:30') }];

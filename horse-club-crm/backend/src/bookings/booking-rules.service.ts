@@ -21,6 +21,7 @@ interface Reservation {
   trainerId: string;
   arenaId: string | null;
   horseIds: string[];
+  clientIds: string[];
   riders: number;
   start: Date;
   end: Date;
@@ -79,8 +80,14 @@ export class BookingRulesService {
     const windowStart = new Date(Math.min(+firstDay.toJSDate(), +start - restMs));
     const windowEnd = new Date(Math.max(+lastDay.plus({ days: 1 }).toJSDate(), +end + restMs));
     const reservations = await this.reservations(tx, input, horseIds, windowStart, windowEnd);
+    if (reservations.some(r => r.clientIds.some(id => clientIds.includes(id)) && overlaps(r.start, r.end, start, end))) {
+      throw new BookingValidationError('CLIENT_BUSY', 'Клиент уже записан на занятие в это время');
+    }
     for (const horse of horses) {
       const work = reservations.filter(r => r.horseIds.includes(horse.id));
+      if (work.some(r => overlaps(r.start, r.end, start, end))) {
+        throw new BookingValidationError('HORSE_BUSY', `Лошадь ${horse.name} уже занята в это время`, { horseId: horse.id });
+      }
       for (let day = firstDay; day <= lastDay; day = day.plus({ days: 1 })) {
         const dayStart = day.toJSDate(), dayEnd = day.plus({ days: 1 }).toJSDate();
         const minutes = (work.reduce((sum, r) => sum + intersection(r.start, r.end, dayStart, dayEnd), 0) + intersection(start, end, dayStart, dayEnd)) / MINUTE;
@@ -90,9 +97,6 @@ export class BookingRulesService {
       if (work.some(r => overlaps(r.start, r.end, new Date(+start - rest), new Date(+end + rest)))) {
         throw new BookingValidationError('HORSE_REST_VIOLATION', `Лошади требуется отдых не менее ${horse.requiredRestMinutes} минут между тренировками`, { horseId: horse.id, requiredRestMinutes: horse.requiredRestMinutes });
       }
-    }
-    if (reservations.some(r => r.trainerId === trainerId && overlaps(r.start, r.end, start, end))) {
-      throw new BookingValidationError('TRAINER_BUSY', 'Тренер уже занят в этот интервал времени');
     }
     if (arena) {
       const events: { at: number; delta: number }[] = [];
@@ -111,19 +115,20 @@ export class BookingRulesService {
   }
 
   private async reservations(tx: Prisma.TransactionClient, input: BookingRuleInput, horseIds: string[], start: Date, end: Date): Promise<Reservation[]> {
+    const clientIds = input.participants.map(p => p.clientId);
     const direct = await tx.booking.findMany({ where: {
       lessonId: null, status: { in: ['scheduled', 'completed'] }, startTime: { lt: end }, endTime: { gt: start },
       ...(input.excludeBookingId ? { id: { not: input.excludeBookingId } } : {}),
-      OR: [{ trainerId: input.trainerId }, ...(input.arenaId ? [{ arenaId: input.arenaId }] : []), { horseId: { in: horseIds } }],
+      OR: [{ clientId: { in: clientIds } }, { trainerId: input.trainerId }, ...(input.arenaId ? [{ arenaId: input.arenaId }] : []), { horseId: { in: horseIds } }],
     } });
     const lessons = await tx.lesson.findMany({ where: {
-      status: { in: ['SCHEDULED', 'COMPLETED'] }, startTime: { lt: end }, endTime: { gt: start },
+      deletedAt: null, status: { in: ['SCHEDULED', 'COMPLETED'] }, startTime: { lt: end }, endTime: { gt: start },
       ...(input.excludeLessonId ? { id: { not: input.excludeLessonId } } : {}),
-      OR: [{ trainerId: input.trainerId }, ...(input.arenaId ? [{ arenaId: input.arenaId }] : []), { bookings: { some: { horseId: { in: horseIds } } } }],
-    }, include: { bookings: { select: { horseId: true } } } });
+      OR: [{ bookings: { some: { clientId: { in: clientIds } } } }, { trainerId: input.trainerId }, ...(input.arenaId ? [{ arenaId: input.arenaId }] : []), { bookings: { some: { horseId: { in: horseIds } } } }],
+    }, include: { bookings: { select: { horseId: true, clientId: true } } } });
     return [
-      ...direct.map(b => ({ trainerId: b.trainerId, arenaId: b.arenaId, horseIds: b.horseId ? [b.horseId] : [], riders: 1, start: b.startTime, end: b.endTime })),
-      ...lessons.map(l => ({ trainerId: l.trainerId, arenaId: l.arenaId, horseIds: [...new Set(l.bookings.flatMap(b => b.horseId ? [b.horseId] : []))], riders: l.bookings.length, start: l.startTime, end: l.endTime })),
+      ...direct.map(b => ({ trainerId: b.trainerId, arenaId: b.arenaId, clientIds: [b.clientId], horseIds: b.horseId ? [b.horseId] : [], riders: 1, start: b.startTime, end: b.endTime })),
+      ...lessons.map(l => ({ trainerId: l.trainerId, arenaId: l.arenaId, clientIds: l.bookings.map(b => b.clientId), horseIds: [...new Set(l.bookings.flatMap(b => b.horseId ? [b.horseId] : []))], riders: l.bookings.length, start: l.startTime, end: l.endTime })),
     ];
   }
 }

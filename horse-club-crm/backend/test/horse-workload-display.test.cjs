@@ -57,7 +57,7 @@ function rescheduleHarness(options = {}) {
       findMany: async ({ where }) => {
         reads.push(where);
         assert.deepEqual(where.id, { not: 'lesson-a' });
-        return where.OR ? (options.conflict ? [{ trainerId: 'trainer-a', bookings: [] }] : []) : [interval];
+        return where.OR ? (options.conflict ? [{ trainerId: 'trainer-a', bookings: [{ horseId: 'h1' }] }] : []) : [interval];
       },
       update: async args => { updates.push(args); return { ...lesson, ...args.data }; },
     },

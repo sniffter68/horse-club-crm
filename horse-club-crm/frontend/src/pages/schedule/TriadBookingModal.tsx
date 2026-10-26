@@ -1,3 +1,6 @@
+import { ScheduleConflictNotice } from './ScheduleConflictNotice'
+import { scheduleConflicts } from './triad'
+import { useScheduleConflicts } from './useScheduleConflicts'
 import { useClientPreferences } from './useClientPreferences'
 import { activePreferredHorse } from '../clients/preferredResources'
 import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
@@ -31,6 +34,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const clientId = Form.useWatch('clientId', form) as string | undefined
+  const trainerId = Form.useWatch('trainerId', form) as string | undefined
   const horseId = Form.useWatch('horseId', form) as string | undefined
   const arenaId = Form.useWatch('arenaId', form) as string | undefined
   const startTime = Form.useWatch('startTime', form) as string | undefined
@@ -60,6 +64,8 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
   }, [clientId, clientRevision, report])
   let from: string | undefined, to: string | undefined
   try { if (startTime && endTime) { from = toInstant(startTime); to = toInstant(endTime); if (from >= to) { from = undefined; to = undefined } } } catch { /* Inline date validation owns malformed intervals. */ }
+  const conflicts = useScheduleConflicts(from, to, booking?.id)
+  const horseBusy = scheduleConflicts(conflicts.entries, trainerId, horseId ? [horseId] : []).horses.length > 0
   const availability = useTriadAvailability(from, to, revision, report, booking?.id)
   const client = loadedClient?.id === clientId ? loadedClient : clients.find(c => c.id === clientId)
   const preferences = useClientPreferences(form, client, horses, trainers, ['horseId'], Boolean(booking))
@@ -76,7 +82,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
     modal.confirm({ title: 'Закрыть бронирование без сохранения?', content: 'Введённые изменения будут потеряны.', okText: 'Закрыть без сохранения', cancelText: 'Продолжить заполнение', onOk: onClose })
   }
   async function save(values: TriadValues) {
-    if (lock.current || overweight) return
+    if (lock.current || overweight || horseBusy || conflicts.loading) return
     lock.current = true; setBusy(true); setFailure(undefined)
     try {
       const payload = { ...values, membershipId: values.membershipId || undefined, startTime: toInstant(values.startTime), endTime: toInstant(values.endTime) }
@@ -132,6 +138,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
       </Form.Item>
       {overweight && <Alert className="horse-workload-warning" type="error" showIcon role="alert" message="Вес всадника превышает допустимый лимит для выбранной лошади. Выберите другую лошадь." />}
       {workload && <Typography.Paragraph className="triad-load" role="status">Нагрузка за {availability.data?.date?.split('-').reverse().join('.')}: {formatMinutes(workload.currentWorkloadMinutes)} / {workload.maxDailyWorkloadMinutes} мин</Typography.Paragraph>}
+      <ScheduleConflictNotice entries={conflicts.entries} trainerId={trainerId} horseIds={horseId ? [horseId] : []} error={conflicts.error} />
       <Form.Item name="trainerId" label="Тренер" rules={[required]}><Select onInputKeyDown={stopPopupEscape} onChange={preferences.trainerChanged} id="triad_trainerId" aria-label="Тренер" showSearch allowClear optionFilterProp="label" placeholder="Выберите тренера"
         options={trainers.filter(t => t.isActive !== false).map(t => ({ value: t.id, label: `${t.fullName || t.name}${t.specializations?.length ? ` · ${t.specializations.join(', ')}` : t.qualification ? ` · ${t.qualification}` : ''}` }))} /></Form.Item>
       <Form.Item name="arenaId" label="Локация" rules={[required]}><Select onInputKeyDown={stopPopupEscape} id="triad_arenaId" aria-label="Локация" showSearch allowClear optionFilterProp="label" placeholder="Манеж, плац или маршрут" loading={availability.loading}
@@ -150,7 +157,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
         <Select onInputKeyDown={stopPopupEscape} id="triad_membershipId" aria-label="Абонемент / депозит" allowClear showSearch optionFilterProp="label" disabled={!clientId || busy} loading={membershipState.loading} placeholder="Без абонемента"
           options={suitableMemberships.map(m => ({ value: m.id, label: `${m.isShared ? `Семейный (${m.ownerName})` : m.title || m.pricingPlan?.name || 'Абонемент'} · ${membershipBalance(m).label}` }))} />
       </Form.Item>
-      <Space wrap className="triad-actions"><Button type="primary" htmlType="submit" loading={busy} aria-busy={busy} disabled={overweight || availability.loading || Boolean(availability.error)}>{booking ? 'Сохранить бронирование' : 'Создать бронирование'}</Button>
+      <Space wrap className="triad-actions"><Button type="primary" htmlType="submit" loading={busy} aria-busy={busy} disabled={overweight || horseBusy || conflicts.loading || availability.loading || Boolean(availability.error)}>{booking ? 'Сохранить бронирование' : 'Создать бронирование'}</Button>
         <Button disabled={busy} onClick={close}>Отмена</Button></Space>
     </Form>
   </Modal>

@@ -54,9 +54,9 @@ test('PostgreSQL booking rules, rollback, HTTP contract and concurrent triad wri
       await service.createBooking({ ...dto, startTime: '2030-01-08T21:30Z', endTime: '2030-01-08T22:00Z' });
       assert.equal(await p.booking.count({ where: { horseId: dto.horseId } }), 2);
     });
-    await t.test('trainer conflict with a different horse and arena', async () => {
+    await t.test('same trainer permits a different rider, horse and arena', async () => {
       const one = await resources(), two = await resources(); await service.createBooking(one);
-      await assert.rejects(service.createBooking({ ...two, trainerId: one.trainerId }), hasCode('TRAINER_BUSY'));
+      await service.createBooking({ ...two, trainerId: one.trainerId });
     });
     for (const race of ['horse', 'trainer', 'arena', 'daily-workload']) {
       await t.test(`simultaneous ${race} contenders cannot overbook`, async () => {
@@ -67,8 +67,8 @@ test('PostgreSQL booking rules, rollback, HTTP contract and concurrent triad wri
           ...(race === 'arena' ? { arenaId: entries[0].arenaId } : {}),
           ...(race === 'daily-workload' ? { startTime: `2030-01-08T${String(6 + i * 2).padStart(2, '0')}:00Z`, endTime: `2030-01-08T${String(6 + i * 2).padStart(2, '0')}:30Z` } : {}),
         })));
-        assert.equal(results.filter(r => r.status === 'fulfilled').length, race === 'arena' ? 2 : 1);
-        const expected = race === 'arena' ? 'ARENA_FULL' : race === 'trainer' ? 'TRAINER_BUSY' : 'HORSE_OVERLOADED';
+        assert.equal(results.filter(r => r.status === 'fulfilled').length, race === 'trainer' ? 5 : race === 'arena' ? 2 : 1);
+        const expected = race === 'arena' ? 'ARENA_FULL' : race === 'horse' ? 'HORSE_BUSY' : 'HORSE_OVERLOADED';
         for (const result of results.filter(r => r.status === 'rejected')) assert.ok(hasCode(expected)(result.reason), String(result.reason));
       });
     }
@@ -82,7 +82,7 @@ test('PostgreSQL booking rules, rollback, HTTP contract and concurrent triad wri
       const result = await Promise.allSettled([service.createBooking(one), lessons.createLesson(legacy)]);
       assert.equal(result.filter(r => r.status === 'fulfilled').length, 1);
       const rejected = result.find(r => r.status === 'rejected').reason;
-      assert.ok(hasCode('HORSE_REST_VIOLATION')(rejected));
+      assert.ok(hasCode('HORSE_BUSY')(rejected));
     });
     await t.test('legacy reschedule uses real dates, respects new bookings and rolls back conflicts', async () => {
       const dto = await resources();
@@ -92,7 +92,7 @@ test('PostgreSQL booking rules, rollback, HTTP contract and concurrent triad wri
       await lessons.rescheduleLesson(lesson.id, '2030-01-08T08:00Z', 30);
       await assert.rejects(service.createBooking({ ...dto, startTime: '2030-01-08T09:00Z', endTime: '2030-01-08T09:30Z' }), hasCode('HORSE_REST_VIOLATION'));
       await service.createBooking(dto);
-      await assert.rejects(lessons.rescheduleLesson(lesson.id, dto.startTime, 30), hasCode('HORSE_REST_VIOLATION'));
+      await assert.rejects(lessons.rescheduleLesson(lesson.id, dto.startTime, 30), hasCode('CLIENT_BUSY'));
       assert.equal((await p.lesson.findUniqueOrThrow({ where: { id: lesson.id } })).startTime.toISOString(), '2030-01-08T08:00:00.000Z');
       await p.lesson.update({ where: { id: lesson.id }, data: { status: 'CANCELLED' } });
       await service.createBooking({ ...dto, startTime: '2030-01-08T08:00Z', endTime: '2030-01-08T08:30Z' });

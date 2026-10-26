@@ -19,6 +19,50 @@ const trainer = { id: 't1', name: 'Мария', fullName: 'Мария Волко
 const client = { id: 'c1', name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567', weightKg: '75.00', membership: { planName: 'Клубный', remainingUnits: 5, totalUnits: 8 } }
 const arena = { id: 'a1', name: 'Крытый манеж', capacity: 6, maxRidersCapacity: 6, isActive: true, isUnavailable: false }
 const booking = { id: 'booking1', clientId: 'c1', horseId: 'h1', trainerId: 't1', arenaId: 'a1', membershipId: null, startTime: '2026-10-09T07:00:00Z', endTime: '2026-10-09T08:00:00Z', serviceType: 'dressage', costAmount: '1500', status: 'scheduled', client, horse, trainer, arena }
+
+for (const width of [1280, 375]) test(`parallel trainer cards remain separate and clickable at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  const second = { ...booking, id: 'booking2', horseId: 'h2', clientId: 'c2', costAmount: '2200', horse: { ...horse, id: 'h2', name: 'Буран' }, client: { ...client, id: 'c2', name: 'Борис', firstName: 'Борис', lastName: '' } }
+  await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking, second], headers: { 'x-total-count': '2' } }))
+  await page.goto('/schedule')
+  const calendar = page.locator('.fc-timegrid-event-harness')
+  await expect(calendar).toHaveCount(2)
+  const a = await calendar.nth(0).boundingBox(), b = await calendar.nth(1).boundingBox()
+  expect(a && b && (a.x + a.width <= b.x + 1 || b.x + b.width <= a.x + 1)).toBeTruthy()
+  const grouping = page.getByRole('combobox', { name: 'Группировка расписания' })
+  await grouping.focus(); await grouping.press('ArrowDown'); await page.getByTitle('По тренерам', { exact: true }).click()
+  const cards = page.locator('.resource-booking')
+  await expect(cards).toHaveCount(2)
+  const first = await cards.nth(0).boundingBox(), next = await cards.nth(1).boundingBox()
+  expect(first && next && first.x + first.width <= next.x).toBeTruthy()
+  await grouping.press('Escape')
+  await page.screenshot({ path: `test-results/parallel-trainer-${width}.png` })
+  for (const name of ['Анна Орлова', 'Борис']) {
+    await page.getByRole('button', { name: new RegExp(name) }).click()
+    const detail = page.getByRole('dialog', { name: 'Карточка бронирования', exact: true })
+    await expect(detail).toContainText(name)
+    await detail.locator('.ant-modal-close').click()
+  }
+})
+
+test('trainer overlap is informational while horse overlap disables save', async ({ page }) => {
+  let submitted = 0
+  const other = { ...booking, id: 'parallel', startTime: '2026-10-09T06:00:00Z', horseId: 'h2', clientId: 'c2', horse: { ...horse, id: 'h2', name: 'Буран' }, client: { ...client, id: 'c2', name: 'Борис', firstName: 'Борис', lastName: '' } }
+  await page.route('**/api/bookings?*', route => route.fulfill({ json: [other], headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/bookings', route => { submitted++; return route.fulfill({ status: 201, json: booking }) })
+  const modal = await openFilled(page)
+  await expect(modal.getByText(/Занятие будет добавлено параллельно/)).toContainText('Борис / Буран')
+  const save = modal.getByRole('button', { name: 'Создать бронирование', exact: true })
+  await expect(save).toBeEnabled()
+  await choose(page, modal, 'Лошадь', 'Буран')
+  await expect(modal.getByText('Лошадь Буран уже занята в это время', { exact: true })).toBeVisible()
+  await expect(save).toBeDisabled()
+  await choose(page, modal, 'Лошадь', 'Валдай')
+  await expect(save).toBeEnabled()
+  await save.click()
+  await expect(modal).toHaveCount(0)
+  expect(submitted).toBe(1)
+})
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   await page.route('**/api/bookings/booking1/available-horses', route => route.fulfill({ json: [{ ...horse, id: 'h2', name: 'Буран', maxRiderWeight: 110 }] }))

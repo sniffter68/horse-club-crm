@@ -300,7 +300,7 @@ export class LessonsService {
       }
       const schedule = await this.getClubSchedule(tx);
       this.assertClubWorkingHours(start, end, schedule);
-      const matchingLesson = participants.length && !perPerson
+      const matchingLesson = participants.length && !perPerson && service.maxCapacity > 1
         ? await tx.lesson.findFirst({
             where: {
               trainerId: dto.trainerId,
@@ -721,15 +721,10 @@ export class LessonsService {
       },
     });
 
-    if (conflicts.some((lesson) => lesson.trainerId === trainerId)) {
-      throw new ConflictException('Тренер уже занят в этот интервал времени');
-    }
     if (conflicts.some((lesson) => lesson.bookings.some((booking) => booking.horseId && horseIds.includes(booking.horseId)))) {
       throw new ConflictException('Лошадь уже забронирована на это время');
     }
-    if (arenaId && conflicts.some((lesson) => lesson.arenaId === arenaId)) {
-      throw new ConflictException('Манеж уже занят в это время');
-    }
+    // Arena capacity and client occupancy are enforced by shared booking rules.
   }
 
   private async getHorseWorkloadWithClient(

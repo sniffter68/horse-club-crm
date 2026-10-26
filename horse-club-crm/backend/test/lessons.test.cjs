@@ -77,18 +77,10 @@ test('lesson history applies server pagination and relation filters', async () =
   assert.equal(listArgs.where.OR.length, 6);
 });
 
-test('blocks a mathematically overlapping trainer interval', async () => {
+test('allows overlapping individual lessons for the same trainer', async () => {
   const service = new LessonsService(prismaWithLessons([scheduled]), unusedLedger);
-  await assert.rejects(
-    service.validateNoConflicts(
-      'trainer-1',
-      'horse-2',
-      new Date('2026-09-07T10:30:00.000Z'),
-      new Date('2026-09-07T11:30:00.000Z'),
-    ),
-    (error) => error.getStatus() === 409 &&
-      error.message === 'Тренер уже занят в этот интервал времени',
-  );
+  await service.validateNoConflicts('trainer-1', 'horse-2',
+    new Date('2026-09-07T10:30:00.000Z'), new Date('2026-09-07T11:30:00.000Z'));
 });
 
 test('blocks a mathematically overlapping horse interval', async () => {
@@ -105,24 +97,10 @@ test('blocks a mathematically overlapping horse interval', async () => {
   );
 });
 
-test('blocks a mathematically overlapping arena interval', async () => {
-  const service = new LessonsService(prismaWithLessons([{
-    ...scheduled,
-    trainerId: 'trainer-2',
-    arenaId: 'arena-1',
-    bookings: [],
-  }]), unusedLedger);
-  await assert.rejects(
-    service.validateNoConflicts(
-      'trainer-1',
-      undefined,
-      new Date('2026-09-07T10:15:00.000Z'),
-      new Date('2026-09-07T10:45:00.000Z'),
-      undefined,
-      'arena-1',
-    ),
-    (error) => error.getStatus() === 409 && error.message === 'Манеж уже занят в это время',
-  );
+test('legacy overlap check delegates arena capacity to shared rules', async () => {
+  const service = new LessonsService(prismaWithLessons([{ ...scheduled, arenaId: 'arena-1', bookings: [] }]), unusedLedger);
+  await service.validateNoConflicts('trainer-1', undefined,
+    new Date('2026-09-07T10:15:00.000Z'), new Date('2026-09-07T10:45:00.000Z'), undefined, 'arena-1');
 });
 
 test('CANCELLED lessons do not block the same slot and touching intervals are allowed', async () => {

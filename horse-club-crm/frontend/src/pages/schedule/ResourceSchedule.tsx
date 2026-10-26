@@ -1,3 +1,4 @@
+import { parallelLayout } from './parallelLayout'
 import { Button, Empty, Progress, Tooltip } from 'antd'
 import { DateTime } from 'luxon'
 import type { Arena, Horse, Trainer } from '../catalogs/types'
@@ -30,14 +31,7 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
           const rows = entries.filter(e => +new Date(e.startTime) < end && +new Date(e.endTime) > start
             && (grouping === 'trainers' ? e.trainerId === resource.id : grouping === 'horses' ? e.horses.some(h => h.id === resource.id) : e.arenaId === resource.id))
             .sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime) || a.id.localeCompare(b.id))
-          const laneEnds: number[] = []
-          const placed = rows.map(entry => {
-            let lane = laneEnds.findIndex(until => until <= +new Date(entry.startTime))
-            if (lane === -1) lane = laneEnds.length
-            laneEnds[lane] = +new Date(entry.endTime)
-            return { entry, lane }
-          })
-          const lanes = Math.max(1, laneEnds.length)
+          const placed = parallelLayout(rows)
           const workload = workloads.find(w => w.horseId === resource.id)
           const arena = arenas.find(a => a.id === resource.id)
           const rests = grouping === 'horses' ? entries.filter(e => e.active && e.horses.some(h => h.id === resource.id)).flatMap(e => {
@@ -57,7 +51,7 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
                 onClick={() => onBook({ startTime: DateTime.fromMillis(at, { zone: CLUB_TIME_ZONE }).toFormat("yyyy-MM-dd'T'HH:mm"), endTime: DateTime.fromMillis(Math.min(at + 1800000, end), { zone: CLUB_TIME_ZONE }).toFormat("yyyy-MM-dd'T'HH:mm"),
                   ...(grouping === 'trainers' ? { trainerId: resource.id } : grouping === 'horses' ? { horseId: resource.id } : { arenaId: resource.id }) })} />)}
               {rests.map(rest => <div key={rest.id} className="resource-rest" style={{ top: (Math.max(start, rest.from) - start) / 60000 * scale, height: (Math.min(end, rest.to) - Math.max(start, rest.from)) / 60000 * scale }} title={`Отдых ${rest.rest} мин, до ${DateTime.fromMillis(rest.to, { zone: CLUB_TIME_ZONE }).toFormat('HH:mm')}`}><span>Отдых {rest.rest} мин</span></div>)}
-              {placed.map(({ entry, lane }) => {
+              {placed.map(({ entry, lane, lanes }) => {
                 const text = eventSummary(entry)
                 return <Tooltip key={entry.id} title={text} trigger={['hover', 'focus']}><button type="button" className={`resource-booking ${entry.completed ? 'resource-booking--completed' : !entry.active ? 'resource-booking--cancelled' : ''}`}
                   style={{ top: (Math.max(start, +new Date(entry.startTime)) - start) / 60000 * scale + 2, height: Math.max(0, (Math.min(end, +new Date(entry.endTime)) - Math.max(start, +new Date(entry.startTime))) / 60000 * scale - 4), left: `${lane / lanes * 100}%`, width: `calc(${100 / lanes}% - 4px)` }}

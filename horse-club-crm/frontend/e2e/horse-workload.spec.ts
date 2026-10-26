@@ -42,6 +42,13 @@ async function selectOption(page: Page, modal: Locator, label: string, text: str
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: text }).last().click()
 }
 
+async function setStart(page: Page, modal: Locator, value: string) {
+  const input = modal.getByLabel('Время начала', { exact: true })
+  await input.fill(value)
+  await input.press('Enter')
+  await expect(page.locator('.booking-date-popup:visible')).toHaveCount(0)
+}
+
 async function openBooking(page: Page) {
   await page.goto('/schedule')
   await openCalendarLesson(page)
@@ -83,7 +90,7 @@ for (const width of [1280, 320, 768]) {
 
 test('changing booking date recalculates options and blocks overload on the destination day', async ({ page }) => {
   const modal = await openBooking(page)
-  await modal.getByLabel('Время начала', { exact: true }).fill('2026-10-09T12:00')
+  await setStart(page, modal, '09.10.2026 12:00')
   await expect(modal.getByTitle('Валдай — 100 / 120 мин', { exact: true })).toBeVisible()
   await expect(modal.getByText('Внимание: суммарная нагрузка лошади составит 160 мин (лимит 120 мин)')).toBeVisible()
   await expect(modal.getByRole('button', { name: 'Создать занятие', exact: true })).toBeDisabled()
@@ -101,7 +108,7 @@ test('transfer excludes the original lesson, preserves participants and sends on
   const modal = page.getByRole('dialog', { name: 'Перенос занятия', exact: true })
   await expect(modal.getByText('Доступно: 120 из 120 мин', { exact: true })).toBeVisible()
   await expect(modal.getByLabel('Лошадь участника', { exact: true })).toBeDisabled()
-  await modal.getByLabel('Время начала', { exact: true }).fill('2026-10-08T12:00')
+  await setStart(page, modal, '08.10.2026 12:00')
   await modal.getByLabel('Длительность, мин', { exact: true }).fill('120')
   await modal.getByRole('button', { name: 'Сохранить перенос', exact: true }).click()
   await expect(modal).not.toBeVisible()
@@ -114,7 +121,7 @@ test('API failure blocks selected horses, supports retry and empty daily state',
   await page.route('**/api/horses/workload?*', route => route.fulfill(fail
     ? { status: 500, json: { message: 'Данные временно недоступны' } }
     : { json: workloads('2026-10-09') }))
-  await modal.getByLabel('Время начала', { exact: true }).fill('2026-10-09T12:00')
+  await setStart(page, modal, '09.10.2026 12:00')
   await expect(modal.getByText('Не удалось проверить нагрузку лошадей')).toBeVisible()
   await expect(modal.getByRole('button', { name: 'Создать занятие', exact: true })).toBeDisabled()
   fail = false
@@ -149,10 +156,10 @@ test('slow date lookup disables save and a superseded response cannot replace th
     if (date === '2026-10-09') await gate
     await route.fulfill({ json: workloads(date) })
   })
-  await modal.getByLabel('Время начала', { exact: true }).fill('2026-10-09T12:00')
+  await setStart(page, modal, '09.10.2026 12:00')
   await expect(modal.locator('.ant-spin-spinning')).toBeVisible()
   await expect(modal.getByRole('button', { name: 'Создать занятие', exact: true })).toBeDisabled()
-  await modal.getByLabel('Время начала', { exact: true }).fill('2026-10-10T12:00')
+  await setStart(page, modal, '10.10.2026 12:00')
   await expect(modal.getByText('Доступно: 60 из 120 мин')).toBeVisible()
   release?.()
   await expect(modal.getByText('Валдай — 60 / 120 мин', { exact: true })).toBeVisible()

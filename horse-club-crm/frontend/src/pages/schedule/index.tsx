@@ -1,3 +1,6 @@
+import { ScheduleConflictNotice } from './ScheduleConflictNotice'
+import { scheduleConflicts } from './triad'
+import { useScheduleConflicts } from './useScheduleConflicts'
 import { ServiceCancellationAction } from '../../components/ServiceCancellationAction'
 import { useClientPreferences } from './useClientPreferences'
 import { ScheduleEventContent } from './ScheduleEventContent'
@@ -195,6 +198,7 @@ export function SchedulePage() {
   const savingRef = useRef(false)
   const [form] = Form.useForm<BookingValues>()
   const selectedService = Form.useWatch('serviceId', form) as string | undefined
+  const selectedTrainer = Form.useWatch('trainerId', form) as string | undefined
   const selectedArena = Form.useWatch('arenaId', form) as string | undefined
   const selectedStart = Form.useWatch('startTime', form) as string | undefined
   const duration = Form.useWatch('durationMinutes', form) as number | undefined
@@ -204,6 +208,15 @@ export function SchedulePage() {
   const bookingWorkloads = useHorseWorkloads(bookingOpen ? [bookingDate] : [], revision + workloadRevision, report, editingLesson?.id)
   const bookingLoads = bookingWorkloads.byDate[bookingDate] ?? []
   const selectedHorseIds = (participants ?? []).map(participant => participant?.horseId).filter((id): id is string => Boolean(id))
+  let conflictFrom: string | undefined, conflictTo: string | undefined
+  try {
+    if (bookingOpen && selectedStart && duration) {
+      conflictFrom = toInstant(selectedStart)
+      conflictTo = new Date(+new Date(conflictFrom) + duration * 60000).toISOString()
+    }
+  } catch { /* The date field owns invalid input feedback. */ }
+  const conflicts = useScheduleConflicts(conflictFrom, conflictTo, editingLesson?.id)
+  const horseBusy = scheduleConflicts(conflicts.entries, selectedTrainer, selectedHorseIds).horses.length > 0
   const workloadBlocked = selectedHorseIds.length > 0 && (bookingWorkloads.loading || Boolean(bookingWorkloads.error) || selectedHorseIds.some(id => {
     const row = bookingLoads.find(item => item.horseId === id)
     return !row || row.status === 'UNAVAILABLE' || row.currentWorkloadMinutes + (duration ?? 0) > row.maxDailyWorkloadMinutes
@@ -281,7 +294,7 @@ export function SchedulePage() {
     setError(undefined); setBookingOpen(true)
   }
   async function createBooking(values: BookingValues) {
-    if (savingRef.current) return
+    if (savingRef.current || horseBusy || conflicts.loading) return
     const hasHorses = values.participants.some(participant => participant.horseId)
     if (hasHorses && (bookingWorkloads.loading || bookingWorkloads.error || values.startTime.slice(0, 10) !== bookingDate || values.participants.some(participant => {
       if (!participant.horseId) return false
@@ -375,7 +388,7 @@ export function SchedulePage() {
         headerToolbar={compactLayout ? { left: 'prev,next', center: 'title', right: 'today' } : { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' }}
         buttonText={{ today: 'Сегодня', week: 'Неделя', day: 'День' }} firstDay={1} allDaySlot={false} nowIndicator height="auto"
         slotMinTime={schedule.openTime} slotMaxTime={schedule.closeTime} hiddenDays={schedule.daysOfWeekOff}
-        selectable={canManage && ready} selectMirror selectOverlap={false} slotEventOverlap={false} eventMinHeight={0} eventDisplay="block"
+        selectable={canManage && ready} selectMirror selectOverlap={true} slotEventOverlap={false} eventMinHeight={0} eventDisplay="block"
         datesSet={({ start, end, view }) => {
           setRange(previous => previous?.from === start.toISOString() && previous.to === end.toISOString() ? previous : { from: start.toISOString(), to: end.toISOString() })
           setWorkloadDate(toLocalInput(view.calendar.getDate()).slice(0, 10))
@@ -411,6 +424,7 @@ export function SchedulePage() {
       <Form form={form} noValidate layout="vertical" onFinish={createBooking} disabled={saving}>
         {editingLesson && <Typography.Paragraph type="secondary">Меняются только время и длительность. Переносимое занятие исключено из текущей нагрузки.</Typography.Paragraph>}
         <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} onChange={id => form.setFieldsValue({ participantsCount: 1, pricePerPerson: isPerPersonService(services.find(row => row.id === id)) ? Number(services.find(row => row.id === id)?.price ?? 0) : undefined, durationMinutes: services.find(row => row.id === id)?.durationMinutes, cost: Number(services.find(row => row.id === id)?.price ?? 0), prepaymentAmount: 0, prepaymentMethod: undefined })} /></Form.Item>
+        <ScheduleConflictNotice entries={conflicts.entries} trainerId={selectedTrainer} horseIds={selectedHorseIds} error={conflicts.error} />
         <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" onChange={() => { setTrainerManual(true) }} disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
         <Form.Item name="arenaId" label="Манеж" extra="Необязательно для выездного или теоретического занятия."><Select disabled={Boolean(editingLesson)} allowClear showSearch optionFilterProp="label" options={arenaOptions} /></Form.Item>
         <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><BookingDateTimeInput /></Form.Item>
@@ -451,7 +465,7 @@ export function SchedulePage() {
         {!editingLesson && selectedServiceRecord && participants?.length === 1 && !participants[0]?.membershipId && <LessonPriceFields key={selectedService} perPerson={isPerPersonService(selectedServiceRecord)} price={selectedServiceRecord.price} />}
         {workloadBlocked && !bookingWorkloads.loading && !bookingWorkloads.error && <Typography.Paragraph type="danger" role="status">Выбранная лошадь недоступна или суточный лимит будет превышен.</Typography.Paragraph>}
         <Button type="primary" htmlType="submit" aria-label={editingLesson ? 'Сохранить перенос' : 'Создать занятие'} aria-busy={saving}
-          loading={saving} disabled={!ready || workloadBlocked} style={{ marginTop: 16 }}>{editingLesson ? 'Сохранить перенос' : 'Создать занятие'}</Button>
+          loading={saving} disabled={!ready || workloadBlocked || horseBusy || conflicts.loading} style={{ marginTop: 16 }}>{editingLesson ? 'Сохранить перенос' : 'Создать занятие'}</Button>
       </Form>
     </EntryOverlay>
     <Modal title="Карточка занятия" open={Boolean(detail)} keyboard={!saving} maskClosable={!saving} closable={!saving} onCancel={() => { if (!saving) setDetail(undefined) }} footer={null}>
