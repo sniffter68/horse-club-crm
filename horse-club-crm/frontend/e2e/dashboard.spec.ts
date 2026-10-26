@@ -1,6 +1,73 @@
 import { test, expect, type Page, type Locator } from './fixtures'
 import { checkBookingDatePicker } from './bookingDatePicker'
 
+for (const width of [1440, 390]) test(`schedule trainer slot opens shared drawer at ${width}px`, async ({ page }) => {
+  await setup(page)
+  await page.setViewportSize({ width, height: 900 })
+  await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } }))
+  await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [] }))
+  await page.route('**/api/bookings?*', route => route.fulfill({ json: [] }))
+  await page.route('**/api/horses/workload?*', route => route.fulfill({ json: [] }))
+  let reads = 0
+  const rows: Record<string, unknown>[] = []
+  await page.route('**/api/lessons?*', route => { reads++; return route.fulfill({ json: rows }) })
+  await page.goto('/schedule')
+  await page.getByRole('combobox', { name: 'Группировка расписания' }).focus()
+  await page.getByRole('combobox', { name: 'Группировка расписания' }).press('ArrowDown')
+  await page.getByText('По тренерам', { exact: true }).click()
+  await page.getByRole('button', { name: 'Забронировать: Мария Волкова, 11:00', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
+  await expect(drawer).toBeVisible()
+  await expect(drawer.getByRole('textbox', { name: 'Выберите дату' })).toHaveValue('20.10.2026 11:00')
+  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Мария Волкова')
+  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await expect(drawer.getByText('Заполните поле').first()).toBeVisible()
+  for (const [label, value] of [['Клиент', 'Анна Орлова'], ['Услуга', 'Выездка'], ['Лошадь', 'Валдай']]) await choose(page, drawer, label, value)
+  let fail = true
+  await page.route('**/api/lessons', route => {
+    expect(route.request().postDataJSON()).toMatchObject({ trainerId: '00000003-1111-4111-8111-111111111111', startTime: '2026-10-20T08:00:00.000Z' })
+    if (fail) return route.fulfill({ status: 409, json: { message: 'Слот занят' } })
+    rows.push({ id: 'created', startTime: '2026-10-20T08:00:00Z', endTime: '2026-10-20T09:00:00Z', status: 'SCHEDULED',
+      trainer: { id: '00000003-1111-4111-8111-111111111111', name: 'Мария Волкова' }, service: { name: 'Выездка' },
+      bookings: [{ id: 'booking', client: { name: 'Анна Орлова' }, horse: { id: '00000002-1111-4111-8111-111111111111', name: 'Валдай' } }] })
+    return route.fulfill({ status: 201, json: rows[0] })
+  })
+  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await expect(drawer.getByText('Слот занят')).toBeVisible()
+  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Мария Волкова')
+  fail = false
+  const before = reads
+  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await expect(drawer).not.toBeVisible()
+  await expect.poll(() => reads).toBeGreaterThan(before)
+  await expect(page.locator('.resource-booking')).toContainText('Анна Орлова')
+  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await expect(drawer).toBeVisible()
+  await expect(drawer.getByRole('combobox', { name: 'Клиент', exact: true })).toHaveValue('')
+  await drawer.getByRole('button', { name: 'Закрыть', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Группировка расписания' }).focus()
+  await page.getByRole('combobox', { name: 'Группировка расписания' }).press('ArrowDown')
+  await page.getByText('По локациям', { exact: true }).click()
+  await page.getByRole('button', { name: 'Забронировать: Манеж, 12:30', exact: true }).click()
+  await expect(drawer.getByRole('textbox', { name: 'Выберите дату' })).toHaveValue('20.10.2026 12:30')
+  await expect(drawer.locator('.ant-form-item').filter({ hasText: 'Манеж / локация' }).locator('.ant-select-selection-item')).toHaveText('Манеж')
+  await page.screenshot({ path: `test-results/unified-booking-${width}.png` })
+  if (width === 1440) {
+    await drawer.getByRole('button', { name: 'Закрыть', exact: true }).click()
+    await page.getByRole('combobox', { name: 'Группировка расписания' }).focus()
+    await page.getByRole('combobox', { name: 'Группировка расписания' }).press('ArrowDown')
+    await page.getByText('Календарь', { exact: true }).click()
+    const slot = page.locator('.fc-timegrid-slot-lane[data-time="13:00:00"]')
+    await slot.scrollIntoViewIfNeeded()
+    const column = await page.locator('.fc-timegrid-col[data-date="2026-10-20"]').boundingBox()
+    const time = await slot.boundingBox()
+    if (!column || !time) throw new Error('Calendar slot is not visible')
+    await page.mouse.click(column.x + column.width / 2, time.y + time.height / 2)
+    await expect(drawer).toBeVisible()
+    await expect(drawer.getByRole('textbox', { name: 'Выберите дату' })).toHaveValue('20.10.2026 13:00')
+  }
+})
+
 for (const width of [1440, 390]) test(`dashboard date footer confirms Moscow time at ${width}px`, async ({ page }) => {
   await setup(page)
   await page.setViewportSize({ width, height: 650 })

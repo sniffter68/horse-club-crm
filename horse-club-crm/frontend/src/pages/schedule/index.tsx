@@ -1,17 +1,14 @@
+import { LessonDrawer, type LessonDrawerProps } from './LessonDrawer'
 import { ScheduleConflictNotice } from './ScheduleConflictNotice'
 import { scheduleConflicts } from './triad'
 import { useScheduleConflicts } from './useScheduleConflicts'
 import { ServiceCancellationAction } from '../../components/ServiceCancellationAction'
-import { useClientPreferences } from './useClientPreferences'
 import { ScheduleEventContent } from './ScheduleEventContent'
 import { DeleteLessonAction } from './DeleteLessonAction'
 import { eventSummary } from './scheduleEventPresentation'
-import { isPerPersonService } from './groupPricing'
 import { BookingDateTimeInput } from '../../components/BookingDateTimePicker'
 import { EntryOverlay } from '../../components/EntryOverlay'
-import { LessonGroupBadge, LessonGroupSummary, CompleteLessonModal, LessonPaymentBadge, LessonPriceFields } from './LessonPayments'
-import { isUuid } from '../../uuid'
-import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
+import { LessonGroupBadge, LessonGroupSummary, CompleteLessonModal, LessonPaymentBadge } from './LessonPayments'
 import { ReplaceHorseAction } from './ReplaceHorseAction'
 import { HorseIssues } from './HorseIssues'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -22,13 +19,13 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import luxonPlugin from '@fullcalendar/luxon3'
 import ruLocale from '@fullcalendar/core/locales/ru'
-import { Alert, App, Button, Card, Descriptions, Form, Grid, Input, InputNumber, Modal, Progress, Select, Space, Spin, Tag, Typography, type FormInstance } from 'antd'
+import { Alert, App, Button, Card, Descriptions, Form, Grid, Input, InputNumber, Modal, Select, Space, Spin, Tag, Typography } from 'antd'
 import { useOnError } from '@refinedev/core'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { useCatalogPermissions } from '../catalogs/permissions'
 import type { Arena, Client, Horse, Service, Trainer } from '../catalogs/types'
 import { CLUB_TIME_ZONE, formatTime, toInstant, toLocalInput } from './time'
-import { statuses, type BookingParticipantValues, type BookingValues, type ClientWithMemberships, type ClubSchedule, type DailyHorseWorkload, type Lesson, type MembershipSummary, type Status } from './types'
+import { statuses, type BookingValues, type ClubSchedule, type Lesson, type Status } from './types'
 import { HorseWorkloadBadge, HorseWorkloadList } from './workload'
 import { useHorseWorkloads } from './useHorseWorkloads'
 import { TriadBookingModal } from './TriadBookingModal'
@@ -37,101 +34,6 @@ import { bookingStatusLabels, clientName as personName, dayBounds, disciplines, 
 import { useTriadAvailability } from './useTriadAvailability'
 import { BookingLifecycleActions } from './BookingLifecycleActions'
 import { catalog } from '../catalogs/loadCatalog'
-const membershipDate = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeZone: CLUB_TIME_ZONE })
-
-function ParticipantEditor({ index, form, horses, trainers, trainerManual, participants, service, durationMinutes, workloads, workloadLoading, readOnly, canRemove, onRemove, report }: {
-  index: number
-  form: FormInstance<BookingValues>
-  clients: Client[]
-  horses: Horse[]
-  trainers: Trainer[]
-  trainerManual: boolean
-  participants: BookingParticipantValues[]
-  service?: Service
-  durationMinutes?: number
-  workloads: DailyHorseWorkload[]
-  workloadLoading: boolean
-  readOnly: boolean
-  canRemove: boolean
-  onRemove: () => void
-  report: (cause: unknown) => void
-}) {
-  const selectedClient = Form.useWatch(['participants', index, 'clientId'], form) as string | undefined
-  const perPerson = isPerPersonService(service)
-  const selectedHorse = Form.useWatch(['participants', index, 'horseId'], form) as string | undefined
-  const [preferenceClient, setPreferenceClient] = useState<Client>()
-  const preferences = useClientPreferences(form, preferenceClient?.id === selectedClient ? preferenceClient : undefined, horses, trainers, ['participants', index, 'horseId'], readOnly, trainerManual, index === 0)
-  const [memberships, setMemberships] = useState<MembershipSummary[]>([])
-  const [membershipsLoading, setMembershipsLoading] = useState(false)
-  const [membershipsError, setMembershipsError] = useState<string>()
-  const workload = workloads.find(row => row.horseId === selectedHorse)
-
-  useEffect(() => {
-    if (readOnly) return
-    const controller = new AbortController()
-    const loadMemberships = async () => {
-      await Promise.resolve()
-      if (controller.signal.aborted) return
-      setMemberships([]); setMembershipsError(undefined)
-      if (!selectedClient || !isUuid(selectedClient)) {
-        setMembershipsLoading(false)
-        form.setFieldValue(['participants', index, 'membershipId'], undefined)
-        return
-      }
-      setMembershipsLoading(true)
-      try {
-        const response = await httpClient.get<ClientWithMemberships>(`${API_URL}/clients/${selectedClient}`, { signal: controller.signal })
-        if (controller.signal.aborted) return
-        setPreferenceClient(response.data)
-        const active = (!service?.allowMembership || perPerson ? [] : response.data.memberships)
-          .filter(membership => membership.isActive)
-          .sort((left, right) => new Date(left.validUntil).getTime() - new Date(right.validUntil).getTime())
-        setMemberships(active)
-        form.setFieldValue(['participants', index, 'membershipId'], active[0]?.id)
-      } catch (cause) {
-        if (controller.signal.aborted) return
-        const failure = toHttpError(cause)
-        setMembershipsError(failure.message)
-        form.setFieldValue(['participants', index, 'membershipId'], undefined)
-        if (failure.statusCode === 401) report(cause)
-      } finally {
-        if (!controller.signal.aborted) setMembershipsLoading(false)
-      }
-    }
-    void loadMemberships()
-    return () => controller.abort()
-  }, [form, index, readOnly, report, selectedClient, service?.allowMembership, perPerson])
-
-  const selectedClientIds = participants.map(participant => participant?.clientId).filter(Boolean)
-  const selectedHorseIds = participants.map(participant => participant?.horseId).filter(Boolean)
-
-  return <Card size="small" title={`Участник ${index + 1}`} extra={<Button danger type="link" disabled={!canRemove} onClick={onRemove}>Удалить</Button>}>
-    <Form.Item name={[index, 'clientId']} label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}>
-      <ClientSelectWithCreate disabled={readOnly} excludedIds={selectedClientIds as string[]} />
-    </Form.Item>
-    {service?.allowMembership && !isPerPersonService(service) && !readOnly && <Form.Item name={[index, 'membershipId']} label="Абонемент" extra="Активный абонемент с ближайшим сроком окончания выбирается автоматически.">
-      <Select allowClear loading={membershipsLoading} placeholder={memberships.length ? 'Выберите абонемент' : 'Активных абонементов нет'} options={memberships.map(membership => ({
-        value: membership.id,
-        label: `${membership.isShared ? `Семейный (${membership.ownerName})` : membership.pricingPlan?.name || 'Абонемент'} · ост. ${membership.remainedLessons} зан. · до ${membershipDate.format(new Date(membership.validUntil))}`,
-      }))} />
-    </Form.Item>}
-    {membershipsError && <Alert type="error" showIcon message="Не удалось загрузить абонементы" description={membershipsError} />}
-    <Form.Item name={[index, 'horseId']} label="Лошадь участника" extra={isPerPersonService(service) ? 'Для экскурсий выбор лошади необязателен' : 'Оставьте пустым для теоретического занятия или занятия без клубной лошади.'}>
-      <Select onChange={preferences.horseChanged} disabled={readOnly} loading={workloadLoading} allowClear showSearch optionFilterProp="label" options={horses.map(row => {
-        const load = workloads.find(item => item.horseId === row.id)
-        return { value: row.id, label: `${row.name} — ${load ? `${load.currentWorkloadMinutes} / ${load.maxDailyWorkloadMinutes} мин` : workloadLoading ? 'загрузка…' : 'нагрузка недоступна'}`,
-          disabled: row.isUnavailable || (row.id !== selectedHorse && selectedHorseIds.includes(row.id)) }
-      })} />
-    </Form.Item>
-    {workloadLoading && <Spin size="small" />}
-    {workload && <div aria-live="polite">
-      <Typography.Text>Доступно: {Math.max(0, workload.maxDailyWorkloadMinutes - workload.currentWorkloadMinutes)} из {workload.maxDailyWorkloadMinutes} мин</Typography.Text>
-      <Progress strokeColor="#724C39" percent={workload.maxDailyWorkloadMinutes > 0 ? Math.min(100, Math.round(workload.currentWorkloadMinutes / workload.maxDailyWorkloadMinutes * 100)) : 100} />
-      {workload.currentWorkloadMinutes + (durationMinutes ?? 0) > workload.maxDailyWorkloadMinutes &&
-        <Alert className="horse-workload-warning" type="error" showIcon message={`Внимание: суммарная нагрузка лошади составит ${workload.currentWorkloadMinutes + (durationMinutes ?? 0)} мин (лимит ${workload.maxDailyWorkloadMinutes} мин)`} />}
-    </div>}
-  </Card>
-}
 
 export function SchedulePage() {
   const screens = Grid.useBreakpoint()
@@ -169,7 +71,6 @@ export function SchedulePage() {
     }
   }, [])
   const [range, setRange] = useState<{ from: string; to: string }>()
-  const [trainerManual, setTrainerManual] = useState(false)
   const [trainerId, setTrainerId] = useState<string>()
   const [horseId, setHorseId] = useState<string>()
   const [arenaId, setArenaId] = useState<string>()
@@ -183,6 +84,7 @@ export function SchedulePage() {
   const [triadDetail, setTriadDetail] = useState<TriadBooking>()
   const [triadLifecycleBusy, setTriadLifecycleBusy] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [lessonSeed, setLessonSeed] = useState<Partial<LessonDrawerProps>>()
   const [bookingOpen, setBookingOpen] = useState(false)
   const [editingLesson, setEditingLesson] = useState<Lesson>()
   const calendarRef = useRef<FullCalendar>(null)
@@ -197,17 +99,14 @@ export function SchedulePage() {
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const [form] = Form.useForm<BookingValues>()
-  const selectedService = Form.useWatch('serviceId', form) as string | undefined
   const selectedTrainer = Form.useWatch('trainerId', form) as string | undefined
-  const selectedArena = Form.useWatch('arenaId', form) as string | undefined
   const selectedStart = Form.useWatch('startTime', form) as string | undefined
   const duration = Form.useWatch('durationMinutes', form) as number | undefined
-  const participants = Form.useWatch('participants', form) as BookingParticipantValues[] | undefined
   const dayWorkloads = useHorseWorkloads([workloadDate, ...lessons.map(lesson => toLocalInput(new Date(lesson.startTime)).slice(0, 10))], revision + workloadRevision, report)
   const bookingDate = selectedStart?.slice(0, 10) ?? ''
   const bookingWorkloads = useHorseWorkloads(bookingOpen ? [bookingDate] : [], revision + workloadRevision, report, editingLesson?.id)
   const bookingLoads = bookingWorkloads.byDate[bookingDate] ?? []
-  const selectedHorseIds = (participants ?? []).map(participant => participant?.horseId).filter((id): id is string => Boolean(id))
+  const selectedHorseIds = (editingLesson?.bookings ?? []).map(booking => booking.horse?.id).filter((id): id is string => Boolean(id))
   let conflictFrom: string | undefined, conflictTo: string | undefined
   try {
     if (bookingOpen && selectedStart && duration) {
@@ -284,21 +183,17 @@ export function SchedulePage() {
     else setTriadDetail(triadBookings.find(b => b.id === entry.id))
   }
 
-  function openBooking(start: Date, minutes = 60) {
+  function openBooking(values: Partial<TriadValues> = {}, minutes = 60) {
     if (!canManage || !ready || savingRef.current) return
-    setEditingLesson(undefined)
-    setWorkloadDate(toLocalInput(start).slice(0, 10))
-    form.resetFields()
-    setTrainerManual(false)
-    form.setFieldsValue({ startTime: toLocalInput(start), durationMinutes: minutes, trainerId, arenaId, participants: [{ horseId }] })
-    setError(undefined); setBookingOpen(true)
+    setLessonSeed({ initialDateTime: values.startTime ?? `${workloadDate}T${schedule?.openTime ?? '09:00'}`,
+      initialTrainerId: values.trainerId ?? trainerId, initialArenaId: values.arenaId ?? arenaId,
+      initialHorseId: values.horseId ?? horseId, initialDurationMinutes: minutes })
   }
-  async function createBooking(values: BookingValues) {
-    if (savingRef.current || horseBusy || conflicts.loading) return
-    const hasHorses = values.participants.some(participant => participant.horseId)
-    if (hasHorses && (bookingWorkloads.loading || bookingWorkloads.error || values.startTime.slice(0, 10) !== bookingDate || values.participants.some(participant => {
-      if (!participant.horseId) return false
-      const load = bookingLoads.find(row => row.horseId === participant.horseId)
+  async function saveReschedule(values: BookingValues) {
+    if (!editingLesson || savingRef.current || horseBusy || conflicts.loading) return
+    const hasHorses = selectedHorseIds.length > 0
+    if (hasHorses && (bookingWorkloads.loading || bookingWorkloads.error || values.startTime.slice(0, 10) !== bookingDate || selectedHorseIds.some(horseId => {
+      const load = bookingLoads.find(row => row.horseId === horseId)
       return !load || load.status === 'UNAVAILABLE' || load.currentWorkloadMinutes + values.durationMinutes > load.maxDailyWorkloadMinutes
     }))) {
       setError('Проверьте нагрузку лошадей: сохранение доступно после загрузки данных и в пределах суточного лимита.')
@@ -306,15 +201,7 @@ export function SchedulePage() {
     }
     savingRef.current = true; setSaving(true); setError(undefined)
     try {
-      if (editingLesson) {
-        await httpClient.patch<Lesson>(`${API_URL}/lessons/${editingLesson.id}/reschedule`, { startTime: toInstant(values.startTime), durationMinutes: values.durationMinutes })
-      } else {
-        const ids = [values.serviceId, values.trainerId, values.arenaId, ...values.participants.flatMap(p => [p.clientId, p.horseId, p.membershipId])].filter(Boolean) as string[]
-        if (ids.some(id => !isUuid(id))) throw new Error('Выберите корректные записи из справочников')
-        const oneOff = values.participants.length === 1 && !values.participants[0].membershipId
-        if (!oneOff) { delete values.cost; delete values.prepaymentAmount; delete values.prepaymentMethod }
-        await httpClient.post<Lesson>(`${API_URL}/lessons`, { ...values, startTime: toInstant(values.startTime) })
-      }
+      await httpClient.patch<Lesson>(`${API_URL}/lessons/${editingLesson.id}/reschedule`, { startTime: toInstant(values.startTime), durationMinutes: values.durationMinutes })
       setWorkloadDate(values.startTime.slice(0, 10))
       setBookingOpen(false); setRevision(value => value + 1); void message.success(editingLesson ? 'Занятие перенесено' : 'Занятие создано')
     } catch (cause) { report(cause) }
@@ -346,9 +233,6 @@ export function SchedulePage() {
   const trainerOptions = trainers.map(row => ({ value: row.id, label: row.name }))
   const horseOptions = horses.map(row => ({ value: row.id, label: row.name, disabled: row.isUnavailable }))
   const arenaOptions = arenas.map(row => ({ value: row.id, label: row.name, disabled: row.isUnavailable }))
-  const selectedServiceRecord = services.find(item => item.id === selectedService)
-  const selectedArenaRecord = arenas.find(item => item.id === selectedArena)
-  const participantLimit = Math.min(selectedServiceRecord?.maxCapacity ?? 1, selectedArenaRecord?.capacity ?? Number.POSITIVE_INFINITY)
   const failure = error ? <Alert type="error" showIcon message={error} /> : null
   return <Space className="schedule-page" direction="vertical" size="middle" style={{ width: '100%' }}>
     {completing && <CompleteLessonModal lesson={completing} onClose={() => { setDetail(completing); setCompleting(undefined) }} onSaved={updated => { setCompleting(undefined); setDetail(updated); setRevision(v => v + 1) }} />}
@@ -369,7 +253,7 @@ export function SchedulePage() {
       <Button onClick={() => setWorkloadOpen(true)}>Нагрузка лошадей</Button>
       <Select aria-label="Группировка расписания" value={grouping} style={{ width: compactLayout ? '100%' : 210 }} onChange={setGrouping}
         options={[{ value: 'calendar', label: 'Календарь' }, { value: 'trainers', label: 'По тренерам' }, { value: 'horses', label: 'По лошадям' }, { value: 'arenas', label: 'По локациям' }]} />
-      {canManage && <Button type="primary" disabled={!ready} onClick={() => openTriad()}>Записать на тренировку</Button>}
+      {canManage && <Button type="primary" disabled={!ready} onClick={() => openBooking()}>Записать на тренировку</Button>}
     </Space>
     {(triadError || triadAvailability.error) && <Alert type="error" showIcon message="Не удалось загрузить бронирования или доступность ресурсов" description={triadError || triadAvailability.error}
       action={<Button onClick={() => setRevision(r => r + 1)}>Повторить загрузку</Button>} />}
@@ -381,7 +265,7 @@ export function SchedulePage() {
     <Card className="schedule-calendar"><Spin spinning={loading || triadLoading || (!ready && !error)}>
       {grouping !== 'calendar' && schedule && <ResourceSchedule grouping={grouping} date={workloadDate} schedule={schedule} entries={entries}
         trainers={trainers.filter(t => !trainerId || t.id === trainerId)} horses={horses.filter(h => !horseId || h.id === horseId)} arenas={arenas.filter(a => !arenaId || a.id === arenaId)}
-        workloads={triadAvailability.data?.horseWorkloads ?? []} occupancy={triadAvailability.data?.arenaOccupancy} canManage={canManage && ready} onBook={openTriad} onOpen={openEntry} />}
+        workloads={triadAvailability.data?.horseWorkloads ?? []} occupancy={triadAvailability.data?.arenaOccupancy} canManage={canManage && ready} onBook={openBooking} onOpen={openEntry} />}
       <div hidden={grouping !== 'calendar'}>
       {schedule && <FullCalendar ref={calendarRef} plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin, luxonPlugin]} locale={ruLocale}
         timeZone={CLUB_TIME_ZONE} initialView={compactLayout ? 'timeGridDay' : 'timeGridWeek'}
@@ -393,7 +277,7 @@ export function SchedulePage() {
           setRange(previous => previous?.from === start.toISOString() && previous.to === end.toISOString() ? previous : { from: start.toISOString(), to: end.toISOString() })
           setWorkloadDate(toLocalInput(view.calendar.getDate()).slice(0, 10))
         }}
-        select={({ start, end, view }) => { openBooking(start, Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000))); view.calendar.unselect() }}
+        select={({ start, end, view }) => { openBooking({ startTime: toLocalInput(start) }, Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000))); view.calendar.unselect() }}
         events={entries.map(entry => ({ id: entry.source === 'booking' ? `triad:${entry.id}` : entry.id,
           title: eventSummary(entry), start: entry.startTime, end: entry.endTime,
           backgroundColor: entry.source === 'lesson' ? statuses[entry.status as Status].event : entry.completed ? '#3E5F48' : entry.active ? '#724C39' : '#8C6527',
@@ -405,6 +289,9 @@ export function SchedulePage() {
         eventClick={({ event }) => { if (event.id.startsWith('triad:')) { setTriadDetail(triadBookings.find(b => `triad:${b.id}` === event.id)); return } setError(undefined); const lesson = lessons.find(lesson => lesson.id === event.id); setDetail(lesson); if (lesson) setWorkloadDate(toLocalInput(new Date(lesson.startTime)).slice(0, 10)) }} />}
       </div>
     </Spin></Card>
+    {lessonSeed && canManage && <LessonDrawer {...lessonSeed} onClose={() => setLessonSeed(undefined)} onSaved={start => {
+      setLessonSeed(undefined); setWorkloadDate(start.slice(0, 10)); calendarRef.current?.getApi().gotoDate(start.slice(0, 10)); setRevision(r => r + 1)
+    }} />}
     {triadSeed && <TriadBookingModal initial={triadSeed} booking={editingTriad} clients={clients} horses={horses} trainers={trainers} arenas={arenas} report={report}
       onClose={() => setTriadSeed(undefined)} onSaved={start => { setTriadSeed(undefined); setEditingTriad(undefined); setWorkloadDate(start.slice(0, 10)); calendarRef.current?.getApi().gotoDate(start.slice(0, 10)); setRevision(r => r + 1) }} />}
     <Modal open={Boolean(triadDetail)} title="Карточка бронирования" footer={null} keyboard={!triadLifecycleBusy} maskClosable={!triadLifecycleBusy} closable={!triadLifecycleBusy} onCancel={() => { if (!triadLifecycleBusy) setTriadDetail(undefined) }} destroyOnHidden>
@@ -419,53 +306,21 @@ export function SchedulePage() {
       {canManage && <BookingLifecycleActions disabled={triadLifecycleBusy} key={triadDetail.id} booking={triadDetail} report={report} onBusyChange={setTriadLifecycleBusy} onSaved={() => { setTriadDetail(undefined); setTriadLifecycleBusy(false); setRevision(r => r + 1) }} />}{canManage && <Button disabled={triadLifecycleBusy || triadDetail.status !== 'scheduled' || !ready} onClick={() => openTriad({ clientId: triadDetail.clientId, horseId: triadDetail.horseId, trainerId: triadDetail.trainerId,
         arenaId: triadDetail.arenaId, membershipId: triadDetail.membershipId ?? undefined, startTime: toLocalInput(new Date(triadDetail.startTime)), endTime: toLocalInput(new Date(triadDetail.endTime)), serviceType: triadDetail.serviceType, costAmount: Number(triadDetail.costAmount) }, triadDetail)}>Редактировать бронирование</Button>}</Space>}
     </Modal>
-    <EntryOverlay variant="drawer" title={editingLesson ? 'Перенос занятия' : 'Быстрое бронирование'} open={bookingOpen} onCancel={() => { if (!saving) setBookingOpen(false) }} footer={null} forceRender width={720} keyboard={!saving} maskClosable={!saving} closable={!saving}>
+    <EntryOverlay variant="drawer" title="Перенос занятия" open={bookingOpen} onCancel={() => { if (!saving) setBookingOpen(false) }} footer={null} forceRender width={720} keyboard={!saving} maskClosable={!saving} closable={!saving}>
       {failure}
-      <Form form={form} noValidate layout="vertical" onFinish={createBooking} disabled={saving}>
-        {editingLesson && <Typography.Paragraph type="secondary">Меняются только время и длительность. Переносимое занятие исключено из текущей нагрузки.</Typography.Paragraph>}
-        <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} onChange={id => form.setFieldsValue({ participantsCount: 1, pricePerPerson: isPerPersonService(services.find(row => row.id === id)) ? Number(services.find(row => row.id === id)?.price ?? 0) : undefined, durationMinutes: services.find(row => row.id === id)?.durationMinutes, cost: Number(services.find(row => row.id === id)?.price ?? 0), prepaymentAmount: 0, prepaymentMethod: undefined })} /></Form.Item>
+      <Form form={form} noValidate layout="vertical" onFinish={saveReschedule} disabled={saving}>
+        {editingLesson && <><Typography.Paragraph type="secondary">Меняются только время и длительность. Переносимое занятие исключено из текущей нагрузки.</Typography.Paragraph><LessonGroupSummary lesson={editingLesson} /></>}
+        <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} /></Form.Item>
         <ScheduleConflictNotice entries={conflicts.entries} trainerId={selectedTrainer} horseIds={selectedHorseIds} error={conflicts.error} />
-        <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" onChange={() => { setTrainerManual(true) }} disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
+        <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
         <Form.Item name="arenaId" label="Манеж" extra="Необязательно для выездного или теоретического занятия."><Select disabled={Boolean(editingLesson)} allowClear showSearch optionFilterProp="label" options={arenaOptions} /></Form.Item>
         <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><BookingDateTimeInput /></Form.Item>
         <Form.Item name="durationMinutes" label="Длительность, мин" rules={[{ required: true }, { type: 'integer', min: 1 }]}><InputNumber min={1} precision={0} /></Form.Item>
         {bookingWorkloads.error && <Alert type="error" showIcon message="Не удалось проверить нагрузку лошадей" description={bookingWorkloads.error}
           action={<Button onClick={() => setWorkloadRevision(value => value + 1)}>Повторить проверку</Button>} />}
-        <Typography.Title level={5}>Участники</Typography.Title>
-        <Typography.Text type="secondary">Максимум для выбранной услуги и манежа: {Number.isFinite(participantLimit) ? participantLimit : selectedServiceRecord?.maxCapacity ?? 1}</Typography.Text>
-        <Form.List name="participants" initialValue={[{}]} rules={[{
-          validator: async (_, value: BookingParticipantValues[] | undefined) => {
-            if (!value?.length && !editingLesson) throw new Error('Добавьте хотя бы одного участника')
-            if ((value?.length ?? 0) > participantLimit) throw new Error(`Можно добавить не более ${participantLimit} участников`)
-          },
-        }]}>
-          {(fields, { add, remove }, { errors }) => <Space direction="vertical" size="middle" style={{ width: '100%', marginTop: 12 }}>
-            {fields.map(field => <ParticipantEditor
-              key={field.key}
-              index={field.name}
-              form={form}
-              clients={clients}
-              trainers={trainers}
-              trainerManual={trainerManual}
-              horses={horses}
-              participants={participants ?? []}
-              service={selectedServiceRecord}
-              durationMinutes={duration}
-              workloads={bookingLoads}
-              workloadLoading={bookingWorkloads.loading}
-              readOnly={Boolean(editingLesson)}
-              canRemove={!editingLesson && fields.length > 1}
-              onRemove={() => remove(field.name)}
-              report={report}
-            />)}
-            <Button onClick={() => add({})} disabled={Boolean(editingLesson) || !selectedServiceRecord || fields.length >= participantLimit || isPerPersonService(selectedServiceRecord)}>Добавить участника</Button>
-            <Form.ErrorList errors={errors} />
-          </Space>}
-        </Form.List>
-        {!editingLesson && selectedServiceRecord && participants?.length === 1 && !participants[0]?.membershipId && <LessonPriceFields key={selectedService} perPerson={isPerPersonService(selectedServiceRecord)} price={selectedServiceRecord.price} />}
         {workloadBlocked && !bookingWorkloads.loading && !bookingWorkloads.error && <Typography.Paragraph type="danger" role="status">Выбранная лошадь недоступна или суточный лимит будет превышен.</Typography.Paragraph>}
-        <Button type="primary" htmlType="submit" aria-label={editingLesson ? 'Сохранить перенос' : 'Создать занятие'} aria-busy={saving}
-          loading={saving} disabled={!ready || workloadBlocked || horseBusy || conflicts.loading} style={{ marginTop: 16 }}>{editingLesson ? 'Сохранить перенос' : 'Создать занятие'}</Button>
+        <Button type="primary" htmlType="submit" aria-label="Сохранить перенос" aria-busy={saving}
+          loading={saving} disabled={!ready || workloadBlocked || horseBusy || conflicts.loading} style={{ marginTop: 16 }}>Сохранить перенос</Button>
       </Form>
     </EntryOverlay>
     <Modal title="Карточка занятия" open={Boolean(detail)} keyboard={!saving} maskClosable={!saving} closable={!saving} onCancel={() => { if (!saving) setDetail(undefined) }} footer={null}>

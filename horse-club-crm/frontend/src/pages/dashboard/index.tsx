@@ -157,6 +157,7 @@ export function DashboardPage() {
     const refreshAfterPayment = () => { void loadSummary() }
     window.addEventListener('lead:created', refreshAfterPayment)
     window.addEventListener('cash-desk-paid', refreshAfterPayment)
+    window.addEventListener('lesson-created', refreshAfterPayment)
     window.addEventListener('lesson-deleted', refreshAfterPayment)
     document.addEventListener('visibilitychange', refreshWhenVisible)
     return () => {
@@ -165,6 +166,7 @@ export function DashboardPage() {
       window.removeEventListener('focus', refreshWhenVisible)
       window.removeEventListener('lead:created', refreshAfterPayment)
       window.removeEventListener('cash-desk-paid', refreshAfterPayment)
+      window.removeEventListener('lesson-created', refreshAfterPayment)
       window.removeEventListener('lesson-deleted', refreshAfterPayment)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
