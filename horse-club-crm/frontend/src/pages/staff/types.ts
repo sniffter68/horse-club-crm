@@ -5,5 +5,8 @@ export const shiftColors = { SCHEDULED: 'blue', COMPLETED: 'green', ABSENT: 'red
 export type Shift = { id: string; staffId: string; date: string; startTime: string; endTime: string; status: ShiftStatus; notes?: string }
 export type Payroll = { id?: string; updatedAt?: string; staffId: string; fullName: string; roleTitle: string; shiftsCount: number; shiftsTotal: string; lessonsCount: number; lessonsTotal: string; bonuses: string; penalties: string; totalAmount: string; isPaid: boolean; blocked: boolean; paidAt?: string; expenseId?: string }
 export type PageData<T> = { data: T[]; total: number }
+export type PaidPeriod = { id: string; staffId: string; periodStart: string; periodEnd: string; createdAt: string }
+export type PayrollStatement = PaidPeriod & { staff: { fullName: string; roleTitle: string }; isPaid: boolean; totalAmount: string }
+export const paidPeriodFor = (periods: PaidPeriod[], staffId: string, date: string) => periods.find(row => row.staffId === staffId && row.periodStart.slice(0, 10) <= date && row.periodEnd.slice(0, 10) >= date)
 
 export const staffRoles: Record<string, string> = { ADMIN: 'Администратор', MANAGER: 'Менеджер', TRAINER: 'Тренер', GROOM: 'Конюх', VET: 'Ветеринар', OTHER: 'Другое', STABLE_WORKER: 'Сотрудник конюшни' }

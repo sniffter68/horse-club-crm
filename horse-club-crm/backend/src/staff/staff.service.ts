@@ -128,7 +128,7 @@ export class StaffService {
       if (!staff?.isActive) throw new BadRequestException('Выберите активного сотрудника');
       const local = DateTime.fromJSDate(now, { zone: 'Europe/Moscow' });
       const date = payrollDay(local.toISODate()!);
-      await this.unlocked(tx, targetId, date, date);
+      await this.shiftUnlocked(tx, targetId, date, user);
       const shift = await tx.workShift.findUnique({ where: { staffId_date: { staffId: targetId, date } } });
       if (action === 'start') {
         if (shift?.endedAt || shift && shift.status !== 'SCHEDULED') throw new ConflictException('Смена уже закрыта или отмечена нерабочей');
@@ -153,6 +153,40 @@ export class StaffService {
   private async unlocked(tx: Prisma.TransactionClient, staffId: string, start: Date, end: Date) {
     if (await tx.payrollCalculation.findFirst({ where: { staffId, isPaid: true, periodStart: { lte: end }, periodEnd: { gte: start } } })) throw new ConflictException('Период уже оплачен или пересекается с оплаченной ведомостью');
   }
+  private async shiftUnlocked(tx: Prisma.TransactionClient, staffId: string, date: Date, user: AuthUser, force = false) {
+    if (force && user.role !== Role.ADMIN) throw new ForbiddenException('Принудительная корректировка доступна только администратору');
+    const paid = await tx.payrollCalculation.findMany({ where: { staffId, isPaid: true, periodStart: { lte: date }, periodEnd: { gte: date } } });
+    if (paid.length && !force) throw new ConflictException('Дата смены входит в оплаченный период. Администратор может отменить оплату в списке ведомостей');
+    // Explicit admin confirmation reopens the affected payrolls and reverses their expenses.
+    // All changes, including the shift itself, commit or roll back together.
+    for (const row of paid) await this.reopenPayrollInTransaction(tx, row.id, user);
+  }
+  payrolls(query: ShiftQueryDto, user: AuthUser) {
+    return this.prisma.$transaction(async tx => {
+      const staffId = await this.scope(tx, user, query.staffId);
+      const where = { staffId };
+      return { data: await tx.payrollCalculation.findMany({ where, include: { staff: { select: { fullName: true, roleTitle: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: ((query.page ?? 1) - 1) * (query.pageSize ?? 20), take: query.pageSize ?? 20 }), total: await tx.payrollCalculation.count({ where }) };
+    }, { isolationLevel: 'RepeatableRead' });
+  }
+  paidPeriods(staffId: string, user: AuthUser) {
+    return this.prisma.$transaction(async tx => {
+      await this.scope(tx, user, staffId);
+      return tx.payrollCalculation.findMany({ where: { staffId, isPaid: true }, select: { id: true, staffId: true, periodStart: true, periodEnd: true, createdAt: true }, orderBy: { periodStart: 'asc' } });
+    });
+  }
+  reopenPayroll(id: string, user: AuthUser) {
+    if (user.role !== Role.ADMIN) throw new ForbiddenException('Отмена оплаты доступна только администратору');
+    return this.atomic(tx => this.reopenPayrollInTransaction(tx, id, user));
+  }
+  private async reopenPayrollInTransaction(tx: Prisma.TransactionClient, id: string, user: AuthUser) {
+    const row = await tx.payrollCalculation.findUnique({ where: { id }, include: { expense: true } });
+    if (!row) throw new NotFoundException('Ведомость не найдена');
+    if (!row.isPaid) return row;
+    if (row.expense?.archivedAt) throw new ConflictException('Архивную выплату нельзя отменить');
+    if (row.expense) await tx.expense.update({ where: { id: row.expense.id }, data: { cancelledAt: row.expense.cancelledAt ?? new Date(), cancelledById: row.expense.cancelledById ?? user.id } });
+    await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'PAYROLL_REOPENED', actorId: user.id, actorName: user.email, details: { calculationId: id, staffId: row.staffId, expenseId: row.expenseId, totalAmount: String(row.totalAmount), periodStart: row.periodStart.toISOString(), periodEnd: row.periodEnd.toISOString() } } });
+    return tx.payrollCalculation.update({ where: { id }, data: { isPaid: false, paidAt: null, expenseId: null } });
+  }
   createShifts(dto: CreateShiftDto, user: AuthUser) {
     this.manage(user);
     if (!!dto.date === !!dto.dates) throw new BadRequestException('Укажите одну дату или список дат');
@@ -161,7 +195,7 @@ export class StaffService {
     return this.atomic(async tx => {
       const staff = await tx.staffProfile.findUnique({ where: { id: dto.staffId } });
       if (!staff?.isActive) throw new BadRequestException('Выберите активного сотрудника');
-      for (const date of dates) await this.unlocked(tx, dto.staffId, date, date);
+      for (const date of dates) await this.shiftUnlocked(tx, dto.staffId, date, user, dto.force);
       await tx.workShift.createMany({ data: dates.map(date => ({ staffId: dto.staffId, date, startTime: dto.startTime, endTime: dto.endTime, notes: dto.notes, createdById: user.id })) });
       return { count: dates.length };
     });
@@ -173,11 +207,12 @@ export class StaffService {
     return this.atomic(async tx => {
       const shift = await tx.workShift.findUnique({ where: { id } });
       if (!shift) throw new NotFoundException('Смена не найдена');
-      await this.unlocked(tx, shift.staffId, shift.date, shift.date);
+      await this.shiftUnlocked(tx, shift.staffId, shift.date, user, dto?.force);
       if (!dto) return tx.workShift.delete({ where: { id } });
       if ((dto.startTime ?? shift.startTime) >= (dto.endTime ?? shift.endTime)) throw new BadRequestException('Окончание должно быть позже начала');
       if (dto.status === 'COMPLETED' && shift.date.toISOString().slice(0, 10) > DateTime.now().setZone('Europe/Moscow').toISODate()!) throw new BadRequestException('Нельзя завершить будущую смену');
-      return tx.workShift.update({ where: { id }, data: dto });
+      const { force: _force, ...data } = dto;
+      return tx.workShift.update({ where: { id }, data });
     });
   }
   private async compute(tx: Prisma.TransactionClient, staff: StaffProfile & { user: { trainerId: string | null } }, from: string, to: string, bonuses: Prisma.Decimal.Value = 0, penalties: Prisma.Decimal.Value = 0) {

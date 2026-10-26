@@ -12,3 +12,5 @@
 .staff-grid td > div { display: flex; flex-direction: column; gap: 6px; align-items: center; }
 .staff-grid .ant-tag { margin: 0; white-space: normal; }
 .staff-shift-button.ant-btn { height: auto; padding: 0; border: 0; background: transparent; }
+.staff-grid td.staff-day-locked { background: color-mix(in srgb, var(--crm-ink) 8%, var(--crm-paper)); }
+.staff-day-locked > span { display: block; margin-bottom: 6px; font-size: 12px; }

@@ -44,6 +44,7 @@ export class PayrollQueryDto extends ShiftQueryDto {
   @Matches(day) declare to: string;
 }
 export class CreateShiftDto {
+  @PreserveInput() @IsOptional() @IsBoolean() force?: boolean;
   @IsUUID() staffId!: string;
   @IsOptional() @Matches(day) date?: string;
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(31) @ArrayUnique() @Matches(day, { each: true }) dates?: string[];
@@ -52,6 +53,7 @@ export class CreateShiftDto {
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
 }
 export class UpdateShiftDto {
+  @PreserveInput() @IsOptional() @IsBoolean() force?: boolean;
   @IsOptional() @IsEnum(WorkShiftStatus) status?: WorkShiftStatus;
   @IsOptional() @Matches(clock) startTime?: string;
   @IsOptional() @Matches(clock) endTime?: string;

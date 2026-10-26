@@ -5,7 +5,7 @@ import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { StableEntryModal } from '../stable/shared'
 import { currency } from '../cash-desk/shared'
-import { shiftStatuses, type Payroll, type Shift, type ShiftStatus, type Staff } from './types'
+import { paidPeriodFor, shiftStatuses, type PaidPeriod, type Payroll, type Shift, type ShiftStatus, type Staff } from './types'
 import { VkProfileField, VkProfileLink } from '../../components/VkProfileLink'
 import { PhoneField } from '../../components/PhoneField'
 import { phonePayload } from '../../components/formatPhone'
@@ -70,21 +70,41 @@ export function ProfileModal({ staff, onClose, onSaved }: { staff?: Staff; onClo
 }
 
 export function ShiftModal({ variant = 'modal', leading, staff, shift, selectedDate, onClose, onSaved, onDelete }: { variant?: 'modal' | 'drawer'; leading?: ReactNode; staff: Staff[]; shift?: Shift; selectedDate: string; onClose: () => void; onSaved: () => void; onDelete?: (shift: Shift) => void }) {
-  const [form] = Form.useForm<{ staffId: string; dates: Dayjs[]; times: [Dayjs, Dayjs]; status: ShiftStatus; notes?: string }>()
+  const [form] = Form.useForm<{ staffId: string; dates: Dayjs[]; times: [Dayjs, Dayjs]; status: ShiftStatus; notes?: string; force?: boolean }>()
+  const { data: role } = usePermissions<Role>({})
+  const selectedStaff = Form.useWatch('staffId', form) ?? staff.find(row => row.isActive)?.id
+  const staffId = shift?.staffId ?? selectedStaff
+  const force = Form.useWatch('force', form) === true && role === 'ADMIN'
+  const [periodState, setPeriodState] = useState<{ staffId: string; periods: PaidPeriod[] }>()
+  const [periodError, setPeriodError] = useState<string>()
+  useEffect(() => {
+    const controller = new AbortController()
+    if (!staffId || !isUuid(staffId)) return
+    void httpClient.get<PaidPeriod[]>(`${API_URL}/staff/${staffId}/paid-periods`, { signal: controller.signal }).then(response => {
+      if (!controller.signal.aborted) { setPeriodState({ staffId, periods: response.data }); setPeriodError(undefined) }
+    }).catch(cause => { if (!controller.signal.aborted) setPeriodError(toHttpError(cause).message) })
+    return () => controller.abort()
+  }, [staffId])
+  const periodsReady = periodState?.staffId === staffId && !periodError
+  const isClosed = (date: string) => !!paidPeriodFor(periodState?.periods ?? [], staffId ?? '', date)
   return <StableEntryModal variant={variant} title={shift ? 'Изменить смену' : 'Запланировать смену'} form={form} submitLabel={shift ? 'Сохранить смену' : 'Запланировать смену'} resources={['staff']} onClose={onClose} onSaved={onSaved}
     save={values => {
       if (!isUuid(shift?.id ?? values.staffId)) throw new Error('Некорректный идентификатор сотрудника или смены')
-      const payload = { startTime: values.times[0].format('HH:mm'), endTime: values.times[1].format('HH:mm'), notes: values.notes }
+      if (!periodsReady) throw new Error('Не удалось проверить закрытые периоды. Закройте форму и повторите попытку')
+      if (!force && (shift ? isClosed(shift.date.slice(0, 10)) : values.dates.some(date => isClosed(date.format('YYYY-MM-DD'))))) throw new Error('Выберите даты вне оплаченных периодов или отмените оплату ведомости')
+      const payload = { startTime: values.times[0].format('HH:mm'), endTime: values.times[1].format('HH:mm'), notes: values.notes, ...(force ? { force: true } : {}) }
       if (payload.startTime >= payload.endTime) return Promise.reject(new Error('Окончание смены должно быть позже начала в тот же день'))
       return shift ? httpClient.patch(`${API_URL}/staff/shifts/${shift.id}`, { ...payload, status: values.status }) : httpClient.post(`${API_URL}/staff/shifts`, { ...payload, staffId: values.staffId, dates: values.dates.map(date => date.format('YYYY-MM-DD')) })
     }}>
     {leading}
+    {periodError && <Alert showIcon type="error" message="Не удалось загрузить закрытые периоды" description={periodError} />}
+    {role === 'ADMIN' && <Form.Item name="force" valuePropName="checked"><Checkbox>Подтверждаю корректировку закрытых дат: отменить оплату затронутых ведомостей и связанные расходы, вернуть ведомости в черновик</Checkbox></Form.Item>}
     {!shift && <><Form.Item name="staffId" label="Сотрудник" initialValue={staff.find(row => row.isActive)?.id} rules={required}><Select aria-label="Сотрудник" options={staff.filter(row => row.isActive).map(row => ({ value: row.id, label: row.fullName }))} /></Form.Item>
-      <Form.Item name="dates" label="Даты смен (до 31 даты)" initialValue={[dayjs(selectedDate)]} rules={[...required, { validator: (_, dates: Dayjs[]) => dates?.length > 31 ? Promise.reject(new Error('Выберите не более 31 даты')) : Promise.resolve() }]}><DatePicker multiple locale={ruDatePicker} format="DD.MM.YYYY" style={{ width: '100%' }} /></Form.Item></>}
+      <Form.Item name="dates" label="Даты смен (до 31 даты)" initialValue={[dayjs(selectedDate)]} rules={[...required, { validator: (_, dates: Dayjs[]) => dates?.length > 31 ? Promise.reject(new Error('Выберите не более 31 даты')) : dates?.some(date => !force && isClosed(date.format('YYYY-MM-DD'))) ? Promise.reject(new Error('Выберите даты вне оплаченных периодов')) : Promise.resolve() }]}><DatePicker multiple locale={ruDatePicker} disabled={!periodsReady} disabledDate={date => !force && isClosed(date.format('YYYY-MM-DD'))} format="DD.MM.YYYY" style={{ width: '100%' }} /></Form.Item></>}
     <Form.Item name="times" label="Время смены (Москва)" initialValue={[dayjs(`2000-01-01T${shift?.startTime ?? '08:00'}`), dayjs(`2000-01-01T${shift?.endTime ?? '20:00'}`)]} rules={required}><TimePicker.RangePicker locale={ruDatePicker} placeholder={['Начало', 'Окончание']} format="HH:mm" /></Form.Item>
     {shift && <Form.Item name="status" label="Статус смены" initialValue={shift.status} rules={required}><Select options={Object.entries(shiftStatuses).map(([value, label]) => ({ value, label }))} /></Form.Item>}
     <Form.Item name="notes" label="Комментарий" initialValue={shift?.notes}><Input.TextArea rows={3} maxLength={2000} style={{ resize: 'none' }} /></Form.Item>
-    {shift && onDelete && <Button danger onClick={() => onDelete(shift)}>Удалить смену</Button>}
+    {shift && onDelete && <Button danger disabled={!periodsReady || isClosed(shift.date.slice(0, 10))} onClick={() => onDelete(shift)}>Удалить смену</Button>}
   </StableEntryModal>
 }
 

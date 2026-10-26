@@ -24,6 +24,8 @@ export class StaffController {
   @Post(':id/archive') @Roles(Role.ADMIN, Role.MANAGER)
   archive(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: AuthUser }) { return this.service.archive(id, req.user); }
   @Get('shifts') shifts(@Query() query: ShiftQueryDto, @Req() req: { user: AuthUser }) { return this.service.shifts(query, req.user); }
+  @Get(':id/paid-periods')
+  paidPeriods(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: AuthUser }) { return this.service.paidPeriods(id, req.user); }
   @Post('shifts') @Roles(Role.ADMIN, Role.MANAGER)
   createShifts(@Body() dto: CreateShiftDto, @Req() req: { user: AuthUser }) { return this.service.createShifts(dto, req.user); }
   @Patch('shifts/:id') @Roles(Role.ADMIN, Role.MANAGER)
@@ -38,6 +40,10 @@ export class StaffController {
 @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
 export class PayrollController {
   constructor(private readonly service: StaffService) {}
+  @Get('calculations')
+  list(@Query() query: ShiftQueryDto, @Req() req: { user: AuthUser }) { return this.service.payrolls(query, req.user); }
+  @Post('calculations/:id/reopen') @Roles(Role.ADMIN)
+  reopen(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: AuthUser }) { return this.service.reopenPayroll(id, req.user); }
   @Get('me') @Roles(Role.TRAINER, Role.STABLE_WORKER) @PersonalModuleAccess()
   mine(@Query() query: PayrollQueryDto, @Req() req: { user: AuthUser }) { return this.service.calculate(query, req.user); }
   @Get('calculate') calculate(@Query() query: PayrollQueryDto, @Req() req: { user: AuthUser }) { return this.service.calculate(query, req.user); }

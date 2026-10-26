@@ -1,8 +1,8 @@
-import { EditOutlined } from '@ant-design/icons'
+import { EditOutlined, LockOutlined } from '@ant-design/icons'
 import { usePermissions as useModules } from '../../modulePermissions'
 import { useEffect, useRef, useState } from 'react'
 import { usePermissions, useOnError } from '@refinedev/core'
-import { Alert, App, Button, Card, DatePicker, Empty, Grid, Pagination, Select, Space, Spin, Tabs, Tag, Typography } from 'antd'
+import { Alert, App, Button, Card, DatePicker, Empty, Grid, Pagination, Select, Space, Spin, Tabs, Tag, Tooltip, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
@@ -12,7 +12,7 @@ import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { currency } from '../cash-desk/shared'
 import { AdjustmentModal, PayoutModal, ProfileModal, ShiftModal } from './forms'
-import { staffRoles, shiftColors, shiftStatuses, type PageData, type Payroll, type Shift, type Staff } from './types'
+import { paidPeriodFor, staffRoles, shiftColors, shiftStatuses, type PaidPeriod, type PayrollStatement, type PageData, type Payroll, type Shift, type Staff } from './types'
 import './staff.css'
 import { isUuid } from '../../uuid'
 
@@ -31,7 +31,7 @@ export function StaffPage() {
   const from = validDate(params.get('from'), now.startOf('month').toISODate()!)
   const to = validDate(params.get('to'), now.endOf('month').toISODate()!)
   const rawTab = params.get('tab') ?? 'employees'
-  const tab = ['employees', 'shifts', 'payroll', ...(canManage ? ['rates'] : [])].includes(rawTab) ? rawTab : 'shifts'
+  const tab = ['employees', 'shifts', 'payroll', ...(canManage ? ['rates', 'statements'] : [])].includes(rawTab) ? rawTab : 'shifts'
   const roleFilter = params.get('role') || undefined
   const activity = params.get('activity') || undefined
   const duty = params.get('duty') || undefined
@@ -45,6 +45,8 @@ export function StaffPage() {
   const [staff, setStaff] = useState<Staff[]>([])
   const [shifts, setShifts] = useState<Shift[]>([])
   const [payroll, setPayroll] = useState<Payroll[]>([])
+  const [paidPeriods, setPaidPeriods] = useState<PaidPeriod[]>([])
+  const [statements, setStatements] = useState<PayrollStatement[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
@@ -62,7 +64,11 @@ export function StaffPage() {
       await Promise.resolve()
       if (controller.signal.aborted) return
       setLoading(true); setError(undefined)
-      if (tab === 'payroll') {
+      if (tab === 'statements') {
+        const response = await httpClient.get<PageData<PayrollStatement>>(`${API_URL}/payroll/calculations`, { params: { page, pageSize: 10 }, signal: controller.signal })
+        if (controller.signal.aborted) return
+        setStatements(response.data.data); setTotal(response.data.total)
+      } else if (tab === 'payroll') {
         const response = await httpClient.get<PageData<Payroll>>(`${API_URL}/payroll/calculate`, { params: { from, to, page, pageSize: 10 }, signal: controller.signal })
         if (controller.signal.aborted) return
         setPayroll(response.data.data); setTotal(response.data.total)
@@ -75,6 +81,12 @@ export function StaffPage() {
           const end = DateTime.fromISO(month).endOf('month').toISODate()
           const results = await Promise.all(people.map(person => httpClient.get<PageData<Shift>>(`${API_URL}/staff/shifts`, { params: { staffId: person.id, from: month, to: end, pageSize: 100 }, signal: controller.signal })))
           if (controller.signal.aborted) return
+          const periods = await Promise.all(people.map(person => {
+            if (!isUuid(person.id)) throw new Error('Некорректный идентификатор сотрудника')
+            return httpClient.get<PaidPeriod[]>(`${API_URL}/staff/${person.id}/paid-periods`, { signal: controller.signal })
+          }))
+          if (controller.signal.aborted) return
+          setPaidPeriods(periods.flatMap(result => result.data))
           setShifts(results.flatMap(result => result.data.data))
         }
         setStaff(people); setTotal(response.data.total)
@@ -97,6 +109,13 @@ export function StaffPage() {
     catch (cause) { const failure = toHttpError(cause); setError(failure.message); if (failure.statusCode === 401) authError(failure) }
     finally { lock.current = false; setBusy(false) }
   }
+  const closedPeriod = (shift: Shift) => paidPeriodFor(paidPeriods, shift.staffId, shift.date.slice(0, 10))
+  const closedLabel = (period: PaidPeriod) => `Период закрыт ведомостью от ${DateTime.fromISO(period.createdAt, { zone: 'Europe/Moscow' }).toFormat('dd.MM.yyyy')}`
+  const reopen = (row: PayrollStatement) => modal.confirm({ title: 'Отменить оплату ведомости?', content: `${row.staff.fullName} · ${dayjs(row.periodStart.slice(0, 10)).format('DD.MM.YYYY')}–${dayjs(row.periodEnd.slice(0, 10)).format('DD.MM.YYYY')}. Связанный расход зарплаты будет отменён в кассе, ведомость станет черновиком, даты смен будут разблокированы. История отмены сохранится.`, okText: 'Отменить оплату', cancelText: 'Назад', autoFocusButton: 'cancel', okButtonProps: { danger: true }, onOk: async () => {
+    if (!isUuid(row.id)) throw new Error('Некорректный идентификатор ведомости')
+    try { await httpClient.post(`${API_URL}/payroll/calculations/${row.id}/reopen`); changed(); void message.success('Оплата отменена, ведомость переведена в черновик') }
+    catch (cause) { const failure = toHttpError(cause); setError(failure.message); throw failure }
+  } })
   const complete = (shift: Shift) => run(async () => { await httpClient.patch(`${API_URL}/staff/shifts/${shift.id}`, { status: 'COMPLETED' }); void message.success('Смена отмечена отработанной') })
   const remove = (shift: Shift) => modal.confirm({ title: 'Удалить смену?', content: `${staff.find(person => person.id === shift.staffId)?.fullName} · ${dayjs(shift.date.slice(0, 10)).format('DD.MM.YYYY')}. Смена будет удалена из табеля.`, okText: 'Удалить смену', cancelText: 'Отмена', okButtonProps: { danger: true }, autoFocusButton: 'cancel', onOk: async () => {
     try { await httpClient.delete(`${API_URL}/staff/shifts/${shift.id}`); changed(); void message.success('Смена удалена') }
@@ -108,9 +127,9 @@ export function StaffPage() {
     setPayout({ ...row, ...saved.data })
   })
   const shiftActions = (shift: Shift) => canManage && <Space wrap>
-    {shift.status !== 'COMPLETED' && shift.date.slice(0, 10) <= now.toISODate()! && <Button size="small" disabled={busy} onClick={() => complete(shift)}>Отметить смену отработанной</Button>}
-    <Button size="small" disabled={busy} onClick={() => setShiftModal(shift)}>Изменить смену</Button>
-    {role === 'ADMIN' && <Button size="small" danger disabled={busy} onClick={() => remove(shift)}>Удалить смену</Button>}
+    {shift.status !== 'COMPLETED' && shift.date.slice(0, 10) <= now.toISODate()! && <Button size="small" disabled={busy || !!closedPeriod(shift)} onClick={() => complete(shift)}>Отметить смену отработанной</Button>}
+    <Button size="small" disabled={busy || !!closedPeriod(shift)} onClick={() => setShiftModal(shift)}>Изменить смену</Button>
+    {role === 'ADMIN' && <Button size="small" danger disabled={busy || !!closedPeriod(shift)} onClick={() => remove(shift)}>Удалить смену</Button>}
   </Space>
   const periodPreset = (offset: number) => {
     const start = now.plus({ months: offset }).startOf('month')
@@ -121,7 +140,7 @@ export function StaffPage() {
   return <div className="staff-page">
     <Typography.Title level={2}>Персонал</Typography.Title>
     <Typography.Paragraph type="secondary">График работы, табель и зарплата · время Москвы</Typography.Paragraph>
-    <Tabs activeKey={tab} onChange={key => update({ tab: key, page: '1' })} items={[{ key: 'employees', label: 'Сотрудники' }, { key: 'shifts', label: 'График смен' }, { key: 'payroll', label: 'Табель и расчет зарплаты' }, ...(canManage ? [{ key: 'rates', label: 'Настройки ставок' }] : [])]} />
+    <Tabs activeKey={tab} onChange={key => update({ tab: key, page: '1' })} items={[{ key: 'employees', label: 'Сотрудники' }, { key: 'shifts', label: 'График смен' }, { key: 'payroll', label: 'Табель и расчет зарплаты' }, ...(canManage ? [{ key: 'rates', label: 'Настройки ставок' }, { key: 'statements', label: 'Сформированные ведомости' }] : [])]} />
     <Card>
       <Space wrap className="staff-toolbar">
         {tab === 'employees' && <>
@@ -137,14 +156,16 @@ export function StaffPage() {
         <Button disabled={loading || busy} onClick={() => refresh(value => value + 1)}>{error ? 'Повторить' : 'Обновить'}</Button>
       </Space>
       {error && <Alert className="staff-feedback" showIcon type="error" message="Не удалось выполнить операцию" description={error} />}
-      {loading ? <div className="stable-loading"><Spin aria-label="Загрузка персонала" /></div> : !total ? <Empty description={canManage ? 'Сотрудников пока нет. Нажмите «+ Добавить сотрудника».' : 'Профиль сотрудника пока не создан. Обратитесь к администратору.'} /> : <>
+      {loading ? <div className="stable-loading"><Spin aria-label="Загрузка персонала" /></div> : !total ? <Empty description={tab === 'statements' ? 'Сформированных ведомостей пока нет' : canManage ? 'Сотрудников пока нет. Нажмите «+ Добавить сотрудника».' : 'Профиль сотрудника пока не создан. Обратитесь к администратору.'} /> : <>
         {tab === 'shifts' && (screens.md ? <div className="staff-grid-scroll"><table className="staff-grid"><caption>График смен за {DateTime.fromISO(month).setLocale('ru').toFormat('LLLL yyyy')}</caption><thead><tr><th scope="col">Сотрудник</th>{dates.map(date => <th scope="col" key={date.day}>{date.day}<small>{date.setLocale('ru').toFormat('ccc')}</small></th>)}</tr></thead>
           <tbody>{staff.map(person => <tr key={person.id}><th scope="row" style={{ borderInlineStart: `4px solid ${person.scheduleColor || 'transparent'}` }}>{person.fullName}{canManage && <Button size="small" icon={<EditOutlined />} aria-label={`Редактировать: ${person.fullName}`} onClick={() => setProfileModal(person)} />}<small>{person.roleTitle}{!person.isActive && ' · Неактивен'}</small></th>{dates.map(date => {
             const shift = shifts.find(row => row.staffId === person.id && row.date.slice(0, 10) === date.toISODate())
-            return <td key={date.day}>{shift ? <div>{canManage ? <Button className="staff-shift-button" size="small" disabled={busy} onClick={() => setShiftModal(shift)}><Tag color={shiftColors[shift.status]}>{shiftStatuses[shift.status]}<br />{shift.startTime}–{shift.endTime}</Tag></Button> : <Tag color={shiftColors[shift.status]}>{shiftStatuses[shift.status]}<br />{shift.startTime}–{shift.endTime}</Tag>}
-              {canManage && shift.status === 'SCHEDULED' && date.toISODate()! <= now.toISODate()! && <Button size="small" disabled={busy} aria-label={`Отметить смену отработанной: ${person.fullName}, ${date.toFormat('dd.MM')}`} onClick={() => complete(shift)}>Отработана</Button>}</div> : <span aria-label="Нет смены">—</span>}</td>
+            const period = paidPeriodFor(paidPeriods, person.id, date.toISODate()!)
+            return <td key={date.day} className={period ? 'staff-day-locked' : undefined}>
+              {period && <Tooltip trigger={['hover', 'focus']} title={closedLabel(period)}><span tabIndex={0} aria-label={closedLabel(period)}><LockOutlined /> Закрыто</span></Tooltip>}{shift ? <div>{canManage ? <Button className="staff-shift-button" size="small" disabled={busy || !!period} onClick={() => setShiftModal(shift)}><Tag color={shiftColors[shift.status]}>{shiftStatuses[shift.status]}<br />{shift.startTime}–{shift.endTime}</Tag></Button> : <Tag color={shiftColors[shift.status]}>{shiftStatuses[shift.status]}<br />{shift.startTime}–{shift.endTime}</Tag>}
+              {canManage && shift.status === 'SCHEDULED' && date.toISODate()! <= now.toISODate()! && <Button size="small" disabled={busy || !!period} aria-label={`Отметить смену отработанной: ${person.fullName}, ${date.toFormat('dd.MM')}`} onClick={() => complete(shift)}>Отработана</Button>}</div> : <span aria-label="Нет смены">—</span>}</td>
           })}</tr>)}</tbody></table></div> : <ResponsiveTable<Shift> rowKey="id" dataSource={shifts} pagination={{ pageSize: 10 }} locale={{ emptyText: 'В этом месяце смен нет' }} columns={[
-            { title: 'Сотрудник', render: (_, row) => staff.find(person => person.id === row.staffId)?.fullName }, { title: 'Дата', render: (_, row) => dayjs(row.date.slice(0, 10)).format('DD.MM.YYYY') }, { title: 'Время', render: (_, row) => `${row.startTime}–${row.endTime}` }, { title: 'Статус', render: (_, row) => <Tag color={shiftColors[row.status]}>{shiftStatuses[row.status]}</Tag> }, ...(canManage ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Shift) => shiftActions(row) }] : []),
+            { title: 'Сотрудник', render: (_, row) => staff.find(person => person.id === row.staffId)?.fullName }, { title: 'Дата', render: (_, row) => <>{dayjs(row.date.slice(0, 10)).format('DD.MM.YYYY')}{closedPeriod(row) && <Typography.Paragraph><LockOutlined /> {closedLabel(closedPeriod(row)!)}</Typography.Paragraph>}</> }, { title: 'Время', render: (_, row) => `${row.startTime}–${row.endTime}` }, { title: 'Статус', render: (_, row) => <Tag color={shiftColors[row.status]}>{shiftStatuses[row.status]}</Tag> }, ...(canManage ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Shift) => shiftActions(row) }] : []),
           ]} />)}
         {tab === 'employees' && <ResponsiveTable<Staff> rowKey="id" dataSource={staff} pagination={false} columns={[
           { title: 'ФИО', dataIndex: 'fullName' },
@@ -165,14 +186,21 @@ export function StaffPage() {
           { title: 'Статус', render: (_, row) => <Tag color={row.isPaid ? 'green' : row.blocked ? 'orange' : undefined}>{row.isPaid ? 'Выплачено' : row.blocked ? 'Пересекается с выплатой' : 'К выплате'}</Tag> },
           ...(canManage ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Payroll) => !row.isPaid && !row.blocked && <Space wrap><Button disabled={busy} onClick={() => setAdjustment(row)}>Премии / Штрафы</Button><Button type="primary" disabled={busy || Number(row.totalAmount) <= 0} onClick={() => preparePayout(row)}>Выплатить</Button></Space> }] : []),
         ]} />}
+        {tab === 'statements' && <ResponsiveTable<PayrollStatement> rowKey="id" dataSource={statements} pagination={false} columns={[
+          { title: 'Сотрудник', render: (_, row) => row.staff.fullName },
+          { title: 'Период', render: (_, row) => `${dayjs(row.periodStart.slice(0, 10)).format('DD.MM.YYYY')}–${dayjs(row.periodEnd.slice(0, 10)).format('DD.MM.YYYY')}` },
+          { title: 'Сумма', render: (_, row) => currency(row.totalAmount) },
+          { title: 'Статус', render: (_, row) => <Tag color={row.isPaid ? 'green' : undefined}>{row.isPaid ? 'Выплачено' : 'Черновик'}</Tag> },
+          { title: 'Действия', render: (_, row) => <Space wrap><Button onClick={() => update({ tab: 'payroll', from: row.periodStart.slice(0, 10), to: row.periodEnd.slice(0, 10), page: '1' })}>Открыть расчет</Button>{role === 'ADMIN' && canManage && row.isPaid && <Button danger disabled={busy} onClick={() => reopen(row)}>Отменить оплату</Button>}</Space> },
+        ]} />}
         {tab === 'rates' && <ResponsiveTable<Staff> rowKey="id" dataSource={staff} pagination={false} columns={[
           { title: 'ФИО', dataIndex: 'fullName' }, { title: 'Должность', dataIndex: 'roleTitle' }, { title: 'За смену', render: (_, row) => currency(row.shiftRate ?? 0) }, { title: 'Индивидуальное занятие', render: (_, row) => currency(row.lessonRate ?? 0) }, { title: 'Групповое занятие', render: (_, row) => row.groupLessonRate == null ? 'По индивидуальной ставке' : currency(row.groupLessonRate) }, { title: 'Процент', render: (_, row) => `${row.lessonPercentage ?? 0} %` }, { title: 'Статус', render: (_, row) => row.isActive ? 'Активен' : 'Неактивен' }, { key: 'actions', title: 'Действия', render: (_, row) => <Button icon={<EditOutlined />} onClick={() => setProfileModal(row)}>Редактировать</Button> },
         ]} />}
-        <Pagination className="staff-pagination" current={page} pageSize={10} total={total} showSizeChanger={false} showTotal={count => `Сотрудников: ${count}`} onChange={next => update({ page: String(next) })} />
+        <Pagination className="staff-pagination" current={page} pageSize={10} total={total} showSizeChanger={false} showTotal={count => `${tab === 'statements' ? 'Ведомостей' : 'Сотрудников'}: ${count}`} onChange={next => update({ page: String(next) })} />
       </>}
     </Card>
     {profileModal && <ProfileModal staff={profileModal === 'new' ? undefined : profileModal} onClose={() => setProfileModal(undefined)} onSaved={changed} />}
-    {shiftModal && <ShiftModal staff={staff} shift={shiftModal === 'new' ? undefined : shiftModal} selectedDate={month.slice(0, 7) === now.toFormat('yyyy-MM') ? now.toISODate()! : month} onClose={() => setShiftModal(undefined)} onSaved={changed} onDelete={role === 'ADMIN' ? remove : undefined} />}
+    {shiftModal && <ShiftModal variant="drawer" staff={staff} shift={shiftModal === 'new' ? undefined : shiftModal} selectedDate={month.slice(0, 7) === now.toFormat('yyyy-MM') ? now.toISODate()! : month} onClose={() => setShiftModal(undefined)} onSaved={changed} onDelete={role === 'ADMIN' ? remove : undefined} />}
     {adjustment && <AdjustmentModal row={adjustment} from={from} to={to} onClose={() => setAdjustment(undefined)} onSaved={changed} />}
     {payout && <PayoutModal row={payout} from={from} to={to} onClose={() => setPayout(undefined)} onSaved={changed} />}
   </div>

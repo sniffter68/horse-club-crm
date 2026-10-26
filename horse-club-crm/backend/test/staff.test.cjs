@@ -62,7 +62,7 @@ test('trainer is scoped to own profiles and shifts, foreign identifiers are forb
 });
 test('invalid shift range, future completion, paid shift modification and manager deletion are rejected', async () => {
   let paid = false;
-  const service = new StaffService({ $transaction: work => work({ workShift: { findUnique: async () => ({ ...shift, date: new Date('2099-01-01'), id: 'shift' }) }, payrollCalculation: { findFirst: async () => paid ? { id: 'paid' } : null } }) });
+  const service = new StaffService({ $transaction: work => work({ workShift: { findUnique: async () => ({ ...shift, date: new Date('2099-01-01'), id: 'shift' }) }, payrollCalculation: { findMany: async () => paid ? [{ id: 'paid' }] : [] } }) });
   assert.throws(() => service.createShifts({ ...shift, endTime: '07:00' }, admin), e => e.status === 400);
   assert.throws(() => service.createShifts({ ...shift, dates: ['2026-10-01'] }, admin), e => e.status === 400);
   await assert.rejects(() => service.changeShift('shift', { status: 'COMPLETED' }, admin), e => e.status === 400);
@@ -73,7 +73,7 @@ test('HTTP RBAC and validation: trainers read only, managers cannot delete, auth
   let role = 'TRAINER', received;
   const module = await Test.createTestingModule({ controllers: [StaffController, PayrollController], providers: [RolesGuard, { provide: StaffService, useValue: {
     profiles: async () => ({ data: [], total: 0 }), shifts: async () => ({ data: [], total: 0 }), calculate: async () => ({ data: [], total: 0 }),
-    createShifts: async (dto, user) => { received = user.id; return { count: 1 }; }, changeShift: async () => ({}), payout: async () => ({}),
+    createShifts: async (dto, user) => { received = user.id; return { count: 1 }; }, changeShift: async () => ({}), payout: async () => ({}), reopenPayroll: async () => ({ isPaid: false }), payrolls: async () => ({ data: [], total: 0 }),
   } }] }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
     .overrideGuard(JwtAuthGuard).useValue({ canActivate: context => { context.switchToHttp().getRequest().user = { ...admin, role }; return true; } }).compile();
   const app = module.createNestApplication(); app.setGlobalPrefix('api'); app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true })); await app.init();
@@ -85,10 +85,14 @@ test('HTTP RBAC and validation: trainers read only, managers cannot delete, auth
     await request(server).post('/api/payroll/payout').send({}).expect(403);
     await request(server).get('/api/staff/candidates').expect(403);
     role = 'MANAGER'; await request(server).post('/api/staff/shifts').send(shift).expect(201); assert.equal(received, admin.id);
+    await request(server).get('/api/payroll/calculations?page=1').expect(200);
+    await request(server).post(`/api/payroll/calculations/${randomUUID()}/reopen`).expect(403);
     await request(server).post('/api/staff/shifts').send({ ...shift, createdById: randomUUID() }).expect(400);
     await request(server).delete(`/api/staff/shifts/${randomUUID()}`).expect(403);
     await request(server).get('/api/staff?page=0').expect(400);
     await request(server).post('/api/payroll/payout').send({ calculationId: randomUUID(), expectedTotal: 1, paymentMethod: 'TRANSFER' }).expect(400);
     role = 'ADMIN'; await request(server).delete(`/api/staff/shifts/${randomUUID()}`).expect(200);
+    await request(server).post(`/api/payroll/calculations/${randomUUID()}/reopen`).expect(201);
+    await request(server).post('/api/payroll/calculations/invalid/reopen').expect(400);
   } finally { await app.close(); }
 });

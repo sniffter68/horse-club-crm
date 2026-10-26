@@ -27,7 +27,7 @@ function store() {
     trainer: { create: async ({ data }) => { state.trainerCreates++; return state.trainer = { id: randomUUID(), ...data }; }, update: async ({ data }) => state.trainer = { ...state.trainer, ...data } },
     staffProfile: { findUnique: async ({ where }) => where.userId && where.userId !== state.account?.id ? null : state.profile, create: async ({ data }) => state.profile = { id: randomUUID(), isActive: true, ...data }, update: async ({ data }) => state.profile = { ...state.profile, ...data }, findMany: async args => { state.query = args; return []; }, count: async () => 0 },
     workShift: { findUnique: async () => state.shift, create: async ({ data }) => state.shift = { id: randomUUID(), status: 'SCHEDULED', endedAt: null, ...data }, update: async ({ data }) => state.shift = { ...state.shift, ...data }, updateMany: async args => { state.archiveShifts = args; return { count: 0 }; }, findMany: async args => { state.dutyQuery = args; return []; } },
-    payrollCalculation: { findFirst: async () => state.paid ? {} : null },
+    payrollCalculation: { findMany: async () => state.paid ? [{}] : [] },
   };
   const prisma = { $transaction: async (work, options) => { state.transactions++; state.isolation = options?.isolationLevel; return work(tx); } };
   const identity = { normalize: async input => ({ vkId: input.replace(/\D/g, '') }), applyStaff: async (_tx, id, vkId) => { state.vk = { id, vkId }; } };
