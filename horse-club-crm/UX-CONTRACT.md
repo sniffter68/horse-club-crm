@@ -288,3 +288,6 @@ Canonical toast owner: Ant Design App message. Runtime verification:
 ## Закрытие финансового месяца (2026-10-28)
 
 Источник: задача владельца и [доменный контракт](docs/membership-accrual.md). Владелец интерфейса — cash-desk/MonthlyClosingPanel, календаря — Ant Design DatePicker с русской локалью, подтверждения — Ant Modal, уведомлений — App message. Закрытие доступно только ADMIN с FULL CASHBOX, после окончания месяца по Москве. Подтверждение показывает денежный перенос и число абонементов, начальный фокус — отмена. Во время запроса кнопки и закрытие диалога заблокированы; ошибка остается в диалоге для повторной попытки. Проверки: cash-desk.spec.ts, monthly-closing.test.cjs, membership-accrual.postgres.test.cjs.
+## Полный сброс финансовых и операционных данных
+
+Источник — задача владельца от 28.10.2026, `docs/operational-reset.md`. Владелец — `settings/OperationalReset`, общие Ant Design Modal/Input/Alert и App message. Только ADMIN; точное текстовое подтверждение, первоначальный фокус на отмене, блокировка повторов и закрытия во время запроса. Ошибка сохраняет ввод и ключ идемпотентности; успех инвалидирует весь кэш и переводит на дашборд. Проверки: `operational-reset.spec.ts`, backend `operational-reset.test.cjs` и `operational-reset.postgres.test.cjs`. Визуальные токены сохраняются.

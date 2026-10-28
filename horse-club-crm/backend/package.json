@@ -15,6 +15,7 @@
     "test:unit": "npm run test",
     "test:memberships:postgres": "npm run build && node test/run-membership-sale-postgres.cjs",
     "test:staff:postgres": "npm run build && node test/run-staff-postgres.cjs",
+    "test:reset:postgres": "npm run build && node test/run-operational-reset-postgres.cjs",
     "test:expenses:postgres": "npm run build && node test/run-expenses-postgres.cjs",
     "test:stalls:postgres": "npm run build && node test/run-stall-postgres.cjs"
   },
