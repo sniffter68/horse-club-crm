@@ -1,3 +1,6 @@
+import { HistoryOutlined } from '@ant-design/icons'
+import { DateTime } from 'luxon'
+import { ProfileHeader, ProfileSection, ProfileFields } from '../cards/ProfileDetails'
 import { SharedMembershipAccess, type SharedMember } from '../memberships/SharedMembershipAccess'
 import { deferredBalance } from '../memberships/deferredBalance'
 import { ArchiveAction } from './ArchiveAction'
@@ -92,12 +95,18 @@ export function ClientList() {
       { key: 'createdAt', dataIndex: 'createdAt', title: 'Дата создания', sorter: true, render: (value: string) => dateFormatter.format(new Date(value)) },
     ]} />
 
-    <Modal title="Карточка клиента" open={Boolean(selectedClientId)} footer={null} width={720}
+    <Modal title={client && !query.isLoading ? <ProfileHeader title="Карточка клиента"
+      name={[client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || 'Без имени'}
+      badges={<>{client.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{client.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}{client.deletedAt && <Tag>В архиве</Tag>}</>}
+      actions={<>
+        <CatalogEditAction resource="clients" id={client.id}><ClientForm action="edit" /></CatalogEditAction>
+        {canManage && <Button icon={<HistoryOutlined aria-hidden />} onClick={() => setLedgerClient(client)}>История баланса</Button>}
+        <ArchiveAction resource="clients" id={client.id} archived={Boolean(client.deletedAt)} cardAction onChanged={() => setSelectedClientId(undefined)} />
+      </>} /> : 'Карточка клиента'} open={Boolean(selectedClientId)} footer={null} width={960} className="profile-modal" aria-label="Карточка клиента"
       destroyOnHidden onCancel={() => setSelectedClientId(undefined)}>
       {query.isLoading && <Skeleton active />}
       {query.error && <Alert type="error" showIcon message="Не удалось загрузить карточку клиента" description={query.error.message} />}
       {client && !query.isLoading && <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <CatalogEditAction resource="clients" id={client.id}><ClientForm action="edit" /></CatalogEditAction>
         {canManage && !client.deletedAt && <MembershipBalance clientId={client.id} membership={(() => {
           const active = client.memberships.filter(item => item.isActive)
             .sort((a, b) => a.validUntil.localeCompare(b.validUntil) || a.id.localeCompare(b.id))[0]
@@ -105,22 +114,26 @@ export function ClientList() {
             remainingUnits: active.remainedLessons, totalUnits: active.totalLessons, validUntil: active.validUntil,
             status: new Date(active.validUntil).getTime() - now <= 7 * 86_400_000 ? 'EXPIRING' : 'ACTIVE' } : null
         })()} />}
-        <ArchiveAction resource="clients" id={client.id} archived={Boolean(client.deletedAt)} onChanged={() => setSelectedClientId(undefined)} />
-        {canManage && <Button onClick={() => setLedgerClient(client)}>История баланса</Button>}
         {!client.deletedAt && client.clientType === 'ONE_TIME' && <Space><OneTimeBadge />{canManage && <ConvertClient client={client} />}</Space>}
-        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
-          { key: 'vk', label: 'VK', span: 2, children: <VkProfileLink id={client.id} name={client.name || client.firstName} kind="CLIENT" vkId={client.vkId} vkUserId={client.vkUserId} readOnly={!canManage} /> },
-          { key: 'name', label: 'ФИО', span: 2, children: <span className="client-name">{[client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || '—'}</span> },
-          { key: 'phone', label: 'Телефон', children: client.phone ? <a className="data-mono" href={`tel:${client.phone}`}>{client.phone}</a> : '—' },
-          { key: 'email', label: 'Email', children: client.email ? <a href={`mailto:${client.email}`}>{client.email}</a> : '—' },
-          { key: 'birthDate', label: 'Дата рождения', children: client.birthDate ? dateOnly(client.birthDate) : '—' },
-          { key: 'preferredTrainer', label: 'Тренер по умолчанию', children: client.preferredTrainer?.name || 'Не назначен' },
-          { key: 'preferredHorse', label: 'Лошадь по умолчанию', children: client.preferredHorse?.name || 'Не назначена' },
-          { key: 'riderLevel', label: 'Уровень опыта', children: client.riderLevel || '—' },
-          { key: 'roles', label: 'Роли', span: 2, children: <Space>{client.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{client.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
-          { key: 'preferences', label: 'Заметки', span: 2, children: client.preferences || '—' },
-          ...(client.medicalNotes !== undefined ? [{ key: 'medicalNotes', label: 'Медицинские заметки', span: 2, children: client.medicalNotes || '—' }] : []),
-        ]} />
+        <ProfileSection title="Контакты и соцсети"><ProfileFields items={[
+          { label: 'Телефон', value: client.phone ? <a className="data-mono" href={`tel:${client.phone}`}>{client.phone}</a> : 'Не указан' },
+          { label: 'Email', value: client.email ? <a href={`mailto:${client.email}`}>{client.email}</a> : 'Не указан' },
+          { label: 'VK', value: <VkProfileLink id={client.id} name={client.name || client.firstName} kind="CLIENT" vkId={client.vkId} vkUserId={client.vkUserId} readOnly={!canManage} /> },
+          { label: 'Дата рождения', value: client.birthDate ? dateOnly(client.birthDate) : 'Не указана' },
+          { label: 'Возраст', value: client.birthDate ? (() => {
+            const years = Math.floor(DateTime.fromMillis(now, { zone: 'Europe/Moscow' }).diff(DateTime.fromISO(client.birthDate, { zone: 'Europe/Moscow' }), 'years').years)
+            return Number.isFinite(years) && years >= 0 ? `${years} ${new Intl.PluralRules('ru').select(years) === 'one' ? 'год' : new Intl.PluralRules('ru').select(years) === 'few' ? 'года' : 'лет'}` : '—'
+          })() : 'Не указан' },
+        ]} /></ProfileSection>
+        <ProfileSection title="Обучение и предпочтения"><ProfileFields items={[
+          { label: 'Тренер по умолчанию', value: client.preferredTrainer?.name || 'Не назначен' },
+          { label: 'Лошадь по умолчанию', value: client.preferredHorse?.name || 'Не назначена' },
+          { label: 'Уровень опыта', value: client.riderLevel || 'Не указан' },
+        ]} /></ProfileSection>
+        <ProfileSection title="Заметки и особенности"><ProfileFields items={[
+          ...(client.medicalNotes !== undefined ? [{ label: 'Медицинские противопоказания и заметки', value: client.medicalNotes || 'Не указаны' }] : []),
+          { label: 'Общие комментарии', value: client.preferences || 'Нет комментариев' },
+        ]} /></ProfileSection>
 
         <div>
           <Typography.Title level={5}>Абонементы</Typography.Title>

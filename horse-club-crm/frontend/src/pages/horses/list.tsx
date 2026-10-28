@@ -1,7 +1,8 @@
+import { ProfileHeader, ProfileSection, ProfileFields } from '../cards/ProfileDetails'
 import { useState } from 'react'
 import { HorseForm } from './form'
 import { CatalogEditAction } from '../catalogs/EditDrawer'
-import { Descriptions, Empty, List, Space, Tabs, Tag, Typography } from 'antd'
+import { Empty, List, Space, Tabs, Tag, Typography } from 'antd'
 import { money } from '../catalogs/format'
 import { CatalogList } from '../catalogs/shared'
 import type { Horse, HorseDetails } from '../catalogs/types'
@@ -33,22 +34,22 @@ export function HorseList() {
       { key: 'isUnavailable', dataIndex: 'isUnavailable', title: 'Статус', sorter: true,
         render: (value: boolean) => <Tag color={value ? 'red' : 'green'}>{value ? 'Недоступна' : 'Доступна'}</Tag> },
     ]} />
-    <DetailsModal<HorseDetails> resource="horses" id={selectedId} title="Карточка лошади" onClose={() => setSelectedId(undefined)}>
+    <DetailsModal<HorseDetails> resource="horses" id={selectedId} title="Карточка лошади" onClose={() => setSelectedId(undefined)} width={960}
+      header={horse => <ProfileHeader title="Карточка лошади" name={horse.name}
+        badges={<Tag className={`crm-tag crm-tag--${horse.status === 'sick' || horse.status === 'quarantine' ? 'danger' : horse.isUnavailable ? 'warning' : 'success'}`}>{horse.status ? horseStatuses[horse.status] : horse.isUnavailable ? 'Недоступна' : 'Доступна'}</Tag>}
+        actions={<><CatalogEditAction resource="horses" id={horse.id}><HorseForm action="edit" /></CatalogEditAction>{canManage && <HorseStatusEditor horse={horse} cardAction />}</>} />} >
       {(horse, ready) => <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <CatalogEditAction resource="horses" id={horse.id}><HorseForm action="edit" /></CatalogEditAction>
-        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
-          { key: 'name', label: 'Кличка', children: horse.name },
-          { key: 'status', label: 'Статус', children: <Tag className={`crm-tag crm-tag--${horse.status === 'sick' || horse.status === 'quarantine' ? 'danger' : horse.isUnavailable ? 'warning' : 'success'}`}>{horse.status ? horseStatuses[horse.status] : horse.isUnavailable ? 'Недоступна' : 'Доступна'}</Tag> },
-          { key: 'breed', label: 'Порода', children: horse.breed || '—' },
-          { key: 'coat', label: 'Масть', children: horse.coat || '—' },
-          { key: 'birthYear', label: 'Год рождения', children: horse.birthYear || '—' },
-          { key: 'ownerType', label: 'Тип', children: horse.ownerType === 'private' ? 'Постой' : 'Клубная' },
-          { key: 'level', label: 'Уровень всадника', children: horse.riderLevel || '—' },
-          { key: 'load', label: 'Лимит нагрузки', children: `${horse.maxDailyMinutes} мин/день` },
-          { key: 'rest', label: 'Минимальный отдых', children: `${horse.minRestMinutes} мин` },
-        ]} />
-        {canManage && <HorseStatusEditor horse={horse} />}
-        <HorseIssues key={horse.id} horseId={horse.id} />
+        <ProfileSection title="Основная информация"><ProfileFields items={[
+          { label: 'Порода', value: horse.breed || 'Не указана' },
+          { label: 'Масть', value: horse.coat || 'Не указана' },
+          { label: 'Год рождения', value: horse.birthYear || 'Не указан' },
+          { label: 'Тип принадлежности', value: horse.ownerType === 'private' ? 'Частная' : 'Клубная' },
+        ]} /></ProfileSection>
+        <ProfileSection title="Рабочие нормативы"><ProfileFields items={[
+          { label: 'Лимит дневной нагрузки', value: `${horse.maxDailyMinutes ?? '—'} мин/день` },
+          { label: 'Минимальный отдых', value: `${horse.minRestMinutes ?? '—'} мин` },
+          { label: 'Рекомендуемый уровень всадника', value: horse.riderLevel || 'Не указан' },
+        ]} /></ProfileSection>
         {permissions.boardingAccess && <section><Typography.Title level={5}>Постой</Typography.Title>
           <QuickBoardingActions key={horse.id} context={{ kind: 'HORSE', id: horse.id, name: horse.name, ownerClientId: horse.boardingContracts[0]?.client?.id }}
             contracts={horse.boardingContracts} currentContract={horse.currentBoardingContract} disabled={!ready} />
@@ -69,6 +70,9 @@ export function HorseList() {
               {log.nextDueAt && <span>Следующее: {dateOnly(log.nextDueAt)}</span>}<span>{log.notes || ''}</span></Space>
           </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Записей нет" />}
         </section>}
+        <ProfileSection title="Предстоящие занятия и расписание">
+          <HorseIssues key={horse.id} horseId={horse.id} />
+        </ProfileSection>
         <section><Typography.Title level={5}>Последние занятия</Typography.Title>
           {horse.bookings.length ? <List dataSource={horse.bookings} renderItem={booking => <List.Item>
             <Space wrap><span>{dateTime(booking.lesson.startTime)}</span><strong>{booking.lesson.service.title || booking.lesson.service.name}</strong>

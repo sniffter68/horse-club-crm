@@ -1,5 +1,73 @@
 import { test, expect, type Page } from './fixtures'
 
+for (const width of [320, 390, 1440]) {
+  for (const resource of ['clients', 'horses'] as const) test(`${resource}: grouped profile stays readable at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 })
+    await login(page)
+    const client = resource === 'clients'
+    const name = client ? 'Александр Кузнецов' : 'Амур'
+    const row = { id, name, firstName: 'Александр', lastName: 'Кузнецов', isRider: true, isPayer: true,
+      phone: '+79991234567', email: 'alexander.kuznetsov@example.com', birthDate: '1990-05-15',
+      clientType: 'REGULAR', createdAt: '2026-10-01', membership: null, riderLevel: 'Начинающий',
+      preferences: 'Важный комментарий\nВторая строка', medicalNotes: 'Нет противопоказаний',
+      breed: 'Ахалтекинская', coat: 'Гнедой', birthYear: 2015, ownerType: 'private', status: 'rest', isUnavailable: true,
+      maxDailyMinutes: 240, minRestMinutes: 15, memberships: [], boardingContracts: [], bookings: [], payments: [], healthLogs: [],
+    }
+    await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: [row], headers: { 'x-total-count': '1' } }))
+    await page.route(`**/api/${resource}/${id}`, route => route.fulfill({ json: row }))
+    await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
+    await page.goto(`/${resource}`)
+    await page.getByRole('button', { name, exact: true }).click()
+    const card = page.getByRole('dialog', { name: client ? 'Карточка клиента' : 'Карточка лошади', exact: true })
+    await expect(card).toHaveCSS('transform', 'none')
+    await expect(card.getByRole('heading', { name, exact: true })).toBeVisible()
+    await card.getByRole('heading', { name, exact: true }).scrollIntoViewIfNeeded()
+    await expect(card).not.toHaveClass(/ant-zoom-(appear|enter)/)
+    await expect(card.getByRole('button', { name: 'Редактировать', exact: true })).toBeVisible()
+    await expect(card.locator('.profile-fields')).toHaveCount(client ? 3 : 2)
+    await expect(card.locator('.ant-descriptions-bordered')).toHaveCount(0)
+    if (client) {
+      await expect(card.getByRole('link', { name: row.phone })).toHaveAttribute('href', `tel:${row.phone}`)
+      await expect(card.getByRole('link', { name: row.email })).toHaveAttribute('href', `mailto:${row.email}`)
+      await expect(card.getByText('Не назначена', { exact: true })).toBeVisible()
+      await expect(card.getByRole('button', { name: 'Удалить', exact: true })).toBeVisible()
+      await expect(card.getByRole('button', { name: 'Привязать VK', exact: true })).toBeVisible()
+    } else {
+      await expect(card.getByText('Ахалтекинская', { exact: true })).toBeVisible()
+      await expect(card.getByText('Гнедой', { exact: true })).toBeVisible()
+      await expect(card.getByRole('button', { name: 'Сменить статус', exact: true })).toBeVisible()
+      await card.getByRole('heading', { name: 'Предстоящие занятия и расписание', exact: true }).scrollIntoViewIfNeeded()
+      await expect(card.getByText('Предстоящих занятий нет', { exact: true })).toBeVisible()
+    }
+    const geometry = await card.evaluate(el => {
+      const content = el.querySelector('.ant-modal-content')!
+      const body = el.querySelector('.ant-modal-body')!
+      const box = content.getBoundingClientRect()
+      return { left: box.left, right: box.right, bottom: box.bottom,
+        overflow: body.scrollWidth - body.clientWidth,
+        fields: [...el.querySelectorAll('.profile-fields dd')].map(value => ({
+          width: value.clientWidth, overflow: value.scrollWidth - value.clientWidth,
+          wordBreak: getComputedStyle(value).wordBreak, hyphens: getComputedStyle(value).hyphens,
+        })) }
+    })
+    expect(geometry.left).toBeGreaterThanOrEqual(0)
+    expect(geometry.right).toBeLessThanOrEqual(width)
+    expect(geometry.bottom).toBeLessThanOrEqual(900)
+    expect(geometry.overflow).toBeLessThanOrEqual(1)
+    for (const field of geometry.fields) {
+      expect(field.width).toBeGreaterThan(180)
+      expect(field.overflow).toBeLessThanOrEqual(1)
+      expect(field.wordBreak).toBe('normal')
+      expect(field.hyphens).toBe('none')
+    }
+    await card.locator('.ant-modal-body').evaluate(el => { el.scrollTop = 0 })
+    await page.screenshot({ path: testInfo.outputPath(`profile-${resource}-${width}.png`) })
+    await card.getByRole('button', { name: 'Редактировать', exact: true }).focus()
+    await page.keyboard.press('Escape')
+    await expect(card).toBeHidden()
+  })
+}
+
 const id = '00000000-0000-4000-8000-000000000091'
 async function login(page: Page, readOnly = false) {
   await page.addInitScript(() => {
@@ -52,7 +120,7 @@ for (const resource of ['clients', 'horses', 'trainers'] as const) {
     }
     if (resource === 'horses') {
       await drawer.getByLabel('Масть', { exact: true }).fill('Гнедая')
-      await drawer.getByRole('combobox', { name: 'Статус', exact: true }).press('ArrowDown')
+      await drawer.getByRole('combobox', { name: 'Статус', exact: true }).locator('xpath=ancestor::div[contains(@class,"ant-select-selector")]').click()
       await page.getByTitle('Отдых', { exact: true }).click()
     }
     if (resource === 'trainers') await drawer.getByLabel('Цвет в расписании', { exact: true }).fill('#724C39')

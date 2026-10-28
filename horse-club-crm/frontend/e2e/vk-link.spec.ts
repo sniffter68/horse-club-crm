@@ -102,6 +102,7 @@ test('drawer supports dark theme, reduced motion and Escape', async ({ page }) =
   await trigger.click()
   await expect(page.getByRole('dialog').getByLabel('VK ID или ссылка на страницу')).toBeVisible()
   await page.screenshot({ path: 'test-results/vk-direct-dark.png', fullPage: true })
+  await page.getByRole('dialog').getByLabel('VK ID или ссылка на страницу').focus()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).not.toBeVisible()
   await expect(trigger).toBeFocused()

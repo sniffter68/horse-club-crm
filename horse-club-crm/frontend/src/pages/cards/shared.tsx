@@ -7,11 +7,12 @@ export function CardLink({ children, onClick }: { children: ReactNode; onClick: 
   return <Button type="link" style={{ height: 'auto', padding: 0, textAlign: 'left' }} onClick={onClick}>{children}</Button>
 }
 
-export function DetailsModal<T extends BaseRecord>({ resource, id, title, children, onClose, width = 820 }: {
+export function DetailsModal<T extends BaseRecord>({ resource, id, title, children, onClose, width = 820, header }: {
   resource: string
   id?: string
   title: string
   width?: number
+  header?: (record: T) => ReactNode
   onClose: () => void
   children: (record: T, ready: boolean) => ReactNode
 }) {
@@ -22,7 +23,8 @@ export function DetailsModal<T extends BaseRecord>({ resource, id, title, childr
     queryOptions: { enabled: Boolean(id) },
   })
 
-  return <Modal title={title} open={Boolean(id)} footer={null} width={width} destroyOnHidden
+  return <Modal title={result && !query.isLoading && header ? header(result) : title} aria-label={title}
+    className={header ? 'profile-modal' : undefined} open={Boolean(id)} footer={null} width={width} destroyOnHidden
     onCancel={onClose} afterOpenChange={setReady}>
     {query.isLoading && <Skeleton active />}
     {query.error && <Alert type="error" showIcon message="Не удалось загрузить карточку" description={query.error.message} />}

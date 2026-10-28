@@ -50,10 +50,10 @@ export function VkProfileLink({ id, name, vkId, vkUserId, kind, readOnly }: Prof
   }
   return <Space direction="vertical" size={4} className="vk-profile">
     <Tag className={`crm-tag ${linkedId ? 'vk-chip--connected' : 'vk-chip--disconnected'}`}>{linkedId ? 'VK привязан' : 'VK не привязан'}</Tag>
-    {profileUrl && <a href={profileUrl} target="_blank" rel="noopener noreferrer">Страница ВКонтакте ↗</a>}
+    {profileUrl && <a href={profileUrl} target="_blank" rel="noopener noreferrer"><VkIcon /> Страница ВКонтакте ↗</a>}
     {!readOnly && <Button ref={triggerRef} size="small" icon={<VkIcon />} onClick={() => { form.setFieldsValue({ vkId: linkedId || '' }); setError(undefined); setOpen(true) }}>{linkedId ? 'Изменить VK' : 'Привязать VK'}</Button>}
     <EntryOverlay variant="drawer" title={`Привязка VK · ${name}`} open={open} onCancel={close} destroyOnHidden
-      closable={!busy} maskClosable={!busy} keyboard={!busy} confirmLoading={busy} cancelButtonProps={{ disabled: busy }} onOk={() => form.submit()} afterClose={() => triggerRef.current?.focus()}>
+      closable={!busy} maskClosable={!busy} keyboard={!busy} confirmLoading={busy} okButtonProps={{ 'aria-label': 'Сохранить', disabled: busy }} cancelButtonProps={{ disabled: busy }} onOk={() => form.submit()} afterClose={() => triggerRef.current?.focus()}>
       <Typography.Paragraph>Укажите страницу клиента или сотрудника. Бот узнает его по VK ID при первом сообщении в сообщество клуба.</Typography.Paragraph>
       <Form form={form} layout="vertical" noValidate onFinish={values => void save(values)} disabled={busy}>
         <VkProfileField />

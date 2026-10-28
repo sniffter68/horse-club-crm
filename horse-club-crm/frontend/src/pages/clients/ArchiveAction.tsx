@@ -1,4 +1,5 @@
 import { ServiceCancellationAction } from '../../components/ServiceCancellationAction'
+import { DeleteOutlined } from '@ant-design/icons'
 import { useRef, useState } from 'react'
 import { Alert, App, Button, Modal, Space, Spin, Typography } from 'antd'
 import { useInvalidate } from '@refinedev/core'
@@ -12,8 +13,9 @@ type Preview = { name?: string; title?: string; deletedAt?: string | null; _coun
   totalLessons?: number; remainedLessons?: number; totalPrice?: string | number; boardingBalance?: string | number;
   payments?: Array<{ amount: string | number; status: string }> }
 
-function ClientArchiveAction({ id, resource, archived, onChanged }: {
+function ClientArchiveAction({ id, resource, archived, onChanged, cardAction }: {
   id: string; resource: 'clients' | 'memberships'; archived?: boolean; onChanged?: () => void;
+  cardAction?: boolean;
 }) {
   const { canManage } = useCatalogPermissions(resource)
   const { message } = App.useApp()
@@ -59,7 +61,8 @@ function ClientArchiveAction({ id, resource, archived, onChanged }: {
 
   if (!canManage || (!client && archived)) return null
   return <>
-    <Button size="small" danger={!restore} onClick={() => void load()} disabled={busy}>{action}</Button>
+    <Button size={cardAction ? 'middle' : 'small'} icon={cardAction && !restore ? <DeleteOutlined aria-hidden /> : undefined}
+      danger={!restore} onClick={() => void load()} disabled={busy}>{cardAction && !restore ? 'Удалить' : action}</Button>
     <Modal open={open} title={`${action}?`} closable={!busy} maskClosable={!busy} keyboard={!busy}
       onCancel={() => { if (!lock.current) setOpen(false) }} afterOpenChange={visible => { if (visible) cancel.current?.focus() }}
       footer={<Space wrap><Button ref={cancel} disabled={busy} onClick={() => setOpen(false)}>Отмена</Button>

@@ -32,7 +32,7 @@ for (const readOnly of [false, true]) test(`empty client hard deletion, readOnly
     expect(deleted).toBe(false)
     return
   }
-  await page.getByRole('dialog', { name: 'Карточка клиента' }).getByRole('button', { name: 'Удалить клиента', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Карточка клиента' }).getByRole('button', { name: 'Удалить', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Удалить клиента?', exact: true })
   await expect(dialog).toContainText('Клиент будет удален безвозвратно')
   await dialog.getByRole('button', { name: 'Удалить безвозвратно', exact: true }).click()
@@ -93,7 +93,7 @@ for (const width of [1280, 390]) test(`client archive, membership cancellation a
   await expect(annul.getByRole('button', { name: 'Отмена', exact: true })).toBeFocused()
   await annul.getByRole('button', { name: 'Удалить / аннулировать', exact: true }).click()
   await expect(card.getByText('В архиве', { exact: true })).toBeVisible()
-  await card.getByRole('button', { name: 'Удалить клиента', exact: true }).click()
+  await card.getByRole('button', { name: 'Удалить', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Удалить клиента?', exact: true })
   await expect(dialog).toContainText('3 занятий')
   await dialog.getByRole('button', { name: /В архив/ }).click()
