@@ -78,7 +78,7 @@ for (const width of [1440, 390]) test(`monthly accrual closing preserves summary
   await page.goto('/cash-desk')
   const panel = page.locator('.ant-card').filter({ hasText: 'Учет выручки по месяцам' })
   await expect(panel.getByText('Признанная выручка', { exact: true })).toBeVisible()
-  await expect(panel.getByRole('button', { name: 'Закрыть месяц', exact: true })).toBeDisabled()
+  await expect(panel.getByRole('button', { name: 'Закрыть месяц', exact: true })).toBeEnabled()
   const month = page.getByRole('textbox', { name: 'Месяц финансового отчета' })
   await month.fill('09.2026'); await month.press('Enter'); await month.press('Escape')
   await panel.getByRole('button', { name: 'Закрыть месяц', exact: true }).click()
@@ -147,11 +147,11 @@ test('monthly preview failure can retry; empty balances close once and show zero
   await expect(page.getByText(/Перенесено с прошлого месяца: Касса/)).toContainText('0,00')
 })
 
-test('manager can view monthly revenue but cannot close month', async ({ page }) => {
+test('manager with FULL access can preview and close month', async ({ page }) => {
   await setup(page, 'MANAGER')
   await page.goto('/cash-desk')
   await expect(page.getByText('Переходящий остаток абонементов', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Закрыть месяц', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Закрыть месяц', exact: true })).toBeEnabled()
 })
 
 for (const width of [1440, 390]) test(`owner reset requires exact word, preserves failure and refreshes book at ${width}px`, async ({ page }) => {
@@ -443,4 +443,53 @@ test('quick client phone prefill, validation, failure and cancel retain noncash 
   await expect(payment.getByRole('spinbutton', { name: 'Сумма чека, ₽', exact: true })).toHaveValue('1200.10')
   await expect(payment.getByRole('spinbutton', { name: 'Внесено клиентом, ₽', exact: true })).not.toBeVisible()
   await expect(payment.getByRole('button', { name: 'Провести платёж', exact: true })).toBeEnabled()
+})
+
+
+for (const role of ['ADMIN', 'MANAGER']) for (const width of [1440, 390]) test(`current month preview and early close for ${role} at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  await setup(page, role)
+  let closed = false, confirmations = 0
+  const report = () => ({ year: 2026, month: 10, isClosed: closed, status: closed ? 'CLOSED' : undefined,
+    closedAt: closed ? '2026-10-09T09:00:00Z' : null, cashFlowIncome: '8000', cashFlowExpense: '500',
+    recognizedRevenue: '1000', deferredRevenueCarriedOver: '7000', currentCashBalance: '10500',
+    activeMembershipsCarriedOver: 0, membershipsAdvanceSummary: { totalAdvance: '7000', rows: [] }, openingBalance: null, notes: closed ? 'Досрочно' : null })
+  await page.route('**/api/finance/monthly-closing/status?*', route => route.fulfill({ json: report() }))
+  await page.route('**/api/finance/monthly-closing/preview?*', route => route.fulfill({ json: report() }))
+  await page.route('**/api/finance/monthly-closing/confirm', route => {
+    expect(route.request().postDataJSON()).toEqual({ year: 2026, month: 10, notes: 'Досрочно' })
+    confirmations++; closed = true
+    return route.fulfill({ json: report() })
+  })
+  await page.goto('/cash-desk')
+  const close = page.getByRole('button', { name: 'Закрыть месяц', exact: true })
+  await expect(close).toBeEnabled(); await close.click()
+  const dialog = page.getByRole('dialog', { name: 'Закрытие месяца и перенос сальдо' })
+  await expect(dialog).toContainText('Текущий месяц еще не завершен. Закрытие зафиксирует текущую признанную выручку и перенесет остаток кассы и авансы по абонементам во входящее сальдо следующего месяца')
+  await expect(dialog).toContainText('Фактическая признанная выручка')
+  await expect(dialog).not.toHaveClass(/ant-zoom/)
+  await page.screenshot({ path: `../test-results/current-month-${role}-${width}.png`, fullPage: true, animations: 'disabled' })
+  await dialog.getByLabel('Комментарий к закрытию (необязательно)').fill('Досрочно')
+  await dialog.getByRole('button', { name: /Подтвердить и перенести остатки в ноябрь 2026/ }).click()
+  await expect(dialog).not.toBeVisible()
+  await expect(page.getByText('Месяц закрыт', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Просмотр отчета закрытия' }).click()
+  const saved = page.getByRole('dialog', { name: 'Отчет закрытия месяца' })
+  await expect(saved).toContainText('Зафиксированная ведомость за 2026-10')
+  await expect(saved).toContainText('Комментарий к закрытию: Досрочно')
+  await expect(saved.getByRole('button', { name: /Подтвердить и перенести/ })).toHaveCount(0)
+  await expect(saved.getByText(/Текущий месяц еще не завершен/)).toHaveCount(0)
+  await saved.getByRole('button', { name: 'Вернуться к отчету' }).press('Escape')
+  await expect(saved).not.toBeVisible()
+  expect(confirmations).toBe(1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('READ_ONLY manager cannot close open month', async ({ page }) => {
+  await setup(page, 'MANAGER')
+  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'MANAGER',
+    modules: [{ module: 'CASHBOX', isEnabled: true, accessLevel: 'READ_ONLY' }] } }))
+  await page.goto('/cash-desk')
+  await expect(page.getByText('Доступно только для просмотра', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Закрыть месяц', exact: true })).toHaveCount(0)
 })

@@ -129,6 +129,8 @@ test('HTTP permissions: TRAINER gets 403, MANAGER creates/reads but cannot delet
     await request(server).delete(`/api/finance/expenses/${id}`).expect(403);
     await request(server).get('/api/finance/monthly-closing/status?year=2026&month=9').expect(403);
     await request(server).post('/api/finance/monthly-closing/close').send({ year: 2026, month: 9 }).expect(403);
+    await request(server).get('/api/finance/monthly-closing/preview?year=2026&month=10').expect(403);
+    await request(server).post('/api/finance/monthly-closing/confirm').send({ year: 2026, month: 10 }).expect(403);
     role = 'MANAGER';
     await request(server).post('/api/finance/expenses').send(valid).expect(201); assert.equal(receivedAuthor, userId);
     await request(server).post('/api/finance/expenses').send({ ...valid, createdById: randomUUID() }).expect(400);
@@ -136,10 +138,15 @@ test('HTTP permissions: TRAINER gets 403, MANAGER creates/reads but cannot delet
     await request(server).delete(`/api/finance/expenses/${id}`).expect(403);
     const preview = await request(server).get('/api/finance/monthly-closing/status?year=2026&month=9').expect(200);
     assert.equal(preview.body.month, 9);
-    await request(server).post('/api/finance/monthly-closing/close').send({ year: 2026, month: 9 }).expect(403);
+    await request(server).post('/api/finance/monthly-closing/close').send({ year: 2026, month: 9 }).expect(201);
+    assert.equal(closingAuthor, userId);
+    await request(server).get('/api/finance/monthly-closing/preview?year=2026&month=10').expect(200);
+    await request(server).post('/api/finance/monthly-closing/confirm').send({ year: 2026, month: 10 }).expect(201);
     role = 'ADMIN'; await request(server).delete(`/api/finance/expenses/${id}`).expect(200);
     await request(server).post('/api/finance/monthly-closing/close').send({ year: 2026, month: 9 }).expect(201);
     assert.equal(closingAuthor, userId);
+    await request(server).get('/api/finance/monthly-closing/preview?year=2026&month=10').expect(200);
+    await request(server).post('/api/finance/monthly-closing/confirm').send({ year: 2026, month: 10 }).expect(201);
     await request(server).get('/api/finance/monthly-closing/status?year=2026&month=13').expect(400);
     await request(server).post('/api/finance/monthly-closing/close').send({ year: 2026, month: 9, closedById: randomUUID() }).expect(400);
   } finally { await app.close(); }

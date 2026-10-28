@@ -32,6 +32,8 @@
 
 ## Product context
 
+Закрытие месяца (задача владельца от 29.10.2026, `docs/membership-accrual.md`): `MonthlyClosingPanel` использует Ant Design Modal/Alert и общий App message. ADMIN/MANAGER с FULL CASHBOX могут открыть сверку и подтвердить закрытие текущего месяца; перед подтверждением показано предупреждение о фиксации признанной выручки и переносе остатков. READ_ONLY блокирует закрытие. Кнопка «Просмотр отчета закрытия» открывает неизменяемую ведомость закрытого месяца без действия подтверждения. Проверки: `backend/test/monthly-closing.test.cjs`, `backend/test/expenses.test.cjs`, `frontend/e2e/cash-desk.spec.ts`, включая 1440/390px.
+
 - Audience: администраторы, менеджеры и тренеры конного клуба.
 - Primary jobs: расписание занятий, клиенты, лошади, абонементы, оплаты и справочники.
 - Target market: Россия.

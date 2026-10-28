@@ -24,10 +24,10 @@ export class FinanceController {
   @Get('monthly-closing/preview')
   closingPreview(@Query() dto: MonthlyClosingDto) { return this.monthlyClosing.status(dto); }
   @Post('monthly-closing/confirm')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.MANAGER)
   confirmMonth(@Body() dto: ConfirmMonthlyClosingDto, @Req() req: { user: { id: string } }) { return this.monthlyClosing.close(dto, req.user.id); }
   @Post('monthly-closing/close')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.MANAGER)
   closeMonth(@Body() dto: ConfirmMonthlyClosingDto, @Req() req: { user: { id: string } }) { return this.monthlyClosing.close(dto, req.user.id); }
   @Post('expenses')
   create(@Body() dto: CreateExpenseDto, @Req() req: { user: { id: string } }) { return this.service.create(dto, req.user.id); }

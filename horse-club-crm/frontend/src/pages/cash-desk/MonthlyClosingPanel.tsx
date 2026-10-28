@@ -13,9 +13,10 @@ type Closing = { year: number; month: number; isClosed: boolean; closedAt: strin
   cashFlowIncome: string; cashFlowExpense: string; recognizedRevenue: string;
   deferredRevenueCarriedOver: string; activeMembershipsCarriedOver: number; currentCashBalance: string;
   membershipsAdvanceSummary: { totalAdvance: string; rows: AdvanceRow[] };
+  notes?: string | null;
   openingBalance: { incomingCashBalance: string; incomingAdvanceBalance: string } | null }
 
-export function MonthlyClosingPanel({ admin, refresh }: { admin: boolean; refresh: number }) {
+export function MonthlyClosingPanel({ canClose, refresh }: { canClose: boolean; refresh: number }) {
   const [period, setPeriod] = useState(() => DateTime.now().setZone('Europe/Moscow').toFormat('yyyy-MM'))
   const [result, setResult] = useState<{ key: string; data?: Closing; error?: string }>()
   const [closingError, setClosingError] = useState<string>()
@@ -50,7 +51,7 @@ export function MonthlyClosingPanel({ admin, refresh }: { admin: boolean; refres
     return () => controller.abort()
   }, [confirming, year, month, key])
   const close = async () => {
-    if (busy || !reconciliation || reconciliation.isClosed) return
+    if (!canClose || busy || !reconciliation || reconciliation.isClosed) return
     setBusy(true); setClosingError(undefined)
     try {
       const response = await httpClient.post<Closing>(`${API_URL}/finance/monthly-closing/confirm`, { year, month, ...(notes.trim() ? { notes: notes.trim() } : {}) })
@@ -62,7 +63,8 @@ export function MonthlyClosingPanel({ admin, refresh }: { admin: boolean; refres
     }
     finally { setBusy(false) }
   }
-  const ended = period < DateTime.now().setZone('Europe/Moscow').toFormat('yyyy-MM')
+  const isCurrentMonth = period === DateTime.now().setZone('Europe/Moscow').toFormat('yyyy-MM')
+  const viewingClosed = data?.isClosed || reconciliation?.isClosed
   return <Card title="Учет выручки по месяцам" styles={{ header: { flexWrap: 'wrap', gap: 8 }, title: { whiteSpace: 'normal', paddingBlock: 12 }, extra: { paddingBlock: 8 } }}
     extra={<Tag className={`crm-tag crm-tag--${data?.isClosed ? 'success' : 'accent'}`}>{data ? data.isClosed ? 'Месяц закрыт' : 'Месяц открыт' : loading ? 'Загрузка отчета' : 'Отчет недоступен'}</Tag>}>
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -70,7 +72,7 @@ export function MonthlyClosingPanel({ admin, refresh }: { admin: boolean; refres
         <DatePicker picker="month" locale={ruDatePicker} aria-label="Месяц финансового отчета" allowClear={false}
           format="MM.YYYY" value={dayjs(`${period}-01`)} disabled={busy || confirming} onChange={value => { if (value) setPeriod(value.format('YYYY-MM')) }} />
         <Button loading={loading} disabled={busy || confirming} onClick={() => setRevision(v => v + 1)}>Обновить показатели</Button>
-        {admin && !data?.isClosed && <Button disabled={loading || !data || !ended || busy} onClick={() => { setClosingError(undefined); setPreview(undefined); setNotes(''); setConfirming(true) }}>Закрыть месяц</Button>}
+        {(canClose || data?.isClosed) && <Button disabled={loading || !data || busy || confirming} onClick={() => { setClosingError(undefined); setPreview(undefined); setNotes(''); setConfirming(true) }}>{data?.isClosed ? 'Просмотр отчета закрытия' : 'Закрыть месяц'}</Button>}
       </Space>
       {data?.openingBalance && <Alert type="info" showIcon message={`Перенесено с прошлого месяца: Касса ${currency(data.openingBalance.incomingCashBalance)} | Авансы по абонементам ${currency(data.openingBalance.incomingAdvanceBalance)}`} />}
       {error && !confirming && <Alert type="error" role="alert" showIcon message="Не удалось загрузить отчет" description={error} />}
@@ -80,13 +82,14 @@ export function MonthlyClosingPanel({ admin, refresh }: { admin: boolean; refres
       ].map(([title, value]) => <Col xs={24} md={8} key={title}><Statistic title={title} value={data ? currency(value) : '—'} loading={loading} /></Col>)}</Row>
       <Alert type="info" showIcon message="Оплата абонемента сразу поступает в кассу. Выручка признается в дату проведенного занятия. Остаток занятий переносится без повторного поступления денег." />
     </Space>
-    <Modal className="cash-desk-modal" open={confirming} title="Закрытие месяца и перенос сальдо" width={900}
+    <Modal className="cash-desk-modal" open={confirming} title={viewingClosed ? 'Отчет закрытия месяца' : 'Закрытие месяца и перенос сальдо'} width={900}
       style={{ top: 16 }} styles={{ body: { maxHeight: 'calc(100dvh - 280px)', overflowY: 'auto' } }}
       okText={`Подтвердить и перенести остатки в ${nextMonth}`} cancelText="Вернуться к отчету"
       onOk={() => void close()} onCancel={() => { if (!busy) setConfirming(false) }} confirmLoading={busy}
-      okButtonProps={{ disabled: !reconciliation || reconciliation.isClosed || busy, style: { whiteSpace: 'normal', height: 'auto', minHeight: 40, maxWidth: '100%' } }}
+      okButtonProps={{ disabled: !canClose || !reconciliation || reconciliation.isClosed || busy, style: { display: viewingClosed || !canClose ? 'none' : undefined, whiteSpace: 'normal', height: 'auto', minHeight: 40, maxWidth: '100%' } }}
       cancelButtonProps={{ disabled: busy, autoFocus: true }} closable={!busy} keyboard={!busy} maskClosable={false} focusTriggerAfterClose>
-      <p>Сверка за {period}. Итоги месяца будут сохранены. Изменять проведенные занятия и кассовые операции этого месяца будет нельзя. Неиспользованные занятия сохранятся.</p>
+      <p>{viewingClosed ? `Зафиксированная ведомость за ${period}.` : `Сверка за ${period}. Итоги месяца будут сохранены. Изменять проведенные занятия и кассовые операции этого месяца будет нельзя. Неиспользованные занятия сохранятся.`}</p>
+      {isCurrentMonth && !viewingClosed && <Alert type="info" showIcon message="Текущий месяц еще не завершен. Закрытие зафиксирует текущую признанную выручку и перенесет остаток кассы и авансы по абонементам во входящее сальдо следующего месяца" />}
       {previewLoading && <Spin aria-label="Загрузка сверки" />}
       {previewError && <Alert type="error" role="alert" showIcon message="Не удалось загрузить сверку" description={previewError}
         action={<Button onClick={() => setRevision(v => v + 1)}>Повторить</Button>} />}
@@ -109,9 +112,10 @@ export function MonthlyClosingPanel({ admin, refresh }: { admin: boolean; refres
               { title: 'Аванс к переносу', dataIndex: 'amountToCarryOver', render: value => currency(value) },
             ]} />,
         }]} />
-        <label htmlFor="closing-notes">Комментарий к закрытию (необязательно)</label>
+        {!viewingClosed && <><label htmlFor="closing-notes">Комментарий к закрытию (необязательно)</label>
         <Input.TextArea id="closing-notes" value={notes} onChange={event => setNotes(event.target.value)} maxLength={2000}
-          autoSize={{ minRows: 2, maxRows: 5 }} style={{ resize: 'none' }} disabled={busy} />
+          autoSize={{ minRows: 2, maxRows: 5 }} style={{ resize: 'none' }} disabled={busy} /></>}
+        {viewingClosed && reconciliation.notes && <p>Комментарий к закрытию: {reconciliation.notes}</p>}
       </Space>}
       {closingError && <Alert type="error" role="alert" showIcon message="Не удалось закрыть месяц" description={closingError} />}
     </Modal>

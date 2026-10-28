@@ -72,7 +72,6 @@ export class MonthlyClosingService {
 
   async close(dto: ConfirmMonthlyClosingDto, closedById: string) {
     const { end } = this.period(dto);
-    if (end > new Date()) throw new BadRequestException('Месяц можно закрыть только после его окончания по Москве');
     for (let attempt = 0; ; attempt++) {
       try {
         return await this.prisma.$transaction(async tx => {

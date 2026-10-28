@@ -108,8 +108,8 @@ test('preview calculates cash, revenue, expenses and per-client advances; confir
   assert.equal(incoming.closingId, closed.id);
 });
 
-test('future closing, unknown legacy value and failed snapshot cannot silently close a month', async () => {
-  await assert.rejects(fixture().service.close({ year: 2099, month: 1 }, 'admin'), { status: 400 });
+test('invalid period, unknown legacy value and failed snapshot cannot silently close a month', async () => {
+  await assert.rejects(fixture().service.close({ year: 2026, month: 13 }, 'admin'), { status: 400 });
   await assert.rejects(fixture({ missingPrice: true }).service.close({ year: 2026, month: 9 }, 'admin'), { status: 409 });
   const h = fixture({ fail: true });
   await assert.rejects(h.service.close({ year: 2026, month: 9 }, 'admin'), /snapshot failed/);
@@ -169,4 +169,25 @@ test('concurrent unique conflict retries a fresh snapshot and reports already cl
   } });
   await assert.rejects(service.close({ year: 2026, month: 9 }, 'admin'), { status: 409 });
   assert.equal(attempts, 2);
+});
+
+
+test('current Moscow month previews, closes early and returns its immutable report', async () => {
+  const now = require('luxon').DateTime.now().setZone('Europe/Moscow');
+  const period = { year: now.year, month: now.month };
+  const h = fixture();
+  const preview = await h.service.status(period);
+  assert.equal(preview.isClosed, false);
+  assert.equal(h.state().saved, undefined);
+  const closed = await h.service.close(period, 'admin');
+  assert.equal(closed.status, 'CLOSED');
+  assert.equal(closed.recognizedRevenue.toString(), preview.recognizedRevenue.toString());
+  const next = now.plus({ months: 1 });
+  assert.equal(h.state().openings[0].year, next.year);
+  assert.equal(h.state().openings[0].month, next.month);
+  h.memberships[0].remainedLessons = 1;
+  const report = await h.service.status(period);
+  assert.equal(report.isClosed, true);
+  assert.equal(report.membershipsAdvanceSummary.rows[0].remainingLessons, 3);
+  await assert.rejects(h.service.close(period, 'admin'), { status: 409 });
 });
