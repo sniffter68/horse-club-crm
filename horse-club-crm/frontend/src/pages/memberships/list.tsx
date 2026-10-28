@@ -1,4 +1,5 @@
 import { SharedMembershipAccess, type SharedMember } from './SharedMembershipAccess'
+import { deferredBalance } from './deferredBalance'
 import { ArchiveAction } from '../clients/ArchiveAction'
 import { useState } from 'react'
 import { CreateButton, List as RefineList, useTable } from '@refinedev/antd'
@@ -15,12 +16,13 @@ import { useCatalogPermissions } from '../catalogs/permissions'
 type Membership = {
   members?: SharedMember[]
   deletedAt?: string | null;
-  serviceTitle?: string; totalPrice?: string | number; paymentMethod?: string;
+  serviceTitle?: string; pricePerLesson?: string | number; totalPrice?: string | number; paymentMethod?: string;
   id: string; totalLessons: number; remainedLessons: number; validUntil: string; isActive: boolean;
   client: { id: string; name: string; firstName: string; lastName: string } | null;
   pricingPlan: { id: string; name: string; price: string | number } | null;
 }
 type MembershipDetails = Membership & {
+  recognizedRevenue?: string | number;
   payments: RelationPayment[];
   bookings: Array<{ id: string; attended: boolean; attendanceStatus: string; horse: { id: string; name: string } | null; lesson: RelationLesson }>;
   operations: Array<{ id: string; type: string; amount: number; reason: string; createdAt: string; lesson: RelationLesson | null }>;
@@ -57,6 +59,9 @@ export function MembershipList() {
           { key: 'client', label: 'Клиент', children: membership.client ? personName(membership.client) : '—' },
           { key: 'plan', label: 'Услуга / тариф', children: membership.serviceTitle || membership.pricingPlan?.name || 'Индивидуальный' },
           { key: 'price', label: 'Стоимость', children: money(membership.totalPrice) },
+          { key: 'unitPrice', label: 'Стоимость 1 занятия', children: money(membership.pricePerLesson) },
+          { key: 'earned', label: 'Отзанимался на сумму', children: money(membership.recognizedRevenue) },
+          { key: 'deferred', label: 'Переходит на следующий месяц', children: money(deferredBalance(membership)) },
           { key: 'method', label: 'Способ оплаты', children: membership.paymentMethod === 'CASH' ? 'Наличные' : membership.paymentMethod === 'CARD' ? 'Безналичные' : '—' },
           { key: 'validUntil', label: 'Действует до', children: dateOnly(membership.validUntil) },
           { key: 'status', label: 'Статус', children: <Tag color={membership.isActive ? 'green' : 'default'}>{membership.isActive ? 'Активен' : 'Неактивен'}</Tag> },

@@ -16,7 +16,7 @@ type Action = 'complete' | 'no-show' | 'cancel';
 export class BookingLifecycleService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async transition(id: string, action: Action, cancellation?: CancelBookingDto) {
+  async transition(id: string, action: Action, cancellation?: CancelBookingDto, actorId?: string) {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         return await this.prisma.$transaction(async tx => {
@@ -78,6 +78,7 @@ export class BookingLifecycleService {
             await tx.membership.update({ where: { id: membership.id }, data: { validTo } });
           }
           return tx.booking.update({ where: { id }, data: {
+            ...(actorId ? { financialActorId: actorId } : {}),
             status, membershipId: billable ? membership?.id ?? initial.membershipId : initial.membershipId,
             attended: status === 'completed', attendanceStatus: status === 'completed' ? 'ATTENDED' : status === 'no_show' ? 'NO_SHOW' : 'PENDING',
             ...(action === 'cancel' ? { cancellationReason: cancellation!.reason } : {}),

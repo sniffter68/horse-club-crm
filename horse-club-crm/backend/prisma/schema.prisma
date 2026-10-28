@@ -383,6 +383,7 @@ model VkConsent {
 }
 
 model Lesson {
+  financialActorId String? @db.Uuid
   deletedAt DateTime? @db.Timestamptz(6)
   cancelledAt DateTime? @db.Timestamptz(6)
   participantsCount Int? @default(1)
@@ -413,6 +414,7 @@ model Lesson {
 }
 
 model Membership {
+  revenueRecognitions RevenueRecognition[]
   cancelledAt DateTime? @db.Timestamptz(6)
   members MembershipMember[]
   deletedAt DateTime? @db.Timestamptz(6)
@@ -470,6 +472,7 @@ model PricingPlan {
 }
 
 model Booking {
+  financialActorId String? @db.Uuid
   prepaymentAmount Decimal @default(0) @db.Decimal(12, 2)
   prepaymentMethod PaymentMethod?
   finalPaymentAmount Decimal @default(0) @db.Decimal(12, 2)
@@ -1006,4 +1009,37 @@ model VetEvent {
 
   @@index([status, eventDate])
   @@index([horseId, eventDate])
+}
+
+// Monetary revenue journal is separate from the mixed RUB/lesson client ledger.
+model RevenueRecognition {
+  id String @id @default(uuid()) @db.Uuid
+  bookingId String? @db.Uuid
+  sourcePaymentId String? @db.Uuid
+  membershipId String? @db.Uuid
+  membership Membership? @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  type String @default("REVENUE_RECOGNITION")
+  amount Decimal @db.Decimal(14, 2)
+  recognizedAt DateTime @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  createdById String? @db.Uuid
+  @@unique([bookingId, type])
+  @@unique([sourcePaymentId, type])
+  @@index([recognizedAt])
+  @@index([membershipId])
+}
+
+model MonthlyFinancialClosing {
+  id String @id @default(uuid()) @db.Uuid
+  year Int
+  month Int
+  closedAt DateTime @default(now()) @db.Timestamptz(6)
+  closedById String? @db.Uuid
+  cashFlowIncome Decimal @db.Decimal(14, 2)
+  cashFlowExpense Decimal @db.Decimal(14, 2)
+  recognizedRevenue Decimal @db.Decimal(14, 2)
+  deferredRevenueCarriedOver Decimal @db.Decimal(14, 2)
+  activeMembershipsCarriedOver Int
+  notes String?
+  @@unique([year, month])
 }

@@ -559,7 +559,7 @@ export class LessonsService {
         }
       }
 
-      let financialData: Prisma.LessonUpdateInput = {};
+      let financialData: Prisma.LessonUpdateInput = actor ? { financialActorId: actor.id } : {};
       if (newStatus !== 'COMPLETED' && (payment.payRemaining || payment.paymentMethod || payment.customAmount != null)) {
         throw new BadRequestException('Оплата доступна при завершении занятия');
       }
@@ -595,7 +595,7 @@ export class LessonsService {
             else await tx.payment.updateMany({ where: { bookingId: booking.id, status: 'PENDING' }, data: { amount: outstanding } });
           }
         }
-        financialData = { cost, paymentStatus: paymentStatus(cost, previouslyPaid.plus(amount)),
+        financialData = { ...financialData, cost, paymentStatus: paymentStatus(cost, previouslyPaid.plus(amount)),
           finalPaymentAmount: previouslyPaid.minus(prepaid).plus(amount),
           ...(amount.gt(0) ? { finalPaymentMethod: payment.paymentMethod } : {}) };
       }

@@ -1,6 +1,6 @@
 import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { ReplaceHorseDto } from './dto/replace-horse.dto';
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { setRefineTotalHeaders } from '../common/refine';
 import { BookingAvailabilityDto, HorseIssuesQueryDto, ListBookingsDto } from './dto/booking-query.dto';
@@ -43,13 +43,13 @@ export class BookingsController {
   }
   @Patch(':id/complete')
   @Roles(Role.ADMIN, Role.MANAGER)
-  complete(@Param('id', new ParseUUIDPipe()) id: string) { return this.lifecycle.transition(id, 'complete'); }
+  complete(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: AuthUser }) { return this.lifecycle.transition(id, 'complete', undefined, req.user.id); }
   @Patch(':id/no-show')
   @Roles(Role.ADMIN, Role.MANAGER)
-  noShow(@Param('id', new ParseUUIDPipe()) id: string) { return this.lifecycle.transition(id, 'no-show'); }
+  noShow(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: AuthUser }) { return this.lifecycle.transition(id, 'no-show', undefined, req.user.id); }
   @Patch(':id/cancel')
   @Roles(Role.ADMIN, Role.MANAGER)
-  cancel(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CancelBookingDto) { return this.lifecycle.transition(id, 'cancel', dto); }
+  cancel(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CancelBookingDto, @Req() req: { user: AuthUser }) { return this.lifecycle.transition(id, 'cancel', dto, req.user.id); }
   @Post()
   @Roles(Role.ADMIN, Role.MANAGER)
   create(@Body() dto: CreateBookingDto) { return this.bookings.createBooking(dto); }

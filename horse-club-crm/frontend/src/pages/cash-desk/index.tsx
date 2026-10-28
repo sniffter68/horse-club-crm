@@ -1,3 +1,4 @@
+import { MonthlyClosingPanel } from './MonthlyClosingPanel'
 import { usePermissions as useModules } from '../../modulePermissions'
 import { useEffect, useState } from 'react'
 import { usePermissions } from '@refinedev/core'
@@ -86,6 +87,7 @@ function CashDeskBook() {
   return <Space className="cash-desk-page" direction="vertical" size="large" style={{ width: '100%' }}>
     {!writable && <Alert type="info" showIcon message="Доступно только для просмотра" />}
     <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}><div><Typography.Title level={2}>Касса</Typography.Title><Typography.Text type="secondary">Кассовая книга · время Москвы</Typography.Text></div><Space wrap><CashDeskButton /><Button type="primary" disabled={!writable} onClick={() => setExpenseOpen(true)}>Внести расход</Button><Button onClick={() => setRefresh(value => value + 1)} loading={loading}>Обновить</Button>{writable && role === 'ADMIN' && <CashManagement onReset={() => { setShift(null); setSummary(undefined); changeParams({ period: 'today', page: '1', expensePage: '1' }) }} />}</Space></Space>
+    <MonthlyClosingPanel admin={writable && role === 'ADMIN'} refresh={refresh} />
     <Card><Space wrap>
       <Tag>{shift ? `Смена открыта ${cashTime(shift.openedAt)}` : 'Нет открытой смены'}</Tag>
       {shift ? <><Typography.Text>Размен на начало: {currency(shift.startingCash)}</Typography.Text><Button disabled={!writable} onClick={closeShift}>Закрыть смену</Button></> : <Button disabled={!writable} onClick={() => { setShiftError(undefined); setOpening(true) }}>Открыть смену</Button>}
@@ -94,7 +96,7 @@ function CashDeskBook() {
       {period === 'custom' && <DatePicker.RangePicker locale={ruDatePicker} aria-label="Период кассовой книги" format="DD.MM.YYYY" value={from && to ? [dayjs(from), dayjs(to)] : null} onChange={values => changeParams({ from: values?.[0]?.format('YYYY-MM-DD') || '', to: values?.[1]?.format('YYYY-MM-DD') || '', page: '1' })} />}
     </Space>
     {error && <Alert type="error" role="alert" showIcon message="Не удалось загрузить кассу" description={error} />}
-    {!error && Number(summary?.totalUnspecified) > 0 && <Alert type="warning" showIcon message={`Ранее внесённые оплаты без указанного способа: ${currency(summary?.totalUnspecified)}`} description="Они включены в выручку, но не отнесены к наличным или безналичным." />}
+    {!error && Number(summary?.totalUnspecified) > 0 && <Alert type="warning" showIcon message={`Ранее внесённые оплаты без указанного способа: ${currency(summary?.totalUnspecified)}`} description="Они включены в поступления, но не отнесены к наличным или безналичным." />}
     {period === 'shift' && !loading && !shift && <Alert type="info" message="Откройте смену, чтобы учитывать её платежи отдельно" />}
     {period === 'custom' && (!from || !to) && <Alert type="info" message="Выберите начало и конец периода" />}
     <Row gutter={[16, 16]}>{[
@@ -106,7 +108,7 @@ function CashDeskBook() {
     <Row gutter={[16, 16]}>{[
       [period === 'shift' ? 'Наличные за смену' : 'Наличные за период', summary?.totalCash],
       [period === 'shift' ? 'Безналичные за смену' : 'Безналичные за период', summary?.totalCard],
-      ['Итого выручка', summary?.totalRevenue],
+      ['Всего поступлений', summary?.totalRevenue],
       ['Расходы наличными', summary?.totalExpensesCash],
       ['Расходы безналичными', summary?.totalExpensesCard],
       ['Доходы минус расходы за период', summary?.netTotal],

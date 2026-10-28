@@ -1,3 +1,4 @@
+const { MonthlyClosingService } = require('../dist/payments/monthly-closing.service');
 require('reflect-metadata');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -110,9 +111,11 @@ test('cancel preserves financial record and actor, is idempotent and blocks MANA
   await service.cancel(row.id, { id: 'admin', role: 'ADMIN' }); assert.equal(writes, 1);
 });
 test('HTTP permissions: TRAINER gets 403, MANAGER creates/reads but cannot delete, ADMIN cancels; JWT author cannot be spoofed', async () => {
-  let role = 'TRAINER', receivedAuthor;
+  let role = 'TRAINER', receivedAuthor, closingAuthor;
   const userId = randomUUID(), id = randomUUID();
-  const module = await Test.createTestingModule({ controllers: [FinanceController], providers: [RolesGuard, { provide: FinanceService, useValue: {
+  const module = await Test.createTestingModule({ controllers: [FinanceController], providers: [RolesGuard, { provide: MonthlyClosingService, useValue: {
+    status: async dto => ({ ...dto, isClosed: false }), close: async (dto, author) => { closingAuthor = author; return { ...dto, isClosed: true }; },
+  } }, { provide: FinanceService, useValue: {
     create: async (dto, author) => { receivedAuthor = author; return { id, ...dto }; }, list: async () => ({ data: [], total: 0 }), summary: async () => ({}), cancel: async () => ({ id }),
   } }] }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
     .overrideGuard(JwtAuthGuard).useValue({ canActivate: context => { context.switchToHttp().getRequest().user = { id: userId, role }; return true; } }).compile();
@@ -124,11 +127,20 @@ test('HTTP permissions: TRAINER gets 403, MANAGER creates/reads but cannot delet
     for (const path of ['/api/finance/expenses', '/api/finance/summary?from=2026-10-18&to=2026-10-19']) await request(server).get(path).expect(403);
     await request(server).post('/api/finance/expenses').send(valid).expect(403);
     await request(server).delete(`/api/finance/expenses/${id}`).expect(403);
+    await request(server).get('/api/finance/monthly-closing/status?year=2026&month=9').expect(403);
+    await request(server).post('/api/finance/monthly-closing/close').send({ year: 2026, month: 9 }).expect(403);
     role = 'MANAGER';
     await request(server).post('/api/finance/expenses').send(valid).expect(201); assert.equal(receivedAuthor, userId);
     await request(server).post('/api/finance/expenses').send({ ...valid, createdById: randomUUID() }).expect(400);
     await request(server).get('/api/finance/expenses?page=2&paymentMethod=&category=').expect(200);
     await request(server).delete(`/api/finance/expenses/${id}`).expect(403);
+    const preview = await request(server).get('/api/finance/monthly-closing/status?year=2026&month=9').expect(200);
+    assert.equal(preview.body.month, 9);
+    await request(server).post('/api/finance/monthly-closing/close').send({ year: 2026, month: 9 }).expect(403);
     role = 'ADMIN'; await request(server).delete(`/api/finance/expenses/${id}`).expect(200);
+    await request(server).post('/api/finance/monthly-closing/close').send({ year: 2026, month: 9 }).expect(201);
+    assert.equal(closingAuthor, userId);
+    await request(server).get('/api/finance/monthly-closing/status?year=2026&month=13').expect(400);
+    await request(server).post('/api/finance/monthly-closing/close').send({ year: 2026, month: 9, closedById: randomUUID() }).expect(400);
   } finally { await app.close(); }
 });

@@ -28,6 +28,7 @@ const paymentSummarySelect = {
 } satisfies Prisma.PaymentSelect;
 
 const clientMembershipSelect = {
+  pricePerLesson: true, revenueRecognitions: { select: { amount: true } },
   clientId: true, client: { select: { name: true, firstName: true, lastName: true } },
   members: { include: { client: { select: { id: true, name: true, firstName: true, lastName: true } } } },
   deletedAt: true, _count: { select: { bookings: true, operations: true, transactions: true, payments: true } }, totalPrice: true, type: true, title: true, initialUnits: true, remainingUnits: true, validFrom: true, validTo: true, status: true,
@@ -40,7 +41,7 @@ const clientMembershipSelect = {
   payments: { select: paymentSummarySelect, orderBy: { createdAt: 'desc' as const } },
 } satisfies Prisma.MembershipSelect;
 
-type ClientMembership = Prisma.MembershipGetPayload<{ select: typeof clientMembershipSelect }> & { isActive: boolean; ownerClientId: string | null; isShared: boolean; ownerName: string };
+type ClientMembership = Prisma.MembershipGetPayload<{ select: typeof clientMembershipSelect }> & { recognizedRevenue: Prisma.Decimal; isActive: boolean; ownerClientId: string | null; isShared: boolean; ownerName: string };
 const clientDetailsInclude = Prisma.validator<Prisma.ClientDefaultArgs>()({
   include: {
     ...preferredResourcesInclude,
@@ -184,6 +185,7 @@ export class ClientsService {
         .map(member => member.membership)
         .filter(m => !m.deletedAt && m.status === 'active' && Number(m.remainingUnits) > 0 && m.validFrom <= now && m.validTo >= now)].map((membership) => ({
         ...membership,
+        recognizedRevenue: (membership.revenueRecognitions ?? []).reduce((sum, row) => sum.plus(row.amount), new Prisma.Decimal(0)),
         ownerClientId: membership.clientId,
         isShared: membership.clientId !== id,
         ownerName: membership.client?.name || [membership.client?.firstName, membership.client?.lastName].filter(Boolean).join(' '),

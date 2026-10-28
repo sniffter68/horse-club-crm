@@ -104,7 +104,7 @@ test('archive query accepts explicit booleans and rejects malformed values', () 
   assert.ok(validateSync(plainToInstance(ArchiveQueryDto, { includeArchived: 'yes' })).length);
 });
 test('archived memberships are inactive and cannot be debited through the legacy ledger', async () => {
-  const service = new MembershipsService({ membership: { findUnique: async () => ({
+  const service = new MembershipsService({ revenueRecognition: { aggregate: async () => ({ _sum: { amount: null } }) }, membership: { findUnique: async () => ({
     deletedAt: new Date(), status: 'active', remainedLessons: 8, validUntil: new Date('2099-01-01'),
   }) } });
   assert.equal((await service.findOne('m')).isActive, false);

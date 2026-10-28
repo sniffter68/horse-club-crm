@@ -25,7 +25,7 @@ function run(args) {
   try {
     await admin.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`); created = true;
     run(['node_modules/prisma/build/index.js', 'migrate', 'deploy']);
-    run(['--test', 'test/membership-sale.postgres.test.cjs']);
+    run(['--test', 'test/membership-sale.postgres.test.cjs', 'test/membership-accrual.postgres.test.cjs']);
   } finally {
     if (created) await admin.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);
     await admin.$disconnect();

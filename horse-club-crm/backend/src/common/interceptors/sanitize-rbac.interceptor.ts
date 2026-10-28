@@ -30,7 +30,7 @@ export class SanitizeRbacInterceptor implements NestInterceptor {
       if (!visible('VETERINARY')) hidden.push('healthLogs', 'vetEvents', 'vetRecords', 'healthStatus', 'quarantineUntil', 'lastShoeingAt', 'lastVaccinationAt', 'lastDewormingAt', 'lastVetCheckAt', 'lastDentistAt');
       if (!visible('STABLES')) hidden.push('boardingContracts', 'currentBoardingContract', 'stall');
       if (!visible('SCHEDULE')) hidden.push('bookings', 'lessons');
-      if (!visible('CASHBOX')) hidden.push('payments', 'operations');
+      if (!visible('CASHBOX')) hidden.push('payments', 'operations', 'recognizedRevenue', 'revenueRecognitions', 'pricePerLesson', 'totalPrice');
       if (!visible('STAFF_PAYROLL') || (user.role !== Role.ADMIN && user.role !== Role.MANAGER)) hidden.push('baseRate', 'shiftRate', 'lessonRate', 'groupLessonRate', 'lessonPercentage');
       return this.interceptLegacy(context, next).pipe(map(value => this.sanitize(value, hidden)));
     }));
@@ -46,12 +46,12 @@ export class SanitizeRbacInterceptor implements NestInterceptor {
       return next.handle();
     }
     const fields = [...new Set(['medicalNotes', 'preferences', 'birthDate', 'email', 'phone', 'vkUserId', 'vkId', 'vkScreenName',
-      'baseRate', 'price', 'monthlyRate', 'payments', 'membership', 'memberships',
+      'baseRate', 'price', 'monthlyRate', 'payments', 'membership', 'memberships', 'recognizedRevenue', 'revenueRecognitions', 'pricePerLesson', 'totalPrice',
       'membershipId', 'operations', 'passwordHash', ...(extraFields ?? [])])];
     if (!this.access) return next.handle().pipe(map((value: unknown) => this.sanitize(value, fields)));
     return from(this.access.permissions(request.user.role)).pipe(switchMap(permissions => {
       let hidden = fields;
-      if (permissions.financeRead) hidden = hidden.filter(field => !['price', 'monthlyRate', 'payments', 'membership', 'memberships', 'membershipId', 'operations'].includes(field));
+      if (permissions.financeRead) hidden = hidden.filter(field => !['price', 'monthlyRate', 'payments', 'membership', 'memberships', 'membershipId', 'operations', 'recognizedRevenue', 'revenueRecognitions', 'pricePerLesson', 'totalPrice'].includes(field));
       if (!permissions.healthRead) hidden = [...hidden, 'healthLogs', 'vetEvents', 'vetRecords', 'healthStatus', 'quarantineUntil', 'lastShoeingAt', 'lastVaccinationAt', 'lastDewormingAt', 'lastVetCheckAt', 'lastDentistAt'];
       if (!permissions.boardingAccess) hidden = [...hidden, 'boardingContracts', 'currentBoardingContract'];
       return next.handle().pipe(map((value: unknown) => this.sanitize(value, hidden)));

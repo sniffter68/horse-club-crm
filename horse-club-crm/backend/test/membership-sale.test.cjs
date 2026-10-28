@@ -64,7 +64,7 @@ for (const method of ['CASH', 'CARD']) test(`sale atomically posts discounted ${
   const f = fixture();
   const result = await f.service.create({ ...sale, paymentMethod: method }, actor);
   assert.equal(f.calls(), 1);
-  assert.equal(result.pricePerLesson.toString(), '1250.15');
+  assert.equal(result.pricePerLesson.toString(), '1187.53');
   assert.equal(result.totalPrice.toString(), '9500.25');
   assert.equal(result.remainingUnits, 8);
   assert.equal(result.remainedLessons, 8);

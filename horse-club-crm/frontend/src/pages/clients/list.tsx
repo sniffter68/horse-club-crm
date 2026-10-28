@@ -1,4 +1,5 @@
 import { SharedMembershipAccess, type SharedMember } from '../memberships/SharedMembershipAccess'
+import { deferredBalance } from '../memberships/deferredBalance'
 import { ArchiveAction } from './ArchiveAction'
 import { ClientForm } from './form'
 import { CatalogEditAction } from '../catalogs/EditDrawer'
@@ -19,6 +20,7 @@ import { ClientLedger, MembershipBalance, type ActiveMembership } from './member
 type ClientRow = Client & { membership: ActiveMembership | null }
 
 type ClientMembership = {
+  totalPrice?: string | number; pricePerLesson?: string | number; recognizedRevenue?: string | number;
   ownerClientId?: string | null; isShared?: boolean; ownerName?: string; members?: SharedMember[]
   deletedAt?: string | null
   id: string
@@ -139,6 +141,11 @@ export function ClientList() {
                   status={membership.isActive ? 'active' : 'normal'}
                 />
                 <Typography.Text type="secondary">Действует до {dateFormatter.format(new Date(membership.validUntil))}</Typography.Text>
+                <Descriptions size="small" column={1} items={[
+                  { key: 'price', label: 'Стоимость 1 занятия', children: money(membership.pricePerLesson) },
+                  { key: 'earned', label: 'Отзанимался на сумму', children: money(membership.recognizedRevenue) },
+                  { key: 'carry', label: 'Переходит на следующий месяц', children: money(deferredBalance(membership)) },
+                ]} />
               </div>
             </List.Item>} />}
         </div>

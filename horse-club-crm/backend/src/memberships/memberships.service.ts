@@ -1,3 +1,4 @@
+import { membershipLessonPrice } from '../payments/accrual.math';
 import { refundService, serviceRefundQuote } from '../payments/service-refund';
 import type { CancelServiceDto } from '../payments/dto/cancel-service.dto';
 import { createHash, randomUUID } from 'node:crypto';
@@ -70,10 +71,11 @@ export class MembershipsService {
     return { total, data: data.map((membership) => this.withActive(membership)) };
   }
 
-  async findOne(id: string): Promise<MembershipDetails & { isActive: boolean }> {
+  async findOne(id: string): Promise<MembershipDetails & { isActive: boolean; recognizedRevenue: Prisma.Decimal }> {
     const membership = await this.prisma.membership.findUnique({ where: { id }, include: membershipDetailsInclude });
     if (!membership) throw new NotFoundException('Membership not found');
-    return this.withActive(membership);
+    const revenue = await this.prisma.revenueRecognition.aggregate({ where: { membershipId: id }, _sum: { amount: true } });
+    return { ...this.withActive(membership), recognizedRevenue: revenue._sum.amount ?? new Prisma.Decimal(0) };
   }
 
   async create(dto: CreateMembershipDto, actor: AuthUser): Promise<MembershipResponse> {
@@ -124,7 +126,7 @@ export class MembershipsService {
           stage = 'sale.validation';
           const basePrice = service?.price ?? dto.pricePerLesson ?? (plan ? new Prisma.Decimal(plan.price).div(totalLessons).toDecimalPlaces(2) : undefined);
           if (basePrice === undefined) throw new BadRequestException('Выберите услугу или укажите базовую цену');
-          const pricePerLesson = new Prisma.Decimal(basePrice);
+          const pricePerLesson = membershipLessonPrice(dto.totalPrice, totalLessons);
           const totalPrice = new Prisma.Decimal(dto.totalPrice);
           if ([pricePerLesson, totalPrice].some(price => !price.isFinite() || price.lt(0) || price.decimalPlaces() > 2 || price.gt('9999999999.99')))
             throw new BadRequestException('Укажите корректную стоимость с точностью до копеек');

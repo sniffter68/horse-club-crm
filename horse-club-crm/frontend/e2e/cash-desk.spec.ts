@@ -8,6 +8,10 @@ async function setup(page: Page, role = 'ADMIN') {
     localStorage.setItem('horsecrm.role', sessionStorage.getItem('qa.role') || role)
   }, role)
   const state = { posts: [] as Record<string, unknown>[], summaries: [] as string[], fail: false, paid: false, expenses: [] as Record<string, unknown>[], expensePosts: [] as Record<string, unknown>[], expenseFail: false }
+  await page.route('**/api/finance/monthly-closing/status?*', route => route.fulfill({ json: {
+    year: 2026, month: 10, isClosed: false, closedAt: null, cashFlowIncome: '8000', cashFlowExpense: '500',
+    recognizedRevenue: '1000', deferredRevenueCarriedOver: '7000', activeMembershipsCarriedOver: 1,
+  } }))
   await page.route(/\/api\/finance\/expenses(?:\/[^?]+)?(?:\?.*)?$/, route => {
     if (route.request().method() === 'POST') {
       const payload = route.request().postDataJSON()
@@ -53,6 +57,48 @@ async function fillPayment(page: Page) {
   await modal.getByRole('combobox', { name: 'Услуга / занятие / абонемент', exact: true }).press('Enter')
   return modal
 }
+
+for (const width of [1440, 390]) test(`monthly accrual closing preserves summary and recovers from failure at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  await setup(page)
+  let closed = false, fail = true
+  const posts: unknown[] = []
+  const report = () => ({ year: 2026, month: 9, isClosed: closed, closedAt: closed ? '2026-10-09T09:00:00Z' : null,
+    cashFlowIncome: '8000', cashFlowExpense: '500', recognizedRevenue: '1000', deferredRevenueCarriedOver: '7000', activeMembershipsCarriedOver: 1 })
+  await page.route('**/api/finance/monthly-closing/status?*', route => route.fulfill({ json: report() }))
+  await page.route('**/api/finance/monthly-closing/close', route => {
+    posts.push(route.request().postDataJSON())
+    if (fail) return route.fulfill({ status: 409, json: { message: 'Баланс изменился. Повторите закрытие' } })
+    closed = true
+    return route.fulfill({ json: report() })
+  })
+  await page.goto('/cash-desk')
+  const panel = page.locator('.ant-card').filter({ hasText: 'Учет выручки по месяцам' })
+  await expect(panel.getByText('Признанная выручка', { exact: true })).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Закрыть месяц', exact: true })).toBeDisabled()
+  const month = page.getByRole('textbox', { name: 'Месяц финансового отчета' })
+  await month.fill('09.2026'); await month.press('Enter'); await month.press('Escape')
+  await panel.getByRole('button', { name: 'Закрыть месяц', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Закрыть месяц 2026-09?' })
+  await expect(dialog).toContainText('Перенос авансов')
+  await expect(dialog.getByRole('button', { name: 'Вернуться к отчету' })).toBeFocused()
+  await dialog.getByRole('button', { name: 'Закрыть месяц', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toContainText('Баланс изменился')
+  expect(posts).toEqual([{ year: 2026, month: 9 }])
+  fail = false
+  await dialog.getByRole('button', { name: 'Закрыть месяц', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await expect(panel.getByText('Месяц закрыт', { exact: true })).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Закрыть месяц', exact: true })).toHaveCount(0)
+  await page.screenshot({ path: `../test-results/monthly-accrual-${width}.png`, fullPage: true })
+})
+
+test('manager can view monthly revenue but cannot close month', async ({ page }) => {
+  await setup(page, 'MANAGER')
+  await page.goto('/cash-desk')
+  await expect(page.getByText('Переходящий остаток абонементов', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Закрыть месяц', exact: true })).toHaveCount(0)
+})
 
 for (const width of [1440, 390]) test(`owner reset requires exact word, preserves failure and refreshes book at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 })
@@ -251,7 +297,7 @@ test('custom date picker uses Russian calendar and Moscow date boundaries', asyn
   const state = await setup(page)
   await page.goto('/cash-desk')
   await page.getByText('Выбрать даты', { exact: true }).click()
-  const inputs = page.locator('.ant-picker-input input')
+  const inputs = page.locator('.cash-desk-filters .ant-picker-input input')
   await inputs.first().click()
   await expect(page.locator('.ant-picker-dropdown:visible')).toContainText(/окт/i)
   await inputs.first().fill('01.10.2026')
