@@ -3,11 +3,11 @@ import { Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../prisma/prisma.service';
 import { isSerializationFailure } from '../common/serialization-failure';
-import { MonthlyClosingDto } from './dto/monthly-closing.dto';
-import { membershipDeferred } from './accrual.math';
+import { ConfirmMonthlyClosingDto, MonthlyClosingDto } from './dto/monthly-closing.dto';
+import { currentCashBalance } from './finance.service';
 
 const zone = 'Europe/Moscow';
-type Carry = { id: string; remaining: number; totalLessons: number; totalPrice: Prisma.Decimal; pricePerLesson: Prisma.Decimal };
+
 
 @Injectable()
 export class MonthlyClosingService {
@@ -21,7 +21,7 @@ export class MonthlyClosingService {
 
   private async calculate(tx: Prisma.TransactionClient, dto: MonthlyClosingDto) {
     const { start, end } = this.period(dto);
-    const [income, expenses, revenue, unvaluedCompleted, memberships] = await Promise.all([
+    const [income, expenses, revenue, unvaluedCompleted, memberships, cash] = await Promise.all([
       tx.payment.aggregate({ where: { status: 'PAID', operationType: 'INCOME', OR: [
         { paidAt: { gte: start, lt: end } }, { paidAt: null, createdAt: { gte: start, lt: end } },
       ] }, _sum: { amount: true } }),
@@ -31,52 +31,54 @@ export class MonthlyClosingService {
         { lesson: { status: 'COMPLETED', startTime: { gte: start, lt: end } } },
         { lessonId: null, status: 'completed', startTime: { gte: start, lt: end } },
       ] } }),
-      // Undo subsequent unit movements to reconstruct the balance at month end.
-      // Cash receipts in LedgerTransaction are RUB and must never enter this sum.
-      tx.$queryRaw<Carry[]>`
-        SELECT m.id, (m."remainedLessons" - COALESCE((
-          SELECT SUM(t.amount) FROM "LedgerTransaction" t
-          LEFT JOIN "Booking" b ON b.id = t."bookingId"
-          LEFT JOIN "Lesson" l ON l.id = b."lessonId"
-          WHERE t."membershipId" = m.id AND t."cashDeskPaymentId" IS NULL
-            AND t."sourcePaymentId" IS NULL AND t."transactionType" <> 'purchase'
-            AND CASE WHEN t."transactionType" IN ('usage', 'penalty_cancellation')
-              OR (t."transactionType" = 'refund' AND t."sourceMembershipOpId" IS NOT NULL)
-              THEN COALESCE(l."startTime", b."startTime", t."createdAt") ELSE t."createdAt" END >= ${end}
-        ), 0))::integer AS remaining, m."totalLessons", m."totalPrice", m."pricePerLesson"
-        FROM "Membership" m WHERE m.type = 'fixed_lessons' AND m.status <> 'frozen'
-          AND m."createdAt" < ${end} AND (m."deletedAt" IS NULL OR m."deletedAt" >= ${end})
-          AND (m."cancelledAt" IS NULL OR m."cancelledAt" >= ${end})
-      `,
+      // Reconciliation is a snapshot of current active, unused memberships.
+      tx.membership.findMany({ where: { type: 'fixed_lessons', status: 'active', remainedLessons: { gt: 0 },
+        deletedAt: null, cancelledAt: null }, include: { client: true, pricingPlan: true }, orderBy: { id: 'asc' } }),
+      currentCashBalance(tx),
     ]);
-    const carrying = memberships.filter(m => m.remaining > 0);
+    const carrying = memberships;
     if (unvaluedCompleted || carrying.some(m => m.totalPrice == null || m.pricePerLesson == null)) {
       throw new ConflictException('Есть абонементы без стоимости. Заполните их стоимость перед закрытием месяца');
     }
-    const deferred = carrying.reduce((sum, m) => sum.plus(membershipDeferred(m.totalPrice, m.pricePerLesson, m.remaining, m.totalLessons)), new Prisma.Decimal(0));
+    const rows = carrying.map(m => ({ membershipId: m.id, clientId: m.clientId,
+      clientName: m.client?.name || [m.client?.lastName, m.client?.firstName].filter(Boolean).join(' ') || 'Клиент не указан',
+      membershipTitle: m.title || m.serviceTitle || m.pricingPlan?.name || 'Абонемент',
+      remainingLessons: m.remainedLessons, pricePerLesson: m.pricePerLesson!.toFixed(2),
+      amountToCarryOver: m.pricePerLesson!.times(m.remainedLessons).toFixed(2) }));
+    const deferred = rows.reduce((sum, row) => sum.plus(row.amountToCarryOver), new Prisma.Decimal(0));
     return { values: { year: dto.year, month: dto.month, cashFlowIncome: income._sum.amount ?? new Prisma.Decimal(0),
       cashFlowExpense: expenses._sum.amount ?? new Prisma.Decimal(0), recognizedRevenue: revenue._sum.amount ?? new Prisma.Decimal(0),
-      deferredRevenueCarriedOver: deferred, activeMembershipsCarriedOver: carrying.length }, carrying };
+      deferredRevenueCarriedOver: deferred, cashBalanceCarriedOver: cash.balanceTotal,
+      membershipsAdvanceRows: rows, activeMembershipsCarriedOver: carrying.length }, carrying };
+  }
+
+  private report<T extends { cashBalanceCarriedOver: Prisma.Decimal; cashFlowExpense: Prisma.Decimal;
+    deferredRevenueCarriedOver: Prisma.Decimal; membershipsAdvanceRows: Prisma.JsonValue | Prisma.InputJsonValue }>(values: T) {
+    return { ...values, currentCashBalance: values.cashBalanceCarriedOver, expenses: values.cashFlowExpense,
+      membershipsAdvanceSummary: { totalAdvance: values.deferredRevenueCarriedOver, rows: values.membershipsAdvanceRows } };
   }
 
   status(dto: MonthlyClosingDto) {
     return this.prisma.$transaction(async tx => {
-      const closed = await tx.monthlyFinancialClosing.findUnique({ where: { year_month: dto } });
-      if (closed) return { ...closed, isClosed: true };
+      this.period(dto);
+      const period = { year: dto.year, month: dto.month };
+      const openingBalance = await tx.openingBalance.findUnique({ where: { year_month: period } });
+      const closed = await tx.monthlyFinancialClosing.findUnique({ where: { year_month: period } });
+      if (closed) return { ...this.report(closed), openingBalance, isClosed: true };
       const { values } = await this.calculate(tx, dto);
-      return { ...values, isClosed: false, closedAt: null };
+      return { ...this.report(values), openingBalance, isClosed: false, closedAt: null };
     }, { isolationLevel: 'RepeatableRead' });
   }
 
-  async close(dto: MonthlyClosingDto, closedById: string) {
+  async close(dto: ConfirmMonthlyClosingDto, closedById: string) {
     const { end } = this.period(dto);
     if (end > new Date()) throw new BadRequestException('Месяц можно закрыть только после его окончания по Москве');
     for (let attempt = 0; ; attempt++) {
       try {
         return await this.prisma.$transaction(async tx => {
           await tx.$queryRaw`SELECT pg_advisory_xact_lock(6842026)::text`;
-          const closed = await tx.monthlyFinancialClosing.findUnique({ where: { year_month: dto } });
-          if (closed) return { ...closed, isClosed: true };
+          const closed = await tx.monthlyFinancialClosing.findUnique({ where: { year_month: { year: dto.year, month: dto.month } } });
+          if (closed) throw new ConflictException('Месяц уже закрыт. Остатки уже перенесены');
           const newer = await tx.monthlyFinancialClosing.findFirst({ where: { OR: [
             { year: { gt: dto.year } }, { year: dto.year, month: { gt: dto.month } },
           ] } });
@@ -85,13 +87,22 @@ export class MonthlyClosingService {
           const nextEnd = DateTime.fromJSDate(end, { zone }).endOf('month');
           const validUntil = DateTime.max(nextEnd, DateTime.now().setZone(zone).endOf('month')).toJSDate();
           await tx.membership.updateMany({ where: { id: { in: carrying.map(m => m.id) }, remainedLessons: { gt: 0 },
-            deletedAt: null, cancelledAt: null, status: { not: 'frozen' }, validUntil: { lt: validUntil } },
+            deletedAt: null, cancelledAt: null, status: 'active', validUntil: { lt: validUntil } },
             data: { validUntil, validTo: validUntil, status: 'active' } });
-          const result = await tx.monthlyFinancialClosing.create({ data: { ...values, closedById } });
-          return { ...result, isClosed: true };
+          const result = await tx.monthlyFinancialClosing.create({ data: { ...values, closedById, status: 'CLOSED', notes: dto.notes?.trim() } });
+          const next = DateTime.fromJSDate(end, { zone });
+          const balances = { incomingCashBalance: values.cashBalanceCarriedOver,
+            incomingAdvanceBalance: values.deferredRevenueCarriedOver, closingId: result.id };
+          await tx.openingBalance.upsert({ where: { year_month: { year: next.year, month: next.month } },
+            create: { year: next.year, month: next.month, ...balances }, update: balances });
+          const openingBalance = await tx.openingBalance.findUnique({ where: { year_month: { year: dto.year, month: dto.month } } });
+          return { ...this.report(result), openingBalance, isClosed: true };
         }, { isolationLevel: 'Serializable', timeout: 20000 });
       } catch (error) {
-        if (isSerializationFailure(error) && attempt < 4) continue;
+        // A concurrent serializable snapshot can surface the month unique index
+        // as P2002; retry with a fresh snapshot to return the normal 409.
+        const uniqueConflict = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+        if ((isSerializationFailure(error) || uniqueConflict) && attempt < 4) continue;
         throw error;
       }
     }

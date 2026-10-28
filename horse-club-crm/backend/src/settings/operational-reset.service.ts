@@ -35,7 +35,7 @@ export class OperationalResetService {
         expenses: await tx.expense.findMany(),
         ledger: await tx.ledgerTransaction.findMany(),
         payroll: await tx.payrollCalculation.findMany(),
-        monthlyClosings: await tx.monthlyFinancialClosing.findMany(),
+        monthlyClosings: await tx.monthlyFinancialClosing.findMany({ include: { openingBalance: true } }),
         revenue: await tx.revenueRecognition.findMany(),
         memberships: await tx.membership.findMany(),
         cashShifts: await tx.cashShift.findMany(),

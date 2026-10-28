@@ -1,5 +1,5 @@
 import { MonthlyClosingService } from './monthly-closing.service';
-import { MonthlyClosingDto } from './dto/monthly-closing.dto';
+import { ConfirmMonthlyClosingDto, MonthlyClosingDto } from './dto/monthly-closing.dto';
 import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -21,9 +21,14 @@ export class FinanceController {
   constructor(private readonly service: FinanceService, private readonly monthlyClosing: MonthlyClosingService) {}
   @Get('monthly-closing/status')
   closingStatus(@Query() dto: MonthlyClosingDto) { return this.monthlyClosing.status(dto); }
+  @Get('monthly-closing/preview')
+  closingPreview(@Query() dto: MonthlyClosingDto) { return this.monthlyClosing.status(dto); }
+  @Post('monthly-closing/confirm')
+  @Roles(Role.ADMIN)
+  confirmMonth(@Body() dto: ConfirmMonthlyClosingDto, @Req() req: { user: { id: string } }) { return this.monthlyClosing.close(dto, req.user.id); }
   @Post('monthly-closing/close')
   @Roles(Role.ADMIN)
-  closeMonth(@Body() dto: MonthlyClosingDto, @Req() req: { user: { id: string } }) { return this.monthlyClosing.close(dto, req.user.id); }
+  closeMonth(@Body() dto: ConfirmMonthlyClosingDto, @Req() req: { user: { id: string } }) { return this.monthlyClosing.close(dto, req.user.id); }
   @Post('expenses')
   create(@Body() dto: CreateExpenseDto, @Req() req: { user: { id: string } }) { return this.service.create(dto, req.user.id); }
   @Get('expenses')

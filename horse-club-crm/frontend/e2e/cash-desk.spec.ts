@@ -63,10 +63,13 @@ for (const width of [1440, 390]) test(`monthly accrual closing preserves summary
   await setup(page)
   let closed = false, fail = true
   const posts: unknown[] = []
-  const report = () => ({ year: 2026, month: 9, isClosed: closed, closedAt: closed ? '2026-10-09T09:00:00Z' : null,
-    cashFlowIncome: '8000', cashFlowExpense: '500', recognizedRevenue: '1000', deferredRevenueCarriedOver: '7000', activeMembershipsCarriedOver: 1 })
-  await page.route('**/api/finance/monthly-closing/status?*', route => route.fulfill({ json: report() }))
-  await page.route('**/api/finance/monthly-closing/close', route => {
+  const report = (month = 9) => ({ year: 2026, month, isClosed: month === 9 && closed, closedAt: closed ? '2026-10-09T09:00:00Z' : null,
+    cashFlowIncome: '8000', cashFlowExpense: '500', recognizedRevenue: '1000', deferredRevenueCarriedOver: '7000', activeMembershipsCarriedOver: 1,
+    currentCashBalance: '10500', membershipsAdvanceSummary: { totalAdvance: '7000', rows: [{ membershipId: 'm1', clientId: 'c1', clientName: 'Анна Орлова', membershipTitle: '8 занятий', remainingLessons: 7, pricePerLesson: '1000', amountToCarryOver: '7000' }] },
+    openingBalance: month === 10 && closed ? { incomingCashBalance: '10500', incomingAdvanceBalance: '7000' } : null })
+  await page.route('**/api/finance/monthly-closing/status?*', route => route.fulfill({ json: report(Number(new URL(route.request().url()).searchParams.get('month'))) }))
+  await page.route('**/api/finance/monthly-closing/preview?*', route => route.fulfill({ json: report() }))
+  await page.route('**/api/finance/monthly-closing/confirm', route => {
     posts.push(route.request().postDataJSON())
     if (fail) return route.fulfill({ status: 409, json: { message: 'Баланс изменился. Повторите закрытие' } })
     closed = true
@@ -79,18 +82,69 @@ for (const width of [1440, 390]) test(`monthly accrual closing preserves summary
   const month = page.getByRole('textbox', { name: 'Месяц финансового отчета' })
   await month.fill('09.2026'); await month.press('Enter'); await month.press('Escape')
   await panel.getByRole('button', { name: 'Закрыть месяц', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Закрыть месяц 2026-09?' })
-  await expect(dialog).toContainText('Перенос авансов')
+  const dialog = page.getByRole('dialog', { name: 'Закрытие месяца и перенос сальдо' })
+  await expect(dialog).toContainText('Сумма авансов по неоткатанным абонементам')
   await expect(dialog.getByRole('button', { name: 'Вернуться к отчету' })).toBeFocused()
-  await dialog.getByRole('button', { name: 'Закрыть месяц', exact: true }).click()
+  await expect(dialog).toContainText('Фактический остаток денег в кассе на конец месяца')
+  await dialog.getByRole('button', { name: 'Кому и сколько занятий переносим' }).click()
+  await expect(dialog).toContainText('Анна Орлова')
+  const cashValue = dialog.locator('.ant-descriptions-item-content').first()
+  await expect(cashValue).toHaveCSS('white-space', 'nowrap')
+  await dialog.getByLabel('Комментарий к закрытию (необязательно)').fill('Сверено')
+  const confirm = dialog.getByRole('button', { name: 'Подтвердить и перенести остатки в октябрь 2026' })
+  await confirm.click()
   await expect(dialog.getByRole('alert')).toContainText('Баланс изменился')
-  expect(posts).toEqual([{ year: 2026, month: 9 }])
+  expect(posts).toEqual([{ year: 2026, month: 9, notes: 'Сверено' }])
+  await expect(dialog.getByLabel('Комментарий к закрытию (необязательно)')).toHaveValue('Сверено')
   fail = false
-  await dialog.getByRole('button', { name: 'Закрыть месяц', exact: true }).click()
+  await expect(confirm).toBeEnabled()
+  const confirmBounds = await confirm.boundingBox()
+  expect(confirmBounds!.y + confirmBounds!.height).toBeLessThanOrEqual(900)
+  await page.screenshot({ path: `../test-results/monthly-closing-dialog-${width}.png`, fullPage: true })
+  await confirm.click()
   await expect(dialog).not.toBeVisible()
   await expect(panel.getByText('Месяц закрыт', { exact: true })).toBeVisible()
   await expect(panel.getByRole('button', { name: 'Закрыть месяц', exact: true })).toHaveCount(0)
+  await month.fill('10.2026'); await month.press('Enter'); await month.press('Escape')
+  await expect(panel.getByText(/Перенесено с прошлого месяца: Касса/)).toContainText('Авансы по абонементам')
   await page.screenshot({ path: `../test-results/monthly-accrual-${width}.png`, fullPage: true })
+})
+
+test('monthly preview failure can retry; empty balances close once and show zero incoming balance', async ({ page }) => {
+  await setup(page)
+  let previewAttempts = 0, confirmations = 0
+  const empty = { year: 2026, month: 9, isClosed: false, closedAt: null,
+    cashFlowIncome: '0', cashFlowExpense: '0', recognizedRevenue: '0', deferredRevenueCarriedOver: '0',
+    activeMembershipsCarriedOver: 0, currentCashBalance: '0', membershipsAdvanceSummary: { totalAdvance: '0', rows: [] }, openingBalance: null }
+  await page.route('**/api/finance/monthly-closing/preview?*', async route => {
+    previewAttempts++
+    if (previewAttempts === 1) return route.fulfill({ status: 503, json: { message: 'Сверка временно недоступна' } })
+    return route.fulfill({ json: empty })
+  })
+  await page.route('**/api/finance/monthly-closing/confirm', async route => {
+    confirmations++
+    return route.fulfill({ json: { ...empty, isClosed: true } })
+  })
+  await page.goto('/cash-desk')
+  const month = page.getByRole('textbox', { name: 'Месяц финансового отчета' })
+  await month.fill('09.2026'); await month.press('Enter'); await month.press('Escape')
+  await page.getByRole('button', { name: 'Закрыть месяц', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Закрытие месяца и перенос сальдо' })
+  const confirm = dialog.getByRole('button', { name: /Подтвердить и перенести/ })
+  await expect(dialog.getByRole('alert')).toContainText('Сверка временно недоступна')
+  await expect(confirm).toBeDisabled()
+  await dialog.getByRole('button', { name: 'Повторить', exact: true }).click()
+  await expect(confirm).toBeEnabled()
+  const disclosure = dialog.getByRole('button', { name: 'Кому и сколько занятий переносим' })
+  await disclosure.focus(); await disclosure.press('Enter')
+  await expect(dialog).toContainText('Нет неиспользованных занятий для переноса')
+  await confirm.click()
+  await expect(dialog).not.toBeVisible()
+  expect(confirmations).toBe(1)
+  await page.route('**/api/finance/monthly-closing/status?*', route => route.fulfill({ json: { ...empty, month: 10,
+    openingBalance: { incomingCashBalance: '0', incomingAdvanceBalance: '0' } } }))
+  await month.fill('10.2026'); await month.press('Enter'); await month.press('Escape')
+  await expect(page.getByText(/Перенесено с прошлого месяца: Касса/)).toContainText('0,00')
 })
 
 test('manager can view monthly revenue but cannot close month', async ({ page }) => {

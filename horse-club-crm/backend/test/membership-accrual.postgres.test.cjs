@@ -91,16 +91,25 @@ test('PostgreSQL accrual: cash receipt, completed lesson, rollover, closed-perio
     // A later-month consumption must not reduce September's deferred snapshot.
     const later = await createLesson('2026-10-15T08:00:00Z');
     await lessons.updateLessonStatus(later.id, 'COMPLETED', {}, actor);
-    await t.test('September carries 7 lessons although October has already consumed another', async () => {
+    await t.test('reconciliation carries the 6 currently unused active lessons', async () => {
       const report = await closing.status({ year: 2026, month: 9 });
       assert.equal(report.cashFlowIncome.toString(), '8000');
       assert.equal(report.recognizedRevenue.toString(), '2500');
-      assert.equal(report.deferredRevenueCarriedOver.toString(), '7000');
+      assert.equal(report.deferredRevenueCarriedOver.toString(), '6000');
     });
-    await t.test('closing extends expired membership, preserves cash and snapshots once under parallel retries', async () => {
+    await t.test('closing extends active membership, preserves cash and rejects parallel duplicate', async () => {
       await p.membership.update({ where: { id: membership.id }, data: { validUntil: new Date('2026-09-30T20:59:59Z') } });
-      const [a, b] = await Promise.all([closing.close({ year: 2026, month: 9 }, actor.id), closing.close({ year: 2026, month: 9 }, actor.id)]);
-      assert.equal(a.id, b.id); assert.equal(a.deferredRevenueCarriedOver.toString(), '7000');
+      const results = await Promise.allSettled([closing.close({ year: 2026, month: 9 }, actor.id), closing.close({ year: 2026, month: 9 }, actor.id)]);
+      const successes = results.filter(result => result.status === 'fulfilled');
+      const failures = results.filter(result => result.status === 'rejected');
+      assert.equal(successes.length, 1); assert.equal(failures.length, 1);
+      assert.equal(failures[0].reason.status, 409);
+      const a = successes[0].value;
+      assert.equal(a.deferredRevenueCarriedOver.toString(), '6000');
+      const incoming = await p.openingBalance.findUniqueOrThrow({ where: { year_month: { year: 2026, month: 10 } } });
+      assert.equal(incoming.incomingAdvanceBalance.toString(), '6000');
+      assert.equal(incoming.incomingCashBalance.toString(), a.cashBalanceCarriedOver.toString());
+      assert.equal(incoming.closingId, a.id);
       const active = await p.membership.findUniqueOrThrow({ where: { id: membership.id } });
       assert.equal(active.status, 'active'); assert.equal(active.remainedLessons, 6);
       assert.ok(active.validUntil >= new Date('2026-10-31T20:59:59Z'));
