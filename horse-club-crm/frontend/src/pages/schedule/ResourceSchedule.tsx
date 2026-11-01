@@ -18,7 +18,7 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
   const start = +new Date(toInstant(`${date}T${schedule.openTime}`)), end = +new Date(toInstant(`${date}T${schedule.closeTime}`))
   const scale = 3 // px per minute; preserve the resource timeline scale.
   const height = (end - start) / 60000 * scale
-  const resources = grouping === 'trainers' ? trainers.map(t => ({ id: t.id, name: t.fullName || t.name })) : grouping === 'horses' ? horses : arenas
+  const resources = grouping === 'trainers' ? trainers.map(t => ({ id: t.id, name: t.fullName || t.name })) : grouping === 'horses' ? [...horses, { id: 'unassigned', name: 'Без лошади' }] : arenas
   const slots = Array.from({ length: Math.ceil((end - start) / 1800000) }, (_, i) => start + i * 1800000)
   if (!resources.length) return <Empty description="Нет ресурсов для выбранных фильтров" />
   const isDayOff = schedule.daysOfWeekOff.includes(DateTime.fromISO(date, { zone: CLUB_TIME_ZONE }).weekday % 7)
@@ -29,7 +29,7 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
         <div className="resource-ruler"><div className="resource-header">Время</div><div style={{ height }}>{slots.map(at => <div key={at} className="resource-tick" style={{ top: (at - start) / 60000 * scale }}>{DateTime.fromMillis(at, { zone: CLUB_TIME_ZONE }).toFormat('HH:mm')}</div>)}</div></div>
         {resources.map(resource => {
           const rows = entries.filter(e => +new Date(e.startTime) < end && +new Date(e.endTime) > start
-            && (grouping === 'trainers' ? e.trainerId === resource.id : grouping === 'horses' ? e.horses.some(h => h.id === resource.id) : e.arenaId === resource.id))
+            && (grouping === 'trainers' ? e.trainerId === resource.id : grouping === 'horses' ? resource.id === 'unassigned' ? !e.horses.length : e.horses.some(h => h.id === resource.id) : e.arenaId === resource.id))
             .sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime) || a.id.localeCompare(b.id))
           const placed = parallelLayout(rows)
           const workload = workloads.find(w => w.horseId === resource.id)
@@ -43,7 +43,7 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
           const parallelWidth = Math.max(0, ...placed.map(row => row.lanes)) * minCardWidth
           return <section key={resource.id} className={`resource-column resource-column--${grouping}`} style={parallelWidth > 260 ? { minWidth: parallelWidth } : undefined} aria-label={resource.name}>
             <header className="resource-header"><strong>{resource.name}</strong>
-              {grouping === 'horses' && (workload ? <><span className="resource-data">{Number(workload.currentWorkloadMinutes.toFixed(1))} / {workload.maxDailyWorkloadMinutes} мин</span><Progress size="small" percent={Math.min(100, workload.currentWorkloadMinutes / workload.maxDailyWorkloadMinutes * 100)} showInfo={false} strokeColor="var(--crm-saddle)" /></> : <span>Нагрузка недоступна</span>)}
+              {grouping === 'horses' && resource.id !== 'unassigned' && (workload ? <><span className="resource-data">{Number(workload.currentWorkloadMinutes.toFixed(1))} / {workload.maxDailyWorkloadMinutes} мин</span><Progress size="small" percent={Math.min(100, workload.currentWorkloadMinutes / workload.maxDailyWorkloadMinutes * 100)} showInfo={false} strokeColor="var(--crm-saddle)" /></> : <span>Нагрузка недоступна</span>)}
               {grouping === 'arenas' && <span className="resource-data">Пик за день: {occupancy?.find(a => a.arenaId === resource.id)?.occupied ?? peakOccupancy(rows, start, end)} / {arena?.maxRidersCapacity ?? arena?.capacity ?? '—'} всадников</span>}
             </header>
             <div className="resource-lane" style={{ height }}>
@@ -51,7 +51,7 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
                 disabled={!canManage || isDayOff || rests.some(r => r.from < at + 1800000 && r.to > at)}
                 aria-label={`Забронировать: ${resource.name}, ${DateTime.fromMillis(at, { zone: CLUB_TIME_ZONE }).toFormat('HH:mm')}`}
                 onClick={() => onBook({ startTime: DateTime.fromMillis(at, { zone: CLUB_TIME_ZONE }).toFormat("yyyy-MM-dd'T'HH:mm"), endTime: DateTime.fromMillis(Math.min(at + 1800000, end), { zone: CLUB_TIME_ZONE }).toFormat("yyyy-MM-dd'T'HH:mm"),
-                  ...(grouping === 'trainers' ? { trainerId: resource.id } : grouping === 'horses' ? { horseId: resource.id } : { arenaId: resource.id }) })} />)}
+                  ...(grouping === 'trainers' ? { trainerId: resource.id } : grouping === 'horses' ? resource.id === 'unassigned' ? {} : { horseId: resource.id } : { arenaId: resource.id }) })} />)}
               {rests.map(rest => <div key={rest.id} className="resource-rest" style={{ top: (Math.max(start, rest.from) - start) / 60000 * scale, height: (Math.min(end, rest.to) - Math.max(start, rest.from)) / 60000 * scale }} title={`Отдых ${rest.rest} мин, до ${DateTime.fromMillis(rest.to, { zone: CLUB_TIME_ZONE }).toFormat('HH:mm')}`}><span>Отдых {rest.rest} мин</span></div>)}
               {placed.map(({ entry, lane, lanes }) => {
                 const text = eventSummary(entry)

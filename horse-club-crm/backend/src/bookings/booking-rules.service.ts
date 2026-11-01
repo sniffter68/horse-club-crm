@@ -4,6 +4,7 @@ import { DateTime } from 'luxon';
 import { BookingValidationError } from './booking-validation.error';
 
 export interface BookingRuleInput {
+  requireFreeTrainer?: boolean;
   /** Availability previews do not reserve resources. Writes always acquire locks. */
   lockResources?: boolean;
   requireRiderWeight?: boolean;
@@ -82,6 +83,9 @@ export class BookingRulesService {
     const reservations = await this.reservations(tx, input, horseIds, windowStart, windowEnd);
     if (reservations.some(r => r.clientIds.some(id => clientIds.includes(id)) && overlaps(r.start, r.end, start, end))) {
       throw new BookingValidationError('CLIENT_BUSY', 'Клиент уже записан на занятие в это время');
+    }
+    if (input.requireFreeTrainer && reservations.some(r => r.trainerId === trainerId && overlaps(r.start, r.end, start, end))) {
+      throw new BookingValidationError('TRAINER_BUSY', 'Тренер уже занят в это время');
     }
     for (const horse of horses) {
       const work = reservations.filter(r => r.horseIds.includes(horse.id));

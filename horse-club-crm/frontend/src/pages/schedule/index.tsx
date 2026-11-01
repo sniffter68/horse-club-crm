@@ -9,6 +9,7 @@ import { eventSummary } from './scheduleEventPresentation'
 import { BookingDateTimeInput } from '../../components/BookingDateTimePicker'
 import { EntryOverlay } from '../../components/EntryOverlay'
 import { LessonGroupBadge, LessonGroupSummary, CompleteLessonModal, LessonPaymentBadge } from './LessonPayments'
+import { LessonDeferredPayment } from './LessonDeferredPayment'
 import { ReplaceHorseAction } from './ReplaceHorseAction'
 import { HorseIssues } from './HorseIssues'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -98,6 +99,7 @@ export function SchedulePage() {
   const [completing, setCompleting] = useState<Lesson>()
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
+  const setPaymentBusy = useCallback((busy: boolean) => { savingRef.current = busy; setSaving(busy) }, [])
   const [form] = Form.useForm<BookingValues>()
   const selectedTrainer = Form.useWatch('trainerId', form) as string | undefined
   const selectedStart = Form.useWatch('startTime', form) as string | undefined
@@ -327,6 +329,7 @@ export function SchedulePage() {
       {failure}
       {detail && <Space direction="vertical" style={{ width: '100%' }}>
         <LessonGroupBadge lesson={detail} /><LessonGroupSummary lesson={detail} /><LessonPaymentBadge lesson={detail} />
+        <LessonDeferredPayment key={detail.id} lesson={detail} onBusyChange={setPaymentBusy} onSaved={updated => { setDetail(updated); setRevision(v => v + 1) }} />
         <Tag className="status-badge" bordered={false} style={{ background: statuses[detail.status].background, color: statuses[detail.status].text }}>{statuses[detail.status].label}</Tag>
         <Descriptions column={1} items={[
           { key: 'service', label: 'Услуга', children: detail.service.title || detail.service.name },

@@ -95,11 +95,9 @@ test('existing client is reused by phone and receives the participant notificati
   assert.equal(h.state().notifications.length, 2);
 });
 
-test('trainer overlap permits an independent lesson when converting a lead', async () => {
+test('trainer overlap rejects a second lesson when converting a lead', async () => {
   const h = harness({ collision: 'trainer' });
-  await h.service.accept(ids.lead, dto());
-  assert.equal(h.state().lessons.length, 1);
-  assert.equal(h.validations(), 1);
+  await assert.rejects(h.service.accept(ids.lead, dto()), /Тренер уже занят/);
 });
 
 for (const collision of ['horse']) test(`${collision} overlap rejects and rolls back client and lead`, async () => {

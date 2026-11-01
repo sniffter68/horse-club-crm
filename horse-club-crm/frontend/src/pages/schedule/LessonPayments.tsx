@@ -1,6 +1,6 @@
 import { isUuid } from '../../uuid'
 import { useRef, useState } from 'react'
-import { Alert, App, Button, Descriptions, Form, InputNumber, Modal, Radio, Space, Switch, Tag, Typography } from 'antd'
+import { Alert, App, Button, Descriptions, Form, InputNumber, Modal, Radio, Space, Tag, Typography } from 'antd'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { usePermissions } from '../../modulePermissions'
 import type { Lesson, LessonMoney } from './types'
@@ -15,6 +15,7 @@ export function LessonGroupBadge({ lesson }: { lesson: LessonMoney }) {
   return lesson.pricePerPerson != null || (lesson.participantsCount ?? 1) > 1 ? <Tag color="blue">👥 {lesson.participantsCount ?? 1} чел.</Tag> : null
 }
 export function LessonPaymentBadge({ lesson }: { lesson: LessonMoney }) {
+  if (lesson.paymentStatus === 'PAID_BY_MEMBERSHIP') return <Tag color="success">Оплачено абонементом</Tag>
   if (!lesson.bookings?.some(b => !b.membership && !b.membershipId)) return null
   const { cost, prepayment, remaining } = lessonBalance(lesson)
   if (!remaining && (cost > 0 || lesson.paymentStatus === 'PAID')) return <Tag color="success">Оплачено</Tag>
@@ -45,9 +46,15 @@ export function LessonPriceFields({ price, perPerson = false }: { price?: number
     <Form.Item name="cost" initialValue={Number(price ?? 0)} label={perPerson ? 'Итоговая стоимость (₽)' : 'Стоимость услуги (₽)'} rules={[{ required: true, message: 'Укажите стоимость' }, { type: 'number', min: 0, max: 9999999999.99, message: 'Укажите неотрицательную стоимость' }]}>
       <InputNumber min={0} max={9999999999.99} precision={2} style={{ width: '100%' }} />
     </Form.Item>
-    <Space><Switch aria-label="Внесена предоплата" checked={enabled} disabled={!canPay} onChange={value => {
-      setEnabled(value); form.setFieldsValue({ prepaymentAmount: 0, prepaymentMethod: value ? 'CASH' : undefined })
-    }} /><Typography.Text>Внесена предоплата</Typography.Text></Space>
+    <Form.Item label="Оплата занятия">
+      <Radio.Group aria-label="Оплата занятия" value={enabled ? 'PREPAYMENT' : 'LATER'} onChange={event => {
+        const value = event.target.value === 'PREPAYMENT'
+        setEnabled(value); form.setFieldsValue({ prepaymentAmount: 0, prepaymentMethod: value ? 'CASH' : undefined })
+      }}>
+        <Space direction="vertical"><Radio value="LATER">Оплатить позже (отложенный платёж)</Radio><Radio value="PREPAYMENT" disabled={!canPay}>Внесена предоплата</Radio></Space>
+      </Radio.Group>
+    </Form.Item>
+    {!enabled && <Typography.Paragraph type="secondary">Оплату или абонемент можно привязать в карточке занятия.</Typography.Paragraph>}
     {!canPay && <Typography.Paragraph type="secondary">Для приёма предоплаты нужен полный доступ к кассе.</Typography.Paragraph>}
     {enabled && <>
       <Form.Item name="prepaymentAmount" label="Сумма предоплаты (₽)" rules={[{ required: true, message: 'Укажите сумму' }, { validator: async (_, value) => {

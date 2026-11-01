@@ -188,12 +188,12 @@ export class LessonsService {
       const schedule = await this.getClubSchedule(tx);
       this.assertClubWorkingHours(start, end, schedule);
       for (const booking of lesson.bookings) {
-        if (booking.membership && (booking.membership.remainedLessons <= 0 || booking.membership.validUntil < end)) {
+        if (booking.membership && ((!booking.isPaid && booking.membership.remainedLessons <= 0) || booking.membership.validUntil < end)) {
           throw new ConflictException('Абонемент участника недоступен на новое время занятия');
         }
       }
       const horseIds = [...new Set(lesson.bookings.map(booking => booking.horseId).filter((id): id is string => Boolean(id)))];
-      await this.bookingRules.validate(tx, { trainerId: lesson.trainerId, arenaId: lesson.arenaId, participants: lesson.bookings, start, end, excludeLessonId: lessonId });
+      await this.bookingRules.validate(tx, { requireFreeTrainer: true, trainerId: lesson.trainerId, arenaId: lesson.arenaId, participants: lesson.bookings, start, end, excludeLessonId: lessonId });
       await this.validateNoConflictsWithClient(tx, lesson.trainerId, horseIds, start, end, lessonId, lesson.arenaId ?? undefined);
       for (const horseId of horseIds) {
         await this.getHorseWorkloadWithClient(tx, horseId, this.getLocalDateParts(start), durationMinutes, lessonId);
@@ -300,7 +300,7 @@ export class LessonsService {
       this.assertClubWorkingHours(start, end, schedule);
       // Each create request owns its lesson, participants, status and payments.
       // Group participants are supplied explicitly; never append to another lesson.
-      await this.bookingRules.validate(tx, { trainerId: dto.trainerId, arenaId: dto.arenaId, participants, start, end });
+      await this.bookingRules.validate(tx, { requireFreeTrainer: true, trainerId: dto.trainerId, arenaId: dto.arenaId, participants, start, end });
       await this.validateNoConflictsWithClient(
         tx,
         dto.trainerId,
@@ -453,6 +453,34 @@ export class LessonsService {
     return { success: true, message: 'Занятие успешно удалено' };
   }
 
+  async payWithMembership(lessonId: string, membershipId: string, actor: AuthUser): Promise<LessonDetails> {
+    return this.runSerializable(async tx => {
+      const lesson = await tx.lesson.findUnique({ where: { id: lessonId }, ...lessonDetails });
+      if (!lesson || lesson.deletedAt) throw new NotFoundException('Занятие не найдено');
+      if (lesson.status === 'CANCELLED') throw new ConflictException('Занятие отменено');
+      if (lesson.paymentStatus !== 'UNPAID') throw new ConflictException('Оплатить абонементом можно только неоплаченное занятие');
+      if (!lesson.service.allowMembership || lesson.pricePerPerson != null) throw new BadRequestException('Услуга не допускает оплату абонементом');
+      if (lesson.bookings.length !== 1) throw new BadRequestException('Для оплаты абонементом требуется занятие с одним участником');
+      const booking = lesson.bookings[0];
+      if (booking.membershipId || booking.isPaid || money(booking.prepaymentAmount).gt(0) || money(booking.finalPaymentAmount).gt(0)
+        || booking.payments.some(p => p.status === 'PAID')) throw new ConflictException('У занятия уже есть оплата');
+      const membership = await tx.membership.findUnique({ where: { id: membershipId } });
+      if (!membership || membership.clientId !== booking.clientId) throw new BadRequestException('Абонемент не принадлежит клиенту занятия');
+      if (membership.deletedAt || membership.status !== 'active' || membership.type !== 'fixed_lessons' || membership.remainedLessons <= 0
+        || membership.validUntil < new Date() || membership.validUntil < lesson.endTime) throw new BadRequestException('Абонемент недоступен для занятия');
+      if (membership.serviceId && membership.serviceId !== lesson.serviceId) throw new BadRequestException('Абонемент предназначен для другой услуги');
+      // The ledger owns the atomic decrement and audited DEBIT. Completion and
+      // cancellation reuse that operation, so neither can consume a second visit.
+      await this.membershipLedgerService.debitLesson(membershipId, lessonId, 'Оплата занятия абонементом', tx, booking.clientId);
+      await tx.booking.update({ where: { id: booking.id }, data: { membershipId, isPaid: true, financialActorId: actor.id } });
+      await tx.payment.updateMany({ where: { bookingId: booking.id, status: 'PENDING' }, data: { status: 'CANCELLED' } });
+      if (lesson.status === 'COMPLETED') {
+        await tx.$queryRaw`SELECT post_late_membership_revenue(${booking.id}::uuid, ${lesson.startTime}::timestamptz, ${membershipId}::uuid, ${actor.id}::uuid)::text`;
+      }
+      return tx.lesson.update({ where: { id: lessonId }, data: { cost: 0, paymentStatus: 'PAID_BY_MEMBERSHIP', financialActorId: actor.id }, ...lessonDetails });
+    });
+  }
+
   async updateLessonStatus(
     lessonId: string,
     newStatus: LessonStatus,
@@ -595,7 +623,7 @@ export class LessonsService {
             else await tx.payment.updateMany({ where: { bookingId: booking.id, status: 'PENDING' }, data: { amount: outstanding } });
           }
         }
-        financialData = { ...financialData, cost, paymentStatus: paymentStatus(cost, previouslyPaid.plus(amount)),
+        financialData = { ...financialData, cost, paymentStatus: oneOff.length === 0 && lesson.bookings.length > 0 ? 'PAID_BY_MEMBERSHIP' : paymentStatus(cost, previouslyPaid.plus(amount)),
           finalPaymentAmount: previouslyPaid.minus(prepaid).plus(amount),
           ...(amount.gt(0) ? { finalPaymentMethod: payment.paymentMethod } : {}) };
       }
@@ -674,6 +702,7 @@ export class LessonsService {
     if (conflicts.some((lesson) => lesson.bookings.some((booking) => booking.horseId && horseIds.includes(booking.horseId)))) {
       throw new ConflictException('Лошадь уже забронирована на это время');
     }
+    if (conflicts.some(lesson => lesson.trainerId === trainerId)) throw new ConflictException('Тренер уже занят в это время');
     // Arena capacity and client occupancy are enforced by shared booking rules.
   }
 

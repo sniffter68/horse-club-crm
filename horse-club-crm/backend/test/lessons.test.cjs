@@ -77,10 +77,10 @@ test('lesson history applies server pagination and relation filters', async () =
   assert.equal(listArgs.where.OR.length, 6);
 });
 
-test('allows overlapping individual lessons for the same trainer', async () => {
+test('rejects overlapping individual lessons for the same trainer', async () => {
   const service = new LessonsService(prismaWithLessons([scheduled]), unusedLedger);
-  await service.validateNoConflicts('trainer-1', 'horse-2',
-    new Date('2026-09-07T10:30:00.000Z'), new Date('2026-09-07T11:30:00.000Z'));
+  await assert.rejects(service.validateNoConflicts('trainer-1', 'horse-2',
+    new Date('2026-09-07T10:30:00.000Z'), new Date('2026-09-07T11:30:00.000Z')), /Тренер уже занят/);
 });
 
 test('blocks a mathematically overlapping horse interval', async () => {
@@ -99,7 +99,7 @@ test('blocks a mathematically overlapping horse interval', async () => {
 
 test('legacy overlap check delegates arena capacity to shared rules', async () => {
   const service = new LessonsService(prismaWithLessons([{ ...scheduled, arenaId: 'arena-1', bookings: [] }]), unusedLedger);
-  await service.validateNoConflicts('trainer-1', undefined,
+  await service.validateNoConflicts('trainer-2', undefined,
     new Date('2026-09-07T10:15:00.000Z'), new Date('2026-09-07T10:45:00.000Z'), undefined, 'arena-1');
 });
 

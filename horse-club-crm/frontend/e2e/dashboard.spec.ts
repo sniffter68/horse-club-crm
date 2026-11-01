@@ -471,7 +471,7 @@ test('lesson drawer accepts a cash prepayment and keeps the agreed price', async
   await page.goto('/')
   const drawer = await lesson(page)
   await drawer.getByLabel('Стоимость услуги (₽)').fill('1500')
-  await drawer.getByRole('switch', { name: 'Внесена предоплата' }).click()
+  await drawer.getByRole('radio', { name: 'Внесена предоплата' }).check()
   await drawer.getByLabel('Сумма предоплаты (₽)').fill('500')
   await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   await expect(drawer).not.toBeVisible()
@@ -483,7 +483,7 @@ test('read-only cashbox disables collecting a lesson prepayment', async ({ page 
   await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'MANAGER', modules: modules.map(module => ({ module, isEnabled: true, accessLevel: module === 'CASHBOX' ? 'READ_ONLY' : 'FULL' })) } }))
   await page.goto('/')
   const drawer = await lesson(page)
-  await expect(drawer.getByRole('switch', { name: 'Внесена предоплата' })).toBeDisabled()
+  await expect(drawer.getByRole('radio', { name: 'Внесена предоплата' })).toBeDisabled()
 })
 
 test('timeline completion refreshes progress and removes the finished lesson', async ({ page }) => {

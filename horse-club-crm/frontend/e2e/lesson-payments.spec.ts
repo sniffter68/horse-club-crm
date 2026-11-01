@@ -1,6 +1,101 @@
-import { openCalendarLesson } from './openCalendarLesson'
 import { test, expect, type Page, type Locator } from './fixtures'
 import type { Lesson } from '../src/pages/schedule/types'
+
+for (const width of [1440, 390]) test(`optional horse creates an unpaid individual lesson at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 1000 })
+  const state = await setup(page)
+  await page.route(`**/api/clients/${id(1)}`, route => route.fulfill({ json: { ...client, memberships: [] } }))
+  await page.goto('/schedule')
+  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
+  await choose(page, drawer, 'Клиент', client.name)
+  await choose(page, drawer, 'Услуга', service.name)
+  await choose(page, drawer, 'Тренер', trainer.name)
+  const horse = drawer.getByRole('combobox', { name: 'Лошадь', exact: true })
+  await horse.focus(); await horse.press('ArrowDown')
+  await expect(page.locator('.ant-select-dropdown:visible').filter({ hasText: 'Назначить позже / Не выбрана' })).toBeVisible()
+  await page.keyboard.press('Enter')
+  await expect(drawer).toContainText('Оплатить позже (отложенный платёж)')
+  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await expect(drawer).not.toBeVisible()
+  expect(state.posts[0].horseId || undefined).toBeUndefined()
+  expect(state.posts[0].membershipId).toBeUndefined()
+  expect(state.receipts).toHaveLength(0)
+  await expect(page.locator('.fc-event').first()).toContainText('Без лошади')
+  await page.locator('.fc-event').first().click()
+  await expect(page.getByRole('dialog', { name: 'Карточка занятия' })).toContainText('Занятие не оплачено')
+  await page.getByRole('dialog', { name: 'Карточка занятия' }).locator('.ant-modal-close').click()
+  const grouping = page.getByRole('combobox', { name: 'Группировка расписания' })
+  await grouping.focus(); await grouping.press('ArrowDown'); await grouping.press('ArrowDown'); await grouping.press('ArrowDown'); await grouping.press('Enter')
+  await expect(page.getByRole('region', { name: 'Без лошади', exact: true }).locator('.resource-booking')).toContainText('Без лошади')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: `test-results/optional-horse-${width}.png`, animations: 'disabled' })
+})
+
+test('completed debt opens cash desk with the current client and lesson selected', async ({ page }) => {
+  const state = await setup(page, 0)
+  state.lesson!.status = 'COMPLETED'
+  await page.route(`**/api/payments/cash-desk/options/${client.id}`, route => route.fulfill({ json: { memberships: [], bookings: [{ id: id(5), startTime: state.lesson!.startTime, remainingAmount: 1500, lesson: { service } }] } }))
+  await page.route(`**/api/lessons/${id(4)}`, route => route.fulfill({ json: state.lesson }))
+  let payment: Record<string, unknown> | undefined
+  await page.route('**/api/payments/cash-desk', async route => {
+    payment = route.request().postDataJSON()
+    state.lesson = { ...state.lesson!, paymentStatus: 'PAID', finalPaymentAmount: 1500 }
+    await route.fulfill({ status: 201, json: { id: id(45), method: 'CASH', cashChange: 0 } })
+  })
+  await page.goto('/schedule'); await page.locator('.fc-event').first().click()
+  const detail = page.getByRole('dialog', { name: 'Карточка занятия', exact: true })
+  await detail.getByRole('button', { name: 'Принять оплату в кассу' }).click()
+  const cash = page.getByRole('dialog', { name: 'Принять оплату / Касса' })
+  await expect(cash.getByRole('spinbutton', { name: 'Сумма чека, ₽', exact: true })).toHaveValue('1500.00')
+  await cash.getByRole('button', { name: 'Без сдачи', exact: true }).click()
+  await cash.getByRole('button', { name: 'Провести платёж', exact: true }).click()
+  await expect(cash).not.toBeVisible()
+  await expect(detail.getByRole('button', { name: 'Принять оплату в кассу' })).toHaveCount(0)
+  expect(payment).toMatchObject({ clientId: client.id, bookingId: id(5), amount: 1500 })
+})
+
+for (const sell of [false, true]) test(`completed unpaid lesson uses ${sell ? 'newly sold' : 'existing'} membership with retry`, async ({ page }) => {
+  await page.setViewportSize({ width: sell ? 390 : 1440, height: 1000 })
+  const state = await setup(page, 0)
+  state.lesson!.status = 'COMPLETED'
+  state.lesson!.service = { ...service, allowMembership: true }
+  const membership = { id: id(40), title: '4 тренировки', type: 'fixed_lessons', isActive: true, totalLessons: 4, remainedLessons: 4, validUntil: '2099-01-01' }
+  await page.route(`**/api/clients/${id(1)}`, route => route.fulfill({ json: { ...client, memberships: sell ? [] : [membership] } }))
+  await page.route('**/api/services?*', route => route.fulfill({ json: [{ ...service, allowMembership: true }], headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/pricing-plans?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
+  let sold = 0, attempts = 0
+  await page.route('**/api/memberships', async route => {
+    sold++
+    expect(route.request().postDataJSON()).toMatchObject({ clientId: client.id, serviceId: service.id, totalLessons: 4 })
+    await route.fulfill({ status: 201, json: { ...membership, totalPrice: '6000', cashboxPosted: true } })
+  })
+  await page.route(`**/api/lessons/${id(4)}/pay-with-membership`, async route => {
+    attempts++
+    expect(route.request().postDataJSON()).toEqual({ membershipId: membership.id })
+    if (attempts === 1) return route.fulfill({ status: 409, json: { message: 'Повторите привязку' } })
+    state.lesson = { ...state.lesson!, cost: 0, paymentStatus: 'PAID_BY_MEMBERSHIP', bookings: [{ ...state.lesson!.bookings[0], membership: { ...membership, type: 'fixed_lessons', remainedLessons: 3 } }] }
+    await route.fulfill({ json: state.lesson })
+  })
+  await page.goto('/schedule'); await page.locator('.fc-event').first().click()
+  const detail = page.getByRole('dialog', { name: 'Карточка занятия', exact: true })
+  if (sell) {
+    await detail.getByRole('button', { name: 'Продать абонемент и привязать' }).click()
+    const sale = page.getByRole('dialog', { name: 'Продажа абонемента' })
+    await sale.getByRole('spinbutton', { name: 'Итоговая стоимость к оплате (₽)' }).fill('6000')
+    await sale.getByRole('button', { name: 'Создать абонемент', exact: true }).click()
+    await expect(sale).not.toBeVisible()
+  } else {
+    await detail.getByRole('button', { name: 'Списать с абонемента' }).click()
+    await detail.getByRole('button', { name: 'Списать занятие', exact: true }).click()
+  }
+  await expect(detail.getByRole('alert').filter({ hasText: 'Повторите привязку' })).toBeVisible()
+  await detail.getByRole('button', { name: 'Списать занятие', exact: true }).click()
+  await expect(detail).toContainText('Абонемент: 3 / 4')
+  await expect(detail.getByRole('button', { name: 'Продать абонемент и привязать' })).toHaveCount(0)
+  expect(sold).toBe(sell ? 1 : 0)
+  expect(attempts).toBe(2)
+})
 
 const id = (n: number) => `${String(n).padStart(8, '0')}-1111-4111-8111-111111111111`
 const client = { id: id(1), name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567' }
@@ -113,8 +208,8 @@ for (const width of [1440, 390]) test(`excursion for 20 guests calculates total 
   await page.setViewportSize({ width, height: 1000 })
   const state = await setup(page, undefined, true)
   await page.goto('/schedule')
-  await openCalendarLesson(page)
-  const form = page.getByRole('dialog', { name: 'Быстрое бронирование' })
+  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  const form = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
   await choose(page, form, 'Услуга', 'Экскурсия')
   await choose(page, form, 'Тренер', trainer.name)
   await choose(page, form, 'Клиент', client.name)
@@ -122,9 +217,9 @@ for (const width of [1440, 390]) test(`excursion for 20 guests calculates total 
   await expect(form.getByLabel('Количество участников')).toHaveValue('20')
   await expect(form.getByLabel('Итоговая стоимость (₽)')).toHaveValue('10000.00')
   await expect(form).toContainText('Для экскурсий выбор лошади необязателен')
-  await form.getByRole('switch', { name: 'Внесена предоплата' }).click()
+  await form.getByRole('radio', { name: 'Внесена предоплата' }).check()
   await form.getByLabel('Сумма предоплаты (₽)').fill('3000')
-  await form.getByRole('button', { name: 'Создать занятие', exact: true }).click()
+  await form.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   await expect(form).not.toBeVisible()
   expect(state.posts[0]).toMatchObject({ participantsCount: 20, pricePerPerson: 500, cost: 10000, prepaymentAmount: 3000 })
   expect(state.lesson?.bookings[0].horse).toBeNull()
@@ -148,16 +243,16 @@ for (const width of [1440, 390]) test(`cash prepayment and card completion appea
   await page.setViewportSize({ width, height: 1000 })
   const state = await setup(page)
   await page.goto('/schedule')
-  await openCalendarLesson(page)
-  const form = page.getByRole('dialog', { name: 'Быстрое бронирование' })
+  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  const form = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
   await choose(page, form, 'Услуга', service.title)
   await choose(page, form, 'Тренер', trainer.name)
   await choose(page, form, 'Клиент', client.name)
   await expect(form.getByLabel('Стоимость услуги (₽)')).toHaveValue('1500.00')
-  await form.getByRole('switch', { name: 'Внесена предоплата' }).click()
+  await form.getByRole('radio', { name: 'Внесена предоплата' }).check()
   await form.getByLabel('Сумма предоплаты (₽)').fill('500')
   await form.getByText('Наличные', { exact: true }).click()
-  await form.getByRole('button', { name: 'Создать занятие', exact: true }).click()
+  await form.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   await expect(form).not.toBeVisible()
   expect(state.posts[0]).toMatchObject({ cost: 1500, prepaymentAmount: 500, prepaymentMethod: 'CASH' })
   await page.goto('/cash-desk')

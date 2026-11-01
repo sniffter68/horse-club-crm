@@ -2,6 +2,7 @@ import { CancelServiceDto } from '../payments/dto/cancel-service.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
 import { CompleteLessonDto } from './dto/lesson-payment.dto';
+import { PayWithMembershipDto } from './dto/pay-with-membership.dto';
 import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import {
   Body,
@@ -98,6 +99,12 @@ export class LessonsController {
   @Roles(Role.ADMIN, Role.MANAGER)
   complete(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CompleteLessonDto, @CurrentUser() actor: AuthUser) {
     return this.lessonsService.updateLessonStatus(id, 'COMPLETED', dto, actor);
+  }
+
+  @Post(':id/pay-with-membership')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  payWithMembership(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: PayWithMembershipDto, @CurrentUser() actor: AuthUser) {
+    return this.lessonsService.payWithMembership(id, dto.membershipId, actor);
   }
 
   @Patch(':id/reschedule')

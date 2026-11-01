@@ -98,7 +98,8 @@ test('PostgreSQL accrual: cash receipt, completed lesson, rollover, closed-perio
       assert.equal(report.deferredRevenueCarriedOver.toString(), '6000');
     });
     await t.test('closing extends active membership, preserves cash and rejects parallel duplicate', async () => {
-      await p.membership.update({ where: { id: membership.id }, data: { validUntil: new Date('2026-09-30T20:59:59Z') } });
+      // Keep the fixture active even when this historical-period test runs later.
+      await p.membership.update({ where: { id: membership.id }, data: { validUntil: new Date(Date.now() + 86400000) } });
       const results = await Promise.allSettled([closing.close({ year: 2026, month: 9 }, actor.id), closing.close({ year: 2026, month: 9 }, actor.id)]);
       const successes = results.filter(result => result.status === 'fulfilled');
       const failures = results.filter(result => result.status === 'rejected');

@@ -25,7 +25,16 @@ function run(args) {
   try {
     await admin.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`); created = true;
     run(['node_modules/prisma/build/index.js', 'migrate', 'deploy']);
-    run(['--test', 'test/membership-sale.postgres.test.cjs', 'test/membership-accrual.postgres.test.cjs']);
+    // Financial summaries are schema-wide. Each suite owns its fixtures and
+    // must not observe another suite's sales, closings or deferred balances.
+    for (const file of ['membership-sale', 'membership-accrual', 'lesson-membership']) {
+      if (file !== 'membership-sale') {
+        await admin.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);
+        await admin.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
+        run(['node_modules/prisma/build/index.js', 'migrate', 'deploy']);
+      }
+      run(['--test', `test/${file}.postgres.test.cjs`]);
+    }
   } finally {
     if (created) await admin.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);
     await admin.$disconnect();

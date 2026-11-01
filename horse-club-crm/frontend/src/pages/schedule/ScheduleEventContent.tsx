@@ -14,7 +14,7 @@ export function ScheduleEventContent({ entry }: { entry: ScheduleEntry }) {
     <div className="schedule-event-time">{eventTime(entry)}</div>
     <div className="schedule-event-trainer">{eventTrainer(entry)}</div>
     <div className="schedule-event-rider">{entry.riders.join(', ') || 'Нет участников'}</div>
-    <div className="schedule-event-horse">{entry.horses.map(horse => horse.name).join(', ') || 'Без лошади'}</div>
+    <div className="schedule-event-horse">{entry.horses.length ? entry.horses.map(horse => horse.name).join(', ') : <span className="crm-tag crm-tag--warning">Без лошади</span>}</div>
     {entry.paymentSummary && <div className="schedule-event-payment"><span>{entry.paymentSummary}</span></div>}
   </div>
 }

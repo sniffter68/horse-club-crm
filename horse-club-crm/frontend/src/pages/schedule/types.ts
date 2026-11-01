@@ -2,7 +2,7 @@ import type { Arena, Client, Horse, Service, Trainer } from '../catalogs/types'
 export type Status = 'SCHEDULED' | 'COMPLETED' | 'NO_SHOW' | 'CANCELLED'
 export interface LessonMoney {
   participantsCount?: number | null; pricePerPerson?: number | string | null;
-  cost?: number | string | null; paymentStatus?: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID';
+  cost?: number | string | null; paymentStatus?: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'PAID_BY_MEMBERSHIP';
   prepaymentAmount?: number | string | null; prepaymentMethod?: string | null;
   finalPaymentAmount?: number | string | null; finalPaymentMethod?: string | null;
   service?: { id?: string; name?: string; title?: string; price?: number | string };

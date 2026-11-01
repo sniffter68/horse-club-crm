@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useList, useInvalidate } from '@refinedev/core'
 import { Alert, App, Button, DatePicker, Form, Input, InputNumber, Segmented, Select, Space } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -12,12 +12,13 @@ import { useCatalogPermissions } from '../catalogs/permissions'
 import { money } from '../catalogs/format'
 import { toInstant } from '../schedule/time'
 import { MembershipList } from './list'
+import type { MembershipSummary } from '../schedule/types'
 
 type Service = { id: string; title: string; name: string; price: string | number; allowMembership: boolean }
 type Plan = { id: string; name: string; totalLessons: number; validDays: number }
 type Values = { clientId: string; serviceId: string; pricingPlanId?: string; totalLessons: number; totalPrice: number; paymentMethod: 'CASH' | 'CARD'; validUntil: Dayjs; reason?: string }
 
-export function MembershipCreate() {
+export function MembershipCreate({ initialClientId, initialServiceId, onSold, onClose }: { initialClientId?: string; initialServiceId?: string; onSold?: (membership: MembershipSummary) => void; onClose?: () => void } = {}) {
   const [form] = Form.useForm<Values>()
   const [params] = useSearchParams()
   const navigate = useNavigate()
@@ -39,14 +40,18 @@ export function MembershipCreate() {
   const amount = Form.useWatch('totalPrice', form) ?? 0
   const selected = rows.find(row => row.id === serviceId)
   const recommended = Math.round(Number(selected?.price ?? 0) * 100) * count / 100
+  useEffect(() => {
+    if (initialServiceId && selected && !form.isFieldTouched('totalPrice') && !pending.current) form.setFieldValue('totalPrice', recommended)
+  }, [initialServiceId, selected, recommended, form])
   const cashboxEnabled = access.isEnabled('CASHBOX')
   const allowed = canManage && !access.loading && !access.error && (!cashboxEnabled || access.canWrite('CASHBOX'))
   const close = () => {
     if (submitting.current) return
-    if (!dirty && !uncertain) { navigate('/memberships'); return }
+    const leave = () => onClose ? onClose() : navigate('/memberships')
+    if (!dirty && !uncertain) { leave(); return }
     modal.confirm({ title: uncertain ? 'Результат продажи пока неизвестен' : 'Закрыть продажу абонемента?',
       content: uncertain ? 'Перед новой продажей проверьте абонементы и кассу. Повтор в этой форме безопасен.' : 'Введённые данные будут потеряны.',
-      okText: 'Закрыть', cancelText: 'Продолжить', onOk: () => navigate('/memberships') })
+      okText: 'Закрыть', cancelText: 'Продолжить', onOk: leave })
   }
   const recalculate = (changes: Partial<Values>, values: Values) => {
     setDirty(true)
@@ -64,11 +69,12 @@ export function MembershipCreate() {
     if (!pending.current) pending.current = { ...values, validUntil: toInstant(`${values.validUntil.format('YYYY-MM-DD')}T23:59`), requestId: crypto.randomUUID() }
     submitting.current = true; setBusy(true); setError(undefined)
     try {
-      const { data } = await httpClient.post<{ totalPrice: string; cashboxPosted: boolean }>(`${API_URL}/memberships`, pending.current)
+      const { data } = await httpClient.post<MembershipSummary & { totalPrice: string; cashboxPosted: boolean }>(`${API_URL}/memberships`, pending.current)
       window.dispatchEvent(new Event('cash-desk-paid'))
       for (const resource of ['memberships', 'clients', 'payments']) void invalidate({ resource, invalidates: ['all'] }).catch(() => {})
       void message.success(data.cashboxPosted ? `Абонемент оформлен, оплата ${money(data.totalPrice)} проведена в кассу` : 'Абонемент оформлен. Касса клуба отключена, приход не создан.')
-      navigate('/memberships')
+      if (onSold) onSold(data)
+      else navigate('/memberships')
     } catch (cause) {
       const failure = toHttpError(cause)
       const unknown = failure.details?.rollbackConfirmed !== true && (failure.statusCode === 0 || failure.statusCode >= 500)
@@ -79,7 +85,7 @@ export function MembershipCreate() {
     } finally { submitting.current = false; setBusy(false) }
   }
   return <>
-    <MembershipList />
+    {!onSold && <MembershipList />}
     <EntryOverlay variant="drawer" open title="Продажа абонемента" width={620} onCancel={close}
       maskClosable={false} keyboard={!busy} closable={!busy} onOk={() => form.submit()}
       confirmLoading={busy} okText={uncertain ? 'Повторить продажу' : 'Создать абонемент'}
@@ -89,9 +95,9 @@ export function MembershipCreate() {
       {access.error && <Alert type="error" message="Не удалось проверить доступ к кассе" action={<Button onClick={() => void access.refresh()}>Повторить</Button>} />}
       {!access.loading && !access.error && !allowed && <Alert type="warning" message="Для продажи требуется полный доступ к кассе" />}
       <Form<Values> form={form} noValidate layout="vertical" disabled={busy || uncertain || !allowed} onFinish={submit}
-        scrollToFirstError initialValues={{ clientId: params.get('clientId') || undefined, totalLessons: 4, totalPrice: 0, paymentMethod: 'CASH', validUntil: dayjs().add(30, 'day') }} onValuesChange={recalculate}>
+        scrollToFirstError initialValues={{ clientId: initialClientId || params.get('clientId') || undefined, serviceId: initialServiceId, totalLessons: 4, totalPrice: 0, paymentMethod: 'CASH', validUntil: dayjs().add(30, 'day') }} onValuesChange={recalculate}>
         <Form.Item name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }, { validator: (_, value) => !value || isUuid(value) ? Promise.resolve() : Promise.reject(new Error('Выберите клиента из списка')) }]}>
-          <ClientSelectWithCreate placeholder="Выберите клиента" />
+          <ClientSelectWithCreate disabled={Boolean(initialClientId)} placeholder="Выберите клиента" />
         </Form.Item>
         <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }, { validator: (_, value) => !value || isUuid(value) ? Promise.resolve() : Promise.reject(new Error('Выберите услугу из списка')) }]}>
           <Select aria-label="Услуга" showSearch allowClear optionFilterProp="label" loading={services.query.isLoading} placeholder="Выберите услугу"

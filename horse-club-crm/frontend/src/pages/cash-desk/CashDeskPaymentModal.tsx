@@ -26,7 +26,7 @@ export function CashDeskProvider({ children }: { children: ReactNode }) {
     {open && <CashDeskPaymentModal key={revision} onClose={() => setOpen(false)} />}
   </CashDeskContext.Provider>
 }
-export function CashDeskPaymentModal({ onClose, variant = 'modal' }: { onClose: () => void; variant?: 'modal' | 'drawer' }) {
+export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClientId, initialBookingId, onPaid }: { onClose: () => void; variant?: 'modal' | 'drawer'; initialClientId?: string; initialBookingId?: string; onPaid?: () => void }) {
   const [form] = Form.useForm<Values>()
   const { message, modal } = App.useApp()
   const invalidate = useInvalidate()
@@ -57,10 +57,14 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal' }: { onClose: 
       for (const row of linked.data.memberships) if ((row.type !== 'fixed_lessons' || !row.payments.some((p: { status: string }) => p.status === 'PAID')) && row.status !== 'frozen') options.push({ value: `membership:${row.id}`, label: `Абонемент · ${row.title || row.pricingPlan?.name || row.type}`, price: Number(row.payments.find((p: { status: string }) => p.status === 'PENDING')?.amount || row.pricingPlan?.price || 0), membershipId: row.id })
       options.push({ value: 'manual', label: 'Другая услуга — указать сумму', price: 0, serviceType: 'Другая услуга' })
       setChoices(options)
+      if (initialBookingId && clientId === initialClientId && !form.isFieldTouched('choice')) {
+        const selected = options.find(row => row.bookingId === initialBookingId)
+        if (selected) form.setFieldsValue({ choice: selected.value, amount: selected.price })
+      }
     }).catch(cause => { if (!controller.signal.aborted) setError(toHttpError(cause).message) })
       .finally(() => { if (!controller.signal.aborted) setOptionsLoading(false) })
     return () => controller.abort()
-  }, [clientId, form])
+  }, [clientId, form, initialBookingId, initialClientId])
   const close = () => {
     if (pending.current) return
     if (form.isFieldsTouched()) modal.confirm({ title: 'Закрыть кассу?', content: 'Введённые данные платежа будут потеряны.', okText: 'Закрыть', cancelText: 'Продолжить', onOk: onClose })
@@ -87,6 +91,7 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal' }: { onClose: 
       void message.success(data.method === 'CASH' ? `Платёж проведён. Сдача: ${currency(data.cashChange)}` : 'Платёж проведён')
       void invalidate({ invalidates: ['all'] })
       window.dispatchEvent(new Event('cash-desk-paid'))
+      onPaid?.()
       onClose()
     } catch (cause) {
       const failure = toHttpError(cause)
@@ -97,7 +102,7 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal' }: { onClose: 
   return <><EntryOverlay variant={variant} className="cash-desk-modal" forceRender open title="Принять оплату / Касса" onCancel={close} maskClosable={false} width={600}
     footer={<Space><Button disabled={busy} onClick={close}>Отмена</Button><Button type="primary" loading={busy} disabled={optionsLoading || !choice || amount <= 0 || (method === 'CASH' && change < 0)} onClick={() => form.submit()}>Провести платёж</Button></Space>}>
     {error && <Alert role="alert" type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
-    <Form form={form} layout="vertical" noValidate initialValues={{ method: 'CASH', nonCash: 'CARD_TERMINAL' }} onFinish={pay} disabled={busy || locked} scrollToFirstError>
+    <Form form={form} layout="vertical" noValidate initialValues={{ clientId: initialClientId, method: 'CASH', nonCash: 'CARD_TERMINAL' }} onFinish={pay} disabled={busy || locked} scrollToFirstError>
       <Form.Item name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}>
         <ClientSelectWithCreate onChange={value => {
           const selected = choices.find(row => row.value === form.getFieldValue('choice'))

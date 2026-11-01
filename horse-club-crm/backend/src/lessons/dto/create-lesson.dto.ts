@@ -8,7 +8,7 @@ export class CreateLessonParticipantDto {
   @IsUUID()
   clientId!: string;
 
-  @ApiPropertyOptional({ format: 'uuid', description: 'Лошадь участника. Не требуется для теоретического занятия.' })
+  @ApiPropertyOptional({ format: 'uuid', description: 'Лошадь участника. Можно назначить позже.' })
   @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional()
   @IsUUID()
@@ -41,7 +41,7 @@ export class CreateLessonDto extends LessonPriceDto {
   @IsUUID()
   trainerId!: string;
 
-  @ApiPropertyOptional({ format: 'uuid', description: 'Лошадь участника. Не требуется для теоретического занятия.' })
+  @ApiPropertyOptional({ format: 'uuid', description: 'Лошадь участника. Можно назначить позже.' })
   @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional()
   @IsUUID()

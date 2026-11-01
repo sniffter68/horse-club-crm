@@ -141,6 +141,7 @@ enum LessonPaymentStatus {
   UNPAID
   PARTIALLY_PAID
   PAID
+  PAID_BY_MEMBERSHIP
 }
 
 enum MembershipOpType {
@@ -501,7 +502,7 @@ model Booking {
   attendanceStatus BookingAttendance @default(PENDING)
   lesson           Lesson?           @relation(fields: [lessonId], references: [id], onDelete: SetNull)
   client           Client            @relation(fields: [clientId], references: [id])
-  horse            Horse?            @relation(fields: [horseId], references: [id], onDelete: Restrict)
+  horse            Horse?            @relation(fields: [horseId], references: [id], onDelete: SetNull)
   membership       Membership?       @relation(fields: [membershipId], references: [id])
   payments         Payment[]
   createdAt        DateTime          @default(now()) @db.Timestamptz(6)
