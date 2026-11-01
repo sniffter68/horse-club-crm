@@ -3,6 +3,8 @@ import { createHash, randomInt } from 'node:crypto';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { VkIdentityService } from './vk-identity.service';
+import { vkCommunityId } from './vk-bot.config';
 
 export function normalizePhone(input: string): string {
   const phone = parsePhoneNumberFromString(input, 'RU');
@@ -17,7 +19,8 @@ export class VkLinkService {
   async issue(kind: 'CLIENT' | 'TRAINER', id: string) {
     const row = kind === 'CLIENT' ? await this.prisma.client.findUnique({ where: { id } }) : await this.prisma.trainer.findUnique({ where: { id } });
     if (!row?.phone) throw new BadRequestException('У записи должен быть указан телефон');
-    if (row.vkUserId) throw new ConflictException('Профиль уже привязан');
+    if (row.vkUserId || ('vkId' in row && row.vkId)) throw new ConflictException('Профиль уже привязан');
+    if (kind === 'CLIENT' && 'deletedAt' in row && row.deletedAt) throw new BadRequestException('Клиент находится в архиве');
     const expiresAt = new Date(Date.now() + 5 * 60000);
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const code = randomInt(0, 10000).toString().padStart(4, '0');
@@ -26,7 +29,7 @@ export class VkLinkService {
           await tx.vkLinkCode.deleteMany({ where: { OR: [{ expiresAt: { lt: new Date() } }, { kind, recordId: id }] } });
           await tx.vkLinkCode.create({ data: { codeHash: digest(code), kind, recordId: id, phone: normalizePhone(row.phone!), expiresAt } });
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-        const group = process.env.VK_GROUP_ID;
+        const group = vkCommunityId();
         return { code, expiresAt, instruction: `привязать ${normalizePhone(row.phone)} ${code}`,
           communityUrl: group && /^\d+$/.test(group) ? `https://vk.me/club${group}` : null };
       } catch (error) {
@@ -40,8 +43,12 @@ export class VkLinkService {
     return this.prisma.$transaction(async tx => {
       const target = kind === 'CLIENT' ? await tx.client.findUnique({ where: { id } }) : await tx.trainer.findUnique({ where: { id } });
       if (!target) throw new BadRequestException('Профиль не найден');
-      if (kind === 'CLIENT') await tx.client.update({ where: { id }, data: { vkUserId: null } });
-      else await tx.trainer.update({ where: { id }, data: { vkUserId: null } });
+      if (kind === 'CLIENT') await tx.client.update({ where: { id }, data: { vkUserId: null, vkId: null, vkScreenName: null } });
+      else {
+        const account = await tx.user.findUnique({ where: { trainerId: id } });
+        if (account) await new VkIdentityService(this.prisma).applyStaff(tx, account.id, null);
+        else await tx.trainer.update({ where: { id }, data: { vkUserId: null } });
+      }
       await tx.vkLinkCode.deleteMany({ where: { kind, recordId: id } });
       if (target.vkUserId) await tx.vkNotification.deleteMany({ where: { peerId: target.vkUserId, sentAt: null } });
       return { success: true };
@@ -68,8 +75,17 @@ export class VkLinkService {
       }
       const target = grant.kind === 'CLIENT' ? await tx.client.findUnique({ where: { id: grant.recordId } }) : await tx.trainer.findUnique({ where: { id: grant.recordId } });
       if (!target?.phone || normalizePhone(target.phone) !== phone || (target.vkUserId !== null && target.vkUserId !== BigInt(sender))) throw new ConflictException('Профиль изменён или уже привязан');
-      if (grant.kind === 'CLIENT') await tx.client.update({ where: { id: target.id }, data: { vkUserId: BigInt(sender) } });
-      else await tx.trainer.update({ where: { id: target.id }, data: { vkUserId: BigInt(sender) } });
+      const identity = new VkIdentityService(this.prisma);
+      if (grant.kind === 'CLIENT') {
+        if ('deletedAt' in target && target.deletedAt) throw new ConflictException('Клиент находится в архиве');
+        await identity.assertAvailable(tx, String(sender), 'CLIENT', target.id);
+        await tx.client.update({ where: { id: target.id }, data: { vkUserId: BigInt(sender), vkId: String(sender) } });
+      } else {
+        if ('isActive' in target && !target.isActive) throw new ConflictException('Тренер неактивен');
+        const account = await tx.user.findUnique({ where: { trainerId: target.id } });
+        if (!account) throw new BadRequestException('Тренер не привязан к учетной записи сотрудника');
+        await identity.applyStaff(tx, account.id, String(sender));
+      }
       await tx.vkLinkCode.update({ where: { id: grant.id }, data: { usedBy: BigInt(sender) } });
       return grant.kind === 'CLIENT' ? 'CLIENT' : 'TRAINER';
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });

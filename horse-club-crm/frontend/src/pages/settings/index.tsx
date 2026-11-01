@@ -7,6 +7,7 @@ import type { Role } from '../../authStorage'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { RoleAccessPage } from './RoleAccess'
 import { OperationalReset } from './OperationalReset'
+import { VkIntegration } from './VkIntegration'
 
 interface ClubSchedule { id: number; openTime: string; closeTime: string; daysOfWeekOff: number[] }
 interface ScheduleForm { openTime: Dayjs; closeTime: Dayjs; daysOfWeekOff: number[] }
@@ -21,6 +22,7 @@ export function SettingsPage() {
   const { data: role } = usePermissions<Role>({})
   return <Tabs items={[
     { key: 'schedule', label: 'Режим работы', children: <ClubScheduleSettings /> },
+    ...(role === 'ADMIN' ? [{ key: 'vk', label: 'Интеграция VK', children: <VkIntegration /> }] : []),
     ...(role === 'ADMIN' ? [{ key: 'reset', label: 'Очистка тестовых данных', children: <OperationalReset /> }] : []),
     ...(role === 'ADMIN' ? [{ key: 'modules', label: 'Модули и права доступа', children: <ModulesSettings /> }, { key: 'roles', label: 'Роли и доступ', children: <RoleAccessPage /> }] : []),
   ]} />

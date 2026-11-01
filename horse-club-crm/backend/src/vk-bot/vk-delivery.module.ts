@@ -38,11 +38,17 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
     const token = vkGroupToken();
     if (token) this.vk = new VK({ token, apiVersion: '5.199', apiTimeout: 5000, apiRetryLimit: 0 });
   }
+  refreshTransport() {
+    const token = vkGroupToken();
+    this.vk = token ? new VK({ token, apiVersion: '5.199', apiTimeout: 5000, apiRetryLimit: 0 }) : undefined;
+    if (this.vk && !this.timer) this.onModuleInit();
+  }
   onModuleInit() {
     if (!this.vk) {
-      this.logger.warn({ event: 'vk_delivery_disabled', message: 'Доставка VK отключена: задайте VK_GROUP_TOKEN. Уведомления остаются в очереди.' });
+      this.logger.warn({ event: 'vk_delivery_disabled', message: 'Доставка VK отключена: задайте VK_ACCESS_TOKEN. Уведомления остаются в очереди.' });
       return;
     }
+    if (this.timer) return;
     this.timer = setInterval(() => { void this.flush(); }, 1000);
     this.timer.unref();
   }
@@ -92,5 +98,5 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
     finally { this.running = false; }
   }
 }
-@Module({ imports: [PrismaModule], providers: [VkNotifications] })
+@Module({ imports: [PrismaModule], providers: [VkNotifications], exports: [VkNotifications] })
 export class VkDeliveryModule {}

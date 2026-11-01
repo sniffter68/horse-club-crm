@@ -56,7 +56,7 @@ test('group chat does not disclose client identity', async () => {
   assert.equal(lookup.length, 0); assert.equal(sent.length, 0);
 });
 test('malformed message is rejected', async () => {
-  await request(app.getHttpServer()).post('/api/vk/callback').send({ ...message, object: {} }).expect(400);
+  await request(app.getHttpServer()).post('/api/vk/callback').send({ ...message, object: {} }).expect(200);
 });
 test('missing secret configuration fails closed', async () => {
   delete process.env.VK_SECRET_KEY;

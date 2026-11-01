@@ -1,16 +1,19 @@
 const setting = (name: string, fallback: string) => process.env[name]?.trim() || fallback;
 
 export function vkGroupToken(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  return env.VK_GROUP_TOKEN?.trim() || env.VK_COMMUNITY_TOKEN?.trim() || env.VK_BOT_TOKEN?.trim() || undefined;
+  return env.VK_ACCESS_TOKEN?.trim() || env.VK_GROUP_TOKEN?.trim() || env.VK_COMMUNITY_TOKEN?.trim() || env.VK_BOT_TOKEN?.trim() || undefined;
 }
+
+export const vkCommunityId = (env: NodeJS.ProcessEnv = process.env) => env.VK_COMMUNITY_ID?.trim() || env.VK_GROUP_ID?.trim();
+export const vkConfirmationToken = (env: NodeJS.ProcessEnv = process.env) => env.VK_CONFIRMATION_TOKEN?.trim() || env.VK_CONFIRMATION_CODE?.trim();
 
 export function validateVkConfig(env: NodeJS.ProcessEnv = process.env): void {
   const token = vkGroupToken(env);
-  if (!token && !env.VK_CONFIRMATION_CODE?.trim() && !env.VK_SECRET_KEY?.trim()) return;
-  for (const [key, value] of [['VK_GROUP_TOKEN', token], ['VK_CONFIRMATION_CODE', env.VK_CONFIRMATION_CODE?.trim()], ['VK_SECRET_KEY', env.VK_SECRET_KEY?.trim()]]) {
+  if (!token && !vkConfirmationToken(env) && !env.VK_SECRET_KEY?.trim()) return;
+  for (const [key, value] of [['VK_GROUP_TOKEN', token], ['VK_CONFIRMATION_TOKEN', vkConfirmationToken(env)], ['VK_SECRET_KEY', env.VK_SECRET_KEY?.trim()]]) {
     if (!value) throw new Error(`${key} is required when VK bot is configured`);
   }
-  if (env.VK_GROUP_ID?.trim() && (!/^[1-9]\d*$/.test(env.VK_GROUP_ID.trim()) || !Number.isSafeInteger(Number(env.VK_GROUP_ID)))) throw new Error('VK_GROUP_ID must be a positive numeric group ID');
+  if (vkCommunityId(env) && (!/^[1-9]\d*$/.test(vkCommunityId(env)!) || !Number.isSafeInteger(Number(vkCommunityId(env))))) throw new Error('VK_GROUP_ID must be a positive numeric group ID');
 }
 
 export function clubDirections(): string {

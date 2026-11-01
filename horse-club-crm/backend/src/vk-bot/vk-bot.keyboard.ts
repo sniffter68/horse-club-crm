@@ -1,22 +1,21 @@
 import { Keyboard } from 'vk-io';
 
+const button = (label: string, command: string) => Keyboard.textButton({ label, payload: { command } });
 export function mainMenu(trainer = false) {
   return Keyboard.keyboard(trainer ? [
-    [Keyboard.textButton({ label: '📋 Расписание на сегодня', payload: { command: 'today' } })],
-    [Keyboard.textButton({ label: '👥 Мои всадники', payload: { command: 'riders' } })],
+    [button('📋 Расписание на сегодня', 'today'), button('Расписание на завтра', 'tomorrow')],
+    [button('Мои лошади в работе', 'horses'), button('👥 Мои всадники', 'riders')],
   ] : [
-    [Keyboard.textButton({ label: '🎫 Мой абонемент', payload: { command: 'membership' } })],
-    [Keyboard.textButton({ label: '📅 Мои тренировки', payload: { command: 'bookings' } })],
-    [Keyboard.textButton({ label: '💬 Администратор', payload: { command: 'help' } })],
+    [button('📅 Мои тренировки', 'bookings'), button('🎫 Мой абонемент', 'membership')],
+    [button('Записаться онлайн', 'book'), button('Баланс и касса', 'cash')],
+    [button('💬 Администратор', 'help')],
   ]);
 }
-
 export function welcomeMenu() {
   return Keyboard.keyboard([
-    [Keyboard.textButton({ label: 'О клубе', payload: { command: 'about' } })],
-    [Keyboard.textButton({ label: 'Услуги и цены', payload: { command: 'prices' } })],
-    [Keyboard.textButton({ label: 'Как доехать', payload: { command: 'directions' } })],
-    [Keyboard.textButton({ label: 'Связаться', payload: { command: 'help' } })],
+    [button('Записаться на тренировку', 'book'), button('Наш прайс и услуги', 'prices')],
+    [button('Привязать профиль CRM', 'link'), button('Задать вопрос администратору', 'help')],
+    [button('О клубе', 'about'), button('Как доехать', 'directions')],
   ]);
 }
 
@@ -31,7 +30,13 @@ export function normalizeVkCommand(value: string): string {
   if (['услуги и цены', 'цены', 'услуги'].includes(command)) return 'prices';
   if (['как доехать', 'адрес', 'как добраться'].includes(command)) return 'directions';
   if (['помощь', 'администратор', 'связаться', 'позвать администратора', 'связаться с администратором'].includes(command)) return 'help';
-  if (command === 'записаться') return 'book';
+  if (['баланс и касса', 'cash'].includes(command)) return 'cash';
+  if (['расписание на завтра', 'tomorrow'].includes(command)) return 'tomorrow';
+  if (['мои лошади в работе', 'horses'].includes(command)) return 'horses';
+  if (['привязать профиль crm', 'link'].includes(command)) return 'link';
+  if (command === 'наш прайс и услуги') return 'prices';
+  if (command === 'задать вопрос администратору') return 'help';
+  if (['записаться', 'записаться онлайн', 'записаться на тренировку'].includes(command)) return 'book';
   if (command === 'ближайшая тренировка') return 'next-booking';
   if (['памятка', 'памятка всадника'].includes(command)) return 'guide';
   return command;

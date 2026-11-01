@@ -17,9 +17,9 @@ for (const [input, command] of [
 
 test('client, trainer and guest keyboards have exact labels and executable payloads', () => {
   const expected = [
-    [mainMenu(), ['🎫 Мой абонемент', '📅 Мои тренировки', '💬 Администратор'], ['membership', 'bookings', 'help']],
-    [mainMenu(true), ['📋 Расписание на сегодня', '👥 Мои всадники'], ['today', 'riders']],
-    [welcomeMenu(), ['О клубе', 'Услуги и цены', 'Как доехать', 'Связаться'], ['about', 'prices', 'directions', 'help']],
+    [mainMenu(), ['📅 Мои тренировки', '🎫 Мой абонемент', 'Записаться онлайн', 'Баланс и касса', '💬 Администратор'], ['bookings', 'membership', 'book', 'cash', 'help']],
+    [mainMenu(true), ['📋 Расписание на сегодня', 'Расписание на завтра', 'Мои лошади в работе', '👥 Мои всадники'], ['today', 'tomorrow', 'horses', 'riders']],
+    [welcomeMenu(), ['Записаться на тренировку', 'Наш прайс и услуги', 'Привязать профиль CRM', 'Задать вопрос администратору', 'О клубе', 'Как доехать'], ['book', 'prices', 'link', 'help', 'about', 'directions']],
   ];
   for (const [keyboard, labels, commands] of expected) {
     const value = JSON.parse(String(keyboard));

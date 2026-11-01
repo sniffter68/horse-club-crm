@@ -5,12 +5,14 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { VkLinkService } from './vk-link.service';
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 export class IssueVkLinkDto {
   @IsIn(['CLIENT', 'TRAINER']) kind!: 'CLIENT' | 'TRAINER';
   @IsUUID() id!: string;
 }
 @Controller('vk/link-codes')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ModuleAccessGuard)
+@RequireModule('SCHEDULE')
 export class VkLinkController {
   constructor(private readonly links: VkLinkService) {}
   @Post()

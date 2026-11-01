@@ -42,9 +42,9 @@ function harness({ client = null, trainer = null, admins = [], fail = false, pro
 
 test('main and guest reply keyboards provide role-specific commands', () => {
   const client = keyboard(mainMenu());
-  assert.deepEqual(client.buttons.flat().map(button => button.action.label), ['🎫 Мой абонемент', '📅 Мои тренировки', '💬 Администратор']);
-  assert.deepEqual(client.buttons.flat().map(button => JSON.parse(button.action.payload).command), ['membership', 'bookings', 'help']);
-  assert.deepEqual(keyboard(welcomeMenu()).buttons.flat().map(button => button.action.label), ['О клубе', 'Услуги и цены', 'Как доехать', 'Связаться']);
+  assert.deepEqual(client.buttons.flat().map(button => button.action.label), ['📅 Мои тренировки', '🎫 Мой абонемент', 'Записаться онлайн', 'Баланс и касса', '💬 Администратор']);
+  assert.deepEqual(client.buttons.flat().map(button => JSON.parse(button.action.payload).command), ['bookings', 'membership', 'book', 'cash', 'help']);
+  assert.deepEqual(keyboard(welcomeMenu()).buttons.flat().map(button => button.action.label), ['Записаться на тренировку', 'Наш прайс и услуги', 'Привязать профиль CRM', 'Задать вопрос администратору', 'О клубе', 'Как доехать']);
   assert.equal(keyboard(mainMenu(true)).buttons[0][0].action.label, '📋 Расписание на сегодня');
 });
 
@@ -54,7 +54,7 @@ for (const text of ['ℹ️ О клубе', 'О клубе', '  КОНТАКТЫ
   assert.equal(sent[0].message, clubCard());
   assert.match(sent[0].message, /Союз любителей конного спорта/);
   assert.match(sent[0].message, /ежедневно с 09:00 до 21:00/);
-  assert.match(String(sent[0].keyboard), /Услуги и цены/);
+  assert.match(String(sent[0].keyboard), /Наш прайс и услуги/);
 });
 
 for (const text of ['📖 Памятка всадника', 'Памятка всадника', 'памятка']) test(`guide accepts ${text} for unlinked guests`, async () => {

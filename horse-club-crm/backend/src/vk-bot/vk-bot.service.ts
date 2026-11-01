@@ -9,7 +9,7 @@ import { MembershipLedgerService } from '../memberships/membership-ledger.servic
 import { LeadsService } from '../leads/leads.service';
 import { normalizePhone, VkLinkService } from './vk-link.service';
 import { mainMenu as menu, normalizeVkCommand, welcomeMenu } from './vk-bot.keyboard';
-import { clubCard, clubDirections, riderGuide, vkGroupToken } from './vk-bot.config';
+import { clubCard, clubDirections, riderGuide, vkCommunityId, vkGroupToken } from './vk-bot.config';
 import { queueVkAdminChatNotification } from './vk-delivery.module';
 import { currentLeadConsentVersion as consentVersion } from '../common/lead-consent';
 import { membershipAccessWhere } from '../memberships/membership-access';
@@ -22,6 +22,11 @@ const consentUrl = () => `${(process.env.PUBLIC_LANDING_URL || '').replace(/\/$/
 const date = (value: Date) => DateTime.fromJSDate(value, { zone: zone() }).setLocale('ru').toFormat('dd.MM.yyyy HH:mm');
 const expiryDate = (value: Date) => DateTime.fromJSDate(value, { zone: zone() }).setLocale('ru').toFormat('dd.MM.yyyy');
 const trainingDate = (value: Date) => DateTime.fromJSDate(value, { zone: zone() }).setLocale('ru').toFormat("d MMMM (ccc) 'в' HH:mm");
+const horseLabel = (horse: { name: string; status?: string } | null) => {
+  if (!horse) return 'пока не назначена';
+  const status = ({ active: 'в работе', rest: 'отдыхает', sick: 'на лечении', quarantine: 'карантин' } as Record<string, string>)[horse.status || ''];
+  return `${horse.name.trim()}${status ? ` (${status})` : ''}`;
+};
 const lessonPlural = new Intl.PluralRules('ru');
 const lessonsLeft = (count: number) => {
   const plural = lessonPlural.select(count);
@@ -31,13 +36,18 @@ const lessonsLeft = (count: number) => {
 @Injectable()
 export class VkBotService {
   private readonly logger = new Logger(VkBotService.name);
-  private readonly vk: VK | undefined;
+  private vk: VK | undefined;
   private readonly firstNames = new Map<number, { value: Promise<string | undefined>; expiresAt: number }>();
   constructor(private readonly prisma: PrismaService, private readonly links: VkLinkService,
     private readonly ledger: MembershipLedgerService, private readonly leads: LeadsService,
     private readonly identity: VkIdentityService = new VkIdentityService(prisma)) {
     const token = vkGroupToken();
     if (token) this.vk = new VK({ token, apiVersion: '5.199', apiTimeout: 5000, apiRetryLimit: 0 });
+  }
+  refreshTransport() {
+    const token = vkGroupToken();
+    this.vk = token ? new VK({ token, apiVersion: '5.199', apiTimeout: 5000, apiRetryLimit: 0 }) : undefined;
+    this.firstNames.clear();
   }
   private getFirstName(sender: number): Promise<string | undefined> {
     const cached = this.firstNames.get(sender);
@@ -66,7 +76,7 @@ export class VkBotService {
       for (const [index, message] of chunks.entries()) {
         const key = chunks.length > 1 ? `${event}:part:${index}` : event;
         await this.vk.api.messages.send({ peer_id: peer, message, keyboard: index === chunks.length - 1 ? keyboard : undefined,
-          random_id: createHash('sha256').update(`${process.env.VK_GROUP_ID}:${key}:${peer}`).digest().readInt32BE(0) || 1 });
+          random_id: createHash('sha256').update(`${vkCommunityId()}:${key}:${peer}`).digest().readInt32BE(0) || 1 });
       }
     } catch { throw new ServiceUnavailableException('Не удалось отправить ответ VK'); }
   }
@@ -83,7 +93,7 @@ export class VkBotService {
       }
     } catch { this.logger.warn('Не удалось загрузить профиль для запроса помощи VK'); }
     const adminPeerId = Number(process.env.VK_ADMIN_PEER_ID);
-    const configuredGroupId = process.env.VK_GROUP_ID?.trim() || '';
+    const configuredGroupId = vkCommunityId() || '';
     const groupId = /^-?\d+$/.test(configuredGroupId) ? Math.abs(Number(configuredGroupId)) : 0;
     const profileUrl = `https://vk.com/id${clientPeerId}`;
     const dialogUrl = Number.isSafeInteger(groupId) && groupId > 0
@@ -141,6 +151,25 @@ export class VkBotService {
       const staff = identity.type === 'STAFF' ? identity : null;
       const trainer = staff?.role === 'TRAINER' && staff.trainerId ? { id: staff.trainerId, name: staff.name } : null;
       const keyboard = staff || client ? menu(Boolean(staff)) : welcome;
+      if (command === 'link' || (!client && !staff && /^\+?[\d() -]{10,20}$/.test(text.trim()))) {
+        const phone = command === 'link' ? '+79991234567' : normalizePhone(text.trim());
+        await this.send(peer, eventId, `Для привязки отправьте номер телефона из CRM и одноразовый код, выданный администратором:\nпривязать ${phone} 1234\nНомер без кода не открывает доступ к профилю. Код действует 5 минут.`, keyboard);
+        return;
+      }
+      const binding = /^привязать\s+(.+?)\s+(\d{4})$/i.exec(text.trim());
+      if (binding && !client && !staff) {
+        const kind = await this.links.bind(sender, binding[1], binding[2]);
+        await this.send(peer, eventId, 'Профиль CRM привязан. Выберите действие.', menu(kind === 'TRAINER')); return;
+      }
+      if (command === 'book') {
+        const url = `${(process.env.PUBLIC_LANDING_URL || 'https://horseclub68.ru').replace(/\/$/, '')}/#booking-form`;
+        await this.send(peer, eventId, `Записаться на тренировку: ${url}\nВыберите услугу и оставьте заявку. Администратор согласует время.`, keyboard); return;
+      }
+      if (client && command === 'cash') {
+        const payments = await this.prisma.payment.findMany({ where: { clientId: client.id, status: 'PAID' }, orderBy: [{ paidAt: 'desc' }, { id: 'desc' }], take: 5 });
+        const account = await this.prisma.client.findUniqueOrThrow({ where: { id: client.id }, select: { boardingBalance: true } });
+        await this.send(peer, eventId, `Баланс постоя: ${Number(account.boardingBalance).toLocaleString('ru-RU')} ₽\nПоследние оплаты:\n${payments.map(row => `• ${date(row.paidAt || row.createdAt)} — ${Number(row.amount).toLocaleString('ru-RU')} ₽`).join('\n') || 'Оплат пока нет.'}\nОстаток занятий — в разделе «Мой абонемент».`, keyboard); return;
+      }
       if (command === 'начать' && !client && !staff) {
         const firstName = await this.getFirstName(sender);
         await this.send(peer, eventId, `Здравствуйте${firstName ? `, ${firstName}` : ''}! Приглашаем вас в конный клуб.\nЕсли вы уже наш клиент, попросите администратора привязать ваш VK к профилю в CRM.\n${clubCard()}`, welcome);
@@ -174,12 +203,17 @@ export class VkBotService {
           : `Здравствуйте! Приглашаем вас в конный клуб.\nЕсли вы уже наш клиент, попросите администратора привязать ваш VK к профилю в CRM.\n${clubCard()}`, welcome);
         return;
       }
+      if (trainer && command === 'tomorrow') { await this.today(trainer.id, peer, eventId, offset, false, 1); return; }
+      if (trainer && command === 'horses') {
+        const rows = await this.trainerDay(trainer.id, offset);
+        const lines = rows.slice(0, 10).flatMap(lesson => lesson.bookings.map(row => `• ${row.horse?.name || 'Лошадь пока не назначена'} — ${trainingDate(lesson.startTime)}, ${row.client.name}`));
+        await this.send(peer, eventId, lines.length ? `Мои лошади в работе сегодня:\n${lines.join('\n')}` : 'На сегодня лошади в работу не назначены.', rows.length > 10 ? this.next('horses', offset) : keyboard); return;
+      }
       if (trainer && command === 'today') { await this.today(trainer.id, peer, eventId, offset); return; }
       if (trainer && command === 'riders') { await this.today(trainer.id, peer, eventId, offset, true); return; }
-      if (staff && !trainer && ['today', 'riders'].includes(command)) {
+      if (staff && !trainer && ['today', 'tomorrow', 'horses', 'riders'].includes(command)) {
         await this.send(peer, eventId, 'К вашей учетной записи не привязан профиль тренера. Обратитесь к администратору клуба.', keyboard); return;
       }
-      if (client && command === 'book') { await this.requestAdministrator(peer, eventId); return; }
       if (identity.type === 'CLIENT' && command === 'next-booking') {
         const booking = identity.nextBooking;
         await this.send(peer, eventId, booking ? `📅 Ближайшая тренировка: ${trainingDate(booking.startTime)}\nТренер: ${booking.trainer.name}\nЛошадь: ${booking.horse?.name || 'пока не назначена'}` : 'Предстоящих тренировок пока нет.', keyboard);
@@ -209,7 +243,7 @@ export class VkBotService {
         const cards = rows.slice(0, 10).map(row => {
           const lesson = row.lesson ?? row;
           return [`• ${trainingDate(lesson.startTime)}`,
-            `  Лошадь: ${row.horse?.name.trim() || 'пока не назначена'}`,
+            `  Лошадь: ${horseLabel(row.horse)}`,
             `  Тренер: ${lesson.trainer.name.trim() || 'пока не назначен'}`,
             ...(lesson.arena?.name.trim() ? [`  Манеж: ${lesson.arena.name.trim()}`] : []),
           ].join('\n');
@@ -223,8 +257,8 @@ export class VkBotService {
     }
   }
   private next(command: string, offset: number) { return Keyboard.keyboard([Keyboard.textButton({ label: 'Далее', payload: { command, offset: offset + 10 } })]); }
-  private async trainerDay(trainerId: string, offset: number) {
-    const start = DateTime.now().setZone('Europe/Moscow').startOf('day');
+  private async trainerDay(trainerId: string, offset: number, dayOffset = 0) {
+    const start = DateTime.now().setZone('Europe/Moscow').plus({ days: dayOffset }).startOf('day');
     const range = { gte: start.toJSDate(), lt: start.plus({ days: 1 }).toJSDate() };
     const statuses = ['scheduled', 'completed', 'no_show'] as const;
     // Merge standalone bookings and lesson sessions before pagination; no booking appears twice.
@@ -240,9 +274,9 @@ export class VkBotService {
       .sort((a, b) => a.startTime.getTime() - b.startTime.getTime() || a.id.localeCompare(b.id)).slice(offset, offset + 11);
   }
 
-  private async today(trainerId: string, peer: number, event: string, offset: number, ridersOnly = false) {
-    const rows = await this.trainerDay(trainerId, offset);
-    const command = ridersOnly ? 'riders' : 'today';
+  private async today(trainerId: string, peer: number, event: string, offset: number, ridersOnly = false, dayOffset = 0) {
+    const rows = await this.trainerDay(trainerId, offset, dayOffset);
+    const command = ridersOnly ? 'riders' : dayOffset ? 'tomorrow' : 'today';
     if (ridersOnly) {
       const lines = rows.slice(0, 10).flatMap(lesson => lesson.bookings.map(booking =>
         `• ${booking.client.name} — ${trainingDate(lesson.startTime)}${booking.horse ? `, ${booking.horse.name}` : ''}`));
@@ -250,11 +284,11 @@ export class VkBotService {
         rows.length > 10 ? this.next(command, offset) : menu(true));
       return;
     }
-    if (!rows.length) { await this.send(peer, event, 'На сегодня занятий нет.', menu(true)); return; }
+    if (!rows.length) { await this.send(peer, event, `На ${dayOffset ? 'завтра' : 'сегодня'} занятий нет.`, menu(true)); return; }
     for (const lesson of rows.slice(0, 10)) {
       if (!lesson.bookings.length) await this.send(peer, `${event}:${lesson.id}`, `${date(lesson.startTime)} — Участников пока нет.`, menu(true));
       for (const row of lesson.bookings) {
-        await this.send(peer, `${event}:${row.id}`, `${date(lesson.startTime)} — ${row.client.name}${row.horse ? `, лошадь ${row.horse.name}` : ''}\nОтметка: ${row.attendanceStatus}`,
+        await this.send(peer, `${event}:${row.id}`, `${date(lesson.startTime)} — ${row.client.name}, лошадь ${horseLabel(row.horse)}\nОтметка: ${row.attendanceStatus}`,
           lesson.canMarkAttendance ? Keyboard.keyboard([
             Keyboard.callbackButton({ label: '✅ Присутствовал', payload: { action: 'attendance', bookingId: row.id, attended: true } }),
             Keyboard.callbackButton({ label: '❌ Неявка', payload: { action: 'attendance', bookingId: row.id, attended: false } }),

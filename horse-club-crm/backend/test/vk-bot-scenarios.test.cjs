@@ -24,13 +24,15 @@ test('normalizes Russian national and international phone numbers', () => {
 });
 for (const kind of ['CLIENT', 'TRAINER']) test(`links ${kind} by normalized phone and single-use administrator code`, async () => {
   const target = { id: 'target', phone: '+79991234567', vkUserId: null };
+  const account = { id: 'user', trainerId: 'target', vkUserId: null };
   let grant;
   const targetModel = {
     findUnique: async ({ where }) => where.id === target.id || where.vkUserId === target.vkUserId ? target : null,
+    findFirst: async () => null,
     update: async ({ data }) => Object.assign(target, data),
   };
   const prisma = {
-    client: kind === 'CLIENT' ? targetModel : { findUnique: async () => null },
+    client: kind === 'CLIENT' ? targetModel : { findUnique: async () => null, findFirst: async () => null },
     trainer: kind === 'TRAINER' ? targetModel : { findUnique: async () => null },
     vkLinkCode: {
       deleteMany: async () => { grant = undefined; },
@@ -38,6 +40,9 @@ for (const kind of ['CLIENT', 'TRAINER']) test(`links ${kind} by normalized phon
       findUnique: async ({ where }) => where.codeHash === grant.codeHash ? grant : null,
       update: async ({ data }) => Object.assign(grant, data),
     },
+    user: { findUnique: async ({ where }) => kind === 'TRAINER' && (where.trainerId === 'target' || where.id === 'user') ? account : null,
+      findFirst: async () => null, update: async ({ data }) => Object.assign(account, data) },
+    vkNotification: { deleteMany: async () => {} },
     $transaction: async callback => callback(prisma),
   };
   const links = new VkLinkService(prisma);
@@ -65,7 +70,7 @@ test('unlinked visitor is offered supported VK keyboard and a lead form', async 
   const { service, sent } = bot({ client: { findUnique: async () => null }, trainer: { findUnique: async () => null } });
   await service.handleMessage(message('начать'), 'welcome');
   assert.match(sent[0].message, /Приглашаем вас в конный клуб/);
-  assert.match(String(sent[0].keyboard), /Услуги и цены/);
+  assert.match(String(sent[0].keyboard), /Наш прайс и услуги/);
   assert.doesNotMatch(String(sent[0].keyboard), /request_contact/);
 });
 test('VK lead requires a separately recorded current consent', async () => {
@@ -266,7 +271,7 @@ test('unlink clears the profile, revokes issued codes and drops pending personal
   const tx = { client: { findUnique: async () => ({ id: 'client', vkUserId: 42n }), update: async args => calls.push(args) },
     vkLinkCode: { deleteMany: async args => calls.push(args) }, vkNotification: { deleteMany: async args => calls.push(args) } };
   await new VkLinkService({ $transaction: async fn => fn(tx) }).unlink('CLIENT', 'client');
-  assert.deepEqual(calls[0].data, { vkUserId: null });
+  assert.deepEqual(calls[0].data, { vkUserId: null, vkId: null, vkScreenName: null });
   assert.deepEqual(calls[1].where, { kind: 'CLIENT', recordId: 'client' });
   assert.equal(calls[2].where.peerId, 42n); assert.equal(calls[2].where.sentAt, null);
 });

@@ -7,6 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model VkIntegrationSettings {
+  id Int @id @default(1)
+  encryptedConfig String
+  updatedById String @db.Uuid
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+}
+
 enum Role {
   ADMIN
   MANAGER

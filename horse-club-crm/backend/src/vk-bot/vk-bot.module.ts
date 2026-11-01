@@ -10,5 +10,8 @@ import { VkIdentityModule } from './vk-identity.module';
 import { VkDeliveryModule } from './vk-delivery.module';
 import { VkRemindersModule } from './vk-reminders.module';
 import { AuthModule } from '../auth/auth.module';
-@Module({ imports: [VkIdentityModule, PrismaModule, AuthModule, MembershipsModule, LeadsModule, VkDeliveryModule, VkRemindersModule], controllers: [VkBotController, VkIdentityController], providers: [VkBotService, VkLinkService] })
+import { VkSettingsController } from './vk-settings.controller';
+import { VkSettingsService } from './vk-settings.service';
+import { VkLinkController } from './vk-link.controller';
+@Module({ imports: [VkIdentityModule, PrismaModule, AuthModule, MembershipsModule, LeadsModule, VkDeliveryModule, VkRemindersModule], controllers: [VkBotController, VkIdentityController, VkSettingsController, VkLinkController], providers: [VkBotService, VkLinkService, VkSettingsService] })
 export class VkBotModule {}
