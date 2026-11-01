@@ -19,6 +19,7 @@ const event = (text = 'Начать') => ({ type: 'message_new', secret: 'test-s
 before(async () => {
   delete process.env.VK_GROUP_TOKEN; delete process.env.VK_COMMUNITY_TOKEN; delete process.env.VK_BOT_TOKEN;
   bot = new VkBotService({}, {}, {}, {}, { identify: async () => ({ type: 'UNKNOWN' }) });
+  bot.prisma.vkConversationState = require('./helpers/vk-identity.cjs').idleConversation();
   const module = await Test.createTestingModule({ controllers: [VkBotController],
     providers: [{ provide: VkBotService, useValue: bot }] }).compile();
   controller = module.get(VkBotController);

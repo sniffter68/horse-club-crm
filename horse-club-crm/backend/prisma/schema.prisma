@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model VkConversationState {
+  peerId         BigInt    @id
+  botPausedUntil DateTime? @db.Timestamptz(6)
+  isBotPaused    Boolean   @default(false)
+}
+
 model VkIntegrationSettings {
   id Int @id @default(1)
   encryptedConfig String

@@ -144,6 +144,7 @@ test('bot identifies actual from_id and immediately opens the correct menu witho
     const bot = new VkBotService({}, { bind: () => { throw Error('Phone binding must never run'); } }, {}, {}, {
       identify: async vkId => { calls.push(vkId); return profile; },
     });
+    bot.prisma.vkConversationState = require('./helpers/vk-identity.cjs').idleConversation();
     bot.vk = { api: { messages: { send: async params => sent.push(params) } } };
     await bot.handleMessage({ message: { from_id: 9876, peer_id: 9876, text: 'Здравствуйте', out: 0 } }, 'direct-message');
     assert.deepEqual(calls, ['9876']);

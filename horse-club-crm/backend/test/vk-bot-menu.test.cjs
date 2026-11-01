@@ -3,7 +3,7 @@ const { beforeEach, after, test } = require('node:test');
 require('reflect-metadata');
 const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
 const { VkNotifications } = require('../dist/vk-bot/vk-delivery.module');
-const confirmation = '💬 Мы передали ваш запрос администратору клуба!\nСпециалист свяжется с вами в этом диалоге в ближайшее время. 🐎';
+const confirmation = 'Переключаю на администратора, скоро вам ответят!';
 const { mainMenu, welcomeMenu } = require('../dist/vk-bot/vk-bot.keyboard');
 const { clubCard, riderGuide } = require('../dist/vk-bot/vk-bot.config');
 
@@ -42,9 +42,9 @@ function harness({ client = null, trainer = null, admins = [], fail = false, pro
 
 test('main and guest reply keyboards provide role-specific commands', () => {
   const client = keyboard(mainMenu());
-  assert.deepEqual(client.buttons.flat().map(button => button.action.label), ['📅 Мои тренировки', '🎫 Мой абонемент', 'Записаться онлайн', 'Баланс и касса', '💬 Администратор']);
+  assert.deepEqual(client.buttons.flat().map(button => button.action.label), ['📅 Мои тренировки', '🎫 Мой абонемент', 'Записаться онлайн', 'Баланс и касса', 'Позвать администратора']);
   assert.deepEqual(client.buttons.flat().map(button => JSON.parse(button.action.payload).command), ['bookings', 'membership', 'book', 'cash', 'help']);
-  assert.deepEqual(keyboard(welcomeMenu()).buttons.flat().map(button => button.action.label), ['Записаться на тренировку', 'Наш прайс и услуги', 'Привязать профиль CRM', 'Задать вопрос администратору', 'О клубе', 'Как доехать']);
+  assert.deepEqual(keyboard(welcomeMenu()).buttons.flat().map(button => button.action.label), ['Записаться на тренировку', 'Наш прайс и услуги', 'Привязать профиль CRM', 'Позвать администратора', 'О клубе', 'Как доехать']);
   assert.equal(keyboard(mainMenu(true)).buttons[0][0].action.label, '📋 Расписание на сегодня');
 });
 
@@ -134,7 +134,7 @@ test('help can use the configured fallback recipient without an ADMIN VK account
   process.env.VK_ADMIN_PEER_ID = '2000000001';
   const h = harness(); await h.send('администратор');
   assert.equal([...h.queued.values()][0].peerId, 2000000001n);
-  assert.match(h.sent[0].message, /Мы передали/);
+  assert.match(h.sent[0].message, /Переключаю на администратора/);
 });
 
 for (const recipient of [undefined, '42', 'invalid', '-1']) {

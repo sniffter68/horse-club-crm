@@ -17,9 +17,9 @@ for (const [input, command] of [
 
 test('client, trainer and guest keyboards have exact labels and executable payloads', () => {
   const expected = [
-    [mainMenu(), ['📅 Мои тренировки', '🎫 Мой абонемент', 'Записаться онлайн', 'Баланс и касса', '💬 Администратор'], ['bookings', 'membership', 'book', 'cash', 'help']],
+    [mainMenu(), ['📅 Мои тренировки', '🎫 Мой абонемент', 'Записаться онлайн', 'Баланс и касса', 'Позвать администратора'], ['bookings', 'membership', 'book', 'cash', 'help']],
     [mainMenu(true), ['📋 Расписание на сегодня', 'Расписание на завтра', 'Мои лошади в работе', '👥 Мои всадники'], ['today', 'tomorrow', 'horses', 'riders']],
-    [welcomeMenu(), ['Записаться на тренировку', 'Наш прайс и услуги', 'Привязать профиль CRM', 'Задать вопрос администратору', 'О клубе', 'Как доехать'], ['book', 'prices', 'link', 'help', 'about', 'directions']],
+    [welcomeMenu(), ['Записаться на тренировку', 'Наш прайс и услуги', 'Привязать профиль CRM', 'Позвать администратора', 'О клубе', 'Как доехать'], ['book', 'prices', 'link', 'help', 'about', 'directions']],
   ];
   for (const [keyboard, labels, commands] of expected) {
     const value = JSON.parse(String(keyboard));
@@ -42,6 +42,7 @@ test('VK configuration supports new and legacy token names and rejects partial c
 
 function harness(prisma, profile) {
   const sent = [], identities = [];
+  prisma.vkConversationState = require('./helpers/vk-identity.cjs').idleConversation();
   const bot = new VkBotService(prisma, {}, {}, {}, { identify: async id => { identities.push(id); return profile; } });
   bot.vk = { api: { messages: { send: async value => sent.push(value) } } };
   return { sent, identities, send: (text, payload) => bot.handleMessage({ message: { from_id: 42, peer_id: 42, text, out: 0,

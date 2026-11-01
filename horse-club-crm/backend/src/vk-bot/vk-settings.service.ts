@@ -68,7 +68,7 @@ export class VkSettingsService implements OnModuleInit {
       if (!permissions.permissions.some(item => item.name === 'messages')) throw new Error('messages permission required');
       const confirmation = await vk.api.groups.getCallbackConfirmationCode({ group_id: Number(config.communityId) });
       if (confirmation.code !== config.confirmationToken) throw new Error('confirmation mismatch');
-      return { connected: true, message: 'Токен сообщества и ключ подтверждения проверены. Подтвердите Callback URL в VK и включите message_new и message_event.' };
+      return { connected: true, message: 'Токен сообщества и ключ подтверждения проверены. Подтвердите Callback URL в VK и включите message_new, message_reply и message_event.' };
     } catch { throw new BadRequestException('Не удалось проверить VK. Проверьте ID сообщества, права токена на сообщения и ключ подтверждения.'); }
   }
   async save(input: VkSettingsInput, actorId: string) {

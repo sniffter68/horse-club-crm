@@ -32,6 +32,9 @@ export class VkBotController {
     if (event.type === 'message_new') {
       void this.bot.handleMessage(event.object, event.event_id).catch(() => this.logger.error('Не удалось обработать входящее сообщение VK'));
     }
+    if (event.type === 'message_reply') {
+      void this.bot.handleReply(event.object).catch(() => this.logger.error('Не удалось включить паузу бота VK'));
+    }
     if (event.type === 'message_event') {
       void this.bot.handleEvent(event.object).catch(() => this.logger.error('Не удалось обработать действие VK'));
     }

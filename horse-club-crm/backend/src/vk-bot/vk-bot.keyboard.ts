@@ -8,13 +8,13 @@ export function mainMenu(trainer = false) {
   ] : [
     [button('📅 Мои тренировки', 'bookings'), button('🎫 Мой абонемент', 'membership')],
     [button('Записаться онлайн', 'book'), button('Баланс и касса', 'cash')],
-    [button('💬 Администратор', 'help')],
+    [button('Позвать администратора', 'help')],
   ]);
 }
 export function welcomeMenu() {
   return Keyboard.keyboard([
     [button('Записаться на тренировку', 'book'), button('Наш прайс и услуги', 'prices')],
-    [button('Привязать профиль CRM', 'link'), button('Задать вопрос администратору', 'help')],
+    [button('Привязать профиль CRM', 'link'), button('Позвать администратора', 'help')],
     [button('О клубе', 'about'), button('Как доехать', 'directions')],
   ]);
 }

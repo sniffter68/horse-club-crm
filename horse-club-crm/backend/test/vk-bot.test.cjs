@@ -19,6 +19,7 @@ before(async () => {
     } } }, { provide: MembershipLedgerService, useValue: {} }, { provide: LeadsService, useValue: {} },
     { provide: PrismaService, useValue: { trainer: { findUnique: async () => null }, client: { findUnique: async args => { lookup.push(args); return { id: 'client', firstName: 'Анна' }; } } } }] }).compile();
   bot = module.get(VkBotService);
+  bot.prisma.vkConversationState = require('./helpers/vk-identity.cjs').idleConversation();
   bot.vk = { api: { messages: { send: async params => { sent.push(params); return 1; } } } };
   app = module.createNestApplication(); app.setGlobalPrefix('api'); await app.init();
 });

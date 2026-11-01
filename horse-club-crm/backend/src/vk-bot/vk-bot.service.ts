@@ -82,14 +82,13 @@ export class VkBotService {
   }
   private async requestAdministrator(clientPeerId: number, eventId: string): Promise<void> {
     const requestedAt = new Date();
+    await this.pauseConversation(clientPeerId, 4);
     this.logger.log({ event: 'vk_help_requested', vkUserId: clientPeerId, eventId, requestedAt: requestedAt.toISOString() });
-    let keyboard = welcome;
     let name = 'Гость';
     try {
       const identity = await this.identity.identify(String(clientPeerId));
       if (identity.type !== 'UNKNOWN') {
         name = identity.name || name;
-        keyboard = menu(identity.type === 'STAFF');
       }
     } catch { this.logger.warn('Не удалось загрузить профиль для запроса помощи VK'); }
     const adminPeerId = Number(process.env.VK_ADMIN_PEER_ID);
@@ -109,7 +108,25 @@ export class VkBotService {
         reason: adminPeerId === clientPeerId ? 'same_peer' : 'admin_peer_not_configured' });
     }
     await this.send(clientPeerId, eventId,
-      '💬 Мы передали ваш запрос администратору клуба!\nСпециалист свяжется с вами в этом диалоге в ближайшее время. 🐎', keyboard);
+      'Переключаю на администратора, скоро вам ответят!',
+      Keyboard.keyboard([Keyboard.textButton({ label: 'Вернуться в меню бота', payload: { command: 'RESET_BOT_PAUSE' } })]).inline());
+  }
+  private async pauseConversation(peer: number, hours: number): Promise<void> {
+    const data = { isBotPaused: true, botPausedUntil: new Date(Date.now() + hours * 60 * 60 * 1000) };
+    await this.prisma.vkConversationState.upsert({ where: { peerId: BigInt(peer) },
+      create: { peerId: BigInt(peer), ...data }, update: data });
+  }
+  async handleReply(object: unknown): Promise<void> {
+    if (!record(object)) throw new BadRequestException('Некорректное исходящее сообщение VK');
+    const message = record(object.message) ? object.message : object;
+    const { peer_id: peer, from_id: sender, out, random_id: randomId } = message;
+    if (typeof peer !== 'number' || !Number.isSafeInteger(peer) || peer <= 0 || peer >= 2000000000
+      || typeof sender !== 'number' || !Number.isSafeInteger(sender) || sender >= 0 || out !== 1) return;
+    const group = Number(vkCommunityId());
+    if (group && sender !== -Math.abs(group)) return;
+    // API sends (including our replies and queued notifications) carry a nonzero random_id.
+    if (randomId !== undefined && randomId !== 0) return;
+    await this.pauseConversation(peer, 2);
   }
   async handleMessage(object: unknown, eventId: unknown): Promise<void> {
     if (!record(object) || !record(object.message)) throw new BadRequestException('Некорректное сообщение VK');
@@ -121,16 +138,35 @@ export class VkBotService {
     if (typeof sender !== 'number' || !Number.isSafeInteger(sender) || typeof peer !== 'number' || !Number.isSafeInteger(peer)
       || typeof text !== 'string' || typeof eventId !== 'string' || !eventId || eventId.length > 200) throw new BadRequestException('Некорректное сообщение VK');
     if (sender <= 0 || peer !== sender || out === 1) return;
+    const resetText = ['меню', '/start'].includes(text.trim().toLowerCase());
+    let resetPause = resetText;
     let command = normalizeVkCommand(text);
     let offset = 0;
     if (typeof payload === 'string') {
       try {
         const parsed: unknown = JSON.parse(payload);
+        if (parsed === 'RESET_BOT_PAUSE') resetPause = true;
         if (record(parsed)) {
+          if (parsed.command === 'RESET_BOT_PAUSE' || parsed.action === 'RESET_BOT_PAUSE') resetPause = true;
           if (typeof parsed.command === 'string') command = normalizeVkCommand(parsed.command);
           if (Number.isSafeInteger(parsed.offset) && typeof parsed.offset === 'number' && parsed.offset >= 0 && parsed.offset <= 10000) offset = parsed.offset;
         }
       } catch { /* Ordinary text routes without a payload. */ }
+      if (payload === 'RESET_BOT_PAUSE') resetPause = true;
+    }
+    const state = await this.prisma.vkConversationState.findUnique({ where: { peerId: BigInt(peer) } });
+    if (resetPause) {
+      await this.prisma.vkConversationState.updateMany({ where: { peerId: BigInt(peer) },
+        data: { isBotPaused: false, botPausedUntil: null } });
+      const identity = await this.identity.identify(String(sender));
+      await this.send(peer, eventId, `Здравствуйте${identity.type !== 'UNKNOWN' && identity.name ? `, ${identity.name}` : ''}! Выберите действие.`,
+        identity.type === 'UNKNOWN' ? welcome : menu(identity.type === 'STAFF'));
+      return;
+    }
+    if (state?.botPausedUntil && state.botPausedUntil.getTime() > Date.now()) return;
+    if (state?.isBotPaused || state?.botPausedUntil) {
+      await this.prisma.vkConversationState.updateMany({ where: { peerId: BigInt(peer), botPausedUntil: { lte: new Date() } },
+        data: { isBotPaused: false, botPausedUntil: null } });
     }
     if (command === 'help') { await this.requestAdministrator(peer, eventId); return; }
     try {

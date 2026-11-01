@@ -9,6 +9,7 @@ function harness(get = async () => [{ id: 42, first_name: ' Анна ', last_nam
   const sent = [], queries = [], warnings = [];
   // Greeting must work for new users without consulting CRM profiles.
   const bot = new VkBotService({}, {}, {}, {});
+  bot.prisma.vkConversationState = require('./helpers/vk-identity.cjs').idleConversation();
   bot.identity = { identify: async () => ({ type: 'UNKNOWN' }) };
   bot.vk = { api: {
     users: { get: async params => { queries.push(params); return get(params); } },

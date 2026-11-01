@@ -105,6 +105,7 @@ test('settings endpoints enforce administrator role, module access and validate 
 function bot(profile, prisma = {}, links = {}) {
   const sent = [];
   const service = new VkBotService(prisma, links, {}, {}, { identify: async () => profile });
+  prisma.vkConversationState = require('./helpers/vk-identity.cjs').idleConversation();
   service.vk = { api: { messages: { send: async args => sent.push(args) } } };
   return { sent, send: text => service.handleMessage({ message: { from_id: 42, peer_id: 42, text } }, 'event') };
 }
