@@ -8,10 +8,28 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 deploy_commit=$(git rev-parse --short HEAD)
 echo "Deployment started: $(date --iso-8601=seconds) - commit $deploy_commit"
 ENV_FILE="${ENV_FILE:-.env.production}"
-compose=(docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml)
+# Respect COMPOSE_FILE and Compose's default discovery. A database-only host must
+# never be switched to a new Compose project (and an empty database volume).
+compose=(docker compose)
+if [[ -f "$ENV_FILE" ]]; then compose+=(--env-file "$ENV_FILE"); fi
+# Preserve an already running full-stack production project.
+if [[ -z "${COMPOSE_FILE:-}" && -f "$ENV_FILE" ]] &&
+   docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml ps --status running --services 2>/dev/null | grep -qx backend; then
+  compose+=(-f docker-compose.prod.yml)
+fi
 
 echo "===> 1. Checking production configuration..."
 "${compose[@]}" config --quiet
+services=$("${compose[@]}" config --services)
+if ! grep -qx postgres <<< "$services"; then
+  echo 'Compose must define the postgres service.' >&2
+  exit 1
+fi
+if ! grep -qx backend <<< "$services"; then
+  echo 'Database-only Compose detected; deploying application through its host process manager.'
+  node scripts/deploy-native.cjs "${compose[@]:1}"
+  exit 0
+fi
 "${compose[@]}" config --format json | node scripts/check-public-leads-config.cjs
 
 echo "===> 2. Building frontend dist..."
@@ -46,4 +64,6 @@ NODE
 
 echo "===> 4. Recreating Caddy with current frontend and landing dist..."
 "${compose[@]}" up -d --force-recreate caddy
+echo "===> 5. Checking health, VK schema and authenticated settings endpoint..."
+"${compose[@]}" exec -T backend node < scripts/check-deployed-api.cjs
 echo "Deployment successful: $(date --iso-8601=seconds) - commit $deploy_commit"
