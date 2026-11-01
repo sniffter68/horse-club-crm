@@ -168,11 +168,17 @@ export class VkBotService {
       await this.prisma.vkConversationState.updateMany({ where: { peerId: BigInt(peer), botPausedUntil: { lte: new Date() } },
         data: { isBotPaused: false, botPausedUntil: null } });
     }
+    const consent = /^согласен\s+([a-zA-Z0-9._-]{1,64})$/i.exec(text.trim());
+    const binding = /^привязать\s+(.+?)\s+(\d{4})$/i.exec(text.trim());
+    const lead = /^заявка\s+([^;]{1,100});\s*(.+)$/i.exec(text.trim());
+    // Only explicit commands reach the reply handlers, including their default menus.
+    const knownCommand = ['начать', 'help', 'link', 'book', 'cash', 'about', 'directions', 'prices', 'guide',
+      'первичная заявка', 'tomorrow', 'horses', 'today', 'riders', 'next-booking', 'membership', 'bookings'].includes(command);
+    if (!knownCommand && !consent && !binding && !lead) return;
     if (command === 'help') { await this.requestAdministrator(peer, eventId); return; }
     try {
       // Shared with GET /vk/identify; embedded webhook avoids a loopback HTTP request.
       const identity = await this.identity.identify(String(sender));
-      const consent = /^согласен\s+([a-zA-Z0-9._-]{1,64})$/i.exec(text.trim());
       if (consent) {
         if (consent[1] !== consentVersion()) throw new BadRequestException('Редакция согласия изменилась. Запросите актуальную ссылку командой «Первичная заявка»');
         const consentedAt = new Date();
@@ -187,12 +193,11 @@ export class VkBotService {
       const staff = identity.type === 'STAFF' ? identity : null;
       const trainer = staff?.role === 'TRAINER' && staff.trainerId ? { id: staff.trainerId, name: staff.name } : null;
       const keyboard = staff || client ? menu(Boolean(staff)) : welcome;
-      if (command === 'link' || (!client && !staff && /^\+?[\d() -]{10,20}$/.test(text.trim()))) {
-        const phone = command === 'link' ? '+79991234567' : normalizePhone(text.trim());
+      if (command === 'link') {
+        const phone = '+79991234567';
         await this.send(peer, eventId, `Для привязки отправьте номер телефона из CRM и одноразовый код, выданный администратором:\nпривязать ${phone} 1234\nНомер без кода не открывает доступ к профилю. Код действует 5 минут.`, keyboard);
         return;
       }
-      const binding = /^привязать\s+(.+?)\s+(\d{4})$/i.exec(text.trim());
       if (binding && !client && !staff) {
         const kind = await this.links.bind(sender, binding[1], binding[2]);
         await this.send(peer, eventId, 'Профиль CRM привязан. Выберите действие.', menu(kind === 'TRAINER')); return;
@@ -225,7 +230,6 @@ export class VkBotService {
       }
       if (command === 'guide') { await this.send(peer, eventId, riderGuide(), keyboard); return; }
       if (!client && !staff) {
-        const lead = /^заявка\s+([^;]{1,100});\s*(.+)$/i.exec(text.trim());
         if (lead) {
           const accepted = await this.prisma.vkConsent.findUnique({ where: { vkUserId: BigInt(sender) } });
           if (!accepted || accepted.consentVersion !== consentVersion()) {
