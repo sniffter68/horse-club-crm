@@ -153,6 +153,44 @@ textarea.ant-input { resize: none; }
 .data-mono { color: var(--crm-saddle); font-family: var(--crm-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .client-name { color: var(--crm-ink) !important; font-family: var(--crm-serif); font-size: 1.06rem; font-weight: 600; letter-spacing: -0.015em; }
 
+/* The client directory shares the available workspace width, including long values. */
+.clients-table { width: 100%; min-width: 0; }
+.clients-table .ant-table { width: 100%; font-size: 13px; }
+.clients-table .ant-table-thead > tr > th,
+.clients-table .ant-table-tbody > tr > td { padding: 10px 8px; overflow-wrap: anywhere; }
+.clients-table .ant-table-thead > tr > th { overflow-wrap: normal; }
+.clients-table .ant-table-tbody > tr > td { vertical-align: top; }
+.clients-table .ant-space,
+.clients-table .ant-space-item { min-width: 0; max-width: 100%; }
+.clients-table .ant-btn { max-width: 100%; height: auto; min-height: 24px; white-space: normal; font-size: 12px; padding-inline: 5px; gap: 4px; }
+.clients-table .ant-btn .ant-btn-icon { flex-shrink: 0; }
+.clients-table .ant-btn > span { min-width: 0; overflow-wrap: anywhere; }
+.clients-table .client-name { text-align: left; justify-content: flex-start; font-size: 1.06rem; }
+.clients-table .crm-tag { max-width: 100%; padding-inline: 6px; white-space: normal; font-size: 12px; }
+.clients-table .client-roles .crm-tag { padding: 2px 6px; white-space: nowrap; line-height: 16px; }
+.clients-table .client-notes { display: block; min-width: 0; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clients-table .client-membership { width: 100%; max-width: 240px; box-sizing: border-box; padding: 8px; overflow-wrap: anywhere; font-size: 12px; }
+.clients-table .client-membership-summary,
+.clients-table .client-membership-details { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.clients-table .client-membership-summary { flex-wrap: nowrap; }
+.clients-table .client-membership-plan { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clients-table .client-membership-summary .crm-tag { flex-shrink: 0; padding: 2px 6px; white-space: nowrap; line-height: 16px; }
+.clients-table .client-membership-details { margin-top: 4px; }
+.clients-table .client-membership-balance { margin: 0; font-family: inherit; font-size: 12px; }
+.clients-table .client-membership-issue { margin-top: 4px; }
+@media (min-width: 1280px) {
+  .clients-table .ant-table-thead > tr > th,
+  .clients-table .ant-table-tbody > tr > td { padding-inline: 12px; }
+  .clients-table .client-notes { max-width: 220px; }
+}
+@media (max-width: 1200px) {
+  .clients-table .ant-table-thead > tr > th { overflow-wrap: anywhere; }
+  .clients-table .ant-table-column-title { min-width: 0; }
+  .clients-table .client-roles .crm-tag,
+  .clients-table .client-membership-summary .crm-tag { white-space: normal; }
+  .clients-table .client-membership-summary { flex-wrap: wrap; }
+}
+
 .status-badge,
 .crm-tag { margin-inline-end: 0; border: 0; border-radius: 999px; padding: 3px 10px; font-weight: 600; }
 .crm-tag--accent { color: #3a2f2b; background: #efece8; }

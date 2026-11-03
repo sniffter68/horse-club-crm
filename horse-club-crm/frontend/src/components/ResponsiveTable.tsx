@@ -50,7 +50,7 @@ export function ResponsiveTable<T extends object>({ columns = [], ...tableProps 
     .map(column => column as ColumnType<T>)
 
   return <List<T>
-    className="responsive-record-list"
+    className={['responsive-record-list', tableProps.className].filter(Boolean).join(' ')}
     dataSource={tableProps.dataSource ? [...tableProps.dataSource] : []}
     loading={tableProps.loading}
     pagination={pagination}

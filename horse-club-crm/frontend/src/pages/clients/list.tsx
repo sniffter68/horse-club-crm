@@ -76,23 +76,24 @@ export function ClientList() {
   })
 
   return <>
-    <CatalogList<ClientRow> resource="clients" title="Клиенты"
+    <CatalogList<ClientRow> resource="clients" title="Клиенты" layout="clients"
       extraActions={row => <><ArchiveAction resource="clients" id={row.id} archived={Boolean(row.deletedAt)} /><Button size="small" onClick={() => setLedgerClient(row)}>История баланса</Button>{!row.deletedAt && row.clientType === 'ONE_TIME' && <ConvertClient client={row} />}</>} columns={[
       {
         key: 'name',
         title: 'Клиент',
+        width: '12%',
         sorter: true,
         render: (_: unknown, row) => <Button className="client-name" type="link" style={{ padding: 0 }} onClick={() => setSelectedClientId(row.id)}>
           {[row.firstName, row.lastName].filter(Boolean).join(' ') || row.name || 'Без имени'}
         </Button>,
       },
-      { key: 'clientType', title: 'Тип', render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : row.clientType === 'ONE_TIME' ? <OneTimeBadge /> : 'Постоянный' },
-      { key: 'phone', dataIndex: 'phone', title: 'Телефон', sorter: true, render: (value: string | null) => <span className="data-mono">{value || '—'}</span> },
-      { key: 'vk', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name || row.firstName} kind="CLIENT" vkId={row.vkId} vkUserId={row.vkUserId} /> },
-      { key: 'membership', title: 'Абонемент', hidden: !canManage, width: 300, render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : <MembershipBalance membership={row.membership} clientId={row.id} /> },
-      { key: 'roles', title: 'Роли', render: (_: unknown, row) => <Space>{row.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{row.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
-      { key: 'preferences', dataIndex: 'preferences', title: 'Заметки', width: 260, ellipsis: true, render: (value: string | null) => value || '—' },
-      { key: 'createdAt', dataIndex: 'createdAt', title: 'Дата создания', sorter: true, render: (value: string) => dateFormatter.format(new Date(value)) },
+      { key: 'clientType', title: 'Тип', width: '8%', render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : row.clientType === 'ONE_TIME' ? <OneTimeBadge /> : 'Постоянный' },
+      { key: 'phone', dataIndex: 'phone', title: 'Телефон', width: '11%', sorter: true, render: (value: string | null) => <span className="data-mono">{value || '—'}</span> },
+      { key: 'vk', title: 'VK', hidden: !canManage, width: '11%', render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name || row.firstName} kind="CLIENT" vkId={row.vkId} vkUserId={row.vkUserId} /> },
+      { key: 'membership', title: 'Абонемент', hidden: !canManage, width: '18%', render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : <MembershipBalance membership={row.membership} clientId={row.id} /> },
+      { key: 'roles', title: 'Роли', width: '9%', render: (_: unknown, row) => <Space wrap size={4} className="client-roles">{row.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{row.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
+      { key: 'preferences', dataIndex: 'preferences', title: 'Заметки', ellipsis: true, render: (value: string | null) => <span className="client-notes" title={value || undefined}>{value || '—'}</span> },
+      { key: 'createdAt', dataIndex: 'createdAt', title: 'Дата создания', width: '9%', sorter: true, render: (value: string) => dateFormatter.format(new Date(value)) },
     ]} />
 
     <Modal title={client && !query.isLoading ? <ProfileHeader title="Карточка клиента"

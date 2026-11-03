@@ -1,6 +1,6 @@
 import { useTable } from '@refinedev/antd'
 import type { HttpError } from '@refinedev/core'
-import { Alert, Button, Empty, Space, Tag, Typography } from 'antd'
+import { Alert, Button, Empty, Tag, Typography } from 'antd'
 import { Link } from 'react-router-dom'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { useCatalogPermissions } from '../catalogs/permissions'
@@ -15,14 +15,16 @@ export function MembershipBalance({ membership, clientId }: { membership: Active
   const { canManage } = useCatalogPermissions()
   return <section className="client-membership" aria-label="Активный абонемент">
     {membership ? <>
-      <Space wrap>
-        <Typography.Text strong>{membership.planName}</Typography.Text>
+      <div className="client-membership-summary">
+        <Typography.Text className="client-membership-plan" strong title={membership.planName}>{membership.planName}</Typography.Text>
         <Tag className={`crm-tag crm-tag--${membership.status === 'EXPIRING' ? 'warning' : 'success'}`}>
           {membership.status === 'EXPIRING' ? 'Истекает' : 'Активен'}
         </Tag>
-      </Space>
-      <div className="client-membership-balance">Осталось: <span className="data-mono">{membership.remainingUnits} / {membership.totalUnits}</span> занятий</div>
-      <Typography.Text type="secondary">до {dateOnly(membership.validUntil)}</Typography.Text>
+      </div>
+      <div className="client-membership-details">
+        <div className="client-membership-balance">Осталось: <span className="data-mono">{membership.remainingUnits} / {membership.totalUnits}</span> занятий</div>
+        <Typography.Text type="secondary">до {dateOnly(membership.validUntil)}</Typography.Text>
+      </div>
     </> : <>
       <Typography.Text type="secondary">Нет активного абонемента</Typography.Text>
       {canManage && <Link className="client-membership-issue" to={`/memberships/new?clientId=${encodeURIComponent(clientId)}`}>+ Выдать абонемент</Link>}
