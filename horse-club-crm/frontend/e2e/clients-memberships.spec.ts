@@ -79,6 +79,81 @@ test.beforeEach(async ({ page }) => {
 })
 
 const saleClientId = '00000000-0000-4000-8000-000000000021'
+for (const width of [1280, 390]) test(`client columns persist visibility and order at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  await page.goto('/clients')
+  const settings = page.getByRole('button', { name: 'Настройка колонок', exact: true })
+  await settings.click()
+  await page.getByRole('checkbox', { name: 'Дата создания', exact: true }).check()
+  await page.getByRole('button', { name: 'Дата создания: выше', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Абонемент', exact: true }).uncheck()
+  await settings.click()
+  await page.reload()
+  await settings.click()
+  await expect(page.getByRole('checkbox', { name: 'Дата создания', exact: true })).toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Абонемент', exact: true })).not.toBeChecked()
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('horse_crm_clients_columns_v1') || '[]') as { key: string; visible: boolean }[])
+  expect(saved.findIndex(column => column.key === 'createdAt')).toBeLessThan(saved.findIndex(column => column.key === 'preferences'))
+  await settings.click()
+  if (width >= 768) {
+    const headers = page.locator('.ant-table-thead th')
+    await expect(headers).toHaveText(['Клиент', 'Телефон', 'Тип', 'Дата создания', 'Действия'])
+    await expect(headers.nth(0)).toHaveClass(/ant-table-cell-fix-left/)
+    await expect(headers.nth(1)).toHaveClass(/ant-table-cell-fix-left/)
+    await expect(headers.last()).toHaveClass(/ant-table-cell-fix-right/)
+    await page.locator('.ant-table-content').evaluate(element => { element.scrollLeft = element.scrollWidth })
+    await expect(page.getByRole('button', { name: 'Редактировать', exact: true }).first()).toBeVisible()
+  } else {
+    await expect(page.locator('.responsive-record-label').filter({ hasText: 'Абонемент' })).toHaveCount(0)
+    await expect(page.locator('.responsive-record-label').filter({ hasText: 'Дата создания' }).first()).toBeVisible()
+  }
+  await settings.click()
+  await page.getByRole('button', { name: 'Сбросить настройки', exact: true }).click()
+  await expect(page.getByRole('checkbox', { name: 'Абонемент', exact: true })).toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Дата создания', exact: true })).not.toBeChecked()
+})
+
+test('client column settings work when storage is unavailable', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = Storage.prototype.setItem
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (key === 'horse_crm_clients_columns_v1') throw new DOMException('Blocked', 'SecurityError')
+      original.call(this, key, value)
+    }
+  })
+  await page.goto('/clients')
+  await page.getByRole('button', { name: 'Настройка колонок', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Роли', exact: true }).check()
+  await expect(page.getByRole('status')).toContainText('браузер не разрешил сохранение')
+  await expect(page.getByRole('columnheader', { name: 'Роли', exact: true })).toBeVisible()
+})
+
+test('column changes preserve search, sort and pagination', async ({ page }) => {
+  await page.route('**/api/clients?*', route => route.fulfill({ json: [client], headers: { 'x-total-count': '42' } }))
+  await page.goto('/clients')
+  await page.getByRole('searchbox', { name: 'Поиск', exact: true }).fill('Анна')
+  const search = page.waitForRequest(request => new URL(request.url()).searchParams.get('q') === 'Анна')
+  await page.getByRole('searchbox', { name: 'Поиск', exact: true }).press('Enter')
+  await search
+  const sort = page.waitForRequest(request => request.url().includes('/api/clients?'))
+  await page.getByRole('columnheader', { name: 'Телефон', exact: true }).click()
+  await sort
+  const next = page.waitForResponse(response => response.url().includes('/api/clients?'))
+  await page.locator('.ant-pagination-item-2').click()
+  await next
+  const locationBefore = page.url()
+  await page.getByRole('button', { name: 'Настройка колонок', exact: true }).click()
+  const roles = page.getByRole('checkbox', { name: 'Роли', exact: true })
+  await roles.focus()
+  await roles.press('Space')
+  await expect(roles).toBeChecked()
+  await page.getByRole('button', { name: 'Настройка колонок', exact: true }).click()
+  await expect(page.getByRole('searchbox', { name: 'Поиск', exact: true })).toHaveValue('Анна')
+  await expect(page.locator('.ant-pagination-item-2')).toHaveClass(/ant-pagination-item-active/)
+  await expect(page.getByRole('columnheader', { name: 'Телефон', exact: true })).toHaveAttribute('aria-sort', 'ascending')
+  expect(page.url()).toBe(locationBefore)
+})
+
 for (const width of [1366, 1400, 1440, 1024, 390]) test(`client directory fits workspace at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: width === 1440 ? 900 : 768 })
   const longClient = { ...client, firstName: 'Александра-Екатерина', lastName: 'Константинопольская',
@@ -87,12 +162,18 @@ for (const width of [1366, 1400, 1440, 1024, 390]) test(`client directory fits w
   await page.route('**/api/clients?*', route => route.fulfill({ json: [longClient, { ...client, membership: null }], headers: { 'x-total-count': '2' } }))
   await page.goto('/clients')
   await expect(page.getByRole('button', { name: 'Александра-Екатерина Константинопольская', exact: true })).toBeVisible()
-  await expect(page.getByText(longClient.preferences, { exact: true })).toBeVisible()
-  await expect(page.getByText(longClient.preferences, { exact: true })).toHaveAttribute('title', longClient.preferences)
+  await page.getByRole('button', { name: 'Настройка колонок', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Заметки', exact: true }).check()
+  await page.getByRole('button', { name: 'Настройка колонок', exact: true }).click()
+  await page.getByRole('button', { name: 'Показать заметки', exact: true }).click()
+  await expect(page.locator('.client-notes-popover')).toHaveText(longClient.preferences)
+  await page.getByRole('button', { name: 'Показать заметки', exact: true }).click()
   await expect(page.locator('.client-membership-plan').first()).toHaveAttribute('title', longClient.membership.planName)
-  const containers = page.locator('html, .crm-workspace, .crm-main, .ant-table-content, .ant-table-cell:not(.ant-table-cell-ellipsis), .responsive-record-value')
+  // Ant Design's fixed-column shadow extends beyond its cell by design.
+  const containers = page.locator('html, .crm-workspace, .crm-main, .ant-table-cell:not(.ant-table-cell-ellipsis):not(.ant-table-cell-fix-left-last), .responsive-record-value')
   await expect.poll(() => containers.evaluateAll(elements => elements.filter(el => el.scrollWidth > el.clientWidth + 1).map(el => ({ element: el.className || el.tagName, text: el.textContent })))).toEqual([])
   await expect(page.getByRole('button', { name: 'История баланса', exact: true }).first()).toBeVisible()
+  await expect(page.locator('.ant-popover:visible')).toHaveCount(0)
   await page.screenshot({ path: `test-results/clients-responsive-${width}.png`, fullPage: true })
 })
 

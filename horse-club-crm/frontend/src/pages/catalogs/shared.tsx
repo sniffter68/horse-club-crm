@@ -10,8 +10,8 @@ import { Alert, Button, Checkbox, Form, Input, InputNumber, Result, Select, Spac
 import { useCatalogPermissions } from './permissions'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 
-export function CatalogList<T extends BaseRecord>({ resource, title, columns, extraActions, layout }: {
-  resource: string; title: string; columns: TableColumnsType<T>; extraActions?: (record: T) => ReactNode; layout?: 'clients'
+export function CatalogList<T extends BaseRecord>({ resource, title, columns, extraActions, layout, toolbar }: {
+  resource: string; title: string; columns: TableColumnsType<T>; extraActions?: (record: T) => ReactNode; layout?: 'clients'; toolbar?: ReactNode
 }) {
   const { canManage, role } = useCatalogPermissions(resource)
   const { tableProps, searchFormProps, tableQuery, sorters, filters, currentPage, pageSize, setCurrentPage } = useTable<T, HttpError, { q?: string; clientType?: string; archive?: string }>({
@@ -33,7 +33,7 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
     return { ...column, sortOrder: sorter ? (sorter.order === 'asc' ? 'ascend' as const : 'descend' as const) : null }
   })
   const actions: TableColumnsType<T> = canManage ? [{
-    key: 'actions', title: 'Действия', width: layout === 'clients' ? '14%' : 250,
+    key: 'actions', title: 'Действия', width: layout === 'clients' ? 220 : 250, fixed: layout === 'clients' ? 'right' : undefined, align: 'left',
     render: (_: unknown, record: T) => <Space wrap>
       <EditButton resource={resource} recordItemId={record.id} size="small" aria-label="Редактировать">Редактировать</EditButton>
       {extraActions?.(record)}
@@ -55,11 +55,12 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
       </Form.Item>}
       <Button type="primary" htmlType="submit">Найти</Button>
     </Form>
+    {toolbar && <div className="catalog-table-toolbar">{toolbar}</div>}
     {tableQuery.error && <Alert type="error" showIcon message="Не удалось загрузить каталог" description={tableQuery.error.message} />}
     <ResponsiveTable<T> {...tableProps} rowKey="id" columns={[...sortedColumns, ...actions]}
       className={layout === 'clients' ? 'clients-table' : undefined}
       tableLayout={layout === 'clients' ? 'fixed' : undefined}
-      scroll={layout === 'clients' ? undefined : { x: 'max-content' }}
+      scroll={layout === 'clients' ? { x: [...sortedColumns, ...actions].reduce((width, column) => width + (typeof column.width === 'number' ? column.width : 0), 0) } : { x: 'max-content' }}
       pagination={{ ...tableProps.pagination, showSizeChanger: true, pageSizeOptions: [10, 20, 50], showTotal: total => `Всего: ${total}` }} />
   </List>
 }

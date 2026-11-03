@@ -8,6 +8,7 @@ test.beforeEach(async ({ page }) => {
     localStorage.setItem('horsecrm.access_token', 'cookie-session')
     localStorage.setItem('horsecrm.email', 'qa@example.com')
     localStorage.setItem('horsecrm.role', 'ADMIN')
+    localStorage.setItem('horse_crm_clients_columns_v1', JSON.stringify([{ key: 'vk', visible: true }]))
   })
 })
 

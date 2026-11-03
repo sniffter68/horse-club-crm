@@ -7,9 +7,12 @@ import { ArchiveAction } from './ArchiveAction'
 import { ClientForm } from './form'
 import { CatalogEditAction } from '../catalogs/EditDrawer'
 import { useState } from 'react'
+import { ClientColumnSettings } from './columnSettings'
+import { useClientColumns } from './useClientColumns'
+import type { TableColumnsType } from 'antd'
 import { VkProfileLink } from '../../components/VkProfileLink'
 import { useInvalidate, useOne, type HttpError } from '@refinedev/core'
-import { Alert, App, Button, Descriptions, Empty, List, Modal, Progress, Skeleton, Space, Tag, Typography } from 'antd'
+import { Alert, App, Button, Descriptions, Empty, List, Modal, Popover, Progress, Skeleton, Space, Tag, Typography } from 'antd'
 import { OneTimeBadge } from '../../components/ClientSelectWithCreate'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { isUuid } from '../../uuid'
@@ -46,6 +49,14 @@ type ClientDetails = Client & {
 
 const dateFormatter = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeZone: 'Europe/Moscow' })
 
+function ClientNotes({ value }: { value: string | null }) {
+  const [open, setOpen] = useState(false)
+  if (!value) return <>—</>
+  return <Popover trigger="click" open={open} onOpenChange={setOpen} title="Заметки" content={<div className="client-notes-popover">{value}</div>}>
+    <Button type="link" className="client-notes" aria-label="Показать заметки" aria-expanded={open} onClick={() => setOpen(!open)}>{value}</Button>
+  </Popover>
+}
+
 function ConvertClient({ client }: { client: Client }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -65,6 +76,7 @@ function ConvertClient({ client }: { client: Client }) {
 }
 
 export function ClientList() {
+  const columnSettings = useClientColumns()
   const [now] = useState(() => Date.now())
   const { canManage } = useCatalogPermissions()
   const [ledgerClient, setLedgerClient] = useState<Client>()
@@ -75,27 +87,33 @@ export function ClientList() {
     queryOptions: { enabled: Boolean(selectedClientId) },
   })
 
+  const columns: TableColumnsType<ClientRow> = [
+    {
+      key: 'name',
+      title: 'Клиент',
+      width: 220, fixed: 'left', align: 'left',
+      sorter: true,
+      render: (_: unknown, row) => <Button className="client-name" type="link" style={{ padding: 0 }} onClick={() => setSelectedClientId(row.id)}>
+        {[row.firstName, row.lastName].filter(Boolean).join(' ') || row.name || 'Без имени'}
+      </Button>,
+    },
+    { key: 'phone', dataIndex: 'phone', title: 'Телефон', width: 150, fixed: 'left', align: 'left', sorter: true, render: (value: string | null) => <span className="data-mono">{value || '—'}</span> },
+    { key: 'clientType', title: 'Тип', width: 120, align: 'center', render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : row.clientType === 'ONE_TIME' ? <OneTimeBadge /> : 'Постоянный' },
+    { key: 'vk', title: 'VK', hidden: !canManage, width: 180, align: 'left', render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name || row.firstName} kind="CLIENT" vkId={row.vkId} vkUserId={row.vkUserId} /> },
+    { key: 'membership', title: 'Абонемент', hidden: !canManage, width: 260, align: 'right', render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : <MembershipBalance membership={row.membership} clientId={row.id} /> },
+    { key: 'roles', title: 'Роли', width: 160, align: 'center', render: (_: unknown, row) => <Space wrap size={4} className="client-roles">{row.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{row.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
+    { key: 'preferences', dataIndex: 'preferences', title: 'Заметки', width: 180, align: 'left', render: (value: string | null) => <ClientNotes value={value} /> },
+    { key: 'createdAt', dataIndex: 'createdAt', title: 'Дата создания', width: 150, align: 'left', sorter: true, render: (value: string) => dateFormatter.format(new Date(value)) },
+  ]
+  const visibleColumns = [
+    ...columns.filter(column => column.key === 'name' || column.key === 'phone'),
+    ...columnSettings.columns.filter(preference => preference.visible).flatMap(preference =>
+      columns.filter(column => column.key === preference.key && !column.hidden)),
+  ]
+
   return <>
     <CatalogList<ClientRow> resource="clients" title="Клиенты" layout="clients"
-      extraActions={row => <><ArchiveAction resource="clients" id={row.id} archived={Boolean(row.deletedAt)} /><Button size="small" onClick={() => setLedgerClient(row)}>История баланса</Button>{!row.deletedAt && row.clientType === 'ONE_TIME' && <ConvertClient client={row} />}</>} columns={[
-      {
-        key: 'name',
-        title: 'Клиент',
-        width: '12%',
-        sorter: true,
-        render: (_: unknown, row) => <Button className="client-name" type="link" style={{ padding: 0 }} onClick={() => setSelectedClientId(row.id)}>
-          {[row.firstName, row.lastName].filter(Boolean).join(' ') || row.name || 'Без имени'}
-        </Button>,
-      },
-      { key: 'clientType', title: 'Тип', width: '8%', render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : row.clientType === 'ONE_TIME' ? <OneTimeBadge /> : 'Постоянный' },
-      { key: 'phone', dataIndex: 'phone', title: 'Телефон', width: '11%', sorter: true, render: (value: string | null) => <span className="data-mono">{value || '—'}</span> },
-      { key: 'vk', title: 'VK', hidden: !canManage, width: '11%', render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name || row.firstName} kind="CLIENT" vkId={row.vkId} vkUserId={row.vkUserId} /> },
-      { key: 'membership', title: 'Абонемент', hidden: !canManage, width: '18%', render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : <MembershipBalance membership={row.membership} clientId={row.id} /> },
-      { key: 'roles', title: 'Роли', width: '9%', render: (_: unknown, row) => <Space wrap size={4} className="client-roles">{row.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{row.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
-      { key: 'preferences', dataIndex: 'preferences', title: 'Заметки', ellipsis: true, render: (value: string | null) => <span className="client-notes" title={value || undefined}>{value || '—'}</span> },
-      { key: 'createdAt', dataIndex: 'createdAt', title: 'Дата создания', width: '9%', sorter: true, render: (value: string) => dateFormatter.format(new Date(value)) },
-    ]} />
-
+      extraActions={row => <><ArchiveAction resource="clients" id={row.id} archived={Boolean(row.deletedAt)} /><Button size="small" onClick={() => setLedgerClient(row)}>История баланса</Button>{!row.deletedAt && row.clientType === 'ONE_TIME' && <ConvertClient client={row} />}</>} columns={visibleColumns} toolbar={<ClientColumnSettings settings={columnSettings} canManage={canManage} />} />
     <Modal title={client && !query.isLoading ? <ProfileHeader title="Карточка клиента"
       name={[client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || 'Без имени'}
       badges={<>{client.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{client.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}{client.deletedAt && <Tag>В архиве</Tag>}</>}
