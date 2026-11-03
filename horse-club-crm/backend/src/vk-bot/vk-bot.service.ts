@@ -172,9 +172,10 @@ export class VkBotService {
     const binding = /^привязать\s+(.+?)\s+(\d{4})$/i.exec(text.trim());
     const lead = /^заявка\s+([^;]{1,100});\s*(.+)$/i.exec(text.trim());
     // Only explicit commands reach the reply handlers, including their default menus.
+    const isMenuCommand = /^(начать|\/start|старт|меню)$/i.test(text.trim());
     const knownCommand = ['начать', 'help', 'link', 'book', 'cash', 'about', 'directions', 'prices', 'guide',
       'первичная заявка', 'tomorrow', 'horses', 'today', 'riders', 'next-booking', 'membership', 'bookings'].includes(command);
-    if (!knownCommand && !consent && !binding && !lead) return;
+    if (!isMenuCommand && !knownCommand && !consent && !binding && !lead) return;
     if (command === 'help') { await this.requestAdministrator(peer, eventId); return; }
     try {
       // Shared with GET /vk/identify; embedded webhook avoids a loopback HTTP request.
@@ -290,7 +291,10 @@ export class VkBotService {
         });
         await this.send(peer, eventId, cards.length ? `📅 Предстоящие тренировки:\n${cards.join('\n\n')}` : 'Предстоящих тренировок пока нет.', rows.length > 10 ? this.next('bookings', offset) : menu(false)); return;
       }
-      await this.send(peer, eventId, `Здравствуйте, ${staff?.name || client?.firstName || 'всадник'}! Выберите действие. Время: ${zone()}.`, keyboard);
+      if (isMenuCommand || (typeof payload === 'string' && payload.trim().length > 0)) {
+        await this.send(peer, eventId, `Здравствуйте, ${staff?.name || client?.firstName || 'всадник'}! Выберите действие. Время: ${zone()}.`, keyboard);
+      }
+      return;
     } catch (error) {
       if (error instanceof HttpException && error.getStatus() < 500) { await this.send(peer, `${eventId}:error`, error.message); return; }
       throw error;
