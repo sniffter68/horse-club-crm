@@ -34,6 +34,7 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
           const placed = parallelLayout(rows)
           const workload = workloads.find(w => w.horseId === resource.id)
           const arena = arenas.find(a => a.id === resource.id)
+          const trainer = trainers.find(t => t.id === resource.id)
           const rests = grouping === 'horses' ? entries.filter(e => e.active && e.horses.some(h => h.id === resource.id)).flatMap(e => {
             const rest = e.horses.find(h => h.id === resource.id)!.restMinutes
             const from = +new Date(e.endTime), to = from + rest * 60000
@@ -43,6 +44,7 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
           const parallelWidth = Math.max(0, ...placed.map(row => row.lanes)) * minCardWidth
           return <section key={resource.id} className={`resource-column resource-column--${grouping}`} style={parallelWidth > 260 ? { minWidth: parallelWidth } : undefined} aria-label={resource.name}>
             <header className="resource-header"><strong>{resource.name}</strong>
+              {grouping === 'trainers' && <span className="resource-data">Пик за день: {peakOccupancy(rows, start, end)} / {trainer?.maxParallelLessons ?? 4} всадников</span>}
               {grouping === 'horses' && resource.id !== 'unassigned' && (workload ? <><span className="resource-data">{Number(workload.currentWorkloadMinutes.toFixed(1))} / {workload.maxDailyWorkloadMinutes} мин</span><Progress size="small" percent={Math.min(100, workload.currentWorkloadMinutes / workload.maxDailyWorkloadMinutes * 100)} showInfo={false} strokeColor="var(--crm-saddle)" /></> : <span>Нагрузка недоступна</span>)}
               {grouping === 'arenas' && <span className="resource-data">Пик за день: {occupancy?.find(a => a.arenaId === resource.id)?.occupied ?? peakOccupancy(rows, start, end)} / {arena?.maxRidersCapacity ?? arena?.capacity ?? '—'} всадников</span>}
             </header>

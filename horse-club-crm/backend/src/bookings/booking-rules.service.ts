@@ -4,7 +4,6 @@ import { DateTime } from 'luxon';
 import { BookingValidationError } from './booking-validation.error';
 
 export interface BookingRuleInput {
-  requireFreeTrainer?: boolean;
   /** Availability previews do not reserve resources. Writes always acquire locks. */
   lockResources?: boolean;
   requireRiderWeight?: boolean;
@@ -84,8 +83,19 @@ export class BookingRulesService {
     if (reservations.some(r => r.clientIds.some(id => clientIds.includes(id)) && overlaps(r.start, r.end, start, end))) {
       throw new BookingValidationError('CLIENT_BUSY', 'Клиент уже записан на занятие в это время');
     }
-    if (input.requireFreeTrainer && reservations.some(r => r.trainerId === trainerId && overlaps(r.start, r.end, start, end))) {
-      throw new BookingValidationError('TRAINER_BUSY', 'Тренер уже занят в это время');
+    const maxParallelLessons = trainer.maxParallelLessons ?? 4;
+    const trainerEvents = reservations.filter(r => r.trainerId === trainerId && overlaps(r.start, r.end, start, end)).flatMap(r => [
+      { at: Math.max(+start, +r.start), delta: Math.max(1, r.riders) },
+      { at: Math.min(+end, +r.end), delta: -Math.max(1, r.riders) },
+    ]).sort((a, b) => a.at - b.at || a.delta - b.delta);
+    let trainerRiders = Math.max(1, input.participants.length + (input.existingRiders ?? 0));
+    const assertTrainerCapacity = () => {
+      if (trainerRiders > maxParallelLessons) throw new BookingValidationError('TRAINER_BUSY', `У тренера достигнут максимум одновременных всадников (${maxParallelLessons})`, { trainerId, maxParallelLessons });
+    };
+    assertTrainerCapacity();
+    for (const event of trainerEvents) {
+      trainerRiders += event.delta;
+      assertTrainerCapacity();
     }
     for (const horse of horses) {
       const work = reservations.filter(r => r.horseIds.includes(horse.id));

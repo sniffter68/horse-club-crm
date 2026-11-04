@@ -193,7 +193,7 @@ export class LessonsService {
         }
       }
       const horseIds = [...new Set(lesson.bookings.map(booking => booking.horseId).filter((id): id is string => Boolean(id)))];
-      await this.bookingRules.validate(tx, { requireFreeTrainer: true, trainerId: lesson.trainerId, arenaId: lesson.arenaId, participants: lesson.bookings, start, end, excludeLessonId: lessonId });
+      await this.bookingRules.validate(tx, { trainerId: lesson.trainerId, arenaId: lesson.arenaId, participants: lesson.bookings, start, end, excludeLessonId: lessonId });
       await this.validateNoConflictsWithClient(tx, lesson.trainerId, horseIds, start, end, lessonId, lesson.arenaId ?? undefined);
       for (const horseId of horseIds) {
         await this.getHorseWorkloadWithClient(tx, horseId, this.getLocalDateParts(start), durationMinutes, lessonId);
@@ -300,7 +300,7 @@ export class LessonsService {
       this.assertClubWorkingHours(start, end, schedule);
       // Each create request owns its lesson, participants, status and payments.
       // Group participants are supplied explicitly; never append to another lesson.
-      await this.bookingRules.validate(tx, { requireFreeTrainer: true, trainerId: dto.trainerId, arenaId: dto.arenaId, participants, start, end });
+      await this.bookingRules.validate(tx, { trainerId: dto.trainerId, arenaId: dto.arenaId, participants, start, end });
       await this.validateNoConflictsWithClient(
         tx,
         dto.trainerId,
@@ -702,8 +702,7 @@ export class LessonsService {
     if (conflicts.some((lesson) => lesson.bookings.some((booking) => booking.horseId && horseIds.includes(booking.horseId)))) {
       throw new ConflictException('Лошадь уже забронирована на это время');
     }
-    if (conflicts.some(lesson => lesson.trainerId === trainerId)) throw new ConflictException('Тренер уже занят в это время');
-    // Arena capacity and client occupancy are enforced by shared booking rules.
+    // Trainer/arena capacity and client occupancy are enforced by shared booking rules.
   }
 
   private async getHorseWorkloadWithClient(

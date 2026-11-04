@@ -67,8 +67,8 @@ test('PostgreSQL booking rules, rollback, HTTP contract and concurrent triad wri
           ...(race === 'arena' ? { arenaId: entries[0].arenaId } : {}),
           ...(race === 'daily-workload' ? { startTime: `2030-01-08T${String(6 + i * 2).padStart(2, '0')}:00Z`, endTime: `2030-01-08T${String(6 + i * 2).padStart(2, '0')}:30Z` } : {}),
         })));
-        assert.equal(results.filter(r => r.status === 'fulfilled').length, race === 'trainer' ? 5 : race === 'arena' ? 2 : 1);
-        const expected = race === 'arena' ? 'ARENA_FULL' : race === 'horse' ? 'HORSE_BUSY' : 'HORSE_OVERLOADED';
+        assert.equal(results.filter(r => r.status === 'fulfilled').length, race === 'trainer' ? 4 : race === 'arena' ? 2 : 1);
+        const expected = race === 'trainer' ? 'TRAINER_BUSY' : race === 'arena' ? 'ARENA_FULL' : race === 'horse' ? 'HORSE_BUSY' : 'HORSE_OVERLOADED';
         for (const result of results.filter(r => r.status === 'rejected')) assert.ok(hasCode(expected)(result.reason), String(result.reason));
       });
     }

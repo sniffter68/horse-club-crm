@@ -30,6 +30,7 @@ export function TrainerList() {
           { key: 'name', label: 'ФИО', children: trainer.name },
           { key: 'phone', label: 'Телефон', children: trainer.phone || '—' },
           { key: 'qualification', label: 'Специализация', children: trainer.qualification || '—' },
+          { key: 'maxParallelLessons', label: 'Максимум одновременных всадников', children: trainer.maxParallelLessons ?? 4 },
           ...(canManage && canRead('STAFF_PAYROLL') ? [{ key: 'rate', label: 'Ставка', children: money(trainer.baseRate) }] : []),
         ]} /></>}
     </DetailsModal></>

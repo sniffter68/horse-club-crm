@@ -49,7 +49,7 @@ export interface HorseDetails extends Horse {
     client: { id: string; name: string; firstName: string; lastName: string } | null; stall: { id: string; name: string } | null; payments: RelationPayment[] }>;
   bookings: Array<RelationBooking & { client: { id: string; name: string; firstName: string; lastName: string } }>;
 }
-export interface TrainerValues extends PublicationValues { name: string; phone?: string | null; scheduleColor?: string | null; qualification?: string; maxDailyLoad: number; baseRate?: number }
+export interface TrainerValues extends PublicationValues { name: string; phone?: string | null; scheduleColor?: string | null; qualification?: string; maxDailyLoad: number; maxParallelLessons?: number; baseRate?: number }
 export interface Trainer extends Omit<TrainerValues, 'baseRate' | 'phone' | 'qualification'> {
   fullName?: string; specializations?: string[]; isActive?: boolean;
   vkUserId?: string | null;

@@ -4,8 +4,8 @@ import type { ScheduleEntry } from './triad'
 
 const entry = (id: string, start: number, end: number) => ({ id, startTime: new Date(start * 60000).toISOString(), endTime: new Date(end * 60000).toISOString() }) as ScheduleEntry
 describe('parallel lesson lanes', () => {
-  it('divides two and three simultaneous independent cards evenly', () => {
-    for (const count of [2, 3]) {
+  it('divides up to four simultaneous independent cards evenly', () => {
+    for (const count of [2, 3, 4]) {
       const rows = parallelLayout(Array.from({ length: count }, (_, i) => entry(String(i), 0, 60)))
       expect(rows.map(r => r.lane)).toEqual(Array.from({ length: count }, (_, i) => i))
       expect(rows.every(r => r.lanes === count)).toBe(true)

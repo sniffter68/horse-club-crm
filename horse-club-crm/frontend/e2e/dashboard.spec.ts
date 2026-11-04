@@ -19,7 +19,7 @@ for (const width of [1440, 390]) test(`schedule trainer slot opens shared drawer
   const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
   await expect(drawer).toBeVisible()
   await expect(drawer.getByRole('textbox', { name: 'Выберите дату' })).toHaveValue('20.10.2026 11:00')
-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Мария Волкова')
+  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Мария Волкова')
   await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   await expect(drawer.getByText('Заполните поле').first()).toBeVisible()
   for (const [label, value] of [['Клиент', 'Анна Орлова'], ['Услуга', 'Выездка'], ['Лошадь', 'Валдай']]) await choose(page, drawer, label, value)
@@ -34,7 +34,7 @@ for (const width of [1440, 390]) test(`schedule trainer slot opens shared drawer
   })
   await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   await expect(drawer.getByText('Слот занят')).toBeVisible()
-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Мария Волкова')
+  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Мария Волкова')
   fail = false
   const before = reads
   await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
@@ -233,6 +233,42 @@ async function lesson(page: Page) {
   return drawer
 }
 
+for (const width of [1440, 390]) test(`shared booking shows trainer places and blocks the capacity limit at ${width}px`, async ({ page }) => {
+  const state = await setup(page)
+  await page.setViewportSize({ width, height: 900 })
+  let riders = 2
+  const trainerId = '00000003-1111-4111-8111-111111111111'
+  await page.route('**/api/trainers?*', route => route.fulfill({ json: [{ id: trainerId, name: 'Мария Волкова', isActive: true, maxParallelLessons: 3 }], headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/bookings?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
+  await page.route('**/api/lessons?*', route => route.fulfill({ json: Array.from({ length: riders }, (_, i) => ({
+    id: `other-${i}`, trainer: { id: trainerId, name: 'Мария Волкова' }, service: { name: 'Выездка' },
+    startTime: '2026-10-20T09:00:00Z', endTime: '2026-10-20T10:00:00Z', status: 'SCHEDULED',
+    bookings: [{ client: { id: `other-client-${i}`, name: `Всадник ${i + 1}` }, horse: { id: `other-horse-${i}`, name: `Лошадь ${i + 1}` } }],
+  })) }))
+  await page.goto('/')
+  const drawer = await lesson(page)
+  const save = drawer.getByRole('button', { name: 'Записать на тренировку', exact: true })
+  await expect(drawer.getByRole('status')).toContainText('занято 2/3, свободно 1')
+  await expect(save).toBeEnabled()
+  const select = drawer.getByRole('combobox', { name: 'Тренер', exact: true })
+  await select.focus(); await select.press('ArrowDown')
+  await expect(page.locator('.ant-select-dropdown:visible')).toContainText('Мария Волкова (занято 2/3)')
+  await select.press('Escape')
+  await expect(drawer).toBeVisible()
+  riders = 3
+  await drawer.getByLabel('Длительность, мин', { exact: true }).fill('30')
+  await expect(drawer.getByRole('status')).toContainText('занято 3/3, свободно 0')
+  await expect(drawer.getByRole('alert').filter({ hasText: 'максимум одновременных всадников (3)' })).toBeVisible()
+  await expect(save).toBeDisabled()
+  await page.screenshot({ path: `test-results/trainer-capacity-${width}.png` })
+  riders = 2
+  await drawer.getByLabel('Длительность, мин', { exact: true }).fill('60')
+  await expect(drawer.getByRole('status')).toContainText('занято 2/3, свободно 1')
+  await save.click()
+  await expect(drawer).not.toBeVisible()
+  expect(state.calls).toBe(1)
+})
+
 async function preferenceSetup(page: Page) {
   await setup(page)
   const trainers = [3, 8].map((n, i) => ({ id: `0000000${n}-1111-4111-8111-111111111111`, name: i ? 'Иван Петров' : 'Мария Волкова', isActive: true }))
@@ -256,11 +292,11 @@ for (const width of [1440, 390]) test(`dashboard booking applies client defaults
   await page.setViewportSize({ width, height: 900 })
   const { drawer } = await preferenceSetup(page)
   await choose(page, drawer, 'Клиент', 'Анна Орлова')
-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Мария Волкова')
+  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Мария Волкова')
   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Валдай')
   await page.screenshot({ path: `test-results/dashboard-booking-defaults-${width}.png` })
   await choose(page, drawer, 'Клиент', 'Ольга Соколова')
-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
   await choose(page, drawer, 'Клиент', 'Клиент без предпочтений')
   for (const label of ['Тренер', 'Лошадь']) await expect(resourceSelection(drawer, label)).toHaveCount(0)
@@ -269,10 +305,10 @@ for (const width of [1440, 390]) test(`dashboard booking applies client defaults
   await choose(page, drawer, 'Тренер', 'Иван Петров')
   await choose(page, drawer, 'Лошадь', 'Алмаз')
   await choose(page, drawer, 'Клиент', 'Клиент без предпочтений')
-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
   await choose(page, drawer, 'Клиент', 'Анна Орлова')
-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
   await drawer.getByRole('combobox', { name: 'Тренер', exact: true }).focus()
   await page.keyboard.press('ArrowDown')
@@ -298,13 +334,13 @@ test('dashboard delayed preferences preserve manual resources', async ({ page })
   const response = page.waitForResponse(`**/api/clients/${clients[0].id}`)
   release()
   await (await response).finished()
-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
   const horseSelect = drawer.getByRole('combobox', { name: 'Лошадь', exact: true }).locator('xpath=ancestor::div[contains(@class,"ant-select") and not(contains(@class,"ant-select-selector"))][1]')
   await horseSelect.hover()
   await horseSelect.locator('.ant-select-clear').click()
   await choose(page, drawer, 'Клиент', 'Клиент без предпочтений')
-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
   await expect(resourceSelection(drawer, 'Лошадь')).toHaveCount(0)
   await choose(page, drawer, 'Клиент', 'Ольга Соколова')
   await expect(resourceSelection(drawer, 'Лошадь')).toHaveCount(0)
@@ -319,11 +355,11 @@ test('dashboard ignores preferences from a previously selected client', async ({
   await choose(page, drawer, 'Клиент', 'Анна Орлова')
   await requested
   await choose(page, drawer, 'Клиент', 'Ольга Соколова')
-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
   release()
   await choose(page, drawer, 'Услуга', 'Выездка')
-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
+  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
 })
 
@@ -402,7 +438,7 @@ test('failed lesson save preserves the form, supports retry, and dirty close ask
   const state = await setup(page); state.failure = true; await page.goto('/')
   const drawer = await lesson(page)
   await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
-  await expect(drawer.getByRole('alert')).toContainText('Тренер уже занят')
+  await expect(drawer.getByRole('alert').filter({ hasText: 'Тренер уже занят' })).toBeVisible()
   await expect(drawer.getByRole('combobox', { name: 'Клиент', exact: true })).toHaveValue('')
   await drawer.getByRole('button', { name: 'Закрыть', exact: true }).click()
   const confirm = page.getByRole('dialog', { name: 'Закрыть без сохранения?' })

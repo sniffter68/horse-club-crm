@@ -269,6 +269,7 @@ model Trainer {
   vkUserId      BigInt?  @unique
   qualification String?
   maxDailyLoad  Int      @default(480)
+  maxParallelLessons Int @default(4)
   baseRate      Decimal  @default(0) @db.Decimal(12, 2)
   lessons       Lesson[]
 }

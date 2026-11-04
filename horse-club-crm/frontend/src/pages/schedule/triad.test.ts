@@ -26,6 +26,10 @@ describe('triad schedule data', () => {
     const deposit = membershipBalance({ id: 'deposit', type: 'deposit', totalLessons: 0, remainedLessons: 0, validUntil: '2020-01-01', validTo: '2099-01-01', remainingUnits: '1234.56', initialUnits: '2000' })
     expect(deposit.remaining).toBe(1234.56); expect(deposit.active).toBe(true); expect(deposit.label).toContain('₽')
   })
+  it('retains the configured trainer limit in the inline error', () => {
+    expect(bookingFailure(Object.assign(new Error('Conflict'), { statusCode: 409, code: 'TRAINER_BUSY', details: { maxParallelLessons: 3 } })))
+      .toEqual({ field: 'trainerId', message: 'У тренера достигнут максимум одновременных всадников (3)' })
+  })
   it('counts peak simultaneous riders rather than every intersecting booking', () => {
     const row = { active: true, riders: ['A'], startTime: '2026-10-09T07:00Z', endTime: '2026-10-09T07:30Z' } as ScheduleEntry
     const next = { ...row, startTime: '2026-10-09T07:30Z', endTime: '2026-10-09T08:00Z' }

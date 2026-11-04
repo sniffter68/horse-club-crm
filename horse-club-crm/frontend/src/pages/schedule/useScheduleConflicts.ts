@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { catalog } from '../catalogs/loadCatalog'
 import type { Lesson } from './types'
-import { scheduleEntries, type ScheduleEntry, type TriadBooking } from './triad'
+import { peakOccupancy, scheduleEntries, type ScheduleEntry, type TriadBooking } from './triad'
 
 // Fetch the interval independently of calendar filters and the visible date range.
-export function useScheduleConflicts(from?: string, to?: string, excludeId?: string) {
-  const key = `${from}|${to}|${excludeId}`
+export function useScheduleConflicts(from?: string, to?: string, excludeId?: string, revision = 0) {
+  const key = `${from}|${to}|${excludeId}|${revision}`
   const enabled = Boolean(from && to && from < to)
   const [state, setState] = useState<{ key: string; entries: ScheduleEntry[]; error?: string }>({ key: '', entries: [] })
   useEffect(() => {
@@ -24,5 +24,7 @@ export function useScheduleConflicts(from?: string, to?: string, excludeId?: str
     }, 200)
     return () => { window.clearTimeout(timer); controller.abort() }
   }, [enabled, excludeId, from, key, to])
-  return enabled && state.key === key ? { ...state, loading: false } : { entries: [], loading: enabled, error: undefined }
+  const result = enabled && state.key === key ? { ...state, loading: false } : { entries: [], loading: enabled, error: undefined }
+  return { ...result, trainerOccupancy: (trainerId: string) => enabled && !result.loading && !result.error
+    ? peakOccupancy(result.entries.filter(e => e.trainerId === trainerId), +new Date(from!), +new Date(to!)) : undefined }
 }

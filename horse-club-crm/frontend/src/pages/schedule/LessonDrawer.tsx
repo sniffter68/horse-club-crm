@@ -12,6 +12,7 @@ import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { StableEntryModal } from '../stable/shared'
 import { useLeadLessonCatalogs } from '../dashboard/useLeadLessonCatalogs'
 import { useTriadAvailability } from './useTriadAvailability'
+import { useScheduleConflicts } from './useScheduleConflicts'
 import { useClientPreferences } from './useClientPreferences'
 import { CLUB_TIME_ZONE, toInstant } from './time'
 import type { ClientWithMemberships, MembershipSummary } from './types'
@@ -34,6 +35,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
   const invalidate = useInvalidate()
   const [form] = Form.useForm<LessonValues>()
   const [revision, retry] = useState(0)
+  const [resourceRevision, refreshResources] = useState(0)
   const [failure, setFailure] = useState<string>()
   const report = useCallback((cause: unknown) => setFailure(toHttpError(cause).message), [])
   const catalogs = useLeadLessonCatalogs(true, revision, report)
@@ -41,6 +43,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
   const duration = Form.useWatch('durationMinutes', form) as number | undefined
   const serviceId = Form.useWatch('serviceId', form) as string | undefined
   const clientId = Form.useWatch('clientId', form) as string | undefined
+  const trainerId = Form.useWatch('trainerId', form) as string | undefined
   const membershipId = Form.useWatch('membershipId', form) as string | undefined
   const [memberships, setMemberships] = useState<MembershipSummary[]>([])
   const [membershipsLoading, setMembershipsLoading] = useState(false)
@@ -77,14 +80,18 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
       to = new Date(+new Date(from) + duration * 60000).toISOString()
     }
   } catch { /* Invalid input is handled by the form. */ }
-  const availability = useTriadAvailability(from, to, revision, report)
+  const availability = useTriadAvailability(from, to, revision + resourceRevision, report)
+  const conflicts = useScheduleConflicts(from, to, undefined, revision + resourceRevision)
+  const trainerLimit = catalogs.trainers.find(row => row.id === trainerId)?.maxParallelLessons ?? 4
+  const occupiedTrainerPlaces = trainerId ? conflicts.trainerOccupancy(trainerId) : undefined
+  const trainerFull = occupiedTrainerPlaces !== undefined && occupiedTrainerPlaces >= trainerLimit
   const blockedHorse = (id: string) => {
     const load = availability.data?.horseWorkloads.find(row => row.horseId === id)
     const horse = catalogs.horses.find(row => row.id === id)
     return !load || load.status !== 'AVAILABLE' || load.currentWorkloadMinutes + (duration ?? 0) > load.maxDailyWorkloadMinutes
       || Boolean(horse?.healthStatus && horse.healthStatus !== 'HEALTHY')
   }
-  const unavailable = catalogs.loading || catalogs.error || availability.loading || availability.error || !availability.data || !from || (horseId && blockedHorse(horseId))
+  const unavailable = catalogs.loading || catalogs.error || availability.loading || availability.error || !availability.data || !from || (horseId && blockedHorse(horseId)) || conflicts.loading || trainerFull
   const required = [{ required: true, message: 'Заполните поле' }]
   return <StableEntryModal variant="drawer" title="Записать на тренировку" form={form} submitLabel="Записать на тренировку" submitDisabled={Boolean(unavailable)}
     initialValues={{ startTime: dayjs(initialDateTime ? DateTime.fromISO(initialDateTime, { zone: CLUB_TIME_ZONE }).setZone(CLUB_TIME_ZONE).toFormat("yyyy-MM-dd'T'HH:mm") : DateTime.now().setZone(CLUB_TIME_ZONE).startOf('hour').plus({ hours: 1 }).toFormat("yyyy-MM-dd'T'HH:mm")), trainerId: initialTrainerId, arenaId: initialArenaId, horseId: initialHorseId, durationMinutes: initialDurationMinutes }}
@@ -100,7 +107,12 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
       if (unavailable) throw new Error('Проверьте доступность лошади и загрузку справочников')
       if ([values.clientId, values.serviceId, values.trainerId, values.horseId, values.arenaId, values.membershipId].filter(Boolean).some(id => !isUuid(id!))) throw new Error('Выберите корректные записи из справочников')
       if (values.membershipId) { delete values.cost; delete values.prepaymentAmount; delete values.prepaymentMethod }
-      await httpClient.post(`${API_URL}/lessons`, { ...values, startTime: toInstant(values.startTime.format('YYYY-MM-DDTHH:mm')) })
+      try {
+        await httpClient.post(`${API_URL}/lessons`, { ...values, startTime: toInstant(values.startTime.format('YYYY-MM-DDTHH:mm')) })
+      } catch (cause) {
+        if (toHttpError(cause).statusCode === 409) refreshResources(n => n + 1)
+        throw cause
+      }
     }}>
     <Typography.Paragraph type="secondary">Время Москвы. Проверяем здоровье, дневную нагрузку и занятость ресурсов.</Typography.Paragraph>
     {(failure || catalogs.error || availability.error) && <Alert type="error" showIcon message={failure || catalogs.error || availability.error || 'Не удалось загрузить клиентов'}
@@ -113,11 +125,15 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
       options={catalogs.services.map(row => ({ value: row.id, label: row.title || row.name }))}
       onChange={id => form.setFieldsValue({ participantsCount: 1, pricePerPerson: isPerPersonService(catalogs.services.find(row => row.id === id)) ? Number(catalogs.services.find(row => row.id === id)?.price ?? 0) : undefined, durationMinutes: catalogs.services.find(row => row.id === id)?.durationMinutes ?? 60, cost: Number(catalogs.services.find(row => row.id === id)?.price ?? 0), prepaymentAmount: 0, prepaymentMethod: undefined })} /></Form.Item>
     <Form.Item name="durationMinutes" label="Длительность, мин" rules={[...required, { type: 'number', min: 1, max: 480 }]}><InputNumber min={1} max={480} precision={0} /></Form.Item>
-    <Form.Item name="trainerId" label="Тренер" rules={required}><Select onChange={preferences.trainerChanged} onInputKeyDown={stopPopupEscape} aria-label="Тренер" loading={catalogs.loading} showSearch optionFilterProp="label"
-      options={catalogs.trainers.map(row => ({ value: row.id, label: row.fullName || row.name }))} /></Form.Item>
+    <Form.Item name="trainerId" label="Тренер" rules={required}><Select onChange={preferences.trainerChanged} onInputKeyDown={stopPopupEscape} aria-label="Тренер" loading={catalogs.loading || conflicts.loading} showSearch optionFilterProp="label"
+      options={catalogs.trainers.map(row => ({ value: row.id, label: `${row.fullName || row.name} (занято ${conflicts.trainerOccupancy(row.id) ?? '…'}/${row.maxParallelLessons ?? 4})` }))} /></Form.Item>
+    {occupiedTrainerPlaces !== undefined && <Typography.Paragraph role="status">Тренер: занято {occupiedTrainerPlaces}/{trainerLimit}, свободно {Math.max(0, trainerLimit - occupiedTrainerPlaces)} мест на выбранный интервал.</Typography.Paragraph>}
+    {trainerFull && <Alert type="error" showIcon message={`У тренера достигнут максимум одновременных всадников (${trainerLimit})`} />}
+    {conflicts.error && <Alert type="warning" showIcon message="Не удалось проверить свободные места тренера" description="При сохранении сервер повторно проверит вместимость."
+      action={<Button onClick={() => retry(n => n + 1)}>Повторить</Button>} />}
     <Form.Item name="horseId" label="Лошадь" extra={perPerson ? 'Для экскурсий выбор лошади необязателен' : 'Можно назначить лошадь позже в карточке занятия'}><Select allowClear placeholder="Назначить позже / Не выбрана" onChange={preferences.horseChanged} onInputKeyDown={stopPopupEscape} aria-label="Лошадь" loading={catalogs.loading || availability.loading} showSearch optionFilterProp="label"
       options={[{ value: '', label: 'Назначить позже / Не выбрана' }, ...catalogs.horses.map(row => ({ value: row.id, label: row.name, disabled: !from || availability.loading || blockedHorse(row.id) }))]} /></Form.Item>
-    {horseId && blockedHorse(horseId) && <Alert type="warning" showIcon message="Лошадь недоступна или превышен дневной лимит. Выберите другую лошадь или время." />}
+    {horseId && !availability.loading && blockedHorse(horseId) && <Alert type="warning" showIcon message="Лошадь недоступна или превышен дневной лимит. Выберите другую лошадь или время." />}
     <Form.Item name="arenaId" label="Манеж / локация"><Select onInputKeyDown={stopPopupEscape} allowClear showSearch optionFilterProp="label" loading={catalogs.loading}
       options={catalogs.arenas.map(row => ({ value: row.id, label: row.name }))} /></Form.Item>
     {allowMembership && <Form.Item name="membershipId" label="Абонемент" extra="Оставьте пустым для разового занятия.">

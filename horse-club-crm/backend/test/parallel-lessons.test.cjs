@@ -38,7 +38,7 @@ const dto = { trainerId: 'trainer', arenaId: 'arena', serviceId: 'individual', s
 test('creates and lists two independent simultaneous lessons with separate prices', async () => {
   const { service, rows } = fixture();
   const first = await service.createLesson({ ...dto, cost: 1500 });
-  const second = await service.createLesson({ ...dto, trainerId: 'trainer-2', clientId: 'client-2', horseId: 'horse-2', cost: 2200 });
+  const second = await service.createLesson({ ...dto, clientId: 'client-2', horseId: 'horse-2', cost: 2200 });
   assert.notEqual(first.id, second.id);
   assert.equal(rows.length, 2);
   assert.deepEqual(rows.map(l => l.bookings.length), [1, 1]);
@@ -50,7 +50,7 @@ test('creates and lists two independent simultaneous lessons with separate price
 test('parallel riders retain their own memberships without merging bookings', async () => {
   const { service, rows } = fixture();
   await service.createLesson({ ...dto, membershipId: 'membership-1' });
-  await service.createLesson({ ...dto, trainerId: 'trainer-2', clientId: 'client-2', horseId: 'horse-2', membershipId: 'membership-2' });
+  await service.createLesson({ ...dto, clientId: 'client-2', horseId: 'horse-2', membershipId: 'membership-2' });
   assert.deepEqual(rows.map(l => l.bookings.map(b => b.membershipId)), [['membership-1'], ['membership-2']]);
   assert.ok(rows.every(l => !l.bookings[0].payments));
 });
@@ -66,11 +66,20 @@ for (const resource of ['horse', 'client']) test(`creating overlapping ${resourc
 for (const capacity of [1, 3]) test(`three overlapping lessons remain independent with service capacity ${capacity}`, async () => {
   const { service, rows } = fixture(capacity);
   for (let i = 1; i <= 3; i++) {
-    await service.createLesson({ ...dto, trainerId: `trainer-${i}`, clientId: `client-${i}`, horseId: `horse-${i}`, cost: i * 1000 });
+    await service.createLesson({ ...dto, clientId: `client-${i}`, horseId: `horse-${i}`, cost: i * 1000 });
   }
   assert.equal(new Set(rows.map(row => row.id)).size, 3);
   assert.deepEqual(rows.map(row => row.bookings.map(b => b.clientId)), [['client-1'], ['client-2'], ['client-3']]);
   assert.deepEqual(rows.map(row => Number(row.cost)), [1000, 2000, 3000]);
   assert.ok(rows.every(row => row.status === 'SCHEDULED' && row.paymentStatus === 'UNPAID'));
   assert.deepEqual(rows.map(row => row.bookings[0].payments.create.clientId), ['client-1', 'client-2', 'client-3']);
+});
+
+test('four riders share one trainer; a fifth is rejected before writing a lesson or payment', async () => {
+  const { service, rows } = fixture();
+  for (let i = 1; i <= 4; i++) await service.createLesson({ ...dto, clientId: `client-${i}`, horseId: `horse-${i}` });
+  await assert.rejects(service.createLesson({ ...dto, clientId: 'client-5', horseId: 'horse-5' }), error => error.getResponse().code === 'TRAINER_BUSY');
+  assert.equal(rows.length, 4);
+  assert.ok(rows.every(row => row.trainerId === dto.trainerId));
+  assert.equal(new Set(rows.map(row => row.bookings[0].payments.create.clientId)).size, 4);
 });

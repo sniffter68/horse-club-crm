@@ -101,6 +101,62 @@ test('trainer overlap and adjacent intervals allow independent riders', async ()
   }
 });
 
+test('trainer capacity combines direct and group riders, accepting the exact limit', async () => {
+  for (const maxParallelLessons of [3, 4]) {
+    const f = fixture({ trainer: { maxParallelLessons }, bookings: [{ trainerId: 'trainer', clientId: 'other', horseId: 'other', startTime: at('10:00'), endTime: at('10:30') }],
+      lessons: [{ trainerId: 'trainer', arenaId: 'elsewhere', startTime: at('10:00'), endTime: at('10:30'), bookings: [{ clientId: 'a' }, { clientId: 'b' }] }] });
+    if (maxParallelLessons === 4) await rules.validate(f.tx, f.input);
+    else await assert.rejects(rules.validate(f.tx, f.input), error => failure('TRAINER_BUSY')(error)
+      && error.message === 'У тренера достигнут максимум одновременных всадников (3)'
+      && error.getResponse().details.maxParallelLessons === 3);
+  }
+});
+
+test('trainer uses peak occupancy and half-open boundaries instead of total intersections', async () => {
+  const base = { trainerId: 'trainer', clientId: 'other', horseId: 'other' };
+  const bookings = [
+    { ...base, startTime: at('09:00'), endTime: at('10:00') },
+    { ...base, startTime: at('10:00'), endTime: at('10:15') },
+    { ...base, startTime: at('10:15'), endTime: at('10:30') },
+    { ...base, startTime: at('10:30'), endTime: at('11:00') },
+  ];
+  const f = fixture({ trainer: { maxParallelLessons: 2 }, bookings });
+  await rules.validate(f.tx, f.input);
+  bookings.push({ ...base, startTime: at('10:14'), endTime: at('10:16') });
+  await assert.rejects(rules.validate(f.tx, f.input), failure('TRAINER_BUSY'));
+});
+
+test('new group and existing riders consume trainer places even without horses', async () => {
+  const f = fixture({ trainer: { maxParallelLessons: 2 } });
+  await rules.validate(f.tx, { ...f.input, participants: [{ clientId: 'client' }], existingRiders: 1 });
+  await assert.rejects(rules.validate(f.tx, { ...f.input, participants: [{ clientId: 'client' }], existingRiders: 2 }), failure('TRAINER_BUSY'));
+});
+
+test('rescheduling excludes own records and queries only active reservations without copied bookings', async () => {
+  const f = fixture();
+  f.tx.booking.findMany = async ({ where }) => {
+    assert.equal(where.lessonId, null);
+    assert.deepEqual(where.id, { not: 'own-booking' });
+    assert.deepEqual(where.status.in, ['scheduled', 'completed']);
+    return [];
+  };
+  f.tx.lesson.findMany = async ({ where }) => {
+    assert.equal(where.deletedAt, null);
+    assert.deepEqual(where.id, { not: 'own-lesson' });
+    assert.deepEqual(where.status.in, ['SCHEDULED', 'COMPLETED']);
+    return [];
+  };
+  await rules.validate(f.tx, { ...f.input, excludeBookingId: 'own-booking', excludeLessonId: 'own-lesson' });
+});
+
+test('trainer DTO validates integral capacity from one to one hundred', async () => {
+  const { plainToInstance } = require('class-transformer');
+  const { validate } = require('class-validator');
+  const { UpdateTrainerDto } = require('../dist/trainers/dto/update-trainer.dto');
+  for (const maxParallelLessons of [1, 4, 100]) assert.equal((await validate(plainToInstance(UpdateTrainerDto, { maxParallelLessons }))).length, 0);
+  for (const maxParallelLessons of [0, -1, 1.5, 101, '4', null]) assert.ok((await validate(plainToInstance(UpdateTrainerDto, { maxParallelLessons }))).length > 0);
+});
+
 test('horse and client overlaps remain hard conflicts across direct and legacy records', async () => {
   for (const legacy of [false, true]) {
     for (const resource of ['horse', 'client']) {

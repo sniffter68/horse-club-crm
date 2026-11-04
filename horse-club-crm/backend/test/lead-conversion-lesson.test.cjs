@@ -14,11 +14,11 @@ const ids = Object.fromEntries(['lead', 'client', 'trainer', 'horse', 'arena', '
 const dto = () => ({ firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567', isRider: true, isPayer: false,
   lesson: { trainerId: ids.trainer, horseId: ids.horse, arenaId: ids.arena, startTime: '2026-10-14T10:00:00Z', durationMinutes: 45 } });
 
-function harness({ existing = false, collision, failLeadUpdate = false, missingService = false } = {}) {
+function harness({ existing = false, collision, failLeadUpdate = false, missingService = false, maxParallelLessons = 4 } = {}) {
   let state = { lead: { id: ids.lead, status: 'PENDING', serviceId: missingService ? null : ids.service },
     clients: existing ? [{ id: ids.client, phone: dto().phone, firstName: 'Старое имя', vkUserId: 42n }] : [], lessons: [], notifications: [] };
   let transactionCount = 0, validateCount = 0;
-  const trainer = { id: ids.trainer, isActive: true, name: 'Мария', vkUserId: 77n };
+  const trainer = { id: ids.trainer, isActive: true, maxParallelLessons, name: 'Мария', vkUserId: 77n };
   const horse = { id: ids.horse, name: 'Валдай', status: 'active', isUnavailable: false,
     requiredRestMinutes: 45, maxDailyWorkloadMinutes: 240, maxDailyMinutes: 240, maxRiderWeight: 85 };
   const arena = { id: ids.arena, name: 'Манеж', isActive: true, isUnavailable: false, capacity: 6, maxRidersCapacity: 6 };
@@ -95,9 +95,17 @@ test('existing client is reused by phone and receives the participant notificati
   assert.equal(h.state().notifications.length, 2);
 });
 
-test('trainer overlap rejects a second lesson when converting a lead', async () => {
+test('trainer overlap permits converting a lead within capacity', async () => {
   const h = harness({ collision: 'trainer' });
-  await assert.rejects(h.service.accept(ids.lead, dto()), /Тренер уже занят/);
+  await h.service.accept(ids.lead, dto());
+  assert.equal(h.state().lessons.length, 1);
+});
+
+test('trainer capacity rejects a lead conversion and rolls back the new client', async () => {
+  const h = harness({ collision: 'trainer', maxParallelLessons: 1 });
+  await assert.rejects(h.service.accept(ids.lead, dto()), /У тренера достигнут максимум одновременных всадников \(1\)/);
+  assert.deepEqual(h.state().clients, []);
+  assert.equal(h.state().lead.status, 'PENDING');
 });
 
 for (const collision of ['horse']) test(`${collision} overlap rejects and rolls back client and lead`, async () => {

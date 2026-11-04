@@ -48,11 +48,12 @@ for (const width of [1280, 375]) test(`parallel trainer cards remain separate an
 test('trainer overlap is informational while horse overlap disables save', async ({ page }) => {
   let submitted = 0
   const other = { ...booking, id: 'parallel', startTime: '2026-10-09T06:00:00Z', horseId: 'h2', clientId: 'c2', horse: { ...horse, id: 'h2', name: 'Буран' }, client: { ...client, id: 'c2', name: 'Борис', firstName: 'Борис', lastName: '' } }
-  await page.route('**/api/bookings?*', route => route.fulfill({ json: [other], headers: { 'x-total-count': '1' } }))
-  await page.route('**/api/bookings', route => { submitted++; return route.fulfill({ status: 201, json: booking }) })
-  const modal = await openFilled(page)
-  await expect(modal.getByText(/Занятие будет добавлено параллельно/)).toContainText('Борис / Буран')
-  const save = modal.getByRole('button', { name: 'Создать бронирование', exact: true })
+  await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking, other], headers: { 'x-total-count': '2' } }))
+  await page.route('**/api/bookings/booking1', route => { submitted++; return route.fulfill({ json: booking }) })
+  const modal = await openExisting(page)
+  await expect(modal.getByText(/Параллельная запись доступна/)).toContainText('Борис / Буран')
+  await expect(modal.getByRole('status').filter({ hasText: 'Тренер:' })).toContainText('занято 1/4, свободно 3')
+  const save = modal.getByRole('button', { name: 'Сохранить бронирование', exact: true })
   await expect(save).toBeEnabled()
   await choose(page, modal, 'Лошадь', 'Буран')
   await expect(modal.getByText('Лошадь Буран уже занята в это время', { exact: true })).toBeVisible()
@@ -62,6 +63,23 @@ test('trainer overlap is informational while horse overlap disables save', async
   await save.click()
   await expect(modal).toHaveCount(0)
   expect(submitted).toBe(1)
+})
+
+test('trainer capacity blocks an extra rider and refreshes when the interval changes', async ({ page }) => {
+  await page.route('**/api/trainers?*', route => route.fulfill({ json: [{ ...trainer, maxParallelLessons: 2 }], headers: { 'x-total-count': '1' } }))
+  const others = [1, 2].map(i => ({ ...booking, id: `parallel-${i}`, trainerId: 't1', horseId: `other-horse-${i}`, clientId: `other-client-${i}`,
+    startTime: '2026-10-09T07:00:00Z', endTime: '2026-10-09T08:00:00Z' }))
+  await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking, ...others], headers: { 'x-total-count': '3' } }))
+  const modal = await openExisting(page)
+  await expect(modal.getByRole('status').filter({ hasText: 'Тренер:' })).toContainText('занято 2/2, свободно 0')
+  await expect(modal.getByRole('alert').filter({ hasText: 'У тренера достигнут максимум одновременных всадников (2)' })).toBeVisible()
+  await expect(modal.getByRole('button', { name: 'Сохранить бронирование', exact: true })).toBeDisabled()
+  const start = modal.getByLabel('Начало', { exact: true })
+  const end = modal.getByLabel('Окончание', { exact: true })
+  await end.fill('09.10.2026 12:00'); await end.press('Enter'); await end.press('Tab')
+  await start.fill('09.10.2026 11:00'); await start.press('Enter'); await start.press('Tab')
+  await expect(modal.getByRole('status').filter({ hasText: 'Тренер:' })).toContainText('занято 0/2, свободно 2')
+  await expect(modal.getByRole('button', { name: 'Сохранить бронирование', exact: true })).toBeEnabled()
 })
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
@@ -99,6 +117,12 @@ async function openFilled(page: Page) {
   await choose(page, modal, 'Тренер', 'Мария Волкова')
   await choose(page, modal, 'Локация', 'Крытый манеж')
   return modal
+}
+async function openExisting(page: Page) {
+  await page.goto('/schedule')
+  await page.locator('.fc-event').filter({ hasText: 'Анна Орлова' }).first().click()
+  await page.getByRole('dialog', { name: 'Карточка бронирования', exact: true }).getByRole('button', { name: 'Редактировать бронирование', exact: true }).click()
+  return page.getByRole('dialog', { name: 'Редактирование бронирования', exact: true })
 }
 
 test('family membership payment option names the owner and submits beneficiary booking', async ({ page }) => {

@@ -107,13 +107,13 @@ test('revenue failure rolls back debit, booking linkage and pending cancellation
 test('shared lesson rules check trainer occupancy even without a horse', async () => {
   const rules = new BookingRulesService();
   const tx = {
-    $queryRaw: async () => [], trainer: { findUnique: async () => ({ isActive: true }) },
+    $queryRaw: async () => [], trainer: { findUnique: async () => ({ isActive: true, maxParallelLessons: 1 }) },
     horse: { findMany: async ({ where }) => { assert.deepEqual(where.id.in, []); return []; } },
     client: { findMany: async () => [{ id: id(4) }] },
     booking: { findMany: async () => [{ trainerId: id(5), clientId: id(99), startTime: new Date('2026-11-02T09:00Z'), endTime: new Date('2026-11-02T10:00Z') }] },
     lesson: { findMany: async () => [] },
   };
-  await assert.rejects(rules.validate(tx, { requireFreeTrainer: true, trainerId: id(5), participants: [{ clientId: id(4) }],
+  await assert.rejects(rules.validate(tx, { trainerId: id(5), participants: [{ clientId: id(4) }],
     start: new Date('2026-11-02T09:30Z'), end: new Date('2026-11-02T10:30Z') }), error => error.getResponse().code === 'TRAINER_BUSY');
 });
 

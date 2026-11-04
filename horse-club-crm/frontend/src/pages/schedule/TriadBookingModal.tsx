@@ -64,7 +64,12 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
   }, [clientId, clientRevision, report])
   let from: string | undefined, to: string | undefined
   try { if (startTime && endTime) { from = toInstant(startTime); to = toInstant(endTime); if (from >= to) { from = undefined; to = undefined } } } catch { /* Inline date validation owns malformed intervals. */ }
-  const conflicts = useScheduleConflicts(from, to, booking?.id)
+  const conflicts = useScheduleConflicts(from, to, booking?.id, revision)
+  const { trainerOccupancy } = conflicts
+  const selectedTrainer = trainers.find(t => t.id === trainerId)
+  const trainerLimit = selectedTrainer?.maxParallelLessons ?? 4
+  const occupiedTrainerPlaces = trainerId ? trainerOccupancy(trainerId) : undefined
+  const trainerFull = occupiedTrainerPlaces !== undefined && occupiedTrainerPlaces >= trainerLimit
   const horseBusy = scheduleConflicts(conflicts.entries, trainerId, horseId ? [horseId] : []).horses.length > 0
   const availability = useTriadAvailability(from, to, revision, report, booking?.id)
   const client = loadedClient?.id === clientId ? loadedClient : clients.find(c => c.id === clientId)
@@ -82,7 +87,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
     modal.confirm({ title: 'Закрыть бронирование без сохранения?', content: 'Введённые изменения будут потеряны.', okText: 'Закрыть без сохранения', cancelText: 'Продолжить заполнение', onOk: onClose })
   }
   async function save(values: TriadValues) {
-    if (lock.current || overweight || horseBusy || conflicts.loading) return
+    if (lock.current || overweight || horseBusy || trainerFull || conflicts.loading) return
     lock.current = true; setBusy(true); setFailure(undefined)
     try {
       const payload = { ...values, membershipId: values.membershipId || undefined, startTime: toInstant(values.startTime), endTime: toInstant(values.endTime) }
@@ -140,7 +145,9 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
       {workload && <Typography.Paragraph className="triad-load" role="status">Нагрузка за {availability.data?.date?.split('-').reverse().join('.')}: {formatMinutes(workload.currentWorkloadMinutes)} / {workload.maxDailyWorkloadMinutes} мин</Typography.Paragraph>}
       <ScheduleConflictNotice entries={conflicts.entries} trainerId={trainerId} horseIds={horseId ? [horseId] : []} error={conflicts.error} />
       <Form.Item name="trainerId" label="Тренер" rules={[required]}><Select onInputKeyDown={stopPopupEscape} onChange={preferences.trainerChanged} id="triad_trainerId" aria-label="Тренер" showSearch allowClear optionFilterProp="label" placeholder="Выберите тренера"
-        options={trainers.filter(t => t.isActive !== false).map(t => ({ value: t.id, label: `${t.fullName || t.name}${t.specializations?.length ? ` · ${t.specializations.join(', ')}` : t.qualification ? ` · ${t.qualification}` : ''}` }))} /></Form.Item>
+        loading={conflicts.loading} options={trainers.filter(t => t.isActive !== false).map(t => ({ value: t.id, label: `${t.fullName || t.name} (занято ${trainerOccupancy(t.id) ?? '…'}/${t.maxParallelLessons ?? 4})${t.specializations?.length ? ` · ${t.specializations.join(', ')}` : t.qualification ? ` · ${t.qualification}` : ''}` }))} /></Form.Item>
+      {occupiedTrainerPlaces !== undefined && <Typography.Paragraph role="status">Тренер: занято {occupiedTrainerPlaces}/{trainerLimit}, свободно {Math.max(0, trainerLimit - occupiedTrainerPlaces)} мест на выбранный интервал.</Typography.Paragraph>}
+      {trainerFull && <Alert className="triad-feedback" type="error" showIcon message={`У тренера достигнут максимум одновременных всадников (${trainerLimit})`} />}
       <Form.Item name="arenaId" label="Локация" rules={[required]}><Select onInputKeyDown={stopPopupEscape} id="triad_arenaId" aria-label="Локация" showSearch allowClear optionFilterProp="label" placeholder="Манеж, плац или маршрут" loading={availability.loading}
         options={arenas.filter(a => a.isActive !== false && !a.isUnavailable).map(a => {
           const row = availability.data?.arenaOccupancy.find(o => o.arenaId === a.id)
@@ -157,7 +164,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
         <Select onInputKeyDown={stopPopupEscape} id="triad_membershipId" aria-label="Абонемент / депозит" allowClear showSearch optionFilterProp="label" disabled={!clientId || busy} loading={membershipState.loading} placeholder="Без абонемента"
           options={suitableMemberships.map(m => ({ value: m.id, label: `${m.isShared ? `Семейный (${m.ownerName})` : m.title || m.pricingPlan?.name || 'Абонемент'} · ${membershipBalance(m).label}` }))} />
       </Form.Item>
-      <Space wrap className="triad-actions"><Button type="primary" htmlType="submit" loading={busy} aria-busy={busy} disabled={overweight || horseBusy || conflicts.loading || availability.loading || Boolean(availability.error)}>{booking ? 'Сохранить бронирование' : 'Создать бронирование'}</Button>
+      <Space wrap className="triad-actions"><Button type="primary" htmlType="submit" loading={busy} aria-busy={busy} disabled={overweight || horseBusy || trainerFull || conflicts.loading || availability.loading || Boolean(availability.error)}>{booking ? 'Сохранить бронирование' : 'Создать бронирование'}</Button>
         <Button disabled={busy} onClick={close}>Отмена</Button></Space>
     </Form>
   </Modal>

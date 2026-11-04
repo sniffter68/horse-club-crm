@@ -77,10 +77,10 @@ test('lesson history applies server pagination and relation filters', async () =
   assert.equal(listArgs.where.OR.length, 6);
 });
 
-test('rejects overlapping individual lessons for the same trainer', async () => {
+test('legacy overlap check delegates trainer capacity to shared rules', async () => {
   const service = new LessonsService(prismaWithLessons([scheduled]), unusedLedger);
-  await assert.rejects(service.validateNoConflicts('trainer-1', 'horse-2',
-    new Date('2026-09-07T10:30:00.000Z'), new Date('2026-09-07T11:30:00.000Z')), /Тренер уже занят/);
+  await service.validateNoConflicts('trainer-1', 'horse-2',
+    new Date('2026-09-07T10:30:00.000Z'), new Date('2026-09-07T11:30:00.000Z'));
 });
 
 test('blocks a mathematically overlapping horse interval', async () => {

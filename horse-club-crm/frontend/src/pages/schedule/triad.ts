@@ -86,7 +86,7 @@ const reasons: Record<string, { field?: keyof TriadValues; message: string }> = 
   HORSE_OVERLOADED: { field: 'horseId', message: 'Превышен суточный лимит нагрузки лошади. Выберите другую лошадь или дату.' },
   HORSE_REST_VIOLATION: { field: 'horseId', message: 'Лошади нужен отдых между тренировками. Измените время или выберите другую лошадь.' },
   RIDER_WEIGHT_EXCEEDED: { field: 'horseId', message: 'Вес всадника превышает допустимый лимит для выбранной лошади.' },
-  TRAINER_BUSY: { field: 'trainerId', message: 'Тренер занят в выбранное время. Выберите другого тренера или интервал.' },
+  TRAINER_BUSY: { field: 'trainerId', message: 'У тренера достигнут максимум одновременных всадников. Выберите другого тренера или интервал.' },
   ARENA_FULL: { field: 'arenaId', message: 'Вместимость локации исчерпана. Выберите другую локацию или время.' },
   HORSE_UNAVAILABLE: { field: 'horseId', message: 'Лошадь недоступна для тренировок.' },
   TRAINER_UNAVAILABLE: { field: 'trainerId', message: 'Тренер недоступен для тренировок.' },
@@ -95,5 +95,10 @@ const reasons: Record<string, { field?: keyof TriadValues; message: string }> = 
   BOOKING_NOT_EDITABLE: { message: 'Запись уже изменена. Обновите расписание перед редактированием.' },
   BOOKING_CONTENTION: { message: 'Ресурсы изменились одновременно. Проверьте доступность и повторите сохранение.' },
 }
-export function bookingFailure(error: ApiError) { return reasons[error.code ?? ''] ?? { message: error.message } }
+export function bookingFailure(error: ApiError) {
+  if (error.code === 'TRAINER_BUSY' && typeof error.details?.maxParallelLessons === 'number') {
+    return { field: 'trainerId' as const, message: `У тренера достигнут максимум одновременных всадников (${error.details.maxParallelLessons})` }
+  }
+  return reasons[error.code ?? ''] ?? { message: error.message }
+}
 export const isPenaltyCancellation = (start: string, now: number) => +new Date(start) - now < 12 * 3600000
