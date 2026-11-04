@@ -50,7 +50,7 @@ function harness(prisma, profile) {
   } }, `message-${sent.length}`) };
 }
 const client = { type: 'CLIENT', clientId: 'child', name: 'Анна' };
-const trainer = { type: 'STAFF', role: 'TRAINER', staffId: 'account', trainerId: 'trainer', name: 'Иван' };
+const trainer = { type: 'TRAINER', id: 'trainer', name: 'Иван' };
 
 test('family membership reply queries active shared lesson packages and shows their common balance', async () => {
   let query;
@@ -122,7 +122,8 @@ test('guest prices use only public CRM services; directions and explanation rema
   } } }, { type: 'UNKNOWN' });
   await h.send('Услуги и цены'); assert.match(h.sent[0].message, /Индивидуальная тренировка/); assert.match(h.sent[0].message, /1.500 ₽.*45 мин/);
   await h.send('Как доехать'); assert.match(h.sent[1].message, /Адрес/);
-  await h.send('Здравствуйте'); assert.match(h.sent[2].message, /попросите администратора привязать ваш VK к профилю в CRM/);
+  await h.send('Здравствуйте'); assert.equal(h.sent.length, 2);
+  await h.send('Начать'); assert.match(h.sent[2].message, /попросите администратора привязать ваш VK к профилю в CRM/);
 });
 
 test('webhook confirmation, secret headers/body, missing configuration and group checks', async () => {

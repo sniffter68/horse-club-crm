@@ -5,13 +5,14 @@ import type { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { rethrowCatalogMutation } from '../common/prisma-errors';
 import { parseRefineQuery } from '../common/refine';
 import type { PaginatedResult } from '../common/refine';
+import { VkIdentityService } from '../vk-bot/vk-identity.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateTrainerDto } from './dto/create-trainer.dto';
 import type { UpdateTrainerDto } from './dto/update-trainer.dto';
 
 @Injectable()
 export class TrainersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly identity: VkIdentityService = new VkIdentityService(prisma)) {}
 
   async findAll(query: RefineQueryDto): Promise<PaginatedResult<Trainer>> {
     const options = parseRefineQuery(query, ['id', 'name', 'phone', 'baseRate', 'maxDailyLoad'], 'name');
@@ -42,13 +43,24 @@ export class TrainersService {
     return trainer;
   }
 
-  create(dto: CreateTrainerDto): Promise<Trainer> {
-    return this.prisma.trainer.create({ data: dto });
+  async create(dto: CreateTrainerDto): Promise<Trainer> {
+    const { vkId: input, ...data } = dto;
+    const vk = input === undefined ? null : await this.identity.normalize(input);
+    return this.identity.atomic(async tx => {
+      await this.identity.assertAvailable(tx, vk?.vkId ?? null, 'TRAINER');
+      return tx.trainer.create({ data: { ...data, vkId: vk?.vkId ? BigInt(vk.vkId) : null } });
+    });
   }
 
   async update(id: string, dto: UpdateTrainerDto): Promise<Trainer> {
+    const { vkId: input, ...data } = dto;
+    const vk = input === undefined ? undefined : await this.identity.normalize(input);
     try {
-      return await this.prisma.trainer.update({ where: { id }, data: dto });
+      if (!vk) return await this.prisma.trainer.update({ where: { id }, data });
+      return await this.identity.atomic(async tx => {
+        await this.identity.applyTrainer(tx, id, vk.vkId);
+        return tx.trainer.update({ where: { id }, data });
+      });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Тренер');
     }

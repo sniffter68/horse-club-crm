@@ -119,7 +119,7 @@ test('guest linking requests phone plus administrator code and booking links to 
 });
 test('tomorrow schedule has Moscow boundaries and shows rider and optional horse', async () => {
   let range;
-  const h = bot({ type: 'STAFF', role: 'TRAINER', trainerId: 'trainer' }, {
+  const h = bot({ type: 'TRAINER', id: 'trainer' }, {
     lesson: { findMany: async query => { range = query.where.startTime; return []; } },
     booking: { findMany: async () => [{ id: 'booking', startTime: new Date(), client: { name: 'Анна' }, horse: null }] },
   });

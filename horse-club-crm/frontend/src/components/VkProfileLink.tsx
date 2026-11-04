@@ -12,8 +12,8 @@ export function VkIcon() {
   return <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12.8 17.5C6.7 17.5 3.2 13.3 3 6.5h3.1c.2 5 2.4 7.1 4.1 7.6V6.5h2.9v4.4c1.7-.2 3.5-2.2 4.1-4.4h2.9c-.5 2.7-2.5 4.7-3.9 5.5 1.4.7 3.7 2.5 4.6 5.5h-3.2c-.7-2.1-2.3-3.8-4.6-4v4h-.2Z" /></svg>
 }
 
-export function VkProfileField({ initialValue }: { initialValue?: string | null }) {
-  return <Form.Item name="vkId" label="VK ID или ссылка на страницу" initialValue={initialValue}
+export function VkProfileField({ initialValue, label = 'VK ID или ссылка на страницу' }: { initialValue?: string | null; label?: string }) {
+  return <Form.Item name="vkId" label={label} initialValue={initialValue}
     extra="Например, 12345678 или vk.com/username. Очистите поле, чтобы снять привязку."
     rules={[{ max: 256, message: 'Не более 256 символов' }]}>
     <Input prefix={<VkIcon />} placeholder="vk.com/id12345678" maxLength={256} autoComplete="off" />
@@ -54,9 +54,9 @@ export function VkProfileLink({ id, name, vkId, vkUserId, kind, readOnly }: Prof
     {!readOnly && <Button ref={triggerRef} size="small" icon={<VkIcon />} onClick={() => { form.setFieldsValue({ vkId: linkedId || '' }); setError(undefined); setOpen(true) }}>{linkedId ? 'Изменить VK' : 'Привязать VK'}</Button>}
     <EntryOverlay variant="drawer" title={`Привязка VK · ${name}`} open={open} onCancel={close} destroyOnHidden
       closable={!busy} maskClosable={!busy} keyboard={!busy} confirmLoading={busy} okButtonProps={{ 'aria-label': 'Сохранить', disabled: busy }} cancelButtonProps={{ disabled: busy }} onOk={() => form.submit()} afterClose={() => triggerRef.current?.focus()}>
-      <Typography.Paragraph>Укажите страницу клиента или сотрудника. Бот узнает его по VK ID при первом сообщении в сообщество клуба.</Typography.Paragraph>
+      <Typography.Paragraph>{kind === 'TRAINER' ? 'Укажите страницу тренера. После сохранения отправьте боту /start, чтобы открыть расписание.' : 'Укажите страницу клиента или сотрудника. Бот узнает его по VK ID при первом сообщении в сообщество клуба.'}</Typography.Paragraph>
       <Form form={form} layout="vertical" noValidate onFinish={values => void save(values)} disabled={busy}>
-        <VkProfileField />
+        <VkProfileField label={kind === 'TRAINER' ? 'VK ID' : undefined} />
       </Form>
       {error && <Alert type="error" role="alert" showIcon message={error} />}
     </EntryOverlay>

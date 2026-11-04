@@ -45,14 +45,17 @@ export class VkIdentityService {
     return { vkId: String(user.id), vkScreenName: parsed.vkScreenName! };
   }
 
-  async assertAvailable(tx: Prisma.TransactionClient, vkId: string | null, kind: 'CLIENT' | 'STAFF', id?: string, trainerId?: string | null) {
+  async assertAvailable(tx: Prisma.TransactionClient, vkId: string | null, kind: 'CLIENT' | 'STAFF' | 'TRAINER', id?: string, trainerId?: string | null) {
     if (!vkId) return;
     const [client, user, trainer] = await Promise.all([
       tx.client.findFirst({ where: { OR: [{ vkId }, { vkUserId: BigInt(vkId) }] }, select: { id: true } }),
-      tx.user.findFirst({ where: { OR: [{ vkId }, { vkUserId: BigInt(vkId) }] }, select: { id: true } }),
-      tx.trainer.findUnique({ where: { vkUserId: BigInt(vkId) }, select: { id: true } }),
+      tx.user.findFirst({ where: { OR: [{ vkId }, { vkUserId: BigInt(vkId) }] }, select: { id: true, trainerId: true } }),
+      tx.trainer.findUnique({ where: { vkId: BigInt(vkId) }, select: { id: true } }),
     ]);
-    if ((client && (kind !== 'CLIENT' || client.id !== id)) || (user && (kind !== 'STAFF' || user.id !== id)) || (trainer && (kind !== 'STAFF' || trainer.id !== trainerId))) {
+    const ownsClient = kind === 'CLIENT' && client?.id === id;
+    const ownsUser = kind === 'STAFF' && user?.id === id || kind === 'TRAINER' && id !== undefined && user?.trainerId === id;
+    const ownsTrainer = kind === 'TRAINER' && trainer?.id === id || kind === 'STAFF' && trainer?.id === trainerId;
+    if ((client && !ownsClient) || (user && !ownsUser) || (trainer && !ownsTrainer)) {
       throw new ConflictException('Этот VK ID уже привязан к другому клиенту или сотруднику');
     }
   }
@@ -71,9 +74,19 @@ export class VkIdentityService {
   }
 
   async setTrainer(trainerId: string, input: string | null) {
-    const user = await this.prisma.user.findUnique({ where: { trainerId } });
-    if (!user) throw new BadRequestException('Сначала привяжите тренера к учетной записи сотрудника');
-    return this.setStaff(user.id, input);
+    const { vkId } = await this.normalize(input);
+    return this.atomic(tx => this.applyTrainer(tx, trainerId, vkId));
+  }
+
+  async applyTrainer(tx: Prisma.TransactionClient, id: string, vkId: string | null) {
+    const trainer = await tx.trainer.findUnique({ where: { id } });
+    if (!trainer) throw new NotFoundException('Тренер не найден');
+    await this.assertAvailable(tx, vkId, 'TRAINER', id);
+    const nextPeer = vkId ? BigInt(vkId) : null;
+    if (trainer.vkId && trainer.vkId !== nextPeer) {
+      await tx.vkNotification.deleteMany({ where: { peerId: trainer.vkId, sentAt: null } });
+    }
+    return tx.trainer.update({ where: { id }, data: { vkId: nextPeer } });
   }
 
   async setStaff(id: string, input: string | null) {
@@ -85,20 +98,20 @@ export class VkIdentityService {
     const user = await tx.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('Сотрудник не найден');
     await this.assertAvailable(tx, vkId, 'STAFF', id, user.trainerId);
-    const trainer = user.trainerId ? await tx.trainer.findUnique({ where: { id: user.trainerId } }) : null;
     const nextPeer = vkId ? BigInt(vkId) : null;
-    const previousPeers = [...new Set([user.vkUserId, trainer?.vkUserId].filter((peer): peer is bigint => peer != null && peer !== nextPeer))];
+    const previousPeers = [...new Set([user.vkUserId].filter((peer): peer is bigint => peer != null && peer !== nextPeer))];
     if (previousPeers.length) await tx.vkNotification.deleteMany({ where: { peerId: { in: previousPeers }, sentAt: null } });
-    if (user.trainerId) await tx.trainer.update({ where: { id: user.trainerId }, data: { vkUserId: nextPeer } });
     return tx.user.update({ where: { id }, data: { vkId, vkUserId: nextPeer },
       select: { id: true, email: true, role: true, trainerId: true, vkId: true, vkUserId: true, createdAt: true, updatedAt: true } });
   }
 
   async identify(vkId: string) {
     if (!/^[1-9]\d{0,14}$/.test(vkId)) throw new BadRequestException('Укажите числовой VK ID');
-    const user = await this.prisma.user.findUnique({ where: { vkId }, include: { staffProfile: true, trainer: true } });
-    if (user && user.staffProfile?.isActive !== false && user.trainer?.isActive !== false) return {
-      type: 'STAFF' as const, role: user.role, name: user.staffProfile?.fullName || user.trainer?.name || user.email, staffId: user.id, trainerId: user.trainerId,
+    const trainer = await this.prisma.trainer.findFirst({ where: { vkId: BigInt(vkId), isActive: true } });
+    if (trainer) return { type: 'TRAINER' as const, id: trainer.id, name: trainer.name };
+    const user = await this.prisma.user.findUnique({ where: { vkId }, include: { staffProfile: true } });
+    if (user && user.role !== 'TRAINER' && user.staffProfile?.isActive !== false) return {
+      type: 'STAFF' as const, role: user.role, name: user.staffProfile?.fullName || user.email, staffId: user.id, trainerId: user.trainerId,
     };
     const client = await this.prisma.client.findUnique({ where: { vkId } });
     if (!client || client.deletedAt) return { type: 'UNKNOWN' as const };

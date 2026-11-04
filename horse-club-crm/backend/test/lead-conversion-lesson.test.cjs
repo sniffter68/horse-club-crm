@@ -18,7 +18,7 @@ function harness({ existing = false, collision, failLeadUpdate = false, missingS
   let state = { lead: { id: ids.lead, status: 'PENDING', serviceId: missingService ? null : ids.service },
     clients: existing ? [{ id: ids.client, phone: dto().phone, firstName: 'Старое имя', vkUserId: 42n }] : [], lessons: [], notifications: [] };
   let transactionCount = 0, validateCount = 0;
-  const trainer = { id: ids.trainer, isActive: true, maxParallelLessons, name: 'Мария', vkUserId: 77n };
+  const trainer = { id: ids.trainer, isActive: true, maxParallelLessons, name: 'Мария', vkId: 77n };
   const horse = { id: ids.horse, name: 'Валдай', status: 'active', isUnavailable: false,
     requiredRestMinutes: 45, maxDailyWorkloadMinutes: 240, maxDailyMinutes: 240, maxRiderWeight: 85 };
   const arena = { id: ids.arena, name: 'Манеж', isActive: true, isUnavailable: false, capacity: 6, maxRidersCapacity: 6 };

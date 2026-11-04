@@ -40,11 +40,11 @@ for (const patch of [{ secret: 'wrong' }, { secret: null }, { group_id: 456 }]) 
 });
 const message = { ...event, type: 'message_new', event_id: 'event-1', object: { message: { from_id: 42, peer_id: 42, text: '/start', out: 0 } } };
 
-test('/start binding command returns personalized role greeting through the callback', async () => {
+test('legacy /start binding text is acknowledged without replying or identifying', async () => {
   await request(app.getHttpServer()).post('/api/vk/callback').send({ ...message,
     object: { message: { ...message.object.message, text: '/start +79991234567 1234' } } }).expect(200);
-  assert.match(sent[0].message, /Здравствуйте, Анна/);
-  assert.match(String(sent[0].keyboard), /Мой абонемент/);
+  assert.equal(sent.length, 0);
+  assert.equal(lookup.length, 0);
 });
 test('message routes by BigInt vkUserId and repeats use stable random_id', async () => {
   for (let i = 0; i < 2; i++) assert.equal((await request(app.getHttpServer()).post('/api/vk/callback').send(message).expect(200)).text, 'ok');

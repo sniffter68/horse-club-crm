@@ -160,7 +160,7 @@ export class VkBotService {
         data: { isBotPaused: false, botPausedUntil: null } });
       const identity = await this.identity.identify(String(sender));
       await this.send(peer, eventId, `Здравствуйте${identity.type !== 'UNKNOWN' && identity.name ? `, ${identity.name}` : ''}! Выберите действие.`,
-        identity.type === 'UNKNOWN' ? welcome : menu(identity.type === 'STAFF'));
+        identity.type === 'UNKNOWN' ? welcome : menu(identity.type === 'STAFF' || identity.type === 'TRAINER'));
       return;
     }
     if (state?.botPausedUntil && state.botPausedUntil.getTime() > Date.now()) return;
@@ -192,14 +192,14 @@ export class VkBotService {
       }
       const client = identity.type === 'CLIENT' ? { id: identity.clientId, firstName: identity.name } : null;
       const staff = identity.type === 'STAFF' ? identity : null;
-      const trainer = staff?.role === 'TRAINER' && staff.trainerId ? { id: staff.trainerId, name: staff.name } : null;
-      const keyboard = staff || client ? menu(Boolean(staff)) : welcome;
+      const trainer = identity.type === 'TRAINER' ? { id: identity.id, name: identity.name } : null;
+      const keyboard = trainer || staff || client ? menu(Boolean(trainer || staff)) : welcome;
       if (command === 'link') {
         const phone = '+79991234567';
-        await this.send(peer, eventId, `Для привязки отправьте номер телефона из CRM и одноразовый код, выданный администратором:\nпривязать ${phone} 1234\nНомер без кода не открывает доступ к профилю. Код действует 5 минут.`, keyboard);
+        await this.send(peer, eventId, `Тренеру: укажите VK ID или ссылку на профиль в карточке тренера в CRM.\nДля привязки клиента отправьте номер телефона из CRM и одноразовый код, выданный администратором:\nпривязать ${phone} 1234\nНомер без кода не открывает доступ к профилю. Код клиента действует 5 минут.`, keyboard);
         return;
       }
-      if (binding && !client && !staff) {
+      if (binding && !client && !staff && !trainer) {
         const kind = await this.links.bind(sender, binding[1], binding[2]);
         await this.send(peer, eventId, 'Профиль CRM привязан. Выберите действие.', menu(kind === 'TRAINER')); return;
       }
@@ -212,7 +212,7 @@ export class VkBotService {
         const account = await this.prisma.client.findUniqueOrThrow({ where: { id: client.id }, select: { boardingBalance: true } });
         await this.send(peer, eventId, `Баланс постоя: ${Number(account.boardingBalance).toLocaleString('ru-RU')} ₽\nПоследние оплаты:\n${payments.map(row => `• ${date(row.paidAt || row.createdAt)} — ${Number(row.amount).toLocaleString('ru-RU')} ₽`).join('\n') || 'Оплат пока нет.'}\nОстаток занятий — в разделе «Мой абонемент».`, keyboard); return;
       }
-      if (command === 'начать' && !client && !staff) {
+      if (command === 'начать' && !client && !staff && !trainer) {
         const firstName = await this.getFirstName(sender);
         await this.send(peer, eventId, `Здравствуйте${firstName ? `, ${firstName}` : ''}! Приглашаем вас в конный клуб.\nЕсли вы уже наш клиент, попросите администратора привязать ваш VK к профилю в CRM.\n${clubCard()}`, welcome);
         return;
@@ -230,7 +230,7 @@ export class VkBotService {
         return;
       }
       if (command === 'guide') { await this.send(peer, eventId, riderGuide(), keyboard); return; }
-      if (!client && !staff) {
+      if (!client && !staff && !trainer) {
         if (lead) {
           const accepted = await this.prisma.vkConsent.findUnique({ where: { vkUserId: BigInt(sender) } });
           if (!accepted || accepted.consentVersion !== consentVersion()) {
@@ -349,7 +349,7 @@ export class VkBotService {
     let answer = 'Посещение отмечено';
     try {
       const profile = await this.identity.identify(String(object.user_id));
-      const trainer = profile.type === 'STAFF' && profile.role === 'TRAINER' && profile.trainerId ? { id: profile.trainerId } : null;
+      const trainer = profile.type === 'TRAINER' ? { id: profile.id } : null;
       if (!trainer) throw new ForbiddenException('Действие доступно только тренеру');
       await this.ledger.markAttendance(bookingId, attended, { trainerId: trainer.id, noShow: !attended });
       if (!attended) answer = 'Неявка отмечена';

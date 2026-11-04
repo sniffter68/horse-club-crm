@@ -22,7 +22,7 @@ test('normalizes Russian national and international phone numbers', () => {
   assert.equal(normalizePhone('+7 999 123 45 67'), '+79991234567');
   assert.throws(() => normalizePhone('123'));
 });
-for (const kind of ['CLIENT', 'TRAINER']) test(`links ${kind} by normalized phone and single-use administrator code`, async () => {
+for (const kind of ['CLIENT']) test(`links ${kind} by normalized phone and single-use administrator code`, async () => {
   const target = { id: 'target', phone: '+79991234567', vkUserId: null };
   const account = { id: 'user', trainerId: 'target', vkUserId: null };
   let grant;
@@ -33,7 +33,7 @@ for (const kind of ['CLIENT', 'TRAINER']) test(`links ${kind} by normalized phon
   };
   const prisma = {
     client: kind === 'CLIENT' ? targetModel : { findUnique: async () => null, findFirst: async () => null },
-    trainer: kind === 'TRAINER' ? targetModel : { findUnique: async () => null },
+    trainer: kind === 'TRAINER' ? targetModel : { findUnique: async () => null, findFirst: async () => null },
     vkLinkCode: {
       deleteMany: async () => { grant = undefined; },
       create: async ({ data }) => { grant = { id: 'grant', usedBy: null, ...data }; },
@@ -59,7 +59,7 @@ for (const kind of ['CLIENT', 'TRAINER']) test(`links ${kind} by normalized phon
 test('client balance query is limited to the linked owner and active memberships', async () => {
   let query;
   const { service, sent } = bot({
-    client: { findUnique: async () => ({ id: 'owner' }) }, trainer: { findUnique: async () => null },
+    client: { findUnique: async () => ({ id: 'owner' }) }, trainer: { findFirst: async () => null, findUnique: async () => null },
     membership: { findMany: async args => { query = args; return [{ id: 'membership', clientId: 'owner', title: '', remainingUnits: 4, validTo: new Date('2030-01-01T00:00:00Z') }]; } },
   });
   await service.handleMessage(message('Мой баланс'), 'balance-1');
@@ -67,7 +67,7 @@ test('client balance query is limited to the linked owner and active memberships
   assert.ok(query.where.validTo.gte instanceof Date); assert.match(sent[0].message, /4 занятия/);
 });
 test('unlinked visitor is offered supported VK keyboard and a lead form', async () => {
-  const { service, sent } = bot({ client: { findUnique: async () => null }, trainer: { findUnique: async () => null } });
+  const { service, sent } = bot({ client: { findUnique: async () => null }, trainer: { findFirst: async () => null, findUnique: async () => null } });
   await service.handleMessage(message('начать'), 'welcome');
   assert.match(sent[0].message, /Приглашаем вас в конный клуб/);
   assert.match(String(sent[0].keyboard), /Наш прайс и услуги/);
@@ -76,7 +76,7 @@ test('unlinked visitor is offered supported VK keyboard and a lead form', async 
 test('VK lead requires a separately recorded current consent', async () => {
   let accepted, created;
   const prisma = {
-    client: { findUnique: async () => null }, trainer: { findUnique: async () => null },
+    client: { findUnique: async () => null }, trainer: { findFirst: async () => null, findUnique: async () => null },
     vkConsent: {
       findUnique: async () => accepted,
       upsert: async ({ create }) => { accepted = create; return create; },
@@ -92,14 +92,14 @@ test('VK lead requires a separately recorded current consent', async () => {
 });
 test('inline attendance invokes billing with authenticated trainer context', async () => {
   const calls = [];
-  const { service, answers } = bot({ trainer: { findUnique: async () => ({ id: 'trainer' }) } }, { ledger: { markAttendance: async (...args) => calls.push(args) } });
+  const { service, answers } = bot({ trainer: { findFirst: async () => null, findUnique: async () => ({ id: 'trainer' }) } }, { ledger: { markAttendance: async (...args) => calls.push(args) } });
   for (const attended of [true, false]) await service.handleEvent({ user_id: 42, peer_id: 42, event_id: `event-${attended}`, payload: { action: 'attendance', bookingId, attended } });
   assert.deepEqual(calls, [[bookingId, true, { trainerId: 'trainer', noShow: false }], [bookingId, false, { trainerId: 'trainer', noShow: true }]]);
   assert.equal(answers.length, 2);
 });
 test('client cannot invoke trainer inline action', async () => {
   let billed = false;
-  const { service, answers } = bot({ trainer: { findUnique: async () => null } }, { ledger: { markAttendance: async () => { billed = true; } } });
+  const { service, answers } = bot({ trainer: { findFirst: async () => null, findUnique: async () => null } }, { ledger: { markAttendance: async () => { billed = true; } } });
   await service.handleEvent({ user_id: 42, peer_id: 42, event_id: 'forbidden', payload: { action: 'attendance', bookingId, attended: true } });
   assert.equal(billed, false); assert.match(answers[0].event_data, /только тренеру/);
 });
@@ -108,7 +108,7 @@ test('today uses club day bounds and includes lessons without bookings', async (
   process.env.CLUB_TIME_ZONE = 'Europe/Moscow';
   let query;
   const { service, sent } = bot({
-    client: { findUnique: async () => null }, trainer: { findUnique: async () => ({ id: 'trainer' }) },
+    client: { findUnique: async () => null }, trainer: { findFirst: async () => null, findUnique: async () => ({ id: 'trainer' }) },
     booking: { findMany: async () => [] },
     lesson: { findMany: async args => { query = args; return [{ id: 'lesson', startTime: new Date(), bookings: [] }]; } },
   });
@@ -171,7 +171,7 @@ function notificationLessons() {
       findFirst: async () => null, findMany: async () => [],
       findUnique: async () => lesson,
       findUniqueOrThrow: async () => lesson,
-      create: async ({ data }) => { lesson = { ...data, id: 'lesson', trainer: { name: 'Мария', vkUserId: 42n },
+      create: async ({ data }) => { lesson = { ...data, id: 'lesson', trainer: { name: 'Мария', vkId: 42n },
         service: { title: 'Выездка', allowMembership: false }, operations: [], bookings: [
           { id: 'booking', clientId: 'client', membershipId: null, horseId: null, client: { name: 'Анна', vkUserId: 43n } },
           { id: 'booking2', clientId: 'client2', membershipId: null, horseId: null, client: { name: 'Борис', vkUserId: null } },
@@ -246,10 +246,10 @@ test('failed lesson transaction leaves no notification and transport failure can
 });
 
 test('legacy /start text no longer requests a phone; direct identity opens client menu', async () => {
-  const { service, sent } = bot({ client: { findUnique: async () => ({ firstName: 'Анна' }) }, trainer: { findUnique: async () => null } });
+  const { service, sent } = bot({ client: { findUnique: async () => ({ firstName: 'Анна' }) }, trainer: { findFirst: async () => null, findUnique: async () => null } });
   for (const text of ['/start 1234']) {
     await service.handleMessage(message(text), `code-${text}`);
-    assert.match(sent.at(-1).message, /Здравствуйте, Анна/);
+    assert.equal(sent.length, 0);
   }
   await service.handleMessage(message('/start'), 'start');
   assert.match(sent.at(-1).message, /Здравствуйте, Анна/);

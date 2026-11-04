@@ -1,5 +1,9 @@
 # UX Contract
 
+## VK тренера (2026-11-05)
+
+Источник: задача владельца и `docs/trainer-vk-binding.md`. Формой владеет CatalogForm/EntryOverlay, полем «VK ID» — общий VkProfileField, привязкой в карточке — VkProfileLink. ADMIN/MANAGER с FULL SCHEDULE видят мутации. Ошибка сохраняет ввод и отображается в Alert; во время запроса повтор заблокирован. Переход к персоналу не нужен. Проверки: `backend/test/trainer-vk-binding.test.cjs`, `frontend/e2e/vk-link.spec.ts`.
+
 ## Общие настройки колонок (2026-11-05)
 
 Источник — задача владельца о масштабировании паттерна клиентов, `docs/table-columns.md`. Владелец предпочтений — `useTableColumns` / `useColumnPreferences`; панель — общий `TableColumnSettings` (Ant Design Popover/Checkbox/Button), таблица — `ConfigurableTable` / `ResponsiveTable`. Фиксированные поля не скрываются и не перемещаются. `hidden` и отсутствие колонки по RBAC имеют приоритет над localStorage. Ошибка сохранения оставляет изменения в памяти с предупреждением. Escape закрывает панель и возвращает фокус кнопке. Поиск, URL, сортировка, пагинация и мутации остаются у прежних владельцев. Проверки: `useTableColumns.test.ts`, `table-columns.spec.ts`, прежние сценарии клиентов и CRUD.

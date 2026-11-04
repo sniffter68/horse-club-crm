@@ -266,7 +266,7 @@ model Trainer {
   id            String   @id @default(uuid()) @db.Uuid
   name          String   @default("")
   phone         String?  @unique
-  vkUserId      BigInt?  @unique
+  vkId          BigInt?  @unique
   qualification String?
   maxDailyLoad  Int      @default(480)
   maxParallelLessons Int @default(4)

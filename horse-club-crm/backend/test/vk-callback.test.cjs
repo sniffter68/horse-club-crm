@@ -69,14 +69,13 @@ for (const text of ['Начать', 'start']) test(`${text} greets after identit
   assert.ok(Number.isInteger(sent[0].random_id)); assert.notEqual(sent[0].random_id, 0);
 });
 
-test('ordinary messages are acknowledged and receive an identity menu', async () => {
+test('ordinary messages are acknowledged without a bot reply', async () => {
   for (const text of ['Добрый вечер! Все в силе?', 'Привет', '1234']) {
     const response = await request(app.getHttpServer()).post(path).send(event(text)).expect(200);
     assert.equal(response.text, 'ok');
   }
   await nextTurn();
-  assert.equal(sent.length, 3);
-  assert.ok(sent.every(row => /Приглашаем/.test(row.message)));
+  assert.equal(sent.length, 0);
   assert.deepEqual(failures, []);
 });
 

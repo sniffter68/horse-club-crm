@@ -7,7 +7,7 @@ const { VkNotifications } = require('../dist/vk-bot/vk-delivery.module');
 
 const training = () => ({
   startTime: new Date('2026-10-17T08:00:00Z'), endTime: new Date('2026-10-17T09:00:00Z'),
-  trainer: { name: 'Анна Сергеевна', vkUserId: 77n }, trainingType: 'Индивидуальное занятие', notes: 'Первое занятие',
+  trainer: { name: 'Анна Сергеевна', vkId: 77n }, trainingType: 'Индивидуальное занятие', notes: 'Первое занятие',
   participants: [
     { client: { name: 'Иван', phone: '+79991234567', vkUserId: 42n }, horse: { name: 'Гранит' } },
     { client: { name: 'Мария', phone: '+79997654321', vkUserId: 43n }, horse: { name: 'Искра' } },
@@ -60,14 +60,14 @@ test('notification time uses CLUB_TIME_ZONE across midnight', async () => {
 test('missing VK IDs skip recipients, while missing phone, horse and notes have readable fallbacks', async () => {
   const { tx, rows } = queue();
   const value = training();
-  value.trainer.vkUserId = null;
+  value.trainer.vkId = null;
   value.participants[1].client.vkUserId = null;
   await queueTrainingConfirmation(tx, 'one', value);
   assert.deepEqual([...rows.values()].map(row => row.peerId), [42n]);
   rows.clear(); value.participants[0].client.vkUserId = null;
   await queueTrainingConfirmation(tx, 'none', value);
   assert.equal(rows.size, 0);
-  value.trainer.vkUserId = 77n;
+  value.trainer.vkId = 77n;
   value.notes = null; value.participants = [{ client: { firstName: 'Иван', lastName: 'Петров' } }];
   await queueTrainingConfirmation(tx, 'fallback', value);
   const message = [...rows.values()][0].message;

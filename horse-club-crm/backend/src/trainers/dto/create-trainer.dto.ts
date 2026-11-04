@@ -1,8 +1,16 @@
+import { Transform } from 'class-transformer';
 import { PublicationDto } from '../../common/dto/publication.dto';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, Matches, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 
 export class CreateTrainerDto extends PublicationDto {
+  @ApiPropertyOptional({ nullable: true })
+  @Transform(({ value }: { value: unknown }) => typeof value === 'number' && Number.isSafeInteger(value) ? String(value) : value)
+  @IsOptional()
+  @IsString()
+  @MaxLength(256)
+  vkId?: string | null;
+
   @ApiPropertyOptional({ default: 4, description: 'Максимум одновременных всадников' })
   @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
   @IsInt()

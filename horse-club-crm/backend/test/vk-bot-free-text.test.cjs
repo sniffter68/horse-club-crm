@@ -24,32 +24,32 @@ function harness(role) {
 }
 
 for (const role of ['guest', 'client', 'trainer']) {
-  test(`ordinary messages from ${role} are identified and receive their role menu`, async () => {
+  test(`ordinary messages from ${role} stay silent without identity lookup`, async () => {
     const h = harness(role);
     for (const text of [
       'Добрый вечер! Все в силе?', 'Привет', 'Здравствуйте!', 'Спасибо!', 'Да',
       'Можно записаться завтра?', '1234', '', '   ', '🐎',
       'Расскажите о клубе', 'Нужна помощь',
-      'привязаться', '/starter', 'help me',
+      'привязаться', '/starter', 'help me', 'Тест', 'случайное', '+79991234567',
+      'Привязать профиль', '/start 1234',
     ]) await h.send(text);
     await h.send('Добрый вечер!', '{invalid');
     await h.send('Добрый вечер!', JSON.stringify({ command: 'unknown' }));
     await h.send('Добрый вечер!', JSON.stringify({ offset: 10 }));
-    assert.ok(h.sent.length > 0);
-    assert.ok(h.queries.includes('client') || h.queries.includes('trainer'));
-    for (const row of h.sent) assert.match(row.message, role === 'guest' ? /Приглашаем/ : /Здравствуйте/);
+    assert.deepEqual(h.sent, []);
+    assert.deepEqual(h.queries, []);
   });
 }
 
 for (const [role, text, payload, expected] of [
   ['guest', 'Начать', undefined, /Здравствуйте, Анна!/],
+  ['guest', '/start', undefined, /Выберите действие/],
+  ['client', ' Меню ', undefined, /Здравствуйте, Анна!/],
   ['guest', '', { command: 'start' }, /Здравствуйте, Анна!/],
   ['guest', '', { command: 'about' }, /Конный клуб/],
   ['guest', '', { command: 'guide' }, /Шлем/],
   ['guest', '', { command: 'первичная заявка' }, /Ознакомьтесь с согласием/],
   ['guest', 'Первичная заявка', undefined, /Ознакомьтесь с согласием/],
-  ['guest', 'Привязать профиль', undefined, /привязать ваш VK/],
-  ['guest', '/start 1234', undefined, /привязать ваш VK/],
   ['client', '', { command: 'balance' }, /нет активных абонементов/],
   ['client', '', { command: 'bookings' }, /тренировок пока нет/],
   ['trainer', '', { command: 'today' }, /занятий нет/],

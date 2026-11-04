@@ -69,7 +69,7 @@ test('active pause ignores free text, attachments and old menu buttons before id
   await h.send('Мои тренировки', JSON.stringify({ command: 'bookings' }));
   await h.send('Позвать администратора');
   assert.equal(h.sent.length, 0); assert.equal(h.identified.length, 0);
-  await h.send('Здравствуйте', undefined, 43);
+  await h.send('Меню', undefined, 43);
   assert.equal(h.sent.length, 1); assert.equal(h.sent[0].peer_id, 43);
 });
 
@@ -82,21 +82,23 @@ for (const [text, payload] of [
     assert.equal(h.states.get(42n).isBotPaused, false);
     assert.equal(h.states.get(42n).botPausedUntil, null);
     assert.equal(String(h.sent[0].keyboard), String(profile.type === 'UNKNOWN' ? welcomeMenu() : mainMenu()));
-    await h.send('Спасибо'); assert.equal(h.sent.length, 2);
+    await h.send('Спасибо'); assert.equal(h.sent.length, 1);
+    await h.send('О клубе'); assert.equal(h.sent.length, 2);
   });
 }
 
 test('expired pause resumes replies and clears the persisted flag', async () => {
   const h = harness(); h.pause(new Date(Date.now() - 1));
-  await h.send('Здравствуйте');
+  await h.send('Здравствуйте'); assert.equal(h.sent.length, 0);
+  await h.send('О клубе');
   assert.equal(h.sent.length, 1); assert.equal(h.states.get(42n).isBotPaused, false);
   assert.equal(h.states.get(42n).botPausedUntil, null);
 });
 
-test('administrator button pauses for four hours, queues a notification and offers inline reset', async () => {
+for (const payload of [undefined, JSON.stringify({ command: 'help' })]) test(`administrator button pauses for four hours, queues a notification and offers inline reset: ${payload}`, async () => {
   const oldPeer = process.env.VK_ADMIN_PEER_ID; process.env.VK_ADMIN_PEER_ID = '77';
   try {
-    const h = harness(); const now = Date.now(); await h.send('Позвать администратора');
+    const h = harness(); const now = Date.now(); await h.send(payload ? 'Кнопка' : 'Позвать администратора', payload);
     assert.equal(h.states.get(42n).isBotPaused, true);
     assert.ok(h.states.get(42n).botPausedUntil.getTime() >= now + 14400000);
     assert.equal(h.queued.length, 1); assert.equal(h.queued[0].create.peerId, 77n);
@@ -104,6 +106,9 @@ test('administrator button pauses for four hours, queues a notification and offe
     const keyboard = JSON.parse(String(h.sent[0].keyboard));
     assert.equal(keyboard.inline, true);
     assert.equal(keyboard.buttons[0][0].action.label, 'Вернуться в меню бота');
+    await h.send('Тест');
+    await h.send('Кнопка', JSON.stringify({ command: 'about' }));
+    assert.equal(h.sent.length, 1);
     await h.send('Кнопка', keyboard.buttons[0][0].action.payload);
     assert.equal(h.states.get(42n).isBotPaused, false);
   } finally {

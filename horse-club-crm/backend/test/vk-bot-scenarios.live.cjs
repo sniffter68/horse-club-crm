@@ -21,7 +21,7 @@ test('real DB: protected link-code, VK binding, ownership and idempotent attenda
   const ids = Object.fromEntries(['trainer', 'client', 'horse', 'service', 'lesson', 'booking', 'membership'].map(key => [key, randomUUID()]));
   const phone = '+79991234567';
   let vkId;
-  do { vkId = randomInt(100000000, 1000000000); } while (await p.trainer.findUnique({ where: { vkUserId: BigInt(vkId) } }) || await p.client.findUnique({ where: { vkUserId: BigInt(vkId) } }));
+  do { vkId = randomInt(100000000, 1000000000); } while (await p.trainer.findUnique({ where: { vkId: BigInt(vkId) } }) || await p.client.findUnique({ where: { vkUserId: BigInt(vkId) } }));
   try {
     await p.trainer.create({ data: { id: ids.trainer, name: 'QA VK trainer', phone } });
     await p.client.create({ data: { id: ids.client, name: 'QA VK rider' } });
@@ -31,9 +31,9 @@ test('real DB: protected link-code, VK binding, ownership and idempotent attenda
     await p.lesson.create({ data: { id: ids.lesson, trainerId: ids.trainer, serviceId: ids.service, startTime: new Date(Date.now() - 3600000), endTime: new Date(), bookings: { create: { id: ids.booking, clientId: ids.client, horseId: ids.horse, membershipId: ids.membership } } } });
     await request(app.getHttpServer()).post('/api/vk/link-codes').send({ kind: 'TRAINER', id: ids.trainer }).expect(401);
     const auth = await request(app.getHttpServer()).post('/api/auth/login').send({ email: 'admin@test.ru', password: 'admin123' }).expect(200);
-    const code = await request(app.getHttpServer()).post('/api/vk/link-codes').set('Authorization', `Bearer ${auth.body.access_token}`).send({ kind: 'TRAINER', id: ids.trainer }).expect(201);
-    await bot.handleMessage({ message: { from_id: vkId, peer_id: vkId, out: 0, text: code.body.instruction } }, 'link');
-    assert.equal((await p.trainer.findUnique({ where: { id: ids.trainer } })).vkUserId, BigInt(vkId));
+    await request(app.getHttpServer()).patch(`/api/trainers/${ids.trainer}`).set('Authorization', `Bearer ${auth.body.access_token}`).send({ vkId: String(vkId) }).expect(200);
+    assert.equal((await p.trainer.findUnique({ where: { id: ids.trainer } })).vkId, BigInt(vkId));
+    await bot.handleMessage({ message: { from_id: vkId, peer_id: vkId, out: 0, text: '/start' } }, 'start');
     const action = { user_id: vkId, peer_id: vkId, event_id: 'attendance', payload: { action: 'attendance', bookingId: ids.booking, attended: true } };
     await bot.handleEvent(action); await bot.handleEvent(action);
     assert.equal((await p.membership.findUnique({ where: { id: ids.membership } })).remainedLessons, 1);
@@ -45,7 +45,7 @@ test('real DB: protected link-code, VK binding, ownership and idempotent attenda
     await bot.handleEvent({ ...action, event_id: 'cancelled' });
     assert.match(answers.at(-1).event_data, /отменено/);
     assert.equal((await p.booking.findUnique({ where: { id: ids.booking } })).attendanceStatus, 'NO_SHOW');
-    assert.match(messages[0].message, /успешно привязан/);
+    assert.match(messages[0].message, /Выберите действие/);
   } finally {
     await p.vkLinkCode.deleteMany({ where: { recordId: ids.trainer } });
     await p.membershipOp.deleteMany({ where: { membershipId: ids.membership } });

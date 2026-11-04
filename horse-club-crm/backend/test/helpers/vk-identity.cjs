@@ -7,8 +7,8 @@ exports.idleConversation = () => ({
 exports.identityFixture = prisma => {
   prisma.vkConversationState ??= exports.idleConversation();
   return { identify: async () => {
-    const trainer = await prisma.trainer?.findUnique({ where: { vkUserId: 42n } });
-    if (trainer) return { type: 'STAFF', role: 'TRAINER', staffId: 'staff', trainerId: trainer.id, name: trainer.name };
+    const trainer = await prisma.trainer?.findUnique({ where: { vkId: 42n } });
+    if (trainer) return { type: 'TRAINER', id: trainer.id, name: trainer.name };
     const client = await prisma.client?.findUnique({ where: { vkId: '42' } });
     return client ? { type: 'CLIENT', clientId: client.id, name: client.name || client.firstName } : { type: 'UNKNOWN' };
   } };

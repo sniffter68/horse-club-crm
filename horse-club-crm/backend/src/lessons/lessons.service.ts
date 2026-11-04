@@ -651,7 +651,7 @@ export class LessonsService {
   private async notifyLesson(tx: TransactionClient, lesson: LessonDetails, event: string, title: string,
     clientIds?: string[], previousStart?: Date): Promise<void> {
     const participants = (lesson.bookings ?? []).filter(row => !clientIds || clientIds.includes(row.clientId));
-    if (!lesson.trainer?.vkUserId && !participants.some(row => row.client?.vkUserId)) return;
+    if (!lesson.trainer?.vkId && !participants.some(row => row.client?.vkUserId)) return;
     if (event === 'created' || event.startsWith('booking:')) {
       await queueTrainingConfirmation(tx, `lesson:${lesson.id}:${event}`, {
         startTime: lesson.startTime, endTime: lesson.endTime, trainer: lesson.trainer,
@@ -661,7 +661,7 @@ export class LessonsService {
       return;
     }
     const recipients = new Set<bigint>();
-    if (lesson.trainer?.vkUserId) recipients.add(lesson.trainer.vkUserId);
+    if (lesson.trainer?.vkId) recipients.add(lesson.trainer.vkId);
     for (const booking of lesson.bookings ?? []) {
       if ((!clientIds || clientIds.includes(booking.clientId)) && booking.client?.vkUserId) recipients.add(booking.client.vkUserId);
     }

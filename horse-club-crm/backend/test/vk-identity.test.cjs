@@ -38,7 +38,7 @@ test('screen name resolves through VK to a numeric ID; unavailable/deactivated p
 const fixtures = (patch = {}) => ({
   client: { findFirst: async () => null, findUnique: async () => null },
   user: { findFirst: async () => null, findUnique: async () => null },
-  trainer: { findUnique: async () => null }, ...patch,
+  trainer: { findFirst: async () => null, findUnique: async () => null }, ...patch,
 });
 test('uniqueness covers both tables and legacy trainer bindings, permits same owner', async () => {
   const service = new VkIdentityService({});
@@ -57,28 +57,28 @@ test('concurrent unique conflicts return a helpful 409, serialization failures r
   service.prisma.$transaction = async () => { throw error('P2002'); };
   await assert.rejects(service.atomic(async () => {}), error => error.getStatus() === 409 && /VK ID/.test(error.message));
 });
-test('staff update and clear synchronize user/trainer delivery IDs and revoke pending notifications', async () => {
+test('staff update and clear affect only the user and revoke its pending notifications', async () => {
   const account = { id: 'staff', trainerId: 'trainer', vkUserId: 41n };
   const writes = [];
   const tx = fixtures({ user: { findUnique: async () => account, findFirst: async () => null, update: async query => { writes.push(['user', query]); return query.data; } },
-    trainer: { findUnique: async () => ({ id: 'trainer', vkUserId: 41n }), update: async query => writes.push(['trainer', query]) },
+    trainer: { findFirst: async () => null, findUnique: async () => ({ id: 'trainer', vkUserId: 41n }), update: async query => writes.push(['trainer', query]) },
     vkNotification: { deleteMany: async query => writes.push(['queue', query]) } });
   const service = new VkIdentityService({ $transaction: async work => work(tx) });
   const result = await service.setStaff('staff', 'id42');
   assert.equal(result.vkId, '42'); assert.equal(result.vkUserId, 42n);
-  assert.equal(writes.find(([kind]) => kind === 'trainer')[1].data.vkUserId, 42n);
+  assert.equal(writes.some(([kind]) => kind === 'trainer'), false);
   assert.deepEqual(writes.find(([kind]) => kind === 'queue')[1].where.peerId, { in: [41n] });
   assert.equal((await service.setStaff('staff', null)).vkId, null);
 });
 test('identification prioritizes staff, rejects inactive profiles, returns client summary and UNKNOWN', async () => {
-  let user = { id: 'staff', role: 'TRAINER', trainerId: 'trainer', trainer: { name: 'Тренер', isActive: true }, staffProfile: { fullName: 'Иван', isActive: true } };
+  let user = { id: 'staff', role: 'MANAGER', trainerId: 'trainer', trainer: { name: 'Тренер', isActive: true }, staffProfile: { fullName: 'Иван', isActive: true } };
   let client = { id: 'client', name: 'Анна', deletedAt: null };
   let clientReads = 0;
-  const service = new VkIdentityService({ user: { findUnique: async query => { assert.deepEqual(query.where, { vkId: '42' }); return user; } },
+  const service = new VkIdentityService({ trainer: { findFirst: async () => null }, user: { findUnique: async query => { assert.deepEqual(query.where, { vkId: '42' }); return user; } },
     client: { findUnique: async () => { clientReads++; return client; } },
     membership: { count: async query => { assert.equal(query.where.status, 'active'); assert.deepEqual(query.where.remainingUnits, { gt: 0 }); return 2; } },
     booking: { findFirst: async query => { assert.equal(query.where.status, 'scheduled'); return { id: 'booking' }; } } });
-  assert.deepEqual(await service.identify('42'), { type: 'STAFF', staffId: 'staff', role: 'TRAINER', trainerId: 'trainer', name: 'Иван' });
+  assert.deepEqual(await service.identify('42'), { type: 'STAFF', staffId: 'staff', role: 'MANAGER', trainerId: 'trainer', name: 'Иван' });
   assert.equal(clientReads, 0);
   user = null;
   assert.deepEqual(await service.identify('42'), { type: 'CLIENT', clientId: 'client', name: 'Анна', activeMembershipsCount: 2, nextBooking: { id: 'booking' } });
@@ -137,7 +137,7 @@ test('bot identifies actual from_id and immediately opens the correct menu witho
   const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
   for (const profile of [
     { type: 'CLIENT', clientId: 'client', name: 'Анна' },
-    { type: 'STAFF', role: 'TRAINER', staffId: 'user', trainerId: 'trainer', name: 'Иван' },
+    { type: 'TRAINER', id: 'trainer', name: 'Иван' },
     { type: 'UNKNOWN' },
   ]) {
     const calls = [], sent = [];
@@ -146,10 +146,10 @@ test('bot identifies actual from_id and immediately opens the correct menu witho
     });
     bot.prisma.vkConversationState = require('./helpers/vk-identity.cjs').idleConversation();
     bot.vk = { api: { messages: { send: async params => sent.push(params) } } };
-    await bot.handleMessage({ message: { from_id: 9876, peer_id: 9876, text: 'Здравствуйте', out: 0 } }, 'direct-message');
+    await bot.handleMessage({ message: { from_id: 9876, peer_id: 9876, text: '/start', out: 0 } }, 'direct-message');
     assert.deepEqual(calls, ['9876']);
-    assert.match(sent[0].message, profile.type === 'UNKNOWN' ? /Приглашаем/ : new RegExp(profile.name));
-    assert.match(String(sent[0].keyboard), profile.type === 'STAFF' ? /Мои всадники/ : profile.type === 'CLIENT' ? /Мой абонемент/ : /Наш прайс и услуги/);
+    assert.match(sent[0].message, profile.type === 'UNKNOWN' ? /Выберите действие/ : new RegExp(profile.name));
+    assert.match(String(sent[0].keyboard), ['STAFF', 'TRAINER'].includes(profile.type) ? /Мои всадники/ : profile.type === 'CLIENT' ? /Мой абонемент/ : /Наш прайс и услуги/);
     assert.doesNotMatch(sent[0].message, /код|ВАШ_ТЕЛЕФОН/);
   }
 });

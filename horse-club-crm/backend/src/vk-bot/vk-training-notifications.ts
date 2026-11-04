@@ -13,7 +13,7 @@ interface VkPerson {
 interface TrainingNotification {
   startTime: Date;
   endTime: Date;
-  trainer?: VkPerson | null;
+  trainer?: (VkPerson & { vkId?: bigint | null }) | null;
   trainingType: string;
   notes?: string | null;
   participants: { client?: VkPerson | null; horse?: { name: string } | null }[];
@@ -25,17 +25,17 @@ const horseName = (horse?: { name: string } | null) => horse?.name?.trim() || '�
 
 // Only persist here. The worker contacts VK after the business transaction commits.
 export async function queueTrainingConfirmation(tx: Prisma.TransactionClient, key: string, training: TrainingNotification): Promise<void> {
-  if (!training.trainer?.vkUserId && !training.participants.some(row => row.client?.vkUserId)) return;
+  if (!training.trainer?.vkId && !training.participants.some(row => row.client?.vkUserId)) return;
   const zone = process.env.CLUB_TIME_ZONE || 'Europe/Moscow';
   const format = (date: Date) => new Intl.DateTimeFormat('ru-RU', {
     dateStyle: 'short', timeStyle: 'short', timeZone: zone,
   }).format(date);
   const when = `${format(training.startTime)} — ${format(training.endTime)} (${zone})`;
-  if (training.trainer?.vkUserId) {
+  if (training.trainer?.vkId) {
     const participants = training.participants.length ? training.participants.map(row =>
       `• Клиент: ${personName(row.client)} (${row.client?.phone?.trim() || 'телефон не указан'})\n• Лошадь: ${horseName(row.horse)}`
     ).join('\n') : '• Клиент: пока не записан\n• Лошадь: не назначена';
-    await queueVkNotification(tx, `${key}:trainer:${training.trainer.vkUserId}`, training.trainer.vkUserId,
+    await queueVkNotification(tx, `${key}:trainer:${training.trainer.vkId}`, training.trainer.vkId,
       `📅 Новое занятие в вашем расписании!\n• Дата и время: ${when}\n${participants}\n• Тип занятия: ${training.trainingType}\n• Примечание: ${training.notes?.trim() || 'не указано'}`);
   }
   const clients = new Map<bigint, string[]>();
