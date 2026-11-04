@@ -1,5 +1,9 @@
 # UX Contract
 
+## Общие настройки колонок (2026-11-05)
+
+Источник — задача владельца о масштабировании паттерна клиентов, `docs/table-columns.md`. Владелец предпочтений — `useTableColumns` / `useColumnPreferences`; панель — общий `TableColumnSettings` (Ant Design Popover/Checkbox/Button), таблица — `ConfigurableTable` / `ResponsiveTable`. Фиксированные поля не скрываются и не перемещаются. `hidden` и отсутствие колонки по RBAC имеют приоритет над localStorage. Ошибка сохранения оставляет изменения в памяти с предупреждением. Escape закрывает панель и возвращает фокус кнопке. Поиск, URL, сортировка, пагинация и мутации остаются у прежних владельцев. Проверки: `useTableColumns.test.ts`, `table-columns.spec.ts`, прежние сценарии клиентов и CRUD.
+
 ## Колонки клиентов (2026-11-03)
 
 Источник — задача владельца и `docs/clients-columns.md`. Панель `ClientColumnSettings` использует Ant Design Popover/Checkbox/Button; `useClientColumns` сохраняет только предпочтения колонок в localStorage. Клиент/телефон и действия всегда закреплены; настройки не меняют права и серверные фильтры, сортировку, пагинацию. Заметки доступны по нажатию, на телефоне сохраняются карточки `ResponsiveTable`. Ошибка storage сохраняет настройки в памяти и показывает предупреждение. Проверки: `useClientColumns.test.ts`, `clients-memberships.spec.ts`.

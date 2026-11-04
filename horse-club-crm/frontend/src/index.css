@@ -156,9 +156,6 @@ textarea.ant-input { resize: none; }
 /* The client directory shares the available workspace width, including long values. */
 .clients-table { width: 100%; min-width: 0; }
 .catalog-table-toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
-.client-column-settings { width: min(320px, calc(100vw - 48px)); }
-.client-column-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
-.client-column-settings > .ant-space-item { width: 100%; }
 .client-notes-popover { max-width: min(360px, calc(100vw - 48px)); max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .clients-table .ant-btn.client-notes { display: block; width: 100%; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .clients-table .client-membership { margin-left: auto; text-align: left; }
@@ -529,3 +526,17 @@ html[data-theme='dark'] .dashboard-quick-actions .ant-btn-default { color: var(-
 .sidebar-title-row--desktop { flex-shrink: 0; }
 .crm-sidebar .ant-menu { min-height: 0; }
 @media (max-width: 767px) { .crm-main { padding: 12px; } }
+
+/* Entity lists share compact geometry; only the table scrolls when optional columns are enabled. */
+.table-column-settings { width: min(320px, calc(100vw - 48px)); max-height: min(560px, 70vh); overflow-y: auto; }
+.table-column-settings > .ant-space-item { width: 100%; }
+.table-column-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+.crm-entity-table { width: 100%; min-width: 0; }
+.crm-entity-table .ant-table { font-size: 13px; }
+.crm-entity-table .ant-table-thead > tr > th,
+.crm-entity-table .ant-table-tbody > tr > td { padding: 8px; vertical-align: top; overflow-wrap: anywhere; }
+.crm-entity-table .ant-space, .crm-entity-table .ant-space-item { min-width: 0; max-width: 100%; }
+.crm-entity-table .ant-btn { max-width: 100%; height: auto; min-height: 24px; white-space: normal; }
+.crm-entity-table .ant-tag { max-width: 100%; margin-inline-end: 0; white-space: normal; }
+.crm-entity-table .ant-table-cell { font-variant-numeric: tabular-nums; }
+.table-cell-text { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -9,7 +9,7 @@ import { money } from '../catalogs/format'
 import type { RelationLesson, RelationPayment } from '../catalogs/types'
 import { dateOnly, dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
-import { ResponsiveTable } from '../../components/ResponsiveTable'
+import { ConfigurableTable } from '../../components/ConfigurableTable'
 import { usePermissions } from '../../modulePermissions'
 import { useCatalogPermissions } from '../catalogs/permissions'
 
@@ -43,13 +43,13 @@ export function MembershipList() {
       <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q">
         <Input.Search placeholder="Поиск клиента" allowClear onSearch={() => searchFormProps.form?.submit()} />
       </Form.Item></Form>
-      <ResponsiveTable<Membership> {...tableProps} rowKey="id" columns={[
-        { key: 'client', title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : '—'}</CardLink> },
-        { key: 'plan', title: 'Услуга / тариф', render: (_: unknown, record) => record.serviceTitle || record.pricingPlan?.name || 'Индивидуальный' },
-        { key: 'price', title: 'Стоимость', render: (_: unknown, record) => money(record.totalPrice) },
-        { key: 'lessons', title: 'Остаток занятий', render: (_: unknown, record) => `${record.remainedLessons} / ${record.totalLessons}` },
-        { key: 'validUntil', dataIndex: 'validUntil', title: 'Действует до', render: dateOnly },
-        { key: 'isActive', dataIndex: 'isActive', title: 'Статус', render: (active: boolean) => <Tag color={active ? 'green' : 'default'}>{active ? 'Активен' : 'Неактивен'}</Tag> },
+      <ConfigurableTable<Membership> storageKey="horse_crm_memberships_columns_v1" {...tableProps} rowKey="id" columns={[
+        { key: 'client', fixed: 'left', width: 180, title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : '—'}</CardLink> },
+        { key: 'plan', width: 170, title: 'Услуга / тариф', render: (_: unknown, record) => record.serviceTitle || record.pricingPlan?.name || 'Индивидуальный' },
+        { key: 'price', align: 'right', width: 120, title: 'Стоимость', render: (_: unknown, record) => money(record.totalPrice) },
+        { key: 'lessons', align: 'right', width: 120, title: 'Остаток занятий', render: (_: unknown, record) => `${record.remainedLessons} / ${record.totalLessons}` },
+        { key: 'validUntil', width: 110, dataIndex: 'validUntil', title: 'Действует до', render: dateOnly },
+        { key: 'isActive', align: 'center', width: 120, dataIndex: 'isActive', title: 'Статус', render: (active: boolean) => <Tag color={active ? 'green' : 'default'}>{active ? 'Активен' : 'Неактивен'}</Tag> },
       ]} />
     </RefineList>
     <DetailsModal<MembershipDetails> resource="memberships" id={selectedId} title="Карточка абонемента" onClose={() => setSelectedId(undefined)}>

@@ -10,6 +10,7 @@ import { DateTime } from 'luxon'
 import { getIdentity, type Role } from '../../authStorage'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
+import { ConfigurableTable } from '../../components/ConfigurableTable'
 import { currency } from '../cash-desk/shared'
 import { AdjustmentModal, PayoutModal, ProfileModal, ShiftModal } from './forms'
 import { paidPeriodFor, staffRoles, shiftColors, shiftStatuses, type PaidPeriod, type PayrollStatement, type PageData, type Payroll, type Shift, type Staff } from './types'
@@ -111,7 +112,7 @@ export function StaffPage() {
   }
   const closedPeriod = (shift: Shift) => paidPeriodFor(paidPeriods, shift.staffId, shift.date.slice(0, 10))
   const closedLabel = (period: PaidPeriod) => `Период закрыт ведомостью от ${DateTime.fromISO(period.createdAt, { zone: 'Europe/Moscow' }).toFormat('dd.MM.yyyy')}`
-  const reopen = (row: PayrollStatement) => modal.confirm({ title: 'Отменить оплату ведомости?', content: `${row.staff.fullName} · ${dayjs(row.periodStart.slice(0, 10)).format('DD.MM.YYYY')}–${dayjs(row.periodEnd.slice(0, 10)).format('DD.MM.YYYY')}. Связанный расход зарплаты будет отменён в кассе, ведомость станет черновиком, даты смен будут разблокированы. История отмены сохранится.`, okText: 'Отменить оплату', cancelText: 'Назад', autoFocusButton: 'cancel', okButtonProps: { danger: true }, onOk: async () => {
+  const reopen = (row: PayrollStatement) => modal.confirm({ title: 'Отменить оплату ведомости?', content: `${row.staff.fullName} · ${dayjs(row.periodStart.slice(0, 10)).format('DD.MM.YYYY')}–${dayjs(row.periodEnd.slice(0, 10)).format('DD.MM.YYYY')}. Связанный расход зарплаты будет отменён в кассе, ведомость станет черновиком, даты смен будут разблокированы. История отмены сохранится.`, okText: 'Отменить оплату', cancelText: 'Назад', autoFocusButton: 'cancel', okButtonProps: { danger: true, 'aria-label': 'Отменить оплату' }, onOk: async () => {
     if (!isUuid(row.id)) throw new Error('Некорректный идентификатор ведомости')
     try { await httpClient.post(`${API_URL}/payroll/calculations/${row.id}/reopen`); changed(); void message.success('Оплата отменена, ведомость переведена в черновик') }
     catch (cause) { const failure = toHttpError(cause); setError(failure.message); throw failure }
@@ -167,34 +168,34 @@ export function StaffPage() {
           })}</tr>)}</tbody></table></div> : <ResponsiveTable<Shift> rowKey="id" dataSource={shifts} pagination={{ pageSize: 10 }} locale={{ emptyText: 'В этом месяце смен нет' }} columns={[
             { title: 'Сотрудник', render: (_, row) => staff.find(person => person.id === row.staffId)?.fullName }, { title: 'Дата', render: (_, row) => <>{dayjs(row.date.slice(0, 10)).format('DD.MM.YYYY')}{closedPeriod(row) && <Typography.Paragraph><LockOutlined /> {closedLabel(closedPeriod(row)!)}</Typography.Paragraph>}</> }, { title: 'Время', render: (_, row) => `${row.startTime}–${row.endTime}` }, { title: 'Статус', render: (_, row) => <Tag color={shiftColors[row.status]}>{shiftStatuses[row.status]}</Tag> }, ...(canManage ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Shift) => shiftActions(row) }] : []),
           ]} />)}
-        {tab === 'employees' && <ResponsiveTable<Staff> rowKey="id" dataSource={staff} pagination={false} columns={[
-          { title: 'ФИО', dataIndex: 'fullName' },
-          { title: 'Роль', render: (_, row) => <Tag>{staffRoles[row.user?.role ?? 'OTHER']}</Tag> },
-          { title: 'Должность', dataIndex: 'roleTitle' },
-          { title: 'Телефон', render: (_, row) => row.phone || '—' },
-          { title: 'VK', render: (_, row) => row.user?.vkId ? <a href={`https://vk.com/id${row.user.vkId}`} target="_blank" rel="noreferrer"><Tag color="blue">VK</Tag></a> : '—' },
-          { title: 'Статус', render: (_, row) => <Tag color={!row.isActive ? undefined : row.shifts?.length ? 'green' : 'orange'}>{!row.isActive ? 'В архиве' : row.shifts?.length ? 'На смене' : 'Выходной'}</Tag> },
-          { title: 'Действия', render: (_, row) => <Space wrap>
+        {tab === 'employees' && <ConfigurableTable<Staff> storageKey="horse_crm_staff_columns_v1" defaultHiddenColumns={['vk', 'roleTitle']} rowKey="id" dataSource={staff} pagination={false} columns={[
+          { key: 'fullName', width: 180, fixed: 'left' as const, title: 'ФИО', dataIndex: 'fullName' },
+          { key: 'role', width: 120, align: 'center', title: 'Роль', render: (_, row) => <Tag>{staffRoles[row.user?.role ?? 'OTHER']}</Tag> },
+          { key: 'roleTitle', width: 140, title: 'Должность', dataIndex: 'roleTitle' },
+          { key: 'phone', width: 140, fixed: 'left' as const, title: 'Телефон', render: (_, row) => row.phone || '—' },
+          { key: 'vk', width: 70, align: 'center', title: 'VK', render: (_, row) => row.user?.vkId ? <a href={`https://vk.com/id${row.user.vkId}`} target="_blank" rel="noreferrer"><Tag color="blue">VK</Tag></a> : '—' },
+          { key: 'status', width: 120, align: 'center', title: 'Статус', render: (_, row) => <Tag color={!row.isActive ? undefined : row.shifts?.length ? 'green' : 'orange'}>{!row.isActive ? 'В архиве' : row.shifts?.length ? 'На смене' : 'Выходной'}</Tag> },
+          { key: 'actions', width: 180, fixed: 'right' as const, title: 'Действия', render: (_, row) => <Space wrap>
             {canManage && <Button onClick={() => setProfileModal(row)}>Редактировать</Button>}
             {modules.canWrite('STAFF_PAYROLL') && row.isActive && (role === 'ADMIN' || row.user?.email === getIdentity()?.email) && <Button disabled={busy} onClick={() => run(() => { if (!isUuid(row.id)) throw new Error('Некорректный идентификатор сотрудника'); return httpClient.post(`${API_URL}/shifts/${row.shifts?.length ? 'end' : 'start'}`, { staffId: row.id }) })}>{row.shifts?.length ? 'Закончить смену' : 'Начать смену'}</Button>}
             {canManage && row.isActive && <Button danger disabled={busy} onClick={() => modal.confirm({ title: `Архивировать: ${row.fullName}?`, content: 'Доступ в CRM будет отключен. История тренировок и начислений сохранится.', okText: 'Архивировать', cancelText: 'Отмена', autoFocusButton: 'cancel', okButtonProps: { danger: true }, onOk: async () => { if (!isUuid(row.id)) throw new Error('Некорректный идентификатор сотрудника'); await httpClient.post(`${API_URL}/staff/${row.id}/archive`); changed() } })}>Архивировать</Button>}
           </Space> },
         ]} />}
-        {tab === 'payroll' && <ResponsiveTable<Payroll> rowKey="staffId" dataSource={payroll} scroll={{ x: 1400 }} pagination={false} columns={[
-          { title: 'Сотрудник', dataIndex: 'fullName' }, { title: 'Должность', dataIndex: 'roleTitle' }, { title: 'Смен', dataIndex: 'shiftsCount' }, { title: 'Занятий', dataIndex: 'lessonsCount' },
-          { title: 'За смены', render: (_, row) => currency(row.shiftsTotal) }, { title: 'За занятия', render: (_, row) => currency(row.lessonsTotal) }, { title: 'Премии', render: (_, row) => currency(row.bonuses) }, { title: 'Удержания', render: (_, row) => currency(row.penalties) }, { title: 'Итого', render: (_, row) => <strong>{currency(row.totalAmount)}</strong> },
-          { title: 'Статус', render: (_, row) => <Tag color={row.isPaid ? 'green' : row.blocked ? 'orange' : undefined}>{row.isPaid ? 'Выплачено' : row.blocked ? 'Пересекается с выплатой' : 'К выплате'}</Tag> },
-          ...(canManage ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Payroll) => !row.isPaid && !row.blocked && <Space wrap><Button disabled={busy} onClick={() => setAdjustment(row)}>Премии / Штрафы</Button><Button type="primary" disabled={busy || Number(row.totalAmount) <= 0} onClick={() => preparePayout(row)}>Выплатить</Button></Space> }] : []),
+        {tab === 'payroll' && <ConfigurableTable<Payroll> storageKey="horse_crm_staff_payroll_columns_v1" defaultHiddenColumns={['roleTitle', 'shiftsTotal', 'lessonsTotal', 'bonuses', 'penalties']} rowKey="staffId" dataSource={payroll} pagination={false} columns={[
+          { key: 'fullName', width: 180, fixed: 'left' as const, title: 'Сотрудник', dataIndex: 'fullName' }, { key: 'roleTitle', width: 130, title: 'Должность', dataIndex: 'roleTitle' }, { key: 'shiftsCount', width: 80, align: 'right', title: 'Смен', dataIndex: 'shiftsCount' }, { key: 'lessonsCount', width: 80, align: 'right', title: 'Занятий', dataIndex: 'lessonsCount' },
+          { key: 'shiftsTotal', width: 110, align: 'right', title: 'За смены', render: (_, row) => currency(row.shiftsTotal) }, { key: 'lessonsTotal', width: 110, align: 'right', title: 'За занятия', render: (_, row) => currency(row.lessonsTotal) }, { key: 'bonuses', width: 110, align: 'right', title: 'Премии', render: (_, row) => currency(row.bonuses) }, { key: 'penalties', width: 110, align: 'right', title: 'Удержания', render: (_, row) => currency(row.penalties) }, { key: 'totalAmount', width: 120, align: 'right', title: 'Итого', render: (_, row) => <strong>{currency(row.totalAmount)}</strong> },
+          { key: 'status', width: 150, align: 'center', title: 'Статус', render: (_, row) => <Tag color={row.isPaid ? 'green' : row.blocked ? 'orange' : undefined}>{row.isPaid ? 'Выплачено' : row.blocked ? 'Пересекается с выплатой' : 'К выплате'}</Tag> },
+          ...(canManage ? [{ key: 'actions', width: 190, fixed: 'right' as const, title: 'Действия', render: (_: unknown, row: Payroll) => !row.isPaid && !row.blocked && <Space wrap><Button disabled={busy} onClick={() => setAdjustment(row)}>Премии / Штрафы</Button><Button type="primary" disabled={busy || Number(row.totalAmount) <= 0} onClick={() => preparePayout(row)}>Выплатить</Button></Space> }] : []),
         ]} />}
-        {tab === 'statements' && <ResponsiveTable<PayrollStatement> rowKey="id" dataSource={statements} pagination={false} columns={[
-          { title: 'Сотрудник', render: (_, row) => row.staff.fullName },
-          { title: 'Период', render: (_, row) => `${dayjs(row.periodStart.slice(0, 10)).format('DD.MM.YYYY')}–${dayjs(row.periodEnd.slice(0, 10)).format('DD.MM.YYYY')}` },
-          { title: 'Сумма', render: (_, row) => currency(row.totalAmount) },
-          { title: 'Статус', render: (_, row) => <Tag color={row.isPaid ? 'green' : undefined}>{row.isPaid ? 'Выплачено' : 'Черновик'}</Tag> },
-          { title: 'Действия', render: (_, row) => <Space wrap><Button onClick={() => update({ tab: 'payroll', from: row.periodStart.slice(0, 10), to: row.periodEnd.slice(0, 10), page: '1' })}>Открыть расчет</Button>{role === 'ADMIN' && canManage && row.isPaid && <Button danger disabled={busy} onClick={() => reopen(row)}>Отменить оплату</Button>}</Space> },
+        {tab === 'statements' && <ConfigurableTable<PayrollStatement> storageKey="horse_crm_staff_statements_columns_v1" defaultHiddenColumns={[]} rowKey="id" dataSource={statements} pagination={false} columns={[
+          { key: 'staff', width: 180, fixed: 'left' as const, title: 'Сотрудник', render: (_, row) => row.staff.fullName },
+          { key: 'period', width: 180, title: 'Период', render: (_, row) => `${dayjs(row.periodStart.slice(0, 10)).format('DD.MM.YYYY')}–${dayjs(row.periodEnd.slice(0, 10)).format('DD.MM.YYYY')}` },
+          { key: 'totalAmount', width: 120, align: 'right', title: 'Сумма', render: (_, row) => currency(row.totalAmount) },
+          { key: 'status', width: 120, align: 'center', title: 'Статус', render: (_, row) => <Tag color={row.isPaid ? 'green' : undefined}>{row.isPaid ? 'Выплачено' : 'Черновик'}</Tag> },
+          { key: 'actions', width: 190, fixed: 'right' as const, title: 'Действия', render: (_, row) => <Space wrap><Button onClick={() => update({ tab: 'payroll', from: row.periodStart.slice(0, 10), to: row.periodEnd.slice(0, 10), page: '1' })}>Открыть расчет</Button>{role === 'ADMIN' && canManage && row.isPaid && <Button danger disabled={busy} onClick={() => reopen(row)}>Отменить оплату</Button>}</Space> },
         ]} />}
-        {tab === 'rates' && <ResponsiveTable<Staff> rowKey="id" dataSource={staff} pagination={false} columns={[
-          { title: 'ФИО', dataIndex: 'fullName' }, { title: 'Должность', dataIndex: 'roleTitle' }, { title: 'За смену', render: (_, row) => currency(row.shiftRate ?? 0) }, { title: 'Индивидуальное занятие', render: (_, row) => currency(row.lessonRate ?? 0) }, { title: 'Групповое занятие', render: (_, row) => row.groupLessonRate == null ? 'По индивидуальной ставке' : currency(row.groupLessonRate) }, { title: 'Процент', render: (_, row) => `${row.lessonPercentage ?? 0} %` }, { title: 'Статус', render: (_, row) => row.isActive ? 'Активен' : 'Неактивен' }, { key: 'actions', title: 'Действия', render: (_, row) => <Button icon={<EditOutlined />} onClick={() => setProfileModal(row)}>Редактировать</Button> },
+        {tab === 'rates' && <ConfigurableTable<Staff> storageKey="horse_crm_staff_rates_columns_v1" defaultHiddenColumns={['roleTitle', 'groupLessonRate']} rowKey="id" dataSource={staff} pagination={false} columns={[
+          { key: 'fullName', width: 180, fixed: 'left' as const, title: 'ФИО', dataIndex: 'fullName' }, { key: 'roleTitle', width: 130, title: 'Должность', dataIndex: 'roleTitle' }, { key: 'shiftRate', width: 110, align: 'right', title: 'За смену', render: (_, row) => currency(row.shiftRate ?? 0) }, { key: 'lessonRate', width: 125, align: 'right', title: 'Индивидуальное занятие', render: (_, row) => currency(row.lessonRate ?? 0) }, { key: 'groupLessonRate', width: 130, align: 'right', title: 'Групповое занятие', render: (_, row) => row.groupLessonRate == null ? 'По индивидуальной ставке' : currency(row.groupLessonRate) }, { key: 'lessonPercentage', width: 90, align: 'right', title: 'Процент', render: (_, row) => `${row.lessonPercentage ?? 0} %` }, { key: 'status', width: 120, align: 'center', title: 'Статус', render: (_, row) => row.isActive ? 'Активен' : 'Неактивен' }, { key: 'actions', width: 190, fixed: 'right' as const, title: 'Действия', render: (_, row) => <Button icon={<EditOutlined />} onClick={() => setProfileModal(row)}>Редактировать</Button> },
         ]} />}
         <Pagination className="staff-pagination" current={page} pageSize={10} total={total} showSizeChanger={false} showTotal={count => `${tab === 'statements' ? 'Ведомостей' : 'Сотрудников'}: ${count}`} onChange={next => update({ page: String(next) })} />
       </>}

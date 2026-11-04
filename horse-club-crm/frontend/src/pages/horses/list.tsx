@@ -2,7 +2,8 @@ import { ProfileHeader, ProfileSection, ProfileFields } from '../cards/ProfileDe
 import { useState } from 'react'
 import { HorseForm } from './form'
 import { CatalogEditAction } from '../catalogs/EditDrawer'
-import { Empty, List, Space, Tabs, Tag, Typography } from 'antd'
+import { Avatar, Empty, List, Space, Tabs, Tag, Typography } from 'antd'
+import { TableCellText } from '../../components/ConfigurableTable'
 import { money } from '../catalogs/format'
 import { CatalogList } from '../catalogs/shared'
 import type { Horse, HorseDetails } from '../catalogs/types'
@@ -25,13 +26,15 @@ export function HorseList() {
   const { permissions } = useRoleAccess()
   const [selectedId, setSelectedId] = useState<string>()
   return <>
-    <CatalogList<Horse> resource="horses" title="Лошади" columns={[
-      { key: 'name', title: 'Кличка', sorter: true, render: (_: unknown, row) => <CardLink onClick={() => setSelectedId(row.id)}>{row.name}</CardLink> },
-      { key: 'breed', dataIndex: 'breed', title: 'Порода', sorter: true },
-      { key: 'riderLevel', dataIndex: 'riderLevel', title: 'Уровень всадника', sorter: true },
-      { key: 'maxDailyMinutes', dataIndex: 'maxDailyMinutes', title: 'Лимит нагрузки, мин/день', sorter: true },
-      { key: 'minRestMinutes', dataIndex: 'minRestMinutes', title: 'Минимальный отдых, мин', sorter: true },
-      { key: 'isUnavailable', dataIndex: 'isUnavailable', title: 'Статус', sorter: true,
+    <CatalogList<Horse> resource="horses" storageKey="horse_crm_horses_columns_v1" defaultHiddenColumns={['riderLevel', 'minRestMinutes', 'description']} title="Лошади" columns={[
+      { key: 'name', fixed: 'left', width: 180, title: 'Кличка / Фото', sorter: true, render: (_: unknown, row) => <Space size={8}><Avatar shape="square" size={32} src={row.imageUrl ? <img src={row.imageUrl} alt={row.name} /> : undefined}>{row.name.slice(0, 1)}</Avatar><CardLink onClick={() => setSelectedId(row.id)}>{row.name}</CardLink></Space> },
+      { key: 'breed', align: 'center', width: 130, dataIndex: 'breed', title: 'Порода', sorter: true },
+      { key: 'coat', align: 'center', width: 110, dataIndex: 'coat', title: 'Масть' },
+      { key: 'description', width: 160, dataIndex: 'description', title: 'Особенности', render: (value: string | null) => <TableCellText>{value}</TableCellText> },
+      { key: 'riderLevel', align: 'center', width: 140, dataIndex: 'riderLevel', title: 'Уровень всадника', sorter: true },
+      { key: 'maxDailyMinutes', align: 'right', width: 115, dataIndex: 'maxDailyMinutes', title: 'Лимит нагрузки, мин/день', sorter: true },
+      { key: 'minRestMinutes', align: 'right', width: 115, dataIndex: 'minRestMinutes', title: 'Минимальный отдых, мин', sorter: true },
+      { key: 'isUnavailable', align: 'center', width: 130, dataIndex: 'isUnavailable', title: 'Статус', sorter: true,
         render: (value: boolean) => <Tag color={value ? 'red' : 'green'}>{value ? 'Недоступна' : 'Доступна'}</Tag> },
     ]} />
     <DetailsModal<HorseDetails> resource="horses" id={selectedId} title="Карточка лошади" onClose={() => setSelectedId(undefined)} width={960}

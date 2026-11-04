@@ -16,15 +16,15 @@ const statusColors: Record<BoardingContractStatus, string> = {
 export function BoardingContractList() {
   const [selectedId, setSelectedId] = useState<string>()
   return <>
-    <CatalogList<BoardingContract> resource="boarding-contracts" title="Договоры постоя" columns={[
-      { key: 'client', title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : 'Лошадь клуба'}</CardLink> },
-      { key: 'horse', dataIndex: ['horse', 'name'], title: 'Лошадь' },
-      { key: 'stall', title: 'Денник', render: (_: unknown, record) => record.stall?.name || '—' },
-      { key: 'status', dataIndex: 'status', title: 'Статус', sorter: true, render: (value: BoardingContractStatus) => <Tag color={statusColors[value]}>{statusLabels[value]}</Tag> },
-      { key: 'startsAt', dataIndex: 'startsAt', title: 'Начало', sorter: true, render: dateOnly },
-      { key: 'endsAt', dataIndex: 'endsAt', title: 'Окончание', sorter: true, render: dateOnly },
-      { key: 'monthlyRate', dataIndex: 'monthlyRate', title: 'В месяц', sorter: true, render: money },
-      { key: 'payments', title: 'Оплаты', render: (_: unknown, record) => {
+    <CatalogList<BoardingContract> resource="boarding-contracts" storageKey="horse_crm_boarding_contracts_columns_v1" defaultHiddenColumns={['startsAt', 'endsAt', 'payments']} title="Договоры постоя" columns={[
+      { key: 'client', fixed: 'left', width: 180, title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : 'Лошадь клуба'}</CardLink> },
+      { key: 'horse', width: 125, dataIndex: ['horse', 'name'], title: 'Лошадь' },
+      { key: 'stall', align: 'center', width: 100, title: 'Денник', render: (_: unknown, record) => record.stall?.name || '—' },
+      { key: 'status', align: 'center', width: 140, dataIndex: 'status', title: 'Статус', sorter: true, render: (value: BoardingContractStatus) => <Tag color={statusColors[value]}>{statusLabels[value]}</Tag> },
+      { key: 'startsAt', width: 110, dataIndex: 'startsAt', title: 'Начало', sorter: true, render: dateOnly },
+      { key: 'endsAt', width: 110, dataIndex: 'endsAt', title: 'Окончание', sorter: true, render: dateOnly },
+      { key: 'monthlyRate', align: 'right', width: 120, dataIndex: 'monthlyRate', title: 'В месяц', sorter: true, render: money },
+      { key: 'payments', align: 'right', width: 180, title: 'Оплаты', render: (_: unknown, record) => {
         const paid = record.payments.filter(payment => payment.status === 'PAID').reduce((sum, payment) => sum + Number(payment.amount), 0)
         const pending = record.payments.filter(payment => payment.status === 'PENDING').reduce((sum, payment) => sum + Number(payment.amount), 0)
         return <Space direction="vertical" size={2}>{paid > 0 && <Tag color="green">Оплачено: {money(paid)}</Tag>}{pending > 0 && <Tag color="gold">К оплате: {money(pending)}</Tag>}{paid === 0 && pending === 0 && 'Нет начислений'}</Space>

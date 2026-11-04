@@ -7,12 +7,12 @@ import type { Service } from '../catalogs/types'
 export function ServiceList() {
   const { canManage } = useCatalogPermissions()
   const columns: TableColumnsType<Service> = [
-    { key: 'title', dataIndex: 'title', title: 'Название', sorter: true },
-    { key: 'durationMinutes', dataIndex: 'durationMinutes', title: 'Длительность, мин', sorter: true },
-    { key: 'maxCapacity', dataIndex: 'maxCapacity', title: 'Вместимость', sorter: true },
-    ...(canManage ? [{ key: 'price', dataIndex: 'price', title: 'Цена', sorter: true, render: money }] : []),
-    { key: 'cancellationWindowHours', dataIndex: 'cancellationWindowHours', title: 'Бесплатная отмена за, ч', sorter: true },
-    { key: 'allowMembership', dataIndex: 'allowMembership', title: 'Оплата абонементом', render: (value: boolean) => <Tag>{value ? 'Да' : 'Нет'}</Tag> },
+    { key: 'title', fixed: 'left', width: 180, dataIndex: 'title', title: 'Название', sorter: true },
+    { key: 'durationMinutes', align: 'right' as const, width: 115, dataIndex: 'durationMinutes', title: 'Длительность, мин', sorter: true },
+    { key: 'maxCapacity', align: 'right' as const, width: 110, dataIndex: 'maxCapacity', title: 'Вместимость', sorter: true },
+    ...(canManage ? [{ key: 'price', align: 'right' as const, width: 120, dataIndex: 'price', title: 'Цена', sorter: true, render: money }] : []),
+    { key: 'cancellationWindowHours', align: 'right' as const, width: 120, dataIndex: 'cancellationWindowHours', title: 'Бесплатная отмена за, ч', sorter: true },
+    { key: 'allowMembership', align: 'center', width: 130, dataIndex: 'allowMembership', title: 'Оплата абонементом', render: (value: boolean) => <Tag>{value ? 'Да' : 'Нет'}</Tag> },
   ]
-  return <CatalogList<Service> resource="services" title="Услуги" columns={columns} />
+  return <CatalogList<Service> resource="services" storageKey="horse_crm_services_columns_v1" defaultHiddenColumns={['cancellationWindowHours']} title="Услуги" columns={columns} />
 }

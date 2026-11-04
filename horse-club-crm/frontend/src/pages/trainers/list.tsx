@@ -16,13 +16,14 @@ export function TrainerList() {
   const { canManage } = useCatalogPermissions()
   const { canRead } = usePermissions()
   const columns: TableColumnsType<Trainer> = [
-    { key: 'name', title: 'ФИО', sorter: true, render: (_, row) => <CardLink onClick={() => setSelectedId(row.id)}>{row.name}</CardLink> },
-    { key: 'vk', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name} kind="TRAINER" vkUserId={row.vkUserId} /> },
-    { key: 'qualification', dataIndex: 'qualification', title: 'Квалификация', width: 260 },
-    { key: 'maxDailyLoad', dataIndex: 'maxDailyLoad', title: 'Дневная нагрузка, мин', sorter: true },
+    { key: 'name', fixed: 'left', width: 180, title: 'ФИО', sorter: true, render: (_, row) => <CardLink onClick={() => setSelectedId(row.id)}>{row.name}</CardLink> },
+    { key: 'phone', fixed: 'left', width: 145, dataIndex: 'phone', title: 'Телефон' },
+    { key: 'vk', align: 'center', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name} kind="TRAINER" vkUserId={row.vkUserId} /> },
+    { key: 'qualification', dataIndex: 'qualification', title: 'Квалификация', width: 170 },
+    { key: 'maxDailyLoad', align: 'right', width: 115, dataIndex: 'maxDailyLoad', title: 'Дневная нагрузка, мин', sorter: true },
   ]
-  if (canManage && canRead('STAFF_PAYROLL')) columns.push({ key: 'baseRate', dataIndex: 'baseRate', title: 'Базовая ставка', sorter: true, render: money })
-  return <><CatalogList<Trainer> resource="trainers" title="Тренеры" columns={columns} />
+  if (canManage && canRead('STAFF_PAYROLL')) columns.push({ key: 'baseRate', align: 'right', width: 120, dataIndex: 'baseRate', title: 'Базовая ставка', sorter: true, render: money })
+  return <><CatalogList<Trainer> resource="trainers" storageKey="horse_crm_trainers_columns_v1" defaultHiddenColumns={['vk', 'qualification']} title="Тренеры" columns={columns} />
     <DetailsModal<Trainer> resource="trainers" id={selectedId} title="Карточка тренера" onClose={() => setSelectedId(undefined)}>
       {trainer => <><CatalogEditAction resource="trainers" id={trainer.id}><TrainerForm action="edit" /></CatalogEditAction>
         <Descriptions bordered column={1} style={{ marginTop: 16 }} items={[
