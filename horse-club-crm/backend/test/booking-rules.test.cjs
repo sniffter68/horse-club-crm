@@ -200,6 +200,37 @@ test('invalid intervals and costs never start a transaction', async () => {
   }
 });
 
+test('partial reschedule merges current resources and preserves pricing inside the validated transaction', async () => {
+  const { tx, input } = fixture();
+  const current = { id: 'b', lessonId: null, status: 'scheduled', clientId: 'client', horseId: 'horse', trainerId: 'trainer', arenaId: 'arena', membershipId: null, startTime: at('08:00'), endTime: at('08:30'), serviceType: 'dressage', costAmount: new Prisma.Decimal('1234.56') };
+  tx.booking.findUnique = async () => current;
+  let saved, validated;
+  tx.booking.update = async ({ data }) => { saved = data; return { ...current, ...data }; };
+  const service = new BookingsService({ $transaction: async (work, options) => {
+    assert.equal(options.isolationLevel, 'Serializable'); return work(tx);
+  } }, { validate: async (client, values) => { assert.equal(client, tx); validated = values; } });
+  await service.updateBooking('b', { startTime: input.start.toISOString(), endTime: input.end.toISOString(), trainerId: 'new-trainer', arenaId: 'new-arena' });
+  assert.equal(validated.excludeBookingId, 'b');
+  assert.equal(validated.trainerId, 'new-trainer'); assert.equal(validated.arenaId, 'new-arena');
+  assert.deepEqual(validated.participants, input.participants);
+  assert.equal(saved.clientId, 'client'); assert.equal(saved.horseId, 'horse');
+  assert.equal(String(saved.costAmount), '1234.56'); assert.equal(saved.serviceType, 'dressage');
+  saved = undefined;
+  service.rules = { validate: async () => { throw new Error('conflict'); } };
+  await assert.rejects(service.updateBooking('b', { trainerId: 'busy-trainer' }), /conflict/);
+  assert.equal(saved, undefined);
+});
+
+test('partial booking DTO accepts resource/time patches and rejects invalid UUIDs, null times and unknown fields', async () => {
+  const { plainToInstance } = require('class-transformer');
+  const { validate } = require('class-validator');
+  const { UpdateBookingDto } = require('../dist/bookings/dto/update-booking.dto');
+  const check = body => validate(plainToInstance(UpdateBookingDto, body), { whitelist: true, forbidNonWhitelisted: true });
+  assert.equal((await check({ startTime: at('10:00').toISOString(), trainerId: '11111111-1111-4111-8111-111111111111' })).length, 0);
+  assert.equal((await check({ clientId: '', trainerId: '', horseId: '', arenaId: '', membershipId: '', serviceType: '' })).length, 0);
+  for (const body of [{ trainerId: 'bad' }, { startTime: null }, { allowOverlap: true }]) assert.ok((await check(body)).length > 0);
+});
+
 test('horse replacement validates future scheduled booking and only writes horse and reason', async () => {
   const f = fixture({ client: { weightKg: 75 } });
   const startTime = new Date('2030-10-09T10:00:00Z'), endTime = new Date('2030-10-09T10:30:00Z');

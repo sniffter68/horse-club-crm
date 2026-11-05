@@ -110,7 +110,7 @@ export class LessonsController {
   @Patch(':id/reschedule')
   @Roles(Role.ADMIN, Role.MANAGER)
   reschedule(@Param('id', new ParseUUIDPipe()) lessonId: string, @Body() dto: RescheduleLessonDto): Promise<LessonDetails> {
-    return this.lessonsService.rescheduleLesson(lessonId, dto.startTime, dto.durationMinutes);
+    return this.lessonsService.rescheduleLesson(lessonId, dto.startTime, dto.durationMinutes, dto.trainerId, dto.arenaId);
   }
 
   @Get(':id')

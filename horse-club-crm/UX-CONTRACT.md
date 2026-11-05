@@ -1,5 +1,9 @@
 # UX Contract
 
+## Быстрые действия расписания (2026-11-06)
+
+Источник: задача владельца, `bookings/booking-rules.service.ts` и `docs/schedule-interactions.md`. Сеткой ресурсов владеет ResourceSchedule, компактной формой — QuickSlotBooking (Ant Design Popover/Form/Select), поиском клиента — ClientSelectWithCreate. Слот задаёт московское время и ресурс; начальная длительность 60 минут. Расширенные параметры открывают TriadBookingModal с введёнными значениями. Перенос использует HTML5 drag-and-drop с шагом 15 минут, сохраняет длительность, проверяет полный интервал без фильтров, показывает ожидающий статус и откатывает карточку при отказе сервера. Недоступные мутации скрыты или выключены для READ_ONLY. Альтернатива перетаскиванию — редактирование бронирования или шторка «Перенос занятия» с выбором времени, тренера и манежа. Проверки: `schedule-interactions.spec.ts`, `reschedule.test.ts`, `booking-rules.test.cjs`.
+
 ## VK тренера (2026-11-05)
 
 Источник: задача владельца и `docs/trainer-vk-binding.md`. Формой владеет CatalogForm/EntryOverlay, полем «VK ID» — общий VkProfileField, привязкой в карточке — VkProfileLink. ADMIN/MANAGER с FULL SCHEDULE видят мутации. Ошибка сохраняет ввод и отображается в Alert; во время запроса повтор заблокирован. Переход к персоналу не нужен. Проверки: `backend/test/trainer-vk-binding.test.cjs`, `frontend/e2e/vk-link.spec.ts`.

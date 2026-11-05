@@ -1,3 +1,7 @@
+import { QuickSlotBooking } from './QuickSlotBooking'
+import { moveConflict, type ScheduleMove } from './reschedule'
+import { bookingFailure } from './triad'
+import { isUuid } from '../../uuid'
 import { LessonDrawer, type LessonDrawerProps } from './LessonDrawer'
 import { ScheduleConflictNotice } from './ScheduleConflictNotice'
 import { scheduleConflicts } from './triad'
@@ -50,6 +54,8 @@ export function SchedulePage() {
     setError(failure.message)
     if (failure.statusCode === 401) errorHandler.current(failure)
   }, [])
+  const [moving, setMoving] = useState(false)
+  const moveLock = useRef(false)
   const [schedule, setSchedule] = useState<ClubSchedule>()
   const [clients, setClients] = useState<Client[]>([])
   const [horses, setHorses] = useState<Horse[]>([])
@@ -180,6 +186,41 @@ export function SchedulePage() {
     setEditingTriad(booking); setTriadDetail(undefined)
     setTriadSeed({ trainerId, horseId, arenaId, startTime, endTime: DateTime.fromISO(startTime, { zone: CLUB_TIME_ZONE }).plus({ minutes: 60 }).toFormat("yyyy-MM-dd'T'HH:mm"), ...values })
   }
+  async function moveEntry(entry: ScheduleEntry, move: ScheduleMove) {
+    if (!canManage || !ready || moveLock.current || !entry.active || entry.completed) return
+    if (![entry.id, move.trainerId, ...(move.arenaId ? [move.arenaId] : [])].every(isUuid)) { void message.warning('Некорректный идентификатор ресурса'); return }
+    if (+new Date(move.startTime) === +new Date(entry.startTime) && move.trainerId === entry.trainerId && move.arenaId === entry.arenaId) return
+    moveLock.current = true; setMoving(true)
+    const oldLesson = lessons.find(row => row.id === entry.id)
+    const oldBooking = triadBookings.find(row => row.id === entry.id)
+    let optimistic = false
+    try {
+      // Validate against the complete interval, independently of visible filters.
+      const [lessonRows, bookings] = await Promise.all([
+        httpClient.get<Lesson[]>(`${API_URL}/lessons`, { params: { from: move.startTime, to: move.endTime } }),
+        catalog<TriadBooking>('bookings', new AbortController().signal, { from: move.startTime, to: move.endTime }),
+      ])
+      const reason = moveConflict(entry, move, scheduleEntries(lessonRows.data, bookings), trainers)
+      if (reason) { void message.warning(reason); return }
+      optimistic = true
+      const trainer = trainers.find(t => t.id === move.trainerId), arena = arenas.find(a => a.id === move.arenaId)
+      if (entry.source === 'booking') {
+        setTriadBookings(rows => rows.map(row => row.id === entry.id ? { ...row, ...move, arenaId: move.arenaId ?? row.arenaId, trainer: trainer ?? row.trainer, arena: arena ?? row.arena } : row))
+        await httpClient.patch(`${API_URL}/bookings/${entry.id}`, move)
+      } else {
+        setLessons(rows => rows.map(row => row.id === entry.id ? { ...row, startTime: move.startTime, endTime: move.endTime, trainer: trainer ?? row.trainer, arena: arena ?? row.arena } : row))
+        await httpClient.patch(`${API_URL}/lessons/${entry.id}/reschedule`, { startTime: move.startTime, durationMinutes: (+new Date(move.endTime) - +new Date(move.startTime)) / 60000, trainerId: move.trainerId, arenaId: move.arenaId })
+      }
+      void message.success('Занятие перенесено')
+    } catch (cause) {
+      if (optimistic) {
+        if (entry.source === 'lesson' && oldLesson) setLessons(rows => rows.map(row => row.id === entry.id ? oldLesson : row))
+        if (entry.source === 'booking' && oldBooking) setTriadBookings(rows => rows.map(row => row.id === entry.id ? oldBooking : row))
+      }
+      void message.warning(bookingFailure(toHttpError(cause)).message)
+      if (toHttpError(cause).statusCode === 401) report(cause)
+    } finally { moveLock.current = false; setMoving(false); setRevision(r => r + 1) }
+  }
   function openEntry(entry: ScheduleEntry) {
     if (entry.source === 'lesson') { setError(undefined); setDetail(lessons.find(l => l.id === entry.id)) }
     else setTriadDetail(triadBookings.find(b => b.id === entry.id))
@@ -203,7 +244,8 @@ export function SchedulePage() {
     }
     savingRef.current = true; setSaving(true); setError(undefined)
     try {
-      await httpClient.patch<Lesson>(`${API_URL}/lessons/${editingLesson.id}/reschedule`, { startTime: toInstant(values.startTime), durationMinutes: values.durationMinutes })
+      if (![editingLesson.id, values.trainerId, ...(values.arenaId ? [values.arenaId] : [])].every(isUuid)) throw new Error('Выберите доступные ресурсы')
+      await httpClient.patch<Lesson>(`${API_URL}/lessons/${editingLesson.id}/reschedule`, { startTime: toInstant(values.startTime), durationMinutes: values.durationMinutes, trainerId: values.trainerId, arenaId: values.arenaId })
       setWorkloadDate(values.startTime.slice(0, 10))
       setBookingOpen(false); setRevision(value => value + 1); void message.success(editingLesson ? 'Занятие перенесено' : 'Занятие создано')
     } catch (cause) { report(cause) }
@@ -267,7 +309,8 @@ export function SchedulePage() {
     <Card className="schedule-calendar"><Spin spinning={loading || triadLoading || (!ready && !error)}>
       {grouping !== 'calendar' && schedule && <ResourceSchedule grouping={grouping} date={workloadDate} schedule={schedule} entries={entries}
         trainers={trainers.filter(t => !trainerId || t.id === trainerId)} horses={horses.filter(h => !horseId || h.id === horseId)} arenas={arenas.filter(a => !arenaId || a.id === arenaId)}
-        workloads={triadAvailability.data?.horseWorkloads ?? []} occupancy={triadAvailability.data?.arenaOccupancy} canManage={canManage && ready} onBook={openBooking} onOpen={openEntry} />}
+        workloads={triadAvailability.data?.horseWorkloads ?? []} occupancy={triadAvailability.data?.arenaOccupancy} moving={moving} onMove={moveEntry} renderQuick={(values, close) => <QuickSlotBooking initial={{ trainerId, arenaId, ...values }} horses={horses} trainers={trainers} arenas={arenas} report={report}
+          onAdvanced={seed => { close(); openTriad(seed) }} onSaved={() => { close(); setRevision(r => r + 1) }} />} canManage={canManage && ready} onBook={openBooking} onOpen={openEntry} />}
       <div hidden={grouping !== 'calendar'}>
       {schedule && <FullCalendar ref={calendarRef} plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin, luxonPlugin]} locale={ruLocale}
         timeZone={CLUB_TIME_ZONE} initialView={compactLayout ? 'timeGridDay' : 'timeGridWeek'}
@@ -311,11 +354,11 @@ export function SchedulePage() {
     <EntryOverlay variant="drawer" title="Перенос занятия" open={bookingOpen} onCancel={() => { if (!saving) setBookingOpen(false) }} footer={null} forceRender width={720} keyboard={!saving} maskClosable={!saving} closable={!saving}>
       {failure}
       <Form form={form} noValidate layout="vertical" onFinish={saveReschedule} disabled={saving}>
-        {editingLesson && <><Typography.Paragraph type="secondary">Меняются только время и длительность. Переносимое занятие исключено из текущей нагрузки.</Typography.Paragraph><LessonGroupSummary lesson={editingLesson} /></>}
+        {editingLesson && <><Typography.Paragraph type="secondary">Можно изменить время, длительность, тренера и манеж. Переносимое занятие исключено из текущей нагрузки.</Typography.Paragraph><LessonGroupSummary lesson={editingLesson} /></>}
         <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} /></Form.Item>
         <ScheduleConflictNotice entries={conflicts.entries} trainerId={selectedTrainer} horseIds={selectedHorseIds} error={conflicts.error} />
-        <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
-        <Form.Item name="arenaId" label="Манеж" extra="Необязательно для выездного или теоретического занятия."><Select disabled={Boolean(editingLesson)} allowClear showSearch optionFilterProp="label" options={arenaOptions} /></Form.Item>
+        <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
+        <Form.Item name="arenaId" label="Манеж" extra="Необязательно для выездного или теоретического занятия."><Select showSearch optionFilterProp="label" options={arenaOptions} /></Form.Item>
         <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><BookingDateTimeInput /></Form.Item>
         <Form.Item name="durationMinutes" label="Длительность, мин" rules={[{ required: true }, { type: 'integer', min: 1 }]}><InputNumber min={1} precision={0} /></Form.Item>
         {bookingWorkloads.error && <Alert type="error" showIcon message="Не удалось проверить нагрузку лошадей" description={bookingWorkloads.error}

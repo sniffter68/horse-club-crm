@@ -1,3 +1,4 @@
+import { UpdateBookingDto } from './dto/update-booking.dto';
 import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { ReplaceHorseDto } from './dto/replace-horse.dto';
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
@@ -55,7 +56,7 @@ export class BookingsController {
   create(@Body() dto: CreateBookingDto) { return this.bookings.createBooking(dto); }
   @Patch(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
-  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CreateBookingDto) { return this.bookings.updateBooking(id, dto); }
+  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateBookingDto) { return this.bookings.updateBooking(id, dto); }
   @Get('availability')
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
   availability(@Query() query: BookingAvailabilityDto) { return this.bookings.availability(query); }

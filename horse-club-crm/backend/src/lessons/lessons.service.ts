@@ -174,7 +174,7 @@ export class LessonsService {
     });
   }
 
-  async rescheduleLesson(lessonId: string, startTime: string, durationMinutes: number): Promise<LessonDetails> {
+  async rescheduleLesson(lessonId: string, startTime: string, durationMinutes: number, trainerId?: string, arenaId?: string): Promise<LessonDetails> {
     const eventId = randomUUID();
     if (!Number.isSafeInteger(durationMinutes) || durationMinutes <= 0) throw new BadRequestException('Укажите положительную длительность занятия');
     const start = this.parseDate(startTime, 'Некорректное время начала занятия');
@@ -184,7 +184,7 @@ export class LessonsService {
       const lesson = await tx.lesson.findUnique({ where: { id: lessonId }, ...lessonDetails });
       if (!lesson) throw new NotFoundException('Занятие не найдено');
       if (lesson.status !== LessonStatus.SCHEDULED) throw new ConflictException('Переносить можно только запланированные занятия');
-      if (lesson.arena?.isUnavailable) throw new ConflictException('Манеж недоступен на новое время занятия');
+      if (!arenaId && lesson.arena?.isUnavailable) throw new ConflictException('Манеж недоступен на новое время занятия');
       const schedule = await this.getClubSchedule(tx);
       this.assertClubWorkingHours(start, end, schedule);
       for (const booking of lesson.bookings) {
@@ -193,13 +193,13 @@ export class LessonsService {
         }
       }
       const horseIds = [...new Set(lesson.bookings.map(booking => booking.horseId).filter((id): id is string => Boolean(id)))];
-      await this.bookingRules.validate(tx, { trainerId: lesson.trainerId, arenaId: lesson.arenaId, participants: lesson.bookings, start, end, excludeLessonId: lessonId });
-      await this.validateNoConflictsWithClient(tx, lesson.trainerId, horseIds, start, end, lessonId, lesson.arenaId ?? undefined);
+      await this.bookingRules.validate(tx, { trainerId: trainerId ?? lesson.trainerId, arenaId: arenaId ?? lesson.arenaId, participants: lesson.bookings, start, end, excludeLessonId: lessonId });
+      await this.validateNoConflictsWithClient(tx, trainerId ?? lesson.trainerId, horseIds, start, end, lessonId, arenaId ?? lesson.arenaId ?? undefined);
       for (const horseId of horseIds) {
         await this.getHorseWorkloadWithClient(tx, horseId, this.getLocalDateParts(start), durationMinutes, lessonId);
       }
-      const updated = await tx.lesson.update({ where: { id: lessonId }, data: { startTime: start, endTime: end }, ...lessonDetails });
-      if (lesson.startTime.getTime() !== start.getTime() || lesson.endTime.getTime() !== end.getTime()) {
+      const updated = await tx.lesson.update({ where: { id: lessonId }, data: { startTime: start, endTime: end, ...(trainerId ? { trainerId } : {}), ...(arenaId ? { arenaId } : {}) }, ...lessonDetails });
+      if (trainerId && trainerId !== lesson.trainerId || arenaId && arenaId !== lesson.arenaId || lesson.startTime.getTime() !== start.getTime() || lesson.endTime.getTime() !== end.getTime()) {
         await this.notifyLesson(tx, updated, `rescheduled:${eventId}`, 'Тренировка перенесена', undefined, lesson.startTime);
       }
       return updated;

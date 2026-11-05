@@ -1,3 +1,4 @@
+import { UpdateBookingDto } from './dto/update-booking.dto';
 import { canUseMembership } from '../memberships/membership-access';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { BookingServiceType, Prisma } from '@prisma/client';
@@ -121,15 +122,7 @@ export class BookingsService {
     });
   }
 
-  async createBooking(dto: CreateBookingDto) {
-    return this.save(dto);
-  }
-
-  async updateBooking(id: string, dto: CreateBookingDto) {
-    return this.save(dto, id);
-  }
-
-  private async save(dto: CreateBookingDto, id?: string) {
+  private validateBookingValues(dto: CreateBookingDto) {
     const start = new Date(dto.startTime), end = new Date(dto.endTime);
     const zoned = /T.*(?:Z|[+-]\d{2}:\d{2})$/i;
     if (!zoned.test(dto.startTime) || !zoned.test(dto.endTime) || !Number.isFinite(+start) || !Number.isFinite(+end) || start >= end) {
@@ -138,13 +131,27 @@ export class BookingsService {
     if (!Object.values(BookingServiceType).includes(dto.serviceType) || !Number.isFinite(dto.costAmount) || dto.costAmount < 0 || dto.costAmount > 999999999999.99 || new Prisma.Decimal(dto.costAmount).decimalPlaces() > 2) {
       throw new BadRequestException('Некорректный тип услуги или стоимость');
     }
+    return { start, end };
+  }
+
+  async createBooking(dto: CreateBookingDto) {
+    this.validateBookingValues(dto);
+    return this.save(dto);
+  }
+
+  async updateBooking(id: string, dto: UpdateBookingDto) {
+    return this.save(dto, id);
+  }
+
+  private async save(patch: CreateBookingDto | UpdateBookingDto, id?: string) {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         return await this.prisma.$transaction(async tx => {
-          if (id) {
-            const current = await tx.booking.findUnique({ where: { id } });
-            if (!current || current.lessonId !== null || current.status !== 'scheduled') throw new BookingValidationError('BOOKING_NOT_EDITABLE', 'Редактировать можно только запланированное бронирование тройного ресурса');
-          }
+          const current = id ? await tx.booking.findUnique({ where: { id } }) : null;
+          if (id && (!current || current.lessonId !== null || current.status !== 'scheduled')) throw new BookingValidationError('BOOKING_NOT_EDITABLE', 'Редактировать можно только запланированное бронирование тройного ресурса');
+          const defined = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+          const dto = { ...(current ? { ...current, startTime: current.startTime?.toISOString(), endTime: current.endTime?.toISOString(), costAmount: Number(current.costAmount) } : {}), ...defined } as CreateBookingDto;
+          const { start, end } = this.validateBookingValues(dto);
           await this.rules.validate(tx, { trainerId: dto.trainerId, arenaId: dto.arenaId, participants: [{ clientId: dto.clientId, horseId: dto.horseId }], start, end, excludeBookingId: id });
           if (dto.membershipId) {
             await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Membership" WHERE "id" = ${dto.membershipId}::uuid FOR UPDATE`);

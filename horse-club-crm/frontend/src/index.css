@@ -427,6 +427,9 @@ html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); borde
 .resource-rest span { display: block; padding: 5px 8px; font-size: 12px; color: var(--crm-saddle); }
 .resource-booking { position: absolute; display: flex; flex-direction: column; gap: 3px; box-sizing: border-box; padding: 0; margin-left: 2px; text-align: start; background: var(--crm-saddle); color: #fff; border: 0; border-radius: 8px; overflow: hidden; cursor: pointer; font: inherit; font-size: 12px; line-height: 1.3; }
 .resource-booking:hover { filter: brightness(1.08); }
+.resource-booking[draggable="true"] { cursor: grab; }
+.resource-booking[draggable="true"]:active { cursor: grabbing; }
+.resource-booking[aria-busy="true"] { cursor: progress; opacity: .75; }
 .resource-booking--completed { background: #3e5f48; }
 .resource-booking--cancelled { background: #8c6527; }
 .resource-book-action { margin-top: 16px; }
