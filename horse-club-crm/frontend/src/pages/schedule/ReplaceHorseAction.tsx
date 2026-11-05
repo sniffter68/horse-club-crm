@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Alert, App, Button, Form, Input, Modal, Select, Space, Typography } from 'antd'
+import { Alert, App, Button, Form, Input, Modal, Space, Typography } from 'antd'
+import { SearchSelect } from '../../components/SearchSelect'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import type { Horse } from '../catalogs/types'
 import { useRoleAccess } from '../../access'
@@ -60,7 +61,7 @@ export function ReplaceHorseAction({ bookingId, trainerId, disabled, report, onS
       {loadError && <Alert type="error" role="alert" showIcon message={loadError} action={<Button onClick={reload}>Повторить</Button>} />}
       <Form form={form} noValidate layout="vertical" onFinish={save} disabled={busy} scrollToFirstError>
         <Form.Item name="horseId" label="Новая лошадь" rules={[{ required: true, message: 'Выберите лошадь' }]}>
-          <Select aria-label="Новая лошадь" showSearch optionFilterProp="label" loading={loading} disabled={busy || loading || Boolean(loadError)} notFoundContent="На это время нет доступных лошадей"
+          <SearchSelect aria-label="Новая лошадь" showSearch optionFilterProp="label" loading={loading} disabled={busy || loading || Boolean(loadError)} notFoundContent="На это время нет доступных лошадей"
             options={options.map(horse => ({ value: horse.id, label: `${horse.name} · до ${horse.maxRiderWeight} кг` }))} />
         </Form.Item>
         <Form.Item name="reason" label="Причина замены"><Input aria-label="Причина замены" maxLength={500} /></Form.Item>

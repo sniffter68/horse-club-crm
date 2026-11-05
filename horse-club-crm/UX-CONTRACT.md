@@ -95,7 +95,7 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
 |---|---|---|---|---|---|---|---|
 | Button | semantic emphasis | saddle/border emphasis | visible ring | 1px press | muted, inert | stable spinner | intent preserved |
 | Input | warm border | stronger border | saddle ring | n/a | muted | stable suffix | inline Ant error |
-| Search | clear + submit | shared input | shared input | submit | inert | table loader | page alert |
+| Search | clear + 300 ms debounce | LiveSearch | autocomplete, up to 8 | Enter / select immediately | editable | table loader | page alert |
 | Textarea | resize none | shared input | shared input | n/a | muted | form pending | inline Ant error |
 | Table/list | hairline rows | warm row | native controls | n/a | n/a | stable loader | persistent alert |
 
@@ -126,7 +126,7 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
 | Create | Создать | stable busy button | owning list | shared toast | form preserved | list context | shared catalog form |
 | Edit | Сохранить | stable busy button | owning list | shared toast | form preserved | list context | shared catalog form |
 | Delete | Удалить | dialog action busy | owning list | shared toast | dialog remains/retry | list context | Refine DeleteButton |
-| Search | Найти / search input | stable table loading | same route | result table | alert + retry input | search/list | shared catalog list |
+| Search | LiveSearch / optional Найти | stable table loading | same route + Refine query | table / entity card | alert + retry input | search/list | LiveSearch + shared catalog list |
 | Cancel/back | Отмена / Back | none | origin | none | unsaved behavior unchanged | origin | existing routes |
 
 ## Navigation and responsive behavior

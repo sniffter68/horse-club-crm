@@ -1,3 +1,4 @@
+import { SearchSelect } from '../../components/SearchSelect'
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Form, InputNumber, Select, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -131,7 +132,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
     {trainerFull && <Alert type="error" showIcon message={`У тренера достигнут максимум одновременных всадников (${trainerLimit})`} />}
     {conflicts.error && <Alert type="warning" showIcon message="Не удалось проверить свободные места тренера" description="При сохранении сервер повторно проверит вместимость."
       action={<Button onClick={() => retry(n => n + 1)}>Повторить</Button>} />}
-    <Form.Item name="horseId" label="Лошадь" extra={perPerson ? 'Для экскурсий выбор лошади необязателен' : 'Можно назначить лошадь позже в карточке занятия'}><Select allowClear placeholder="Назначить позже / Не выбрана" onChange={preferences.horseChanged} onInputKeyDown={stopPopupEscape} aria-label="Лошадь" loading={catalogs.loading || availability.loading} showSearch optionFilterProp="label"
+    <Form.Item name="horseId" label="Лошадь" extra={perPerson ? 'Для экскурсий выбор лошади необязателен' : 'Можно назначить лошадь позже в карточке занятия'}><SearchSelect allowClear placeholder="Назначить позже / Не выбрана" onChange={preferences.horseChanged} onInputKeyDown={stopPopupEscape} aria-label="Лошадь" loading={catalogs.loading || availability.loading} showSearch optionFilterProp="label"
       options={[{ value: '', label: 'Назначить позже / Не выбрана' }, ...catalogs.horses.map(row => ({ value: row.id, label: row.name, disabled: !from || availability.loading || blockedHorse(row.id) }))]} /></Form.Item>
     {horseId && !availability.loading && blockedHorse(horseId) && <Alert type="warning" showIcon message="Лошадь недоступна или превышен дневной лимит. Выберите другую лошадь или время." />}
     <Form.Item name="arenaId" label="Манеж / локация"><Select onInputKeyDown={stopPopupEscape} allowClear showSearch optionFilterProp="label" loading={catalogs.loading}

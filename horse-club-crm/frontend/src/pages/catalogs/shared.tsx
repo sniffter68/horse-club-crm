@@ -1,3 +1,6 @@
+import { LiveSearch } from '../../components/LiveSearch'
+import { recordSuggestion } from '../../components/searchText'
+import { isUuid } from '../../uuid'
 import { ServiceCancellationAction } from '../../components/ServiceCancellationAction'
 import type { ReactNode } from 'react'
 import { useContext, useEffect, useState } from 'react'
@@ -11,9 +14,9 @@ import { useCatalogPermissions } from './permissions'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { ConfigurableTable } from '../../components/ConfigurableTable'
 
-export function CatalogList<T extends BaseRecord>({ resource, title, columns, extraActions, layout, toolbar, storageKey, defaultHiddenColumns }: {
+export function CatalogList<T extends BaseRecord>({ resource, title, columns, extraActions, layout, toolbar, storageKey, defaultHiddenColumns, onSearchSelect }: {
   resource: string; title: string; columns: TableColumnsType<T>; extraActions?: (record: T) => ReactNode; layout?: 'clients'; toolbar?: ReactNode
-  storageKey?: string; defaultHiddenColumns?: readonly string[]
+  storageKey?: string; defaultHiddenColumns?: readonly string[]; onSearchSelect?: (id: string) => void
 }) {
   const { canManage, role } = useCatalogPermissions(resource)
   const { tableProps, searchFormProps, tableQuery, sorters, filters, currentPage, pageSize, setCurrentPage } = useTable<T, HttpError, { q?: string; clientType?: string; archive?: string }>({
@@ -47,7 +50,9 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
   return <List title={title} canCreate={canManage} createButtonProps={{ children: 'Создать' }}>
     <Form noValidate {...searchFormProps} initialValues={{ ...searchFormProps.initialValues, clientType: filters.find(filter => 'field' in filter && filter.field === 'clientType')?.value }} layout="inline" style={{ marginBottom: 20 }}>
       <Form.Item name="q" style={{ width: 320, maxWidth: '100%' }}>
-        <Input.Search aria-label="Поиск" placeholder="Поиск" allowClear onSearch={() => searchFormProps.form?.submit()} />
+        <LiveSearch onSearch={() => searchFormProps.form?.submit()} loading={tableQuery.isFetching}
+          suggestions={(tableQuery.data?.data ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })}
+          onSelectSuggestion={id => { if (isUuid(id)) onSearchSelect?.(id) }} />
       </Form.Item>
       {resource === 'clients' && <Form.Item name="clientType"><Select aria-label="Тип клиента" allowClear placeholder="Все клиенты" style={{ width: 200 }}
         onChange={() => searchFormProps.form?.submit()} options={[{ value: 'REGULAR', label: 'Постоянные' }, { value: 'ONE_TIME', label: 'Разовые' }]} /></Form.Item>}

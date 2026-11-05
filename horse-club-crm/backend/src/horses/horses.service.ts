@@ -60,7 +60,15 @@ export class HorsesService {
       'name',
     );
     const where: Prisma.HorseWhereInput = options.search
-      ? { name: { contains: options.search, mode: 'insensitive' } }
+      ? { OR: [
+          { name: { contains: options.search, mode: 'insensitive' } },
+          { breed: { contains: options.search, mode: 'insensitive' } },
+          { owner: { is: { OR: [
+            { name: { contains: options.search, mode: 'insensitive' } },
+            { firstName: { contains: options.search, mode: 'insensitive' } },
+            { lastName: { contains: options.search, mode: 'insensitive' } },
+          ] } } },
+        ] }
       : {};
     const orderBy = { [options.sort]: options.order } as Prisma.HorseOrderByWithRelationInput;
     const [total, data] = await this.prisma.$transaction([
@@ -70,6 +78,7 @@ export class HorsesService {
         orderBy: [orderBy, { id: 'asc' }],
         skip: options.skip,
         take: options.take,
+        include: { owner: { select: { name: true } } },
       }),
     ]);
     return { data, total };

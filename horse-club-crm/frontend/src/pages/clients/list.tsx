@@ -112,7 +112,7 @@ export function ClientList() {
   ]
 
   return <>
-    <CatalogList<ClientRow> resource="clients" title="Клиенты" layout="clients"
+    <CatalogList<ClientRow> resource="clients" onSearchSelect={setSelectedClientId} title="Клиенты" layout="clients"
       extraActions={row => <><ArchiveAction resource="clients" id={row.id} archived={Boolean(row.deletedAt)} /><Button size="small" onClick={() => setLedgerClient(row)}>История баланса</Button>{!row.deletedAt && row.clientType === 'ONE_TIME' && <ConvertClient client={row} />}</>} columns={visibleColumns} toolbar={<ClientColumnSettings settings={columnSettings} canManage={canManage} />} />
     <Modal title={client && !query.isLoading ? <ProfileHeader title="Карточка клиента"
       name={[client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || 'Без имени'}

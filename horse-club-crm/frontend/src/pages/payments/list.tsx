@@ -1,8 +1,10 @@
+import { LiveSearch } from '../../components/LiveSearch'
+import { recordSuggestion } from '../../components/searchText'
 import { usePermissions } from '../../modulePermissions'
 import { useState } from 'react'
 import { useUpdate, type HttpError } from '@refinedev/core'
 import { List, useTable } from '@refinedev/antd'
-import { Alert, Button, Descriptions, Form, Input, Space, Tag } from 'antd'
+import { Alert, Button, Descriptions, Form, Space, Tag } from 'antd'
 import { money } from '../catalogs/format'
 import { dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
@@ -45,7 +47,7 @@ export function PaymentList() {
         description="Начисления создаются автоматически. Нажмите «Оплачено», когда деньги получены. Кассовые чеки и бухгалтерия ведутся отдельно."
         style={{ marginBottom: 20 }} />
       <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}>
-        <Form.Item name="q" style={{ width: 320, maxWidth: '100%' }}><Input.Search placeholder="Клиент, лошадь или комментарий" allowClear onSearch={() => searchFormProps.form?.submit()} /></Form.Item>
+        <Form.Item name="q" style={{ width: 320, maxWidth: '100%' }}><LiveSearch loading={tableQuery.isFetching} suggestions={(tableProps.dataSource ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })} placeholder="Клиент, лошадь или комментарий" onSearch={() => searchFormProps.form?.submit()} /></Form.Item>
         <Button htmlType="submit">Найти</Button>
       </Form>
       {tableQuery.error && <Alert type="error" showIcon message="Не удалось загрузить оплаты" description={tableQuery.error.message} />}

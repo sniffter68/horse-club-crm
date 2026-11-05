@@ -1,10 +1,12 @@
+import { LiveSearch } from '../../components/LiveSearch'
+import { recordSuggestion } from '../../components/searchText'
 import { SharedMembershipAccess, type SharedMember } from './SharedMembershipAccess'
 import { deferredBalance } from './deferredBalance'
 import { ArchiveAction } from '../clients/ArchiveAction'
 import { useState } from 'react'
 import { CreateButton, List as RefineList, useTable } from '@refinedev/antd'
 import type { HttpError } from '@refinedev/core'
-import { Descriptions, Empty, Form, Input, List, Progress, Space, Tag, Typography } from 'antd'
+import { Descriptions, Empty, Form, List, Progress, Space, Tag, Typography } from 'antd'
 import { money } from '../catalogs/format'
 import type { RelationLesson, RelationPayment } from '../catalogs/types'
 import { dateOnly, dateTime, personName } from '../cards/format'
@@ -33,7 +35,7 @@ export function MembershipList() {
   const { canManage } = useCatalogPermissions()
   const canSell = canManage && !access.loading && !access.error && (!access.isEnabled('CASHBOX') || access.canWrite('CASHBOX'))
   const [selectedId, setSelectedId] = useState<string>()
-  const { tableProps, searchFormProps } = useTable<Membership, HttpError, { q?: string }>({
+  const { tableProps, searchFormProps, tableQuery } = useTable<Membership, HttpError, { q?: string }>({
     resource: 'memberships', pagination: { pageSize: 10 },
     onSearch: ({ q }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' }],
   })
@@ -41,7 +43,7 @@ export function MembershipList() {
   return <>
     <RefineList title="Абонементы" headerButtons={<CreateButton disabled={!canSell}>Продать абонемент</CreateButton>}>
       <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q">
-        <Input.Search placeholder="Поиск клиента" allowClear onSearch={() => searchFormProps.form?.submit()} />
+        <LiveSearch loading={tableQuery.isFetching} suggestions={(tableProps.dataSource ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })} placeholder="Поиск клиента" onSearch={() => searchFormProps.form?.submit()} />
       </Form.Item></Form>
       <ConfigurableTable<Membership> storageKey="horse_crm_memberships_columns_v1" {...tableProps} rowKey="id" columns={[
         { key: 'client', fixed: 'left', width: 180, title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : '—'}</CardLink> },

@@ -1,6 +1,8 @@
+import { LiveSearch } from '../../components/LiveSearch'
+import { recordSuggestion } from '../../components/searchText'
 import { List, useTable } from '@refinedev/antd'
 import { usePermissions, type HttpError } from '@refinedev/core'
-import { Button, Form, Input, Tag } from 'antd'
+import { Button, Form, Tag } from 'antd'
 import { Link } from 'react-router-dom'
 import type { Role } from '../../authStorage'
 import { ConfigurableTable } from '../../components/ConfigurableTable'
@@ -11,13 +13,13 @@ const roleColor: Record<Role, string> = { ADMIN: 'red', MANAGER: 'blue', TRAINER
 
 export function UserList() {
   const { data: role } = usePermissions<Role>({})
-  const { tableProps, searchFormProps } = useTable<User, HttpError, { q?: string }>({
+  const { tableProps, searchFormProps, tableQuery } = useTable<User, HttpError, { q?: string }>({
     resource: 'users', pagination: { pageSize: 10 }, sorters: { mode: 'server' },
     onSearch: ({ q }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' }],
   })
   return <List title="Пользователи" canCreate={false}
     headerButtons={role === 'ADMIN' ? <Link to="/users/new"><Button type="primary">Создать</Button></Link> : undefined}>
-    <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q"><Input.Search placeholder="Поиск по email" allowClear onSearch={() => searchFormProps.form?.submit()} /></Form.Item><Button htmlType="submit">Найти</Button></Form>
+    <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q"><LiveSearch loading={tableQuery.isFetching} suggestions={(tableProps.dataSource ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })} placeholder="Поиск по email" onSearch={() => searchFormProps.form?.submit()} /></Form.Item><Button htmlType="submit">Найти</Button></Form>
     <ConfigurableTable<User> storageKey="horse_crm_users_columns_v1" {...tableProps} rowKey="id" columns={[
       { key: 'email', fixed: 'left', width: 230, dataIndex: 'email', title: 'Email', sorter: true },
       { key: 'role', align: 'center', width: 130, dataIndex: 'role', title: 'Роль', sorter: true, render: (value: Role) => <Tag color={roleColor[value]}>{value}</Tag> },

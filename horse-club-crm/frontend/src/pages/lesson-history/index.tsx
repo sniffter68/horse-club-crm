@@ -1,6 +1,8 @@
+import { LiveSearch } from '../../components/LiveSearch'
+import { matchRange, recordSuggestion } from '../../components/searchText'
 import { useCallback, useEffect, useState } from 'react'
 import { List as RefineList } from '@refinedev/antd'
-import { Alert, Button, DatePicker, Descriptions, Form, Input, List, Modal, Select, Space, Tag, Typography } from 'antd'
+import { Alert, Button, DatePicker, Descriptions, Form, List, Modal, Select, Space, Tag, Typography } from 'antd'
 import type { Dayjs } from 'dayjs'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
@@ -77,6 +79,7 @@ const attendanceLabels: Record<JournalBooking['attendanceStatus'], string> = {
 
 export function LessonHistoryPage() {
   const [form] = Form.useForm<FilterValues>()
+  const searchQuery = Form.useWatch<string>('q', form) ?? ''
   const [catalogs, setCatalogs] = useState<Catalogs>({ clients: [], horses: [], trainers: [], services: [], arenas: [] })
   const [filters, setFilters] = useState<FilterValues>({})
   const [lessons, setLessons] = useState<JournalLesson[]>([])
@@ -149,7 +152,7 @@ export function LessonHistoryPage() {
     <RefineList title="Журнал занятий" canCreate={false}>
       <Form<FilterValues> noValidate form={form} layout="vertical" onFinish={applyFilters}>
         <Space align="end" wrap size="middle">
-          <Form.Item name="q" label="Поиск"><Input.Search placeholder="Клиент, телефон, услуга, тренер, лошадь" allowClear onSearch={() => form.submit()} style={{ width: 300 }} /></Form.Item>
+          <Form.Item name="q" label="Поиск"><LiveSearch loading={loading} suggestions={[...catalogs.clients, ...catalogs.horses, ...catalogs.trainers, ...catalogs.services].flatMap(row => { const item = recordSuggestion(row); return item && (matchRange(item.text, searchQuery) || matchRange(item.detail ?? '', searchQuery)) ? [item] : [] })} placeholder="Клиент, телефон, услуга, тренер, лошадь" onSearch={() => form.submit()} style={{ width: 300 }} /></Form.Item>
           <Form.Item name="period" label="Период"><DatePicker.RangePicker format="DD.MM.YYYY" /></Form.Item>
           <Form.Item name="status" label="Статус"><Select allowClear placeholder="Все" style={{ width: 180 }} options={Object.entries(statuses).map(([value, item]) => ({ value, label: item.label }))} /></Form.Item>
           <Form.Item name="clientId" label="Клиент"><Select showSearch allowClear optionFilterProp="label" style={{ width: 220 }} options={catalogs.clients.map(row => option(row.id, personName(row)))} /></Form.Item>

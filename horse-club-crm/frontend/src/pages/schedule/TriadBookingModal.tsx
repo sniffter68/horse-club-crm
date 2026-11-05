@@ -1,3 +1,4 @@
+import { SearchSelect } from '../../components/SearchSelect'
 import { ScheduleConflictNotice } from './ScheduleConflictNotice'
 import { scheduleConflicts } from './triad'
 import { useScheduleConflicts } from './useScheduleConflicts'
@@ -135,7 +136,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
         } }]}><BookingDateTimeInput placeholder="Дата и время окончания" /></Form.Item>
       </div>
       <Form.Item name="horseId" label="Лошадь" rules={[required]} extra={horse ? `Допустимый вес: до ${horse.maxRiderWeight ?? 85} кг. Отдых между тренировками: ${horse.requiredRestMinutes ?? horse.minRestMinutes ?? 45} мин.` : undefined}>
-        <Select onInputKeyDown={stopPopupEscape} onChange={preferences.horseChanged} id="triad_horseId" aria-label="Лошадь" showSearch allowClear optionFilterProp="label" placeholder="Выберите активную лошадь" loading={availability.loading} options={horses.filter(activePreferredHorse).map(h => {
+        <SearchSelect onInputKeyDown={stopPopupEscape} onChange={preferences.horseChanged} id="triad_horseId" aria-label="Лошадь" showSearch allowClear optionFilterProp="label" placeholder="Выберите активную лошадь" loading={availability.loading} options={horses.filter(activePreferredHorse).map(h => {
           const load = availability.data?.horseWorkloads.find(w => w.horseId === h.id)
           const unsuitable = weight !== undefined && weight > (h.maxRiderWeight ?? 85)
           return { value: h.id, disabled: unsuitable, label: `${h.name} — ${load ? `${formatMinutes(load.currentWorkloadMinutes)} / ${load.maxDailyWorkloadMinutes} мин` : 'нагрузка уточняется'}${unsuitable ? ` · вес до ${h.maxRiderWeight ?? 85} кг` : ''}` }

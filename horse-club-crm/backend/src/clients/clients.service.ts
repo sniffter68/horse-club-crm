@@ -1,3 +1,4 @@
+import { phoneSearchIds } from '../common/phone-search';
 import { VkIdentityService } from '../vk-bot/vk-identity.service';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -115,10 +116,14 @@ export class ClientsService {
   async findAll(query: ClientQueryDto): Promise<PaginatedResult<ClientListResponse>> {
     const now = new Date();
     const options = parseRefineQuery(query, ['id', 'name', 'phone', 'email', 'firstName', 'lastName', 'createdAt'], 'name');
+    const phoneIds = await phoneSearchIds(this.prisma, 'Client', options.search);
     const where: Prisma.ClientWhereInput = options.search
       ? {
           OR: [
             { name: { contains: options.search, mode: 'insensitive' } },
+            { firstName: { contains: options.search, mode: 'insensitive' } },
+            { lastName: { contains: options.search, mode: 'insensitive' } },
+            ...(phoneIds.length ? [{ id: { in: phoneIds } }] : []),
             { phone: { contains: options.search, mode: 'insensitive' } },
             { email: { contains: options.search, mode: 'insensitive' } },
           ],

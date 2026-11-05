@@ -23,7 +23,7 @@ export function TrainerList() {
     { key: 'maxDailyLoad', align: 'right', width: 115, dataIndex: 'maxDailyLoad', title: 'Дневная нагрузка, мин', sorter: true },
   ]
   if (canManage && canRead('STAFF_PAYROLL')) columns.push({ key: 'baseRate', align: 'right', width: 120, dataIndex: 'baseRate', title: 'Базовая ставка', sorter: true, render: money })
-  return <><CatalogList<Trainer> resource="trainers" storageKey="horse_crm_trainers_columns_v1" defaultHiddenColumns={['vk', 'qualification']} title="Тренеры" columns={columns} />
+  return <><CatalogList<Trainer> resource="trainers" onSearchSelect={setSelectedId} storageKey="horse_crm_trainers_columns_v1" defaultHiddenColumns={['vk', 'qualification']} title="Тренеры" columns={columns} />
     <DetailsModal<Trainer> resource="trainers" id={selectedId} title="Карточка тренера" onClose={() => setSelectedId(undefined)}>
       {trainer => <><CatalogEditAction resource="trainers" id={trainer.id}><TrainerForm action="edit" /></CatalogEditAction>
         {canManage && <VkProfileLink id={trainer.id} name={trainer.name} kind="TRAINER" vkId={trainer.vkId} />}

@@ -1,3 +1,4 @@
+import { phoneSearchIds } from '../common/phone-search';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Trainer } from '@prisma/client';
@@ -16,10 +17,12 @@ export class TrainersService {
 
   async findAll(query: RefineQueryDto): Promise<PaginatedResult<Trainer>> {
     const options = parseRefineQuery(query, ['id', 'name', 'phone', 'baseRate', 'maxDailyLoad'], 'name');
+    const phoneIds = await phoneSearchIds(this.prisma, 'Trainer', options.search);
     const where: Prisma.TrainerWhereInput = options.search
       ? {
           OR: [
             { name: { contains: options.search, mode: 'insensitive' } },
+            ...(phoneIds.length ? [{ id: { in: phoneIds } }] : []),
             { phone: { contains: options.search, mode: 'insensitive' } },
           ],
         }

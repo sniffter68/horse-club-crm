@@ -1,3 +1,4 @@
+import { SearchHighlight } from './LiveSearch'
 import { useEffect, useRef, useState } from 'react'
 import { useInvalidate } from '@refinedev/core'
 import { Alert, Button, Select, Space, Tag, type SelectProps } from 'antd'
@@ -32,7 +33,7 @@ export function ClientSelectWithCreate({ value, onChange, onCreated, excludedIds
     const controller = new AbortController()
     const timer = setTimeout(() => {
       setLoading(true); setError(undefined)
-      void httpClient.get<CreatedClient[]>(`${API_URL}/clients`, { params: { q: search, _start: 0, _end: 50 }, signal: controller.signal })
+      void httpClient.get<CreatedClient[]>(`${API_URL}/clients`, { params: { q: search, _start: 0, _end: 8 }, signal: controller.signal })
         .then(({ data }) => {
           if (controller.signal.aborted) return
           setCache(current => new Map([...current, ...data.map(row => [row.id, row] as const)])); setRows(data); setResultSearch(search)
@@ -58,8 +59,8 @@ export function ClientSelectWithCreate({ value, onChange, onCreated, excludedIds
       open={!creating && open} onOpenChange={setOpen} searchValue={search} onSearch={query => { setLoading(true); setSearch(query) }} onClear={() => setSearch('')}
       onInputKeyDown={event => { if (event.key === 'Escape') event.stopPropagation() }}
       loading={loading} onChange={id => { setSearch(''); onChange?.(id) }}
-      options={[...choices.values()].map(row => ({ value: row.id, disabled: row.id !== value && excludedIds.includes(row.id),
-        label: <Space wrap>{row.name} · {row.phone || 'без телефона'}{row.clientType === 'ONE_TIME' && <OneTimeBadge />}</Space> }))}
+      options={[...choices.values()].slice(0, 8).map(row => ({ value: row.id, disabled: row.id !== value && excludedIds.includes(row.id),
+        label: <Space wrap><SearchHighlight text={row.name} query={search} /> · <SearchHighlight text={row.phone || 'без телефона'} query={search} />{row.clientType === 'ONE_TIME' && <OneTimeBadge />}</Space> }))}
       notFoundContent={loading ? 'Загрузка…' : 'Клиенты не найдены'}
       popupRender={menu => <>{menu}{error && <Alert role="alert" type="error" message={error} action={<Button onClick={() => retry(n => n + 1)}>Повторить</Button>} />}
         {search && <Button type="link" onClick={() => { setSearch(''); select.current?.focus() }}>Очистить поиск</Button>}
