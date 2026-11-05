@@ -19,7 +19,7 @@ export default function App(): ReactElement {
   };
   const bookFirstLesson = () => choose('service', { ...firstLesson });
   return (
-    <div className="min-h-screen bg-[#E4DAD0] text-[#3A2F2B] selection:bg-[#3A2F2B] selection:text-[#E4DAD0] antialiased">
+    <div className="landing-shell min-h-screen bg-luxury-bg text-luxury-dark selection:bg-luxury-dark selection:text-luxury-bg antialiased">
       {/* Умная навигационная капсула (сворачивается в бургер при скролле) */}
       <Navbar onBookFirstLesson={bookFirstLesson} />
 
@@ -47,7 +47,7 @@ export default function App(): ReactElement {
       </main>
 
       {/* Футер */}
-      <footer className="border-t border-white/10 bg-[#1D1817] px-6 py-8 text-center text-xs text-[#8C7E77]">
+      <footer className="border-t border-white/10 bg-luxury-deep px-6 py-8 text-center text-sm text-luxury-bg">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
           <p>© 2026 СЛКС Тамбов. Конный клуб и спортивная школа верховой езды.</p>
           <div className="flex items-center gap-6">

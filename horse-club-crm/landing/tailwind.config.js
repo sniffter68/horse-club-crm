@@ -8,14 +8,15 @@ export default {
     extend: {
       colors: {
         luxury: {
-          bg: '#E4DAD0',        // 01 — основной тёплый фон
-          sand: '#EBD4AB',      // 02 — золотисто-песочный акцент
-          brown: '#724C39',     // 03 — кожа / кнопки
-          taupe: '#BF9D85',     // 04 — мягкий беж
-          dark: '#3A2F2B',      // 05 — глубокий эспрессо (текст)
-          card: '#FAF7F2',      // светлые карточки
-          border: '#D8C8BB',    // рамки
-          muted: '#6E5D53',     // второстепенный текст
+          bg: 'var(--color-club-sand)',
+          sand: 'var(--color-club-sand)',
+          brown: 'var(--color-club-action)',
+          taupe: 'var(--color-club-secondary)',
+          dark: 'var(--color-club-ink)',
+          deep: 'var(--color-club-deep)',
+          card: 'var(--color-club-paper)',
+          border: 'var(--color-club-secondary)',
+          muted: 'var(--color-club-secondary)',
         },
       },
       boxShadow: {

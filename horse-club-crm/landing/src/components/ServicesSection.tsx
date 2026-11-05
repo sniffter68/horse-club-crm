@@ -26,18 +26,18 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
   if (!currentService) return <></>;
 
   return (
-    <section id="services" className="relative overflow-hidden bg-[#241E1C] px-4 py-10 md:py-16 text-white sm:px-10 lg:px-16">
+    <section id="services" className="relative overflow-hidden bg-club-deep px-4 py-10 md:py-16 text-white sm:px-10 lg:px-16">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -bottom-32 -left-32 h-[500px] w-[500px] rounded-full bg-[#724C39]/20 blur-3xl"
+        className="pointer-events-none absolute -bottom-32 -left-32 h-[500px] w-[500px] rounded-full bg-club-action/20 blur-3xl"
       />
 
       <div className="relative mx-auto max-w-7xl">
         <div className="mb-6 md:mb-8 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-          <h2 className="font-serif text-4xl sm:text-6xl font-normal tracking-tight text-[#E4DAD0]">
+          <h2 className="leading-[1.125] font-serif text-[2rem] sm:text-5xl font-normal tracking-tight text-club-sand">
             Услуги
           </h2>
-          <span className="text-xs uppercase tracking-[0.2em] text-[#A6988E]">
+          <span className="text-sm text-club-sand">
             Направления обучения
           </span>
         </div>
@@ -56,7 +56,7 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
                   className={`group relative flex shrink-0 snap-start items-center justify-between rounded-full px-5 py-3 text-left transition-all duration-300 lg:w-full lg:rounded-2xl lg:px-7 lg:py-5 ${
                     isActive
                       ? 'border border-white/20 bg-white/10 text-white shadow-lg backdrop-blur-md'
-                      : 'text-[#8C7E77] hover:text-[#E4DAD0] hover:bg-white/5'
+                      : 'text-club-sand hover:text-club-sand hover:bg-white/5'
                   }`}
                 >
                   <span className="text-sm font-medium tracking-tight transition-transform duration-300 group-hover:translate-x-1 lg:text-3xl lg:font-light">
@@ -66,7 +66,7 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
                   {isActive && (
                     <motion.div
                       layoutId="active-indicator"
-                      className="ml-3 flex h-6 w-6 items-center justify-center rounded-full bg-[#E4DAD0] text-xs font-bold text-[#241E1C] lg:h-7 lg:w-7 lg:text-sm"
+                      className="ml-3 flex h-6 w-6 items-center justify-center rounded-full bg-club-sand text-sm font-bold text-club-deep lg:h-7 lg:w-7 lg:text-sm"
                     >
                       →
                     </motion.div>
@@ -113,9 +113,9 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
             </div>
 
             {/* Карточка с зафиксированной минимальной высотой min-h */}
-            <div className="relative z-10 flex min-h-[500px] flex-col justify-between rounded-[2rem] bg-white p-6 text-[#241E1C] shadow-2xl sm:rounded-[2.8rem] sm:p-12">
+            <div className="relative z-10 flex min-h-[500px] flex-col justify-between rounded-[2rem] bg-white p-6 text-club-deep shadow-2xl sm:rounded-[2.8rem] sm:p-12">
               <div className="min-h-[19rem] sm:min-h-[18rem]">
-                <div className="inline-block rounded-full bg-[#E4DAD0]/60 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5A483E] mb-6">
+                <div className="inline-block rounded-full bg-club-sand/60 px-4 py-1 text-sm font-semibold text-club-secondary mb-6">
                   {currentService.badge}
                 </div>
 
@@ -129,14 +129,14 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
                   >
                     {/* Фиксированная минимальная высота для заголовка */}
                     <div className="flex min-h-[92px] items-start pr-24 sm:min-h-[108px] sm:pr-36 lg:min-h-[84px] lg:pr-28">
-                      <h3 className="font-serif text-2xl sm:text-4xl font-normal leading-snug tracking-tight text-[#241E1C]">
+                      <h3 className="font-serif text-2xl sm:text-4xl font-normal leading-snug tracking-tight text-club-deep">
                         {currentService.cardTitle}
                       </h3>
                     </div>
 
                     {/* Фиксированная минимальная высота для блока описания */}
                     <div className="mt-4 min-h-[132px] max-w-lg sm:min-h-[120px]">
-                      <p className="text-sm sm:text-base leading-relaxed text-[#6E645F]">
+                      <p className="text-base sm:text-base leading-relaxed text-club-secondary">
                         {currentService.desc}
                       </p>
                     </div>
@@ -150,13 +150,13 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
 
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
                   <div>
-                    <span className="block text-xs uppercase tracking-wider text-[#9C8F87]">
+                    <span className="block text-sm text-club-secondary">
                       Стоимость:
                     </span>
-                    <span className="text-3xl sm:text-4xl font-light text-[#241E1C]">
+                    <span className="text-3xl sm:text-4xl font-light text-club-deep">
                       {currentService.price}
                     </span>
-                    <span className="block mt-1 text-xs text-[#8C7E77]">
+                    <span className="block mt-1 text-sm text-club-secondary">
                       {currentService.duration}
                     </span>
                   </div>
@@ -164,7 +164,7 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
                   <a
                     href="#booking-form"
                     onClick={event => { event.preventDefault(); onChoose('service', { id: currentService.id, name: currentService.title }); }}
-                    className="inline-flex w-full items-center justify-center rounded-2xl bg-[#614535] px-6 py-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-md transition-all hover:scale-105 hover:bg-[#432F24] active:scale-95 sm:w-auto sm:px-8"
+                    className="inline-flex w-full items-center justify-center rounded-2xl bg-club-action px-6 py-4 text-center text-sm font-semibold text-white shadow-md transition-all hover:scale-105 hover:bg-club-deep active:scale-95 sm:w-auto sm:px-8"
                   >
                     Записаться на занятие
                   </a>

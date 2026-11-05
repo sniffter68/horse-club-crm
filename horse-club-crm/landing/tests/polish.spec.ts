@@ -42,8 +42,8 @@ for (const width of [320, 390, 768, 1440]) {
     await expect(page.locator('#horses-trainers')).toContainText('Для начинающих');
     await page.locator('#about').scrollIntoViewIfNeeded();
     await expect(page.locator('#about > div').last()).toBeVisible();
-    // The owner explicitly restored the original palette; keep all non-visual a11y rules.
-    const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).disableRules(['color-contrast']).analyze();
+    // Stage one keeps the card layout and checks AA contrast in every open state.
+    const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
     expect(axe.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     // Preserve the original h-72 photo containers instead of enforcing the rejected 4:3 redesign.
@@ -65,7 +65,7 @@ for (const width of [320, 390, 768, 1440]) {
     await expect(dialog.getByRole('link', { name: 'Записаться', exact: true })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(dialog.getByRole('button', { name: 'Закрыть', exact: true })).toBeFocused();
-    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).disableRules(['color-contrast']).analyze()).violations).toEqual([]);
+    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations).toEqual([]);
     await page.keyboard.press('Escape');
     await expect(open).toBeFocused();
     await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
@@ -75,7 +75,7 @@ for (const width of [320, 390, 768, 1440]) {
     if (width < 1024) {
       await page.getByRole('button', { name: 'Открыть меню', exact: true }).click();
       await expect(page.getByRole('dialog', { name: 'Меню сайта' })).toBeVisible();
-      expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).disableRules(['color-contrast']).analyze()).violations).toEqual([]);
+      expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations).toEqual([]);
       await page.keyboard.press('Escape');
       await expect(page.getByRole('button', { name: 'Открыть меню', exact: true })).toBeFocused();
     }

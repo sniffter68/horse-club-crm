@@ -5,7 +5,7 @@ import {
   type MouseEvent,
   type ReactElement,
 } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
 interface NavigationItem {
   label: string;
@@ -28,7 +28,7 @@ function Brand({ inverse = false }: BrandProps): ReactElement {
     <span className="flex min-w-0 items-center gap-2.5">
       <span
         className={`grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border ${
-          inverse ? 'border-white/15 bg-white/10' : 'border-black/10 bg-[#3A2F2B]'
+          inverse ? 'border-white/15 bg-white/10' : 'border-black/10 bg-club-ink'
         }`}
       >
         <img
@@ -40,7 +40,7 @@ function Brand({ inverse = false }: BrandProps): ReactElement {
       </span>
       <span
         className={`truncate font-serif text-base tracking-normal ${
-          inverse ? 'text-[#E4DAD0]' : 'text-[#3A2F2B]'
+          inverse ? 'text-club-sand' : 'text-club-ink'
         }`}
       >
         СЛКС Тамбов
@@ -50,6 +50,7 @@ function Brand({ inverse = false }: BrandProps): ReactElement {
 }
 
 export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
+  const reduceMotion = useReducedMotion();
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -129,7 +130,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
         <div className="mx-auto max-w-7xl">
           <nav
             aria-label="Мобильная навигация"
-            className="pointer-events-auto flex w-full items-center justify-between rounded-full border border-white/10 bg-[#241E1C]/95 px-3 py-2 shadow-[0_16px_40px_rgba(36,30,28,0.22)] backdrop-blur-xl md:hidden"
+            className="pointer-events-auto flex w-full items-center justify-between rounded-full border border-white/10 bg-club-deep/95 px-3 py-2 shadow-[0_16px_40px_rgba(36,30,28,0.22)] backdrop-blur-xl lg:hidden"
           >
             <a href="#hero" onClick={(event) => handleNavigation(event, '#hero')}>
               <Brand inverse />
@@ -145,7 +146,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
               aria-expanded={isOpen}
               aria-controls="mobile-navigation-drawer"
               aria-label={isOpen ? 'Закрыть меню' : 'Открыть меню'}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/15 bg-white/10 text-[#E4DAD0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E4DAD0]"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/15 bg-white/10 text-club-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-club-sand"
             >
               <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
                 {isOpen ? (
@@ -157,25 +158,25 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
             </motion.button>
           </nav>
 
-          <div className="hidden items-center justify-center md:flex">
+          <div className="hidden items-center justify-center lg:flex">
             <AnimatePresence mode="wait">
               {!isScrolled ? (
                 <motion.nav
                   key="desktop-navigation"
                   aria-label="Основная навигация"
-                  initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                  initial={reduceMotion ? false : { opacity: 0, y: -20, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ duration: reduceMotion ? 0 : 0.35, ease: [0.16, 1, 0.3, 1] }}
                   className="pointer-events-auto flex items-center gap-8 rounded-full border border-black/10 bg-white/85 px-4 py-2 shadow-lg backdrop-blur-xl lg:gap-10"
                 >
                   <a href="#hero" className="flex items-center" onClick={(event) => handleNavigation(event, '#hero')}>
                     <Brand />
                   </a>
 
-                  <div className="flex items-center gap-5 text-[11px] uppercase tracking-[0.14em] text-[#6E645F] lg:gap-6">
+                  <div className="flex items-center gap-5 text-sm text-club-secondary lg:gap-6">
                     {navigationItems.map((item) => (
-                      <a key={item.href} href={item.href} className="transition-colors hover:text-[#3A2F2B]">
+                      <a key={item.href} href={item.href} className="transition-colors hover:text-club-ink">
                         {item.label}
                       </a>
                     ))}
@@ -184,7 +185,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
                   <a
                     href="#booking-form"
                     onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
-                    className="rounded-full bg-[#3A2F2B] px-5 py-2.5 text-xs font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-[#724C39] active:scale-95"
+                    className="rounded-full bg-club-ink px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-club-action active:scale-95"
                   >
                     Записаться ↗
                   </a>
@@ -193,7 +194,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
                 <motion.button
                   key="desktop-menu-button"
                   type="button"
-                  initial={{ opacity: 0, scale: 0.75 }}
+                  initial={reduceMotion ? false : { opacity: 0, scale: 0.75 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.75 }}
                   onClick={(event) => {
@@ -205,7 +206,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
                   aria-expanded={isOpen}
                   aria-controls="mobile-navigation-drawer"
                   aria-label={isOpen ? 'Закрыть меню' : 'Открыть меню'}
-                  className="pointer-events-auto ml-auto grid h-12 w-12 place-items-center rounded-full border border-black/10 bg-white/95 text-[#3A2F2B] shadow-xl backdrop-blur-xl"
+                  className="pointer-events-auto ml-auto grid h-12 w-12 place-items-center rounded-full border border-black/10 bg-white/95 text-club-ink shadow-xl backdrop-blur-xl"
                 >
                   <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
                     {isOpen ? (
@@ -233,7 +234,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-[60] overflow-y-auto bg-[#241E1C]/95 px-5 pb-8 pt-28 text-[#E4DAD0] backdrop-blur-2xl sm:px-8"
+            className="fixed inset-0 z-[60] overflow-y-auto bg-club-deep/95 px-5 pb-8 pt-28 text-club-sand backdrop-blur-2xl sm:px-8"
           >
             <motion.div
               initial={{ opacity: 0, y: 24 }}
@@ -243,7 +244,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
               className="mx-auto flex min-h-[calc(100dvh-9rem)] max-w-2xl flex-col justify-between"
             >
               <div className="flex flex-col">
-                <p className="mb-7 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#E4DAD0]/55">
+                <p className="mb-7 text-base font-semibold text-club-sand">
                   Навигация
                 </p>
                 {navigationItems.map((item, index) => (
@@ -266,7 +267,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
                 onClick={event => { event.preventDefault(); setIsOpen(false); onBookFirstLesson(); }}
                 whileHover={{ scale: 1.015 }}
                 whileTap={{ scale: 0.98 }}
-                className="mt-10 flex min-h-14 w-full items-center justify-between rounded-2xl bg-[#E4DAD0] px-6 text-sm font-semibold uppercase tracking-[0.12em] text-[#241E1C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="mt-10 flex min-h-14 w-full items-center justify-between rounded-2xl bg-club-sand px-6 text-sm font-semibold text-club-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <span>Записаться</span>
                 <span aria-hidden="true">↗</span>

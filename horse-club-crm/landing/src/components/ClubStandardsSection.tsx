@@ -60,26 +60,26 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
   return (
     <section
       id="about"
-      className="relative overflow-hidden bg-[#FAF7F2] px-6 py-10 md:py-16 text-[#3A2F2B] sm:px-10 lg:px-16 border-t border-black/5"
+      className="relative overflow-hidden bg-club-paper px-6 py-10 md:py-16 text-club-ink sm:px-10 lg:px-16 border-t border-black/5"
     >
       {/* Декоративный теплый фон */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -left-40 top-1/3 h-[500px] w-[500px] rounded-full bg-[#E4DAD0]/50 blur-3xl"
+        className="pointer-events-none absolute -left-40 top-1/3 h-[500px] w-[500px] rounded-full bg-club-sand/50 blur-3xl"
       />
 
       <div className="relative mx-auto max-w-7xl">
         {/* Заголовок секции */}
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
           <div>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#724C39]">
+            <span className="text-sm font-semibold text-club-action">
               Философия и качество
             </span>
-            <h2 className="mt-3 font-serif text-4xl font-normal tracking-tight text-[#3A2F2B] sm:text-6xl">
+            <h2 className="leading-[1.125] mt-3 font-serif text-[2rem] font-normal tracking-tight text-club-ink sm:text-5xl">
               Стандарты клуба
             </h2>
           </div>
-          <p className="max-w-md text-xs sm:text-sm leading-relaxed text-[#6E645F]">
+          <p className="max-w-md text-base leading-relaxed text-club-secondary">
             Безупречная среда для лошадей турнирного класса и всадников, ценящих приватность, комфорт и безопасность высочайшего уровня.
           </p>
         </div>
@@ -99,22 +99,22 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
                 <div>
                   {/* Верхняя строка карточки */}
                   <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <span className="font-serif text-3xl font-light text-[#724C39]/70">
+                    <span className="font-serif text-3xl font-light text-club-action/70">
                       {item.number}
                     </span>
-                    <span className="rounded-full bg-[#FAF7F2] border border-black/5 px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5A483E]">
+                    <span className="rounded-full bg-club-paper border border-black/5 px-3.5 py-1 text-sm font-semibold text-club-secondary">
                       {item.tag}
                     </span>
                   </div>
 
                   <div className="mt-8">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7E77]">
+                    <span className="text-sm font-semibold text-club-secondary">
                       {item.category}
                     </span>
-                    <h3 className="mt-2 font-serif text-2xl sm:text-3xl font-normal leading-snug text-[#3A2F2B]">
+                    <h3 className="mt-2 font-serif text-2xl sm:text-3xl font-normal leading-snug text-club-ink">
                       {item.title}
                     </h3>
-                    <p className="mt-4 text-xs sm:text-sm leading-relaxed text-[#6E645F]">
+                    <p className="mt-4 text-base leading-relaxed text-club-secondary">
                       {item.description}
                     </p>
                   </div>
@@ -122,10 +122,10 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
 
                 {/* Нижняя метрика */}
                 <div className="mt-10 flex items-baseline justify-between gap-3 flex-wrap border-t border-black/5 pt-6">
-                  <span className="text-xs uppercase tracking-wider text-[#8C7E77]">
+                  <span className="text-sm text-club-secondary">
                     {item.metricLabel}
                   </span>
-                  <span className="font-serif text-2xl sm:text-3xl font-light text-[#3A2F2B]">
+                  <span className="font-serif text-2xl sm:text-3xl font-light text-club-ink">
                     {item.metricValue}
                   </span>
                 </div>
@@ -135,19 +135,19 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
         </div>
 
         {/* Нижняя инфо-плашка с цитатой клуба */}
-        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-[#E4DAD0]/50 p-8 sm:p-10 backdrop-blur-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-club-sand/50 p-8 sm:p-10 backdrop-blur-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="max-w-2xl">
-            <h4 className="font-serif text-xl sm:text-2xl font-normal text-[#3A2F2B]">
+            <h4 className="font-serif text-xl sm:text-2xl font-normal text-club-ink">
               «Лошадь — не спортивный инвентарь, а равноправный партнер»
             </h4>
-            <p className="mt-2 text-xs text-[#6E645F] leading-relaxed">
+            <p className="mt-2 text-base text-club-secondary leading-relaxed">
               Каждое решение в обустройстве конноспортивного клуба СЛКС Тамбов принималось с позиции биомеханики, физиологии и психологии лошадей.
             </p>
           </div>
           <a
             href="#booking-form"
             onClick={event => { event.preventDefault(); onChoose('service', otherServices[3]); }}
-            className="shrink-0 rounded-full bg-[#3A2F2B] px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition-all hover:bg-[#5A483E] hover:scale-105 active:scale-95"
+            className="shrink-0 rounded-full bg-club-ink px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-club-secondary hover:scale-105 active:scale-95"
           >
             Приехать на экскурсию ↗
           </a>

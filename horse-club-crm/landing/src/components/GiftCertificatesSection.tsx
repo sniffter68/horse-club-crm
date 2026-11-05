@@ -25,10 +25,10 @@ export function GiftCertificatesSection(): ReactElement {
     >
       <div className="relative mx-auto max-w-7xl">
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
-          <h2 id="gift-certificates-heading" className="mt-3 max-w-2xl font-serif text-4xl font-normal tracking-tight text-luxury-dark sm:text-6xl">
+          <h2 id="gift-certificates-heading" className="leading-[1.125] mt-3 max-w-2xl font-serif text-[2rem] font-normal tracking-tight text-luxury-dark sm:text-5xl">
             Подарочные сертификаты
           </h2>
-          <p className="max-w-md text-xs leading-relaxed text-[#6E645F] sm:text-sm">
+          <p className="max-w-md text-base leading-relaxed text-club-secondary">
             Подарите время рядом с лошадьми — для первого знакомства или нового шага в верховой езде.
           </p>
         </div>
@@ -37,7 +37,7 @@ export function GiftCertificatesSection(): ReactElement {
           {benefits.map(benefit => (
             <li key={benefit.title} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md sm:p-12">
               <h3 className="mt-2 font-serif text-2xl font-normal leading-snug text-luxury-dark sm:text-3xl">{benefit.title}</h3>
-              <p className="mt-4 text-xs leading-relaxed text-[#6E645F] sm:text-sm">{benefit.description}</p>
+              <p className="mt-4 text-base leading-relaxed text-club-secondary">{benefit.description}</p>
             </li>
           ))}
         </ul>
@@ -46,7 +46,7 @@ export function GiftCertificatesSection(): ReactElement {
           <a
             href="#booking-form"
             onClick={event => { event.preventDefault(); scrollToBooking(); }}
-            className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition-all hover:scale-105 hover:bg-[#5A483E] active:scale-95"
+            className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 hover:bg-club-secondary active:scale-95"
           >
             Заказать сертификат
           </a>

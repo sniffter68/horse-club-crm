@@ -35,10 +35,10 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
     >
       <div className="relative mx-auto max-w-7xl">
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
-          <h2 id="first-lesson-heading" className="mt-3 max-w-2xl font-serif text-4xl font-normal tracking-tight text-luxury-dark sm:text-6xl">
+          <h2 id="first-lesson-heading" className="leading-[1.125] mt-3 max-w-2xl font-serif text-[2rem] font-normal tracking-tight text-luxury-dark sm:text-5xl">
             Впервые в седле? Это проще и безопаснее, чем кажется
           </h2>
-          <p className="max-w-md text-xs leading-relaxed text-[#6E645F] sm:text-sm">
+          <p className="max-w-md text-base leading-relaxed text-club-secondary">
             70% наших гостей приходят без опыта верховой езды. Мы бережно проведём вас через каждое мгновение первого знакомства с лошадью.
           </p>
         </div>
@@ -49,11 +49,11 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
               <article key={step.number} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md">
                 <div className="flex items-center justify-between gap-4">
                   <span aria-hidden="true" className="font-serif text-3xl font-light text-luxury-brown/70">{step.number}</span>
-                  <span className="rounded-full border border-black/5 bg-luxury-card px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5A483E]">{step.duration}</span>
+                  <span className="rounded-full border border-black/5 bg-luxury-card px-3.5 py-1 text-sm font-semibold text-club-secondary">{step.duration}</span>
                 </div>
                 <div className="mt-8">
                   <h3 className="mt-2 font-serif text-2xl font-normal leading-snug text-luxury-dark sm:text-3xl">{step.title}</h3>
-                  <p className="mt-4 text-xs leading-relaxed text-[#6E645F] sm:text-sm">{step.description}</p>
+                  <p className="mt-4 text-base leading-relaxed text-club-secondary">{step.description}</p>
                 </div>
               </article>
             ))}
@@ -65,8 +65,8 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
           <dl className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
             {preparation.map(item => (
               <div key={item.title}>
-                <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-luxury-brown">{item.title}</dt>
-                <dd className="mt-2 text-xs leading-relaxed text-[#6E645F] sm:text-sm">{item.description}</dd>
+                <dt className="text-sm font-semibold text-luxury-brown">{item.title}</dt>
+                <dd className="mt-2 text-sm leading-relaxed text-club-secondary sm:text-sm">{item.description}</dd>
               </div>
             ))}
           </dl>
@@ -76,7 +76,7 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
           <a
             href="#booking-form"
             onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
-            className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition-all hover:scale-105 hover:bg-[#5A483E] active:scale-95"
+            className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 hover:bg-club-secondary active:scale-95"
           >
             Записаться на первое занятие
           </a>

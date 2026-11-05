@@ -66,26 +66,26 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
   return (
     <section
       id="contacts"
-      className="relative overflow-hidden bg-[#241E1C] px-6 py-10 md:py-16 text-white sm:px-10 lg:px-16"
+      className="relative overflow-hidden bg-club-deep px-6 py-10 md:py-16 text-white sm:px-10 lg:px-16"
     >
       {/* Декоративное теплое свечение сзади */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -right-32 top-1/4 h-[550px] w-[550px] rounded-full bg-[#724C39]/15 blur-3xl"
+        className="pointer-events-none absolute -right-32 top-1/4 h-[550px] w-[550px] rounded-full bg-club-action/15 blur-3xl"
       />
 
       <div className="relative mx-auto max-w-7xl">
         {/* Верхний заголовок секции */}
         <div className="mb-6 md:mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-[0.25em] text-[#A6988E]">
+            <span className="text-sm font-semibold text-club-sand">
               Связь и бронирование
             </span>
-            <h2 className="mt-3 font-serif text-4xl font-normal tracking-tight text-[#E4DAD0] sm:text-6xl">
+            <h2 className="leading-[1.125] mt-3 font-serif text-[2rem] font-normal tracking-tight text-club-sand sm:text-5xl">
               Визит в клуб
             </h2>
           </div>
-          <p className="max-w-md text-xs sm:text-sm leading-relaxed text-[#A6988E]">
+          <p className="max-w-md text-base leading-relaxed text-club-sand">
             Мы ценим приватность и индивидуальный подход: все тренировки и посещения клуба проходят по предварительной записи.
           </p>
         </div>
@@ -95,13 +95,13 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
           <div className="flex flex-col gap-10 lg:col-span-5">
             {/* Карточка адреса и режима */}
             <div className="rounded-[2.4rem] border border-white/10 bg-white/5 p-8 backdrop-blur-md">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A6988E]">
+              <span className="text-sm font-semibold text-club-sand">
                 Локация клуба
               </span>
               <h3 className="mt-2 font-serif text-2xl font-light text-white">
                 Тамбов, ул. Бастионная, 22АС2
               </h3>
-              <p className="mt-2 text-xs leading-relaxed text-[#A6988E]">
+              <p className="mt-2 text-base leading-relaxed text-club-sand">
                 Удобный подъезд с закрытой охраняемой парковкой для гостей клуба.
               </p>
 
@@ -110,19 +110,19 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                   href="https://yandex.ru/maps/?text=Тамбов+ул+Бастионная+22АС2"
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-medium text-[#E4DAD0] transition-all hover:bg-white/20 active:scale-95"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-club-sand transition-all hover:bg-white/20 active:scale-95"
                 >
                   <span>Яндекс Карты</span>
-                  <span className="text-xs">↗</span>
+                  <span className="text-sm">↗</span>
                 </a>
                 <a
                   href="https://2gis.ru/tambov"
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-medium text-[#E4DAD0] transition-all hover:bg-white/20 active:scale-95"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-club-sand transition-all hover:bg-white/20 active:scale-95"
                 >
                   <span>2ГИС</span>
-                  <span className="text-xs">↗</span>
+                  <span className="text-sm">↗</span>
                 </a>
               </div>
             </div>
@@ -130,22 +130,22 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
             {/* Карточка контактов и часов работы */}
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
-                <span className="block text-[10px] font-semibold uppercase tracking-widest text-[#A6988E]">
+                <span className="block text-sm font-semibold text-club-sand">
                   Прямой телефон
                 </span>
                 <a
                   href={`tel:${landingData.contacts.phone.replace(/[^+\d]/g, '')}`}
-                  className="mt-2 block font-serif text-xl text-white transition-colors hover:text-[#E4DAD0]"
+                  className="mt-2 block font-serif text-xl text-white transition-colors hover:text-club-sand"
                 >
                   {landingData.contacts.phone}
                 </a>
-                <span className="mt-1 block text-[11px] text-[#A6988E]">
+                <span className="mt-1 block text-sm text-club-sand">
                   {landingData.contacts.workingHours}
                 </span>
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
-                <span className="block text-[10px] font-semibold uppercase tracking-widest text-[#A6988E]">
+                <span className="block text-sm font-semibold text-club-sand">
                   Новости клуба
                 </span>
                 <div className="mt-2 flex gap-3">
@@ -153,20 +153,20 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                     href={landingData.contacts.vkGroup}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-serif text-base text-[#E4DAD0] underline underline-offset-4 hover:text-white transition-colors"
+                    className="font-serif text-base text-club-sand underline underline-offset-4 hover:text-white transition-colors"
                   >
                     ВКонтакте
                   </a>
                 </div>
-                <span className="mt-1 block text-[11px] text-[#A6988E]">
+                <span className="mt-1 block text-sm text-club-sand">
                   События и жизнь клуба
                 </span>
               </div>
             </div>
 
             {/* Памятка первого визита */}
-            <div className="rounded-3xl border border-white/10 bg-[#724C39]/15 p-6 text-xs text-[#E4DAD0]/90">
-              <div className="flex items-center gap-2 font-semibold uppercase tracking-wider text-white mb-2">
+            <div className="rounded-3xl border border-white/10 bg-club-action/15 p-6 text-sm text-club-sand/90">
+              <div className="flex items-center gap-2 font-semibold text-white mb-2">
                 <span>✦</span>
                 <span>Рекомендации к первому визиту</span>
               </div>
@@ -178,7 +178,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
 
           {/* Правая колонка: Форма записи */}
           <div id="booking-form" className="scroll-mt-20 lg:col-span-7">
-            <div className="relative rounded-[2.8rem] bg-white p-8 text-[#241E1C] shadow-2xl sm:p-12">
+            <div className="relative rounded-[2.8rem] bg-white p-8 text-club-deep shadow-2xl sm:p-12">
               <AnimatePresence mode="wait">
                 {isSubmitted ? (
                   <motion.div
@@ -189,13 +189,13 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="flex flex-col items-center justify-center py-12 text-center"
                   >
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#E4DAD0] text-2xl text-[#3A2F2B] mb-5">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-club-sand text-2xl text-club-ink mb-5">
                       ✓
                     </div>
-                    <h3 className="font-serif text-3xl font-normal text-[#241E1C]">
+                    <h3 className="font-serif text-3xl font-normal text-club-deep">
                       Заявка принята!
                     </h3>
-                    <p className="mt-3 max-w-md text-sm leading-relaxed text-[#6E645F]">
+                    <p className="mt-3 max-w-md text-base leading-relaxed text-club-secondary">
                       Мы получили ваши контакты. Администратор клуба свяжется с вами в ближайшее время, чтобы согласовать дату и время первого занятия.
                     </p>
                     <button
@@ -209,7 +209,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                         setError('');
                         onReset();
                       }}
-                      className="mt-8 rounded-full border border-black/15 bg-transparent px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-[#3A2F2B] transition-all hover:bg-black/5"
+                      className="mt-8 rounded-full border border-black/15 bg-transparent px-6 py-2.5 text-sm font-semibold text-club-ink transition-all hover:bg-black/5"
                     >
                       Отправить ещё одну заявку
                     </button>
@@ -226,24 +226,24 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                     className="flex flex-col gap-6"
                   >
                     <div>
-                      <div className="inline-block rounded-full bg-[#E4DAD0]/60 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5A483E] mb-3">
+                      <div className="inline-block rounded-full bg-club-sand/60 px-4 py-1 text-sm font-semibold text-club-secondary mb-3">
                         Онлайн-запись
                       </div>
-                      <h3 id="booking-heading" tabIndex={-1} className="font-serif text-3xl sm:text-4xl font-normal text-[#241E1C]">
+                      <h3 id="booking-heading" tabIndex={-1} className="font-serif text-3xl sm:text-4xl font-normal text-club-deep">
                         Запись на первое занятие
                       </h3>
-                      <p className="mt-1 text-xs text-[#6E645F]">
+                      <p className="mt-1 text-base text-club-secondary">
                         Оставьте контактные данные — администратор клуба перезвонит вам и поможет подобрать удобное время
                       </p>
                     </div>
 
                     {/* Выбор направления */}
                     <div>
-                      <p className="rounded-2xl bg-[#E4DAD0]/60 px-4 py-3 text-sm text-[#3A2F2B]" aria-live="polite">
+                      <p className="rounded-2xl bg-club-sand/60 px-4 py-3 text-base text-club-ink" aria-live="polite">
                         Выбранная услуга: <strong>{selectedService}</strong>
                       </p>
                       <details ref={serviceList} className="mt-2">
-                        <summary className="w-fit cursor-pointer rounded-lg py-2 text-sm text-[#5A483E] underline underline-offset-4 hover:text-[#241E1C]">
+                        <summary className="w-fit cursor-pointer rounded-lg py-2 text-sm text-club-secondary underline underline-offset-4 hover:text-club-deep">
                           Выбрать другую услугу
                         </summary>
                         <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Услуги">
@@ -255,8 +255,8 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                                 serviceList.current?.querySelector('summary')?.focus();
                               }}
                               className={`min-h-11 cursor-pointer rounded-2xl border px-4 py-2 text-left text-sm transition-colors disabled:cursor-wait disabled:opacity-60 ${selectedService === srv.name
-                                ? 'border-[#3A2F2B] bg-[#3A2F2B] text-white'
-                                : 'border-black/10 bg-[#FAF7F2] text-[#5A483E] hover:border-black/30'}`}>
+                                ? 'border-club-ink bg-club-ink text-white'
+                                : 'border-black/10 bg-club-paper text-club-secondary hover:border-black/30'}`}>
                               {srv.name}
                             </button>
                           ))}
@@ -264,7 +264,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                       </details>
                       <div className="mt-3 flex flex-wrap gap-2" aria-live="polite">
                         {(['horse', 'trainer'] as const).map(kind => selection[kind] && <button key={kind} type="button"
-                          disabled={loading} className="rounded-full border border-black/10 bg-[#FAF7F2] px-4 py-2 text-xs font-medium text-[#6E645F]" onClick={() => onRemove(kind)}
+                          disabled={loading} className="rounded-full border border-black/10 bg-club-paper px-4 py-2 text-sm font-medium text-club-secondary" onClick={() => onRemove(kind)}
                           aria-label={`Убрать ${kind === 'horse' ? 'лошадь' : 'тренера'}: ${selection[kind]!.name}`}>
                           {kind === 'horse' ? 'Лошадь' : 'Тренер'}: {selection[kind]!.name} <span aria-hidden="true">×</span>
                         </button>)}
@@ -274,7 +274,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                     {/* Поля ввода: Имя и Телефон */}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
-                        <label htmlFor="contact-name" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
+                        <label htmlFor="contact-name" className="block text-sm font-semibold text-club-secondary mb-1.5">
                           Ваше имя *
                         </label>
                         <input
@@ -289,12 +289,12 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           placeholder="Например, Анна"
-                          className="w-full rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
+                          className="w-full rounded-2xl border border-black/10 bg-club-paper px-4 py-3.5 text-base text-club-deep outline-none transition-all placeholder:text-club-secondary focus:border-club-ink focus:bg-white"
                         />
                       </div>
 
                       <div>
-                        <label htmlFor="contact-phone" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
+                        <label htmlFor="contact-phone" className="block text-sm font-semibold text-club-secondary mb-1.5">
                           Телефон *
                         </label>
                         <input
@@ -308,14 +308,14 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                           value={phone}
                           onChange={(e) => setPhone(phoneMask(e.target.value))}
                           placeholder="+7 (___) ___-__-__"
-                          className="w-full rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
+                          className="w-full rounded-2xl border border-black/10 bg-club-paper px-4 py-3.5 text-base text-club-deep outline-none transition-all placeholder:text-club-secondary focus:border-club-ink focus:bg-white"
                         />
                       </div>
                     </div>
 
                     {/* Пожелания / комментарий */}
                     <div>
-                      <label htmlFor="contact-notes" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
+                      <label htmlFor="contact-notes" className="block text-sm font-semibold text-club-secondary mb-1.5">
                         Пожелания к занятию (необязательно)
                       </label>
                       <textarea
@@ -328,17 +328,17 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         placeholder="Для ребёнка / для взрослого, удобные выходные или будни"
-                        className="w-full resize-none rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
+                        className="w-full resize-none rounded-2xl border border-black/10 bg-club-paper px-4 py-3.5 text-base text-club-deep outline-none transition-all placeholder:text-club-secondary focus:border-club-ink focus:bg-white"
                       />
                     </div>
 
                     {/* Кнопка отправки и согласие */}
                     <div className="pt-2">
-                      <label className="mb-4 flex items-start gap-3 text-xs text-[#6E645F]">
+                      <label className="mb-4 flex items-start gap-3 text-sm text-club-secondary">
                         <input id="personal-data-consent" type="checkbox" checked={consent} disabled={loading}
                           aria-invalid={invalidField === 'personal-data-consent'}
                           aria-describedby={invalidField === 'personal-data-consent' ? 'contact-error' : undefined}
-                          onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 accent-[#614535]" />
+                          onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 accent-club-action" />
                         <span>Я даю согласие на обработку персональных данных для рассмотрения заявки.</span>
                       </label>
                       <div className="min-h-12 text-sm text-[#8C3838]" aria-live="polite">
@@ -347,12 +347,12 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full cursor-pointer rounded-2xl bg-[#614535] py-4 text-xs font-semibold uppercase tracking-[0.16em] text-white shadow-lg transition-all hover:bg-[#432F24] hover:scale-[1.01] active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 disabled:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#614535]"
+                        className="w-full cursor-pointer rounded-2xl bg-club-action py-4 text-sm font-semibold text-white shadow-lg transition-all hover:bg-club-deep hover:scale-[1.01] active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 disabled:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-club-action"
                       >
                         {loading ? 'Отправляем…' : 'Оставить заявку на первое занятие'}
                       </button>
 
-                      <div className="mt-3 text-center text-[11px] text-[#9C8F87]">
+                      <div className="mt-3 text-center text-sm text-club-secondary">
                         Нажимая кнопку, вы соглашаетесь с <PrivacyPolicyLink />
                       </div>
                     </div>
