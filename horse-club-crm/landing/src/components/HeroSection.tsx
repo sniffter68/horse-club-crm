@@ -1,10 +1,12 @@
-import { type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import riderImg from '../assets/rider.png';
 
 export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
+  const [motionPaused, setMotionPaused] = useState(false);
+
   return (
     <section id="hero" aria-labelledby="hero-heading" className="landing-hero bg-luxury-bg px-6 pb-12 pt-28 sm:px-10 lg:px-16">
-      <div className="mx-auto grid w-full max-w-7xl items-center gap-8 lg:grid-cols-2 lg:gap-12">
+      <div className="landing-hero__layout mx-auto grid w-full max-w-7xl items-center gap-6 lg:gap-12">
         <div className="min-w-0">
           <p className="mb-6 text-sm leading-5 text-luxury-muted">Тамбов · ул. Бастионная, 22АС2</p>
           <h1 id="hero-heading" className="landing-hero__heading font-serif font-normal text-luxury-dark">
@@ -14,6 +16,10 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
             Семейный конный клуб, где обучение, спорт и забота о лошадях
             соединяются в одно красивое движение.
           </p>
+          <ul className="mt-4 grid gap-1 text-sm leading-5 text-luxury-muted">
+            <li>• Обучение и конный спорт</li>
+            <li>• Забота о лошадях</li>
+          </ul>
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <a href="#booking-form"
               onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
@@ -25,9 +31,17 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
             </a>
           </div>
         </div>
-        <div className="landing-hero__visual min-w-0">
-          <img src={riderImg} alt="Всадник СЛКС Тамбов" loading="eager"
-            className="h-full w-full object-contain" />
+        <div className="landing-hero__visual relative min-w-0 overflow-hidden">
+          <img src={riderImg} alt="Всадник СЛКС Тамбов" loading="eager" fetchPriority="high"
+            width={1122} height={1402}
+            className={`landing-hero__rider h-full w-full object-contain${motionPaused ? ' landing-hero__rider--paused' : ''}`} />
+          <button type="button" aria-pressed={motionPaused}
+            aria-label={motionPaused ? 'Продолжить анимацию' : 'Остановить анимацию'}
+            title={motionPaused ? 'Продолжить анимацию' : 'Остановить анимацию'}
+            onClick={() => setMotionPaused(paused => !paused)}
+            className="landing-hero__motion absolute bottom-0 right-0 inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-luxury-muted bg-luxury-bg text-sm text-luxury-dark transition-colors hover:bg-luxury-card active:bg-white">
+            <span aria-hidden="true">{motionPaused ? '▶' : 'Ⅱ'}</span>
+          </button>
         </div>
       </div>
       <a href="#services" aria-label="Прокрутить к услугам"

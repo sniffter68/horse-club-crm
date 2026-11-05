@@ -1,0 +1,161 @@
+diff --git a/horse-club-crm/landing/DESIGN.md b/horse-club-crm/landing/DESIGN.md
+index 7d4010b..642cea4 100644
+--- a/horse-club-crm/landing/DESIGN.md
++++ b/horse-club-crm/landing/DESIGN.md
+@@ -4,7 +4,7 @@
+ 
+ Этап 1 по `docs/reports/landing-hallmark-audit.md`: equestrian classic / warm minimal. Канонические цвета находятся в `src/style.css` → `@theme`: `club-paper` #FAF7F2, `club-sand` #E4DAD0, `club-ink` #3A2F2B, `club-deep` #241E1C, `club-action` #614535, `club-secondary` #5A483E. Tailwind генерирует из них `text-club-*`/`bg-club-*`; прежние роли `luxury.*` в `tailwind.config.js` ссылаются на эти же переменные. Белый оставлен для формы и текста основного CTA. Эти токены принадлежат только сборке `landing`, тема Ant Design не меняется.
+ 
+-Заголовки используют Georgia первым в serif-стеке, текст — системный sans без загрузки нового шрифта. H1: 40/44px до 1024px, затем clamp(48px, 5vw, 76px)/1.05; единое прямое начертание. H2: 32/36px и 48/54px, основной текст 16px с межстрочным 1.625, подписи минимум 14px, кнопки 15/20px. Caps и разрядка мелких подписей убраны. Hero до 1024px идёт в потоке «текст → всадник», затем — две независимые колонки одного контейнера; изображение не вылетает за свою колонку. Существующий rider сохранён без заявления о происхождении фотографии. Фокус — контур 2px с отступом 3px и светлой подложкой для тёмных секций; reduced motion отключает CSS-анимации и задержанные fade-reveal, JS-трансформации контролирует общий MotionConfig.
++Заголовки используют Georgia первым в serif-стеке, текст — системный sans без загрузки нового шрифта. H1: 40/44px до 1024px, затем clamp(48px, 5vw, 76px)/1.05; единое прямое начертание. H2: 32/36px и 48/54px, основной текст 16px с межстрочным 1.625, подписи минимум 14px, кнопки 15/20px. Caps и разрядка мелких подписей убраны. Hero до 1024px идёт в потоке «компактный всадник 160px → текст», затем — две независимые колонки 52/48 одного контейнера; изображение не вылетает за свою колонку. Всадник мягко парит через CSS transform, геометрия зарезервирована; кнопка позволяет остановить движение, prefers-reduced-motion отключает анимацию и скрывает эту кнопку. Существующий rider сохранён без заявления о происхождении фотографии. Фокус — контур 2px с отступом 3px и светлой подложкой для тёмных секций; reduced motion отключает CSS-анимации и задержанные fade-reveal, JS-трансформации контролирует общий MotionConfig.
+ 
+ `src/booking.ts` владеет названиями услуг и переходом к форме. Hero, навигация и блок первого занятия явно выбирают «Первое занятие по верховой езде». `ContactsSection` показывает выбранную услугу и нативное раскрытие дополнительных вариантов; имя и телефон обязательны, пожелания необязательны. Обязательное согласие сохраняется, политика открывается в нативном модальном dialog с Escape и возвратом фокуса.
+ 
+diff --git a/horse-club-crm/landing/src/components/HeroSection.tsx b/horse-club-crm/landing/src/components/HeroSection.tsx
+index 5c7a518..a5f2c53 100644
+--- a/horse-club-crm/landing/src/components/HeroSection.tsx
++++ b/horse-club-crm/landing/src/components/HeroSection.tsx
+@@ -1,10 +1,12 @@
+-import { type ReactElement } from 'react';
++import { useState, type ReactElement } from 'react';
+ import riderImg from '../assets/rider.png';
+ 
+ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
++  const [motionPaused, setMotionPaused] = useState(false);
++
+   return (
+     <section id="hero" aria-labelledby="hero-heading" className="landing-hero bg-luxury-bg px-6 pb-12 pt-28 sm:px-10 lg:px-16">
+-      <div className="mx-auto grid w-full max-w-7xl items-center gap-8 lg:grid-cols-2 lg:gap-12">
++      <div className="landing-hero__layout mx-auto grid w-full max-w-7xl items-center gap-6 lg:gap-12">
+         <div className="min-w-0">
+           <p className="mb-6 text-sm leading-5 text-luxury-muted">Тамбов · ул. Бастионная, 22АС2</p>
+           <h1 id="hero-heading" className="landing-hero__heading font-serif font-normal text-luxury-dark">
+@@ -14,6 +16,10 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
+             Семейный конный клуб, где обучение, спорт и забота о лошадях
+             соединяются в одно красивое движение.
+           </p>
++          <ul className="mt-4 grid gap-1 text-sm leading-5 text-luxury-muted">
++            <li>• Обучение и конный спорт</li>
++            <li>• Забота о лошадях</li>
++          </ul>
+           <div className="mt-8 flex flex-wrap items-center gap-4">
+             <a href="#booking-form"
+               onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
+@@ -25,9 +31,17 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
+             </a>
+           </div>
+         </div>
+-        <div className="landing-hero__visual min-w-0">
+-          <img src={riderImg} alt="Всадник СЛКС Тамбов" loading="eager"
+-            className="h-full w-full object-contain" />
++        <div className="landing-hero__visual relative min-w-0 overflow-hidden">
++          <img src={riderImg} alt="Всадник СЛКС Тамбов" loading="eager" fetchPriority="high"
++            width={1122} height={1402}
++            className={`landing-hero__rider h-full w-full object-contain${motionPaused ? ' landing-hero__rider--paused' : ''}`} />
++          <button type="button" aria-pressed={motionPaused}
++            aria-label={motionPaused ? 'Продолжить анимацию' : 'Остановить анимацию'}
++            title={motionPaused ? 'Продолжить анимацию' : 'Остановить анимацию'}
++            onClick={() => setMotionPaused(paused => !paused)}
++            className="landing-hero__motion absolute bottom-0 right-0 inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-luxury-muted bg-luxury-bg text-sm text-luxury-dark transition-colors hover:bg-luxury-card active:bg-white">
++            <span aria-hidden="true">{motionPaused ? '▶' : 'Ⅱ'}</span>
++          </button>
+         </div>
+       </div>
+       <a href="#services" aria-label="Прокрутить к услугам"
+diff --git a/horse-club-crm/landing/src/style.css b/horse-club-crm/landing/src/style.css
+index b3c116e..e39356f 100644
+--- a/horse-club-crm/landing/src/style.css
++++ b/horse-club-crm/landing/src/style.css
+@@ -95,10 +95,21 @@ body {
+ }
+ 
+ .landing-hero__heading { font-size: 40px; line-height: 1.1; letter-spacing: -.02em; }
+-.landing-hero__visual { height: clamp(240px, 48vw, 480px); }
++.landing-hero__visual { grid-row: 1; height: 160px; padding-block: 8px; }
++.landing-hero__rider { animation: rider-float 4s ease-in-out infinite; }
++.landing-hero__rider--paused { animation-play-state: paused; }
++@keyframes rider-float {
++  0%, 100% { transform: translateY(0); }
++  50% { transform: translateY(-6px); }
++}
+ @media (min-width: 1024px) {
++  .landing-hero__layout { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
++  .landing-hero__visual { grid-row: auto; height: clamp(400px, 40vw, 560px); }
+   .landing-hero__heading { font-size: clamp(48px, 5vw, 76px); line-height: 1.05; }
+ }
++@media (prefers-reduced-motion: reduce) {
++  .landing-hero__motion { display: none; }
++}
+ 
+ .landing-shell :is(a, button, summary, input, textarea, select, [tabindex]):focus-visible {
+   outline: 2px solid var(--color-club-action);
+diff --git a/horse-club-crm/landing/tests/stage-one.spec.ts b/horse-club-crm/landing/tests/stage-one.spec.ts
+index 81b11a2..5338ff3 100644
+--- a/horse-club-crm/landing/tests/stage-one.spec.ts
++++ b/horse-club-crm/landing/tests/stage-one.spec.ts
+@@ -11,11 +11,10 @@ for (const width of [375, 390, 768, 1023, 1024, 1025, 1280, 1440, 1920]) {
+     await expect(heading).toHaveText('Искусствобыть в седле');
+     const text = (await heading.boundingBox())!;
+     const rider = (await page.locator('#hero img').boundingBox())!;
+-    expect(text.x + text.width <= rider.x || text.y + text.height <= rider.y).toBe(true);
++    expect(text.x + text.width <= rider.x || rider.y + rider.height <= text.y).toBe(true);
+     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+     const cta = page.locator('#hero').getByRole('link', { name: 'Записаться на первое занятие', exact: true });
+-    const action = (await cta.boundingBox())!;
+-    if (width < 1024) expect(action.y + action.height).toBeLessThanOrEqual(rider.y);
++    if (width < 1024) expect(rider.y + rider.height).toBeLessThanOrEqual(text.y);
+     if (width === 1280) await expect(cta).toBeInViewport();
+     await cta.focus();
+     await expect(cta).toHaveCSS('outline-style', 'solid');
+@@ -23,6 +22,51 @@ for (const width of [375, 390, 768, 1023, 1024, 1025, 1280, 1440, 1920]) {
+   });
+ }
+ 
++test('rider motion stays within its reserved space and can be stopped', async ({ page }) => {
++  await page.setViewportSize({ width: 1440, height: 900 });
++  await page.emulateMedia({ reducedMotion: 'no-preference' });
++  await page.route('**/api/public/content', route => route.fulfill({ json: {} }));
++  await page.goto('/');
++  const rider = page.locator('.landing-hero__rider');
++  await expect(rider).toHaveCSS('animation-name', 'rider-float');
++  await expect.poll(() => rider.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(1122);
++  const visual = page.locator('.landing-hero__visual');
++  const frame = (await visual.boundingBox())!;
++  const heading = (await page.locator('#hero-heading').boundingBox())!;
++  for (const progress of [0, 1000, 2000, 3000, 4000]) {
++    await rider.evaluate((element, time) => {
++      const animation = element.getAnimations()[0];
++      animation.pause();
++      animation.currentTime = time;
++    }, progress);
++    const bounds = (await rider.boundingBox())!;
++    expect(bounds.x).toBeGreaterThanOrEqual(heading.x + heading.width);
++    expect(bounds.y).toBeGreaterThanOrEqual(frame.y);
++    expect(bounds.y + bounds.height).toBeLessThanOrEqual(frame.y + frame.height);
++  }
++  await page.getByRole('button', { name: 'Остановить анимацию' }).click();
++  await expect(rider).toHaveCSS('animation-play-state', 'paused');
++  await page.getByRole('button', { name: 'Продолжить анимацию' }).click();
++  await expect(rider).toHaveCSS('animation-play-state', 'running');
++  await expect(visual).toHaveJSProperty('offsetHeight', frame.height);
++  await page.emulateMedia({ reducedMotion: 'reduce' });
++  await expect(rider).toHaveCSS('animation-name', 'none');
++  await expect(page.locator('.landing-hero__motion')).toBeHidden();
++});
++
++for (const width of [375, 768]) {
++  test(`compact rider and complete heading fit the first screen at ${width}px`, async ({ page }) => {
++    await page.setViewportSize({ width, height: 667 });
++    await page.route('**/api/public/content', route => route.fulfill({ json: {} }));
++    await page.goto('/');
++    const rider = (await page.locator('.landing-hero__visual').boundingBox())!;
++    const heading = (await page.locator('#hero-heading').boundingBox())!;
++    expect(rider.y + rider.height).toBeLessThanOrEqual(heading.y);
++    expect(heading.y + heading.height).toBeLessThanOrEqual(667);
++    await page.screenshot({ path: test.info().outputPath(`rider-phone-${width}.png`) });
++  });
++}
++
+ test('landing text meets AA contrast after reveals and in the booking form', async ({ page }) => {
+   await page.setViewportSize({ width: 1440, height: 900 });
+   await page.emulateMedia({ reducedMotion: 'reduce' });
