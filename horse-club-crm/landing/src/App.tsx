@@ -11,6 +11,7 @@ import { GiftCertificatesSection } from './components/GiftCertificatesSection';
 import { ContactsSection } from './components/ContactsSection';
 import { Footer } from './components/Footer';
 import { FaqSection } from './components/FaqSection';
+import { ScrollToTop } from './components/ScrollToTop';
 
 export function App(): ReactElement {
   const content = usePublicContent();
@@ -56,6 +57,7 @@ export function App(): ReactElement {
 
       {/* Футер */}
       <Footer brandName="СЛКС Тамбов" />
+      <ScrollToTop />
     </div>
   );
 }
