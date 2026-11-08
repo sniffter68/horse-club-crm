@@ -123,6 +123,12 @@ function CatalogSection({ horses, trainers, onChoose, catalog }: CatalogProps & 
           </div>
         </div>
 
+        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-club-secondary sm:text-base">
+          {catalog === 'horses'
+            ? 'Для первых шагов подбираем специально обученных, добрых лошадей, привыкших к детям и новичкам. Познакомиться поможет тренер.'
+            : 'Объясняем простыми словами и поддерживаем на каждом шагу. На первом занятии тренер держит лошадь под уздцы; вы всегда можете попросить паузу.'}
+        </p>
+
         {/* Сетка карточек с кликом для раскрытия */}
         <AnimatePresence mode="wait">
           {catalog === 'horses' ? (

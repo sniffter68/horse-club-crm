@@ -15,7 +15,7 @@ test('local assets load and broken catalog, logo and hero images recover once', 
     const url = await img.getAttribute('src');
     expect((await page.request.get(url!)).status()).toBe(200);
     await img.evaluate((element: HTMLImageElement) => { element.src = '/missing-image.png'; });
-    await expect(img).toHaveAttribute('src', '/images/horse.jpg');
+    await expect(img).toHaveAttribute('src', img === hero ? '/images/first-meeting-fallback.jpg' : '/images/horse.jpg');
   }
   await page.locator('#horses-trainers').scrollIntoViewIfNeeded();
   const horse = page.getByRole('region', { name: 'Лошади клуба', exact: true }).locator('img').first();
@@ -38,7 +38,7 @@ test('policy links are independent of consent; preparation and FAQ have one sour
   await expect(page.getByRole('heading', { name: 'Что надеть и как подготовиться', exact: true })).toHaveCount(1);
   await expect(page.getByText('Обувь на гладкой подошве', { exact: false })).toHaveCount(1);
   const questions = page.locator('#faq details');
-  await expect(questions).toHaveCount(5);
+  await expect(questions).toHaveCount(7);
   for (const question of await questions.all()) {
     await question.locator('summary').click();
     await expect(question).toHaveAttribute('open', '');

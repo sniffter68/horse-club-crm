@@ -46,7 +46,7 @@ for (const width of [390, 768, 1440]) {
     await horses.locator('li > button').first().click();
     await expect(page.getByRole('dialog')).toContainText('Лошадь 1');
     await page.keyboard.press('Escape');
-    for (const label of ['Стандарты клуба', 'Впервые в клубе']) {
+    for (const label of ['С заботой о вашем спокойствии', 'Впервые в клубе']) {
       const carousel = page.getByRole('region', { name: label, exact: true });
       await carousel.scrollIntoViewIfNeeded();
       await expect(carousel.locator('li')).toHaveCount(4);

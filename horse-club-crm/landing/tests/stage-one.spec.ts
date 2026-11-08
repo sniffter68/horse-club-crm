@@ -2,19 +2,19 @@ import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 for (const width of [375, 390, 768, 1023, 1024, 1025, 1280, 1440, 1920]) {
-  test(`hero text and rider stay separate at ${width}px`, async ({ page }) => {
+  test(`hero text and photo stay separate at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: width === 1280 ? 800 : 1080 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.route('**/api/public/content', route => route.fulfill({ json: {} }));
     await page.goto('/');
     const heading = page.locator('#hero-heading');
-    await expect(heading).toHaveText('Искусствобыть в седле');
+    await expect(heading).toHaveText('Ваш первый шаг к лошадям — без страха и суеты');
     const text = (await heading.boundingBox())!;
     const rider = (await page.locator('#hero img').boundingBox())!;
-    expect(text.x + text.width <= rider.x || rider.y + rider.height <= text.y).toBe(true);
+    expect(text.x + text.width <= rider.x || text.y + text.height <= rider.y).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    const cta = page.locator('#hero').getByRole('link', { name: 'Записаться на первое занятие', exact: true });
-    if (width < 1024) expect(rider.y + rider.height).toBeLessThanOrEqual(text.y);
+    const cta = page.locator('#hero').getByRole('link', { name: 'Попробовать первое занятие', exact: true });
+    if (width < 1024) expect(text.y + text.height).toBeLessThanOrEqual(rider.y);
     if (width === 1280) await expect(cta).toBeInViewport();
     await cta.focus();
     await expect(cta).toHaveCSS('outline-style', 'solid');
@@ -22,48 +22,18 @@ for (const width of [375, 390, 768, 1023, 1024, 1025, 1280, 1440, 1920]) {
   });
 }
 
-test('rider motion stays within its reserved space without player controls', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
+test('hero photo stays still and recovers to a local family image', async ({ page }) => {
   await page.route('**/api/public/content', route => route.fulfill({ json: {} }));
+  await page.route('**/images/first-meeting.jpg', route => route.abort());
   await page.goto('/');
-  const rider = page.locator('.landing-hero__rider');
-  await expect(rider).toHaveCSS('animation-name', 'rider-float');
-  await expect.poll(() => rider.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(1122);
-  const visual = page.locator('.landing-hero__visual');
-  const frame = (await visual.boundingBox())!;
-  const heading = (await page.locator('#hero-heading').boundingBox())!;
-  for (const progress of [0, 1000, 2000, 3000, 4000]) {
-    await rider.evaluate((element, time) => {
-      const animation = element.getAnimations()[0];
-      animation.pause();
-      animation.currentTime = time;
-    }, progress);
-    const bounds = (await rider.boundingBox())!;
-    expect(bounds.x).toBeGreaterThanOrEqual(heading.x + heading.width);
-    expect(bounds.y).toBeGreaterThanOrEqual(frame.y);
-    expect(bounds.y + bounds.height).toBeLessThanOrEqual(frame.y + frame.height);
-  }
-  await expect(page.locator('#hero button')).toHaveCount(0);
-  await expect(rider).toHaveCSS('animation-iteration-count', 'infinite');
-  await expect(visual).toHaveJSProperty('offsetHeight', frame.height);
+  const photo = page.locator('.landing-hero__photo');
+  await expect(photo).toHaveAttribute('src', '/images/first-meeting-fallback.jpg');
+  await expect.poll(() => photo.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBeGreaterThan(0);
+  await expect(photo).toHaveCSS('animation-name', 'none');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect(rider).toHaveCSS('animation-name', 'none');
-  await expect(page.locator('.landing-hero__motion')).toBeHidden();
+  await expect(photo).toHaveCSS('animation-name', 'none');
+  await expect(page.locator('#hero button')).toHaveCount(0);
 });
-
-for (const width of [375, 768]) {
-  test(`compact rider and complete heading fit the first screen at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 667 });
-    await page.route('**/api/public/content', route => route.fulfill({ json: {} }));
-    await page.goto('/');
-    const rider = (await page.locator('.landing-hero__visual').boundingBox())!;
-    const heading = (await page.locator('#hero-heading').boundingBox())!;
-    expect(rider.y + rider.height).toBeLessThanOrEqual(heading.y);
-    expect(heading.y + heading.height).toBeLessThanOrEqual(667);
-    await page.screenshot({ path: test.info().outputPath(`rider-phone-${width}.png`) });
-  });
-}
 
 test('landing text meets AA contrast after reveals and in the booking form', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });

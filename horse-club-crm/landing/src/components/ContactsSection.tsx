@@ -300,7 +300,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
             </h2>
           </div>
           <p className="max-w-md text-sm sm:text-base leading-relaxed text-club-sand">
-            Мы ценим приватность и индивидуальный подход: все тренировки и посещения клуба проходят по предварительной записи.
+            Расскажите, кто приедет и что вас волнует. Поможем выбрать спокойный формат знакомства и согласуем время визита.
           </p>
         </div>
 

@@ -29,7 +29,7 @@ export function App(): ReactElement {
       <Navbar onBookFirstLesson={bookFirstLesson} />
 
       <main>
-        {/* 1. Секция Hero с кинематографичным взмыванием всадника */}
+        {/* 1. Первое знакомство с лошадьми и поддержка тренера */}
         <HeroSection onBookFirstLesson={bookFirstLesson} />
 
         <ClubStandardsSection onChoose={choose} />

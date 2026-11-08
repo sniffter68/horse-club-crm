@@ -1,6 +1,12 @@
-import type { ReactElement } from 'react';
-import riderImg from '../assets/rider.png';
-import { handleCatalogImageError } from '../catalogImage';
+import type { ReactElement, SyntheticEvent } from 'react';
+
+const imageBase = `${import.meta.env.BASE_URL}images/`;
+
+function handleHeroImageError(event: SyntheticEvent<HTMLImageElement>): void {
+  const image = event.currentTarget;
+  const fallback = `${imageBase}first-meeting-fallback.jpg`;
+  if (image.getAttribute('src') !== fallback) image.src = fallback;
+}
 
 export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
   return (
@@ -10,31 +16,32 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
           <a href="https://yandex.ru/maps/?text=Тамбов+ул+Бастионная+22АС2" target="_blank" rel="noopener noreferrer"
             className="mb-4 inline-block text-sm leading-5 text-luxury-muted transition-colors hover:text-luxury-dark hover:underline underline-offset-4">Тамбов · ул. Бастионная, 22АС2</a>
           <h1 id="hero-heading" className="landing-hero__heading font-serif font-normal text-luxury-dark text-3xl sm:text-4xl lg:text-5xl leading-tight">
-            Искусство<br />быть в седле
+            Ваш первый шаг к лошадям — без страха и суеты
           </h1>
           <p className="mt-4 max-w-lg text-base leading-relaxed text-luxury-muted sm:text-lg">
-            Семейный конный клуб, где обучение, спорт и забота о лошадях
-            соединяются в одно красивое движение.
+            Спокойные лошади, внимательные тренеры рядом на каждом шагу
+            и забота о безопасности с первых минут в манеже.
           </p>
           <ul className="mt-4 grid gap-1 text-sm leading-5 text-luxury-muted">
-            <li>• Обучение и конный спорт</li>
-            <li>• Забота о лошадях</li>
+            <li>Лошадь держит тренер — вы всё время вместе</li>
+            <li>Шлем и экипировку выдаём бесплатно</li>
+            <li>Начинаем со спокойного шага, в вашем темпе</li>
           </ul>
           <div className="mt-6 flex flex-wrap items-center gap-4">
             <a href="#booking"
               onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
               className="inline-flex min-h-12 items-center justify-center rounded-xl bg-luxury-brown px-6 py-3 text-[15px] font-medium text-white transition-colors hover:bg-luxury-dark active:bg-luxury-deep">
-              Записаться на первое занятие
+              Попробовать первое занятие
             </a>
             <a href="#about" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-luxury-muted px-6 py-3 text-[15px] font-medium text-luxury-dark transition-colors hover:bg-luxury-card active:bg-white">
               О клубе
             </a>
           </div>
         </div>
-        <div className="landing-hero__visual relative min-w-0 overflow-hidden">
-          <img onError={handleCatalogImageError} src={riderImg} alt="Всадник СЛКС Тамбов" loading="eager" fetchPriority="high"
-            width={1122} height={1402}
-            className="landing-hero__rider h-full w-full object-contain" />
+        <div className="landing-hero__visual relative min-w-0 overflow-hidden rounded-3xl bg-club-sand">
+          <img onError={handleHeroImageError} src={`${imageBase}first-meeting.jpg`} alt="Улыбающийся ребёнок гладит спокойную лошадь, тренер рядом держит повод" loading="eager" fetchPriority="high"
+            width={1448} height={1086}
+            className="landing-hero__photo h-full w-full object-cover" />
         </div>
       </div>
       <a href="#services" aria-label="Прокрутить к услугам"

@@ -23,7 +23,7 @@ for (const width of [320, 768, 1440]) {
 
     await page.getByLabel('Ваше имя').fill('Анна');
     await page.getByLabel('Пожелания к занятию').fill('Хочу попробовать впервые');
-    await section.getByRole('link', { name: 'Записаться на первое занятие' }).click();
+    await section.getByRole('link', { name: 'Попробовать первое занятие' }).click();
     await expect(page.locator('#booking-heading')).toBeFocused();
     await expect.poll(async () => page.locator('#booking-form').evaluate(element => {
       const rect = element.getBoundingClientRect();

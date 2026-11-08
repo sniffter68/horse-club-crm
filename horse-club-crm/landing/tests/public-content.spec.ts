@@ -11,7 +11,7 @@ test('resolves uploaded photos against the API origin and displays them in all c
   await page.route('**/uploads/*', route => route.fulfill({ contentType: 'image/png',
     body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWuoAAAAASUVORK5CYII=', 'base64') }));
   await page.goto('/');
-  await expect(page.locator('#services img').first()).toHaveAttribute('src', photo);
+  await expect(page.locator('#services article').filter({ has: page.getByRole('heading', { name: 'Занятие из CRM' }) }).locator('img')).toHaveAttribute('src', photo);
   await expect(page.locator('#horses-trainers img').first()).toHaveAttribute('src', photo);
   await expect(page.locator('#coaches img').first()).toHaveAttribute('src', photo);
   const urls = [resolveCatalogImage(photo, 'https://api.example.com/api'), resolveCatalogImage(photo, '/api'),
@@ -32,6 +32,7 @@ test('loads public records, updates service selection and opens real horse/train
   await page.goto('/');
   await expect(page.locator('#services').getByRole('button').first()).toBeVisible();
   release();
+  await page.locator('#services').getByRole('heading', { name: 'Занятие из CRM' }).scrollIntoViewIfNeeded();
   await expect(page.locator('#services').getByRole('heading', { name: 'Занятие из CRM' })).toBeVisible();
   await expect(page.locator('#services')).toContainText('Описание услуги из базы');
   await expect(page.locator('#services')).toContainText('45 мин');

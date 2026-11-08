@@ -52,7 +52,7 @@ for (const width of [320, 390, 768, 1440]) {
       await expect(media).toHaveCSS('object-fit', 'cover');
       expect((await media.boundingBox())!.height).toBeCloseTo(width < 640 ? 208 : 240, 0);
     }
-    await expect(page.locator('#services img')).toHaveCSS('object-fit', 'contain');
+    for (const image of await page.locator('#services img').all()) await expect(image).toHaveCSS('object-fit', 'contain');
     await page.locator('#horses-trainers').scrollIntoViewIfNeeded();
     await page.screenshot({ path: test.info().outputPath(`catalog-${width}.png`) });
     const open = page.locator('#horses-trainers .club-carousel__slide > button').first();
@@ -137,8 +137,9 @@ test('production CSP allows uploaded photos on same-origin and API origin; SEO a
     await route.fulfill({ response, headers: { ...response.headers(), 'content-security-policy': csp } });
   });
   await page.goto('/');
-  const media = page.locator('#services img');
+  const media = page.locator('#services article').filter({ has: page.getByRole('heading', { name: 'Персональное занятие' }) }).locator('img');
   await page.locator('#services').scrollIntoViewIfNeeded();
+  await media.scrollIntoViewIfNeeded();
   await expect(media).toHaveAttribute('src', `https://api.horseclub68.ru${image}`);
   await expect.poll(() => media.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   await page.locator('#horses-trainers').scrollIntoViewIfNeeded();

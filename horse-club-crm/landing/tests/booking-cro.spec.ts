@@ -22,7 +22,7 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     ]);
     await services.getByRole('button', { name: 'Прогулка в лес', exact: true }).click();
     for (const section of ['#hero', '#preparation']) {
-      const cta = page.locator(section).getByRole('link', { name: 'Записаться на первое занятие', exact: true });
+      const cta = page.locator(section).getByRole('link', { name: 'Попробовать первое занятие', exact: true });
       await expect(cta).toHaveAttribute('href', '#booking');
       await cta.click();
       await expect(page.locator('#booking-heading')).toBeFocused();
@@ -47,7 +47,7 @@ test('first lesson submits without a discipline ID and policy opens with keyboar
     return route.fulfill({ status: 201, json: { success: true } });
   });
   await page.goto('/');
-  await page.locator('#hero').getByRole('link', { name: 'Записаться на первое занятие' }).click();
+  await page.locator('#hero').getByRole('link', { name: 'Попробовать первое занятие' }).click();
   const policy = page.getByRole('link', { name: 'Политикой конфиденциальности', exact: true });
   await policy.focus();
   await page.keyboard.press('Enter');

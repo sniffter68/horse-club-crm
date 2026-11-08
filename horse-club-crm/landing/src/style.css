@@ -108,15 +108,11 @@ body {
 }
 
 .landing-hero__heading { letter-spacing: -.02em; }
-.landing-hero__visual { grid-row: 1; height: 160px; padding-block: 8px; }
-.landing-hero__rider { animation: rider-float 4s ease-in-out infinite; }
-@keyframes rider-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
+.landing-hero__visual { aspect-ratio: 4 / 3; }
+.landing-hero__photo { object-position: center; }
 @media (min-width: 1024px) {
   .landing-hero__layout { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
-  .landing-hero__visual { grid-row: auto; height: clamp(400px, 40vw, 560px); }
+  .landing-hero__visual { aspect-ratio: 4 / 3; }
 }
 
 .landing-shell :is(a, button, summary, input, textarea, select, [tabindex]):focus-visible {
