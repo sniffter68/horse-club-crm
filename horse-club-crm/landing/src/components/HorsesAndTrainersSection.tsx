@@ -106,10 +106,10 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
     <section id="horses-trainers" className="relative overflow-hidden bg-club-sand px-6 py-10 md:py-16 sm:px-10 lg:px-16">
       <div className="mx-auto max-w-7xl">
         {/* Заголовок и переключатель */}
-        <div className="flex flex-col items-start justify-between gap-8 sm:flex-row sm:items-end">
+        <div className="flex flex-col items-start justify-between gap-4 md:gap-6 sm:flex-row sm:items-end">
           <div>
             <span className="text-sm text-club-action">Команда клуба</span>
-            <h2 className="leading-[1.125] mt-3 font-serif text-[2rem] sm:text-5xl font-normal tracking-tight text-club-ink">
+            <h2 className="leading-[1.125] mt-3 font-serif tracking-tight text-club-ink text-2xl sm:text-3xl lg:text-4xl font-normal">
               Лошади и наставники
             </h2>
           </div>
@@ -154,7 +154,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
               transition={{ duration: 0.45 }}
               className="mt-6 md:mt-8"
             >
-              <Carousel label="Лошади клуба" initialIndex={carouselPositions.current.horses}
+              <Carousel nativeMobile label="Лошади клуба" initialIndex={carouselPositions.current.horses}
                 onIndexChange={index => { carouselPositions.current.horses = index; }}>
                 {horsesData.map((horse) => (
                   <button
@@ -166,7 +166,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
                     }}
                     className="group relative flex w-full flex-col overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/90 text-left shadow-[0_15px_35px_rgba(58,47,43,0.06)] backdrop-blur-lg transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_45px_rgba(58,47,43,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-club-action"
                   >
-                    <div className="relative h-72 w-full overflow-hidden">
+                    <div className="relative h-52 sm:h-60 w-full overflow-hidden">
                       <img loading="lazy" decoding="async"
                     onError={handleCatalogImageError}
                         src={horse.image}
@@ -178,15 +178,15 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
                       </div>
                     </div>
 
-                    <div className="flex flex-1 flex-col justify-between p-7">
+                    <div className="flex flex-1 flex-col justify-between p-5 md:p-6">
                       <div>
                         <span className="text-sm text-club-action">
                           {horse.breed}
                         </span>
-                        <h3 className="mt-1 font-serif text-2xl font-normal text-club-ink">
+                        <h3 className="mt-1 font-serif text-club-ink text-lg sm:text-xl font-semibold">
                           {horse.name}
                         </h3>
-                        <p className="mt-3 text-base leading-relaxed text-club-secondary line-clamp-2">
+                        <p className="mt-3 text-sm sm:text-base leading-relaxed text-club-secondary line-clamp-2">
                           {horse.character}
                         </p>
                       </div>
@@ -211,7 +211,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
               transition={{ duration: 0.45 }}
               className="mt-6 md:mt-8"
             >
-              <Carousel label="Тренеры" initialIndex={carouselPositions.current.trainers}
+              <Carousel nativeMobile label="Тренеры" initialIndex={carouselPositions.current.trainers}
                 onIndexChange={index => { carouselPositions.current.trainers = index; }}>
                 {trainersData.map((trainer) => (
                   <button
@@ -223,7 +223,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
                     }}
                     className="group relative flex w-full flex-col overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/90 text-left shadow-[0_15px_35px_rgba(58,47,43,0.06)] backdrop-blur-lg transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_45px_rgba(58,47,43,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-club-action"
                   >
-                    <div className="relative h-72 w-full overflow-hidden">
+                    <div className="relative h-52 sm:h-60 w-full overflow-hidden">
                       <img loading="lazy" decoding="async"
                     onError={handleCatalogImageError}
                         src={trainer.image}
@@ -235,18 +235,18 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
                       </div>
                     </div>
 
-                    <div className="flex flex-1 flex-col justify-between p-7">
+                    <div className="flex flex-1 flex-col justify-between p-5 md:p-6">
                       <div>
                         <span className="text-sm text-club-action">
                           {trainer.role}
                         </span>
-                        <h3 className="mt-1 font-serif text-2xl font-normal text-club-ink">
+                        <h3 className="mt-1 font-serif text-club-ink text-lg sm:text-xl font-semibold">
                           {trainer.name}
                         </h3>
-                        <p className="mt-2 text-base font-medium text-club-secondary">
+                        <p className="mt-2 text-sm sm:text-base font-medium text-club-secondary">
                           {trainer.qualification}
                         </p>
-                        <p className="mt-3 text-base italic leading-relaxed text-club-secondary line-clamp-2">
+                        <p className="mt-3 text-sm sm:text-base italic leading-relaxed text-club-secondary line-clamp-2">
                           {trainer.quote}
                         </p>
                       </div>
@@ -320,18 +320,18 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
               </div>
 
               {/* Правая половина: детали и параметры */}
-              <div className="flex shrink-0 flex-col justify-between p-5 sm:p-10 md:min-h-0 md:flex-1 md:shrink">
+              <div className="flex shrink-0 flex-col justify-between p-5 md:p-6 md:min-h-0 md:flex-1 md:shrink">
                 <div>
                   <span className="text-sm font-semibold text-club-action">
                     {selectedItem.type === 'horse' ? selectedItem.breed : selectedItem.role}
                   </span>
 
-                  <h3 className="mt-1 font-serif text-3xl sm:text-4xl font-normal text-club-ink">
+                  <h3 className="mt-1 font-serif text-club-ink text-lg sm:text-xl font-semibold">
                     {selectedItem.name}
                   </h3>
 
                   {selectedItem.type === 'trainer' && (
-                    <p className="mt-2 text-base font-semibold text-club-secondary">
+                    <p className="mt-2 text-sm sm:text-base font-semibold text-club-secondary">
                       {[selectedItem.qualification, selectedItem.experience].filter(Boolean).join(' · ')}
                     </p>
                   )}
@@ -366,7 +366,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
                     <h4 className="text-sm text-club-secondary font-semibold mb-1.5">
                       {selectedItem.type === 'horse' ? 'Особенности и подготовка' : 'О наставнике'}
                     </h4>
-                    <p className="text-base leading-relaxed text-club-secondary">
+                    <p className="text-sm sm:text-base leading-relaxed text-club-secondary">
                       {selectedItem.fullBio}
                     </p>
                   </div>}
@@ -391,7 +391,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
                 </div>
 
                 {/* Нижняя планка с кнопкой записи */}
-                <div className="mt-8 flex flex-col items-stretch justify-between gap-4 border-t border-black/10 pt-5 sm:flex-row sm:items-center">
+                <div className="mt-6 flex flex-col items-stretch justify-between gap-4 border-t border-black/10 pt-5 sm:flex-row sm:items-center">
                   <div className="text-sm text-club-secondary">
                     {selectedItem.type === 'horse' ? selectedItem.discipline : 'Индивидуальные тренировки'}
                   </div>

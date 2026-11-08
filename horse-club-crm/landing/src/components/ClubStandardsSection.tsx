@@ -75,11 +75,11 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
             <span className="text-sm font-semibold text-club-action">
               Философия и качество
             </span>
-            <h2 className="leading-[1.125] mt-3 font-serif text-[2rem] font-normal tracking-tight text-club-ink sm:text-5xl">
+            <h2 className="leading-[1.125] mt-3 font-serif tracking-tight text-club-ink text-2xl sm:text-3xl lg:text-4xl font-normal">
               Стандарты клуба
             </h2>
           </div>
-          <p className="max-w-md text-base leading-relaxed text-club-secondary">
+          <p className="max-w-md text-sm sm:text-base leading-relaxed text-club-secondary">
             Профессиональные тренеры, бережный подход к всадникам любого уровня подготовки и забота о лошадях.
           </p>
         </div>
@@ -94,7 +94,7 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-60px' }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="group relative flex flex-col justify-between overflow-hidden rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_50px_rgba(58,47,43,0.08)]"
+                className="group relative flex flex-col justify-between overflow-hidden rounded-[2.5rem] border border-black/5 bg-white/90 p-5 md:p-6 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_50px_rgba(58,47,43,0.08)]"
               >
                 <div>
                   {/* Верхняя строка карточки */}
@@ -107,21 +107,21 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
                     </span>
                   </div>
 
-                  <div className="mt-8">
+                  <div className="mt-6">
                     <span className="text-sm font-semibold text-club-secondary">
                       {item.category}
                     </span>
-                    <h3 className="mt-2 font-serif text-2xl sm:text-3xl font-normal leading-snug text-club-ink">
+                    <h3 className="mt-2 font-serif leading-snug text-club-ink text-lg sm:text-xl font-semibold">
                       {item.title}
                     </h3>
-                    <p className="mt-4 text-base leading-relaxed text-club-secondary">
+                    <p className="mt-4 text-sm sm:text-base leading-relaxed text-club-secondary">
                       {item.description}
                     </p>
                   </div>
                 </div>
 
                 {/* Нижняя метрика */}
-                <div className="mt-10 flex items-baseline justify-between gap-3 flex-wrap border-t border-black/5 pt-6">
+                <div className="mt-6 flex items-baseline justify-between gap-3 flex-wrap border-t border-black/5 pt-6">
                   <span className="text-sm text-club-secondary">
                     {item.metricLabel}
                   </span>
@@ -135,12 +135,12 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
         </div>
 
         {/* Нижняя инфо-плашка с цитатой клуба */}
-        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-club-sand/50 p-8 sm:p-10 backdrop-blur-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-club-sand/50 p-5 md:p-6  backdrop-blur-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="max-w-2xl">
             <h4 className="font-serif text-xl sm:text-2xl font-normal text-club-ink">
               «Лошадь — не спортивный инвентарь, а равноправный партнер»
             </h4>
-            <p className="mt-2 text-base text-club-secondary leading-relaxed">
+            <p className="mt-2 text-sm sm:text-base text-club-secondary leading-relaxed">
               Каждое решение в обустройстве конноспортивного клуба СЛКС Тамбов принималось с позиции биомеханики, физиологии и психологии лошадей.
             </p>
           </div>

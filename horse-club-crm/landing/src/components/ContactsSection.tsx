@@ -83,27 +83,27 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
             <span className="text-sm font-semibold text-club-sand">
               Связь и бронирование
             </span>
-            <h2 className="leading-[1.125] mt-3 font-serif text-[2rem] font-normal tracking-tight text-club-sand sm:text-5xl">
+            <h2 className="leading-[1.125] mt-3 font-serif tracking-tight text-club-sand text-2xl sm:text-3xl lg:text-4xl font-normal">
               Визит в клуб
             </h2>
           </div>
-          <p className="max-w-md text-base leading-relaxed text-club-sand">
+          <p className="max-w-md text-sm sm:text-base leading-relaxed text-club-sand">
             Мы ценим приватность и индивидуальный подход: все тренировки и посещения клуба проходят по предварительной записи.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 items-start">
+        <div className="grid grid-cols-1 gap-6 md:gap-8 lg:grid-cols-12 items-start">
           {/* Левая колонка: Контакты, адрес, навигация */}
-          <div className="flex flex-col gap-10 lg:col-span-5">
+          <div className="flex flex-col gap-6 lg:col-span-5">
             {/* Карточка адреса и режима */}
-            <div className="rounded-[2.4rem] border border-white/10 bg-white/5 p-8 backdrop-blur-md">
+            <div className="rounded-[2.4rem] border border-white/10 bg-white/5 p-5 md:p-6 backdrop-blur-md">
               <span className="text-sm font-semibold text-club-sand">
                 Локация клуба
               </span>
-              <h3 className="mt-2 font-serif text-2xl font-light text-white">
+              <h3 className="mt-2 font-serif text-white text-lg sm:text-xl font-semibold">
                 Тамбов, ул. Бастионная, 22АС2
               </h3>
-              <p className="mt-2 text-base leading-relaxed text-club-sand">
+              <p className="mt-2 text-sm sm:text-base leading-relaxed text-club-sand">
                 Удобный подъезд с закрытой охраняемой парковкой для гостей клуба.
               </p>
 
@@ -173,7 +173,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
 
           {/* Правая колонка: Форма записи */}
           <div id="booking-form" className="scroll-mt-20 lg:col-span-7">
-            <div className="relative rounded-[2.8rem] bg-white p-8 text-club-deep shadow-2xl sm:p-12">
+            <div className="relative rounded-[2.8rem] bg-white p-5 md:p-6 text-club-deep shadow-2xl">
               <AnimatePresence mode="wait">
                 {isSubmitted ? (
                   <motion.div
@@ -187,10 +187,10 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-club-sand text-2xl text-club-ink mb-5">
                       ✓
                     </div>
-                    <h3 className="font-serif text-3xl font-normal text-club-deep">
+                    <h3 className="font-serif text-club-deep text-lg sm:text-xl font-semibold">
                       Заявка принята!
                     </h3>
-                    <p className="mt-3 max-w-md text-base leading-relaxed text-club-secondary">
+                    <p className="mt-3 max-w-md text-sm sm:text-base leading-relaxed text-club-secondary">
                       Мы получили ваши контакты. Администратор клуба свяжется с вами в ближайшее время, чтобы согласовать дату и время первого занятия.
                     </p>
                     <button
@@ -205,7 +205,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                         setError('');
                         onReset();
                       }}
-                      className="mt-8 rounded-full border border-black/15 bg-transparent px-6 py-2.5 text-sm font-semibold text-club-ink transition-all hover:bg-black/5"
+                      className="mt-6 rounded-full border border-black/15 bg-transparent px-6 py-2.5 text-sm font-semibold text-club-ink transition-all hover:bg-black/5"
                     >
                       Отправить ещё одну заявку
                     </button>
@@ -225,17 +225,17 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                       <div className="inline-block rounded-full bg-club-sand/60 px-4 py-1 text-sm font-semibold text-club-secondary mb-3">
                         Онлайн-запись
                       </div>
-                      <h3 id="booking-heading" tabIndex={-1} className="font-serif text-3xl sm:text-4xl font-normal text-club-deep">
+                      <h3 id="booking-heading" tabIndex={-1} className="font-serif text-club-deep text-lg sm:text-xl font-semibold">
                         Запись на первое занятие
                       </h3>
-                      <p className="mt-1 text-base text-club-secondary">
+                      <p className="mt-1 text-sm sm:text-base text-club-secondary">
                         Оставьте контактные данные — администратор клуба перезвонит вам и поможет подобрать удобное время
                       </p>
                     </div>
 
                     {/* Выбор направления */}
                     <div>
-                      <p className="rounded-2xl bg-club-sand/60 px-4 py-3 text-base text-club-ink" aria-live="polite">
+                      <p className="rounded-2xl bg-club-sand/60 px-4 py-3 text-sm sm:text-base text-club-ink" aria-live="polite">
                         Выбранная услуга: <strong>{selectedService}</strong>
                       </p>
                       <details ref={serviceList} className="mt-2">

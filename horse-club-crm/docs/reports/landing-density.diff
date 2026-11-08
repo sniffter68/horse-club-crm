@@ -1,0 +1,591 @@
+diff --git a/horse-club-crm/landing/DESIGN.md b/horse-club-crm/landing/DESIGN.md
+index ebbdaac..2838f86 100644
+--- a/horse-club-crm/landing/DESIGN.md
++++ b/horse-club-crm/landing/DESIGN.md
+@@ -7 +7,3 @@
+-Заголовки используют Georgia первым в serif-стеке, текст — системный sans без загрузки нового шрифта. H1: 40/44px до 1024px, затем clamp(48px, 5vw, 76px)/1.05; единое прямое начертание. H2: 32/36px и 48/54px, основной текст 16px с межстрочным 1.625, подписи минимум 14px, кнопки 15/20px. Caps и разрядка мелких подписей убраны. Hero до 1024px идёт в потоке «компактный всадник 160px → текст», затем — две независимые колонки 52/48 одного контейнера; изображение не вылетает за свою колонку. Всадник мягко парит через CSS transform, геометрия зарезервирована; кнопка позволяет остановить движение, prefers-reduced-motion отключает анимацию и скрывает эту кнопку. Существующий rider сохранён без заявления о происхождении фотографии. Фокус — контур 2px с отступом 3px и светлой подложкой для тёмных секций; reduced motion отключает CSS-анимации и задержанные fade-reveal, JS-трансформации контролирует общий MotionConfig.
++Заголовки используют Georgia первым в serif-стеке, текст — системный sans без загрузки нового шрифта. H1: `text-3xl sm:text-4xl lg:text-5xl leading-tight` (30/36/48px); H2: `text-2xl sm:text-3xl lg:text-4xl` (24/30/36px); H3: `text-lg sm:text-xl font-semibold` (18/20px). Описания: `text-sm sm:text-base`, подзаголовок Hero: `text-base sm:text-lg`, поля формы остаются 16px, кнопки 15/20px. Вертикальные отступы секций: `py-10 md:py-16`, до контента: `mb-6 md:mb-8` или эквивалентный margin-top; карточки: `p-5 md:p-6`. Hero сохраняет верхний отступ под навигацию. Caps и разрядка мелких подписей убраны. Hero до 1024px идёт в потоке «компактный всадник 160px → текст», затем — две независимые колонки 52/48 одного контейнера; изображение не вылетает за свою колонку. Всадник мягко парит через CSS transform, геометрия зарезервирована; кнопка позволяет остановить движение, prefers-reduced-motion отключает анимацию и скрывает эту кнопку. Существующий rider сохранён без заявления о происхождении фотографии. Фокус — контур 2px с отступом 3px и светлой подложкой для тёмных секций; reduced motion отключает CSS-анимации и задержанные fade-reveal, JS-трансформации контролирует общий MotionConfig.
++
++Услуги показываются одновременно в сетке `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` без искусственной минимальной высоты; каждая карточка передаёт свою услугу в существующую форму. Каталог лошадей и тренеров до 640px использует нативную горизонтальную прокрутку со snap-точками, видимой полосой прокрутки, промежутком 16px и нижним отступом 16px. Стрелки, Home/End, точки и позиция вкладки сохраняются; от 640px остаётся Embla. Фото карточек: 208px на телефоне и 240px от 640px. FAQ и пояснение номинала центрируются в `max-w-2xl`.
+diff --git a/horse-club-crm/landing/src/components/Carousel.tsx b/horse-club-crm/landing/src/components/Carousel.tsx
+index a0c3475..47f4b8a 100644
+--- a/horse-club-crm/landing/src/components/Carousel.tsx
++++ b/horse-club-crm/landing/src/components/Carousel.tsx
+@@ -1 +1 @@
+-import { Children, useCallback, useEffect, useId, useState, type ReactNode } from 'react';
++import { Children, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+@@ -12,0 +13 @@ interface CarouselProps {
++  nativeMobile?: boolean;
+@@ -16 +17 @@ interface CarouselProps {
+-export function Carousel({ children, label, initialIndex = 0, onIndexChange, dots = true, ordered = false }: CarouselProps) {
++export function Carousel({ children, label, initialIndex = 0, onIndexChange, dots = true, ordered = false, nativeMobile = false }: CarouselProps) {
+@@ -18 +19,7 @@ export function Carousel({ children, label, initialIndex = 0, onIndexChange, dot
+-  const [viewportRef, api] = useEmblaCarousel({ align: 'start', containScroll: 'trimSnaps', startIndex: initialIndex });
++  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 639px)').matches);
++  const native = nativeMobile && narrow;
++  const nativeViewport = useRef<HTMLDivElement | null>(null);
++  const position = useRef(initialIndex);
++  // Carry the current position across the native/Embla breakpoint without reinitializing on every slide.
++  const startIndex = useMemo(() => position.current, [native]);
++  const [viewportRef, api] = useEmblaCarousel({ active: !native, align: 'start', containScroll: 'trimSnaps', startIndex });
+@@ -25,0 +33,43 @@ export function Carousel({ children, label, initialIndex = 0, onIndexChange, dot
++  const attachViewport = useCallback((element: HTMLDivElement | null) => {
++    nativeViewport.current = element;
++    viewportRef(element);
++  }, [viewportRef]);
++
++  useEffect(() => {
++    const media = window.matchMedia('(max-width: 639px)');
++    const update = () => setNarrow(media.matches);
++    media.addEventListener('change', update);
++    return () => media.removeEventListener('change', update);
++  }, []);
++
++  useEffect(() => {
++    const viewport = nativeViewport.current;
++    if (!native || !viewport) return;
++    const slides = Array.from(viewport.querySelectorAll<HTMLElement>('.club-carousel__slide'));
++    const measure = () => {
++      const max = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
++      const start = slides[0]?.offsetLeft ?? 0;
++      const positions = [...new Set(slides.map(slide => Math.min(slide.offsetLeft - start, max)))];
++      setSnaps(positions);
++      return positions;
++    };
++    const syncNative = () => {
++      const positions = measure();
++      const index = positions.reduce((closest, position, i) => Math.abs(position - viewport.scrollLeft) < Math.abs(positions[closest] - viewport.scrollLeft) ? i : closest, 0);
++      position.current = index;
++      setSelected(index);
++      setCanPrev(index > 0);
++      setCanNext(index < positions.length - 1);
++      onIndexChange?.(index);
++    };
++    viewport.scrollLeft = measure()[position.current] ?? 0;
++    syncNative();
++    viewport.addEventListener('scroll', syncNative, { passive: true });
++    const observer = new ResizeObserver(syncNative);
++    observer.observe(viewport);
++    return () => {
++      viewport.removeEventListener('scroll', syncNative);
++      observer.disconnect();
++      viewport.scrollLeft = 0;
++    };
++  }, [native, initialIndex, onIndexChange, children]);
+@@ -28 +78 @@ export function Carousel({ children, label, initialIndex = 0, onIndexChange, dot
+-    if (!api) return;
++    if (!api || native) return;
+@@ -29,0 +80 @@ export function Carousel({ children, label, initialIndex = 0, onIndexChange, dot
++    position.current = index;
+@@ -35 +86 @@ export function Carousel({ children, label, initialIndex = 0, onIndexChange, dot
+-  }, [api, onIndexChange]);
++  }, [api, native, onIndexChange]);
+@@ -44 +95,4 @@ export function Carousel({ children, label, initialIndex = 0, onIndexChange, dot
+-  const go = (index: number) => api?.scrollTo(index, !!reducedMotion);
++  const go = (index: number) => {
++    if (native) nativeViewport.current?.scrollTo({ left: snaps[Math.max(0, Math.min(index, snaps.length - 1))] ?? 0, behavior: reducedMotion ? 'instant' : 'smooth' });
++    else api?.scrollTo(index, !!reducedMotion);
++  };
+@@ -48 +102 @@ export function Carousel({ children, label, initialIndex = 0, onIndexChange, dot
+-      <div id={viewportId} ref={viewportRef} className="club-carousel__viewport"
++      <div id={viewportId} ref={attachViewport} className={`club-carousel__viewport${native ? ' club-carousel__viewport--native snap-x snap-mandatory overflow-x-auto pb-4' : ''}`}
+@@ -57 +111 @@ export function Carousel({ children, label, initialIndex = 0, onIndexChange, dot
+-        <List className="club-carousel__track" role="list">
++        <List className={`club-carousel__track${native ? ' flex gap-4' : ''}`} role="list">
+@@ -59 +113 @@ export function Carousel({ children, label, initialIndex = 0, onIndexChange, dot
+-            <li key={index} className="club-carousel__slide" aria-label={`${index + 1} из ${items.length}`}>
++            <li key={index} className={`club-carousel__slide${native ? ' snap-start' : ''}`} aria-label={`${index + 1} из ${items.length}`}>
+diff --git a/horse-club-crm/landing/src/components/ClubStandardsSection.tsx b/horse-club-crm/landing/src/components/ClubStandardsSection.tsx
+index 876f462..b1af6d5 100644
+--- a/horse-club-crm/landing/src/components/ClubStandardsSection.tsx
++++ b/horse-club-crm/landing/src/components/ClubStandardsSection.tsx
+@@ -78 +78 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+-            <h2 className="leading-[1.125] mt-3 font-serif text-[2rem] font-normal tracking-tight text-club-ink sm:text-5xl">
++            <h2 className="leading-[1.125] mt-3 font-serif tracking-tight text-club-ink text-2xl sm:text-3xl lg:text-4xl font-normal">
+@@ -82 +82 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+-          <p className="max-w-md text-base leading-relaxed text-club-secondary">
++          <p className="max-w-md text-sm sm:text-base leading-relaxed text-club-secondary">
+@@ -97 +97 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+-                className="group relative flex flex-col justify-between overflow-hidden rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_50px_rgba(58,47,43,0.08)]"
++                className="group relative flex flex-col justify-between overflow-hidden rounded-[2.5rem] border border-black/5 bg-white/90 p-5 md:p-6 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_50px_rgba(58,47,43,0.08)]"
+@@ -110 +110 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+-                  <div className="mt-8">
++                  <div className="mt-6">
+@@ -114 +114 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+-                    <h3 className="mt-2 font-serif text-2xl sm:text-3xl font-normal leading-snug text-club-ink">
++                    <h3 className="mt-2 font-serif leading-snug text-club-ink text-lg sm:text-xl font-semibold">
+@@ -117 +117 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+-                    <p className="mt-4 text-base leading-relaxed text-club-secondary">
++                    <p className="mt-4 text-sm sm:text-base leading-relaxed text-club-secondary">
+@@ -124 +124 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+-                <div className="mt-10 flex items-baseline justify-between gap-3 flex-wrap border-t border-black/5 pt-6">
++                <div className="mt-6 flex items-baseline justify-between gap-3 flex-wrap border-t border-black/5 pt-6">
+@@ -138 +138 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+-        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-club-sand/50 p-8 sm:p-10 backdrop-blur-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
++        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-club-sand/50 p-5 md:p-6  backdrop-blur-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+@@ -143 +143 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+-            <p className="mt-2 text-base text-club-secondary leading-relaxed">
++            <p className="mt-2 text-sm sm:text-base text-club-secondary leading-relaxed">
+diff --git a/horse-club-crm/landing/src/components/ContactsSection.tsx b/horse-club-crm/landing/src/components/ContactsSection.tsx
+index 1e3d776..a5ac0ab 100644
+--- a/horse-club-crm/landing/src/components/ContactsSection.tsx
++++ b/horse-club-crm/landing/src/components/ContactsSection.tsx
+@@ -86 +86 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-            <h2 className="leading-[1.125] mt-3 font-serif text-[2rem] font-normal tracking-tight text-club-sand sm:text-5xl">
++            <h2 className="leading-[1.125] mt-3 font-serif tracking-tight text-club-sand text-2xl sm:text-3xl lg:text-4xl font-normal">
+@@ -90 +90 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-          <p className="max-w-md text-base leading-relaxed text-club-sand">
++          <p className="max-w-md text-sm sm:text-base leading-relaxed text-club-sand">
+@@ -95 +95 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 items-start">
++        <div className="grid grid-cols-1 gap-6 md:gap-8 lg:grid-cols-12 items-start">
+@@ -97 +97 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-          <div className="flex flex-col gap-10 lg:col-span-5">
++          <div className="flex flex-col gap-6 lg:col-span-5">
+@@ -99 +99 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-            <div className="rounded-[2.4rem] border border-white/10 bg-white/5 p-8 backdrop-blur-md">
++            <div className="rounded-[2.4rem] border border-white/10 bg-white/5 p-5 md:p-6 backdrop-blur-md">
+@@ -103 +103 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-              <h3 className="mt-2 font-serif text-2xl font-light text-white">
++              <h3 className="mt-2 font-serif text-white text-lg sm:text-xl font-semibold">
+@@ -106 +106 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-              <p className="mt-2 text-base leading-relaxed text-club-sand">
++              <p className="mt-2 text-sm sm:text-base leading-relaxed text-club-sand">
+@@ -176 +176 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-            <div className="relative rounded-[2.8rem] bg-white p-8 text-club-deep shadow-2xl sm:p-12">
++            <div className="relative rounded-[2.8rem] bg-white p-5 md:p-6 text-club-deep shadow-2xl">
+@@ -190 +190 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-                    <h3 className="font-serif text-3xl font-normal text-club-deep">
++                    <h3 className="font-serif text-club-deep text-lg sm:text-xl font-semibold">
+@@ -193 +193 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-                    <p className="mt-3 max-w-md text-base leading-relaxed text-club-secondary">
++                    <p className="mt-3 max-w-md text-sm sm:text-base leading-relaxed text-club-secondary">
+@@ -208 +208 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-                      className="mt-8 rounded-full border border-black/15 bg-transparent px-6 py-2.5 text-sm font-semibold text-club-ink transition-all hover:bg-black/5"
++                      className="mt-6 rounded-full border border-black/15 bg-transparent px-6 py-2.5 text-sm font-semibold text-club-ink transition-all hover:bg-black/5"
+@@ -228 +228 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-                      <h3 id="booking-heading" tabIndex={-1} className="font-serif text-3xl sm:text-4xl font-normal text-club-deep">
++                      <h3 id="booking-heading" tabIndex={-1} className="font-serif text-club-deep text-lg sm:text-xl font-semibold">
+@@ -231 +231 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-                      <p className="mt-1 text-base text-club-secondary">
++                      <p className="mt-1 text-sm sm:text-base text-club-secondary">
+@@ -238 +238 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+-                      <p className="rounded-2xl bg-club-sand/60 px-4 py-3 text-base text-club-ink" aria-live="polite">
++                      <p className="rounded-2xl bg-club-sand/60 px-4 py-3 text-sm sm:text-base text-club-ink" aria-live="polite">
+diff --git a/horse-club-crm/landing/src/components/FaqSection.tsx b/horse-club-crm/landing/src/components/FaqSection.tsx
+index d107b6c..693dbf2 100644
+--- a/horse-club-crm/landing/src/components/FaqSection.tsx
++++ b/horse-club-crm/landing/src/components/FaqSection.tsx
+@@ -12,3 +12,3 @@ export function FaqSection(): ReactElement {
+-  return <section id="faq" aria-labelledby="faq-heading" className="bg-luxury-bg px-6 py-10 sm:px-10 lg:px-16">
+-    <div className="mx-auto max-w-7xl">
+-      <h2 id="faq-heading" className="mb-6 font-serif text-[2rem] sm:text-5xl">Частые вопросы</h2>
++  return <section id="faq" aria-labelledby="faq-heading" className="bg-luxury-bg px-6 py-10 md:py-16 sm:px-10 lg:px-16">
++    <div className="mx-auto max-w-2xl">
++      <h2 id="faq-heading" className="mb-6 md:mb-8 font-serif text-2xl sm:text-3xl lg:text-4xl font-normal">Частые вопросы</h2>
+@@ -17 +17 @@ export function FaqSection(): ReactElement {
+-        <p className="max-w-3xl pb-4 leading-relaxed text-club-secondary">{answer}</p>
++        <p className="max-w-prose pb-4 text-sm sm:text-base leading-relaxed text-club-secondary">{answer}</p>
+diff --git a/horse-club-crm/landing/src/components/FirstLessonSection.tsx b/horse-club-crm/landing/src/components/FirstLessonSection.tsx
+index f5ed96b..b50348b 100644
+--- a/horse-club-crm/landing/src/components/FirstLessonSection.tsx
++++ b/horse-club-crm/landing/src/components/FirstLessonSection.tsx
+@@ -38 +38 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
+-          <h2 id="first-lesson-heading" className="leading-[1.125] mt-3 max-w-2xl font-serif text-[2rem] font-normal tracking-tight text-luxury-dark sm:text-5xl">
++          <h2 id="first-lesson-heading" className="leading-[1.125] mt-3 max-w-2xl font-serif tracking-tight text-luxury-dark text-2xl sm:text-3xl lg:text-4xl font-normal">
+@@ -41 +41 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
+-          <p className="max-w-md text-base leading-relaxed text-club-secondary">
++          <p className="max-w-md text-sm sm:text-base leading-relaxed text-club-secondary">
+@@ -49 +49 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
+-              <article key={step.number} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md">
++              <article key={step.number} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-5 md:p-6 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md">
+@@ -54,3 +54,3 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
+-                <div className="mt-8">
+-                  <h3 className="mt-2 font-serif text-2xl font-normal leading-snug text-luxury-dark sm:text-3xl">{step.title}</h3>
+-                  <p className="mt-4 text-base leading-relaxed text-club-secondary">{step.description}</p>
++                <div className="mt-6">
++                  <h3 className="mt-2 font-serif leading-snug text-luxury-dark text-lg sm:text-xl font-semibold">{step.title}</h3>
++                  <p className="mt-4 text-sm sm:text-base leading-relaxed text-club-secondary">{step.description}</p>
+@@ -63,2 +63,2 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
+-        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-luxury-bg/50 p-8 backdrop-blur-sm sm:p-10">
+-          <h3 className="font-serif text-xl font-normal text-luxury-dark sm:text-2xl">Что надеть и как подготовиться</h3>
++        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-luxury-bg/50 p-5 md:p-6 backdrop-blur-sm">
++          <h3 className="font-serif text-luxury-dark text-lg sm:text-xl font-semibold">Что надеть и как подготовиться</h3>
+diff --git a/horse-club-crm/landing/src/components/Footer.tsx b/horse-club-crm/landing/src/components/Footer.tsx
+index 83cd947..8e13097 100644
+--- a/horse-club-crm/landing/src/components/Footer.tsx
++++ b/horse-club-crm/landing/src/components/Footer.tsx
+@@ -8 +8 @@ export function Footer({ brandName }: { brandName: string }): ReactElement {
+-    <div className="mx-auto max-w-7xl space-y-3">
++    <div className="mx-auto max-w-7xl space-y-2">
+diff --git a/horse-club-crm/landing/src/components/GiftCertificatesSection.tsx b/horse-club-crm/landing/src/components/GiftCertificatesSection.tsx
+index 907665f..85b8fc3 100644
+--- a/horse-club-crm/landing/src/components/GiftCertificatesSection.tsx
++++ b/horse-club-crm/landing/src/components/GiftCertificatesSection.tsx
+@@ -30 +30 @@ export function GiftCertificatesSection({ onChoose }: { onChoose: ChooseBooking
+-          <h2 id="gift-certificates-heading" className="leading-[1.125] mt-3 max-w-2xl font-serif text-[2rem] font-normal tracking-tight text-luxury-dark sm:text-5xl">
++          <h2 id="gift-certificates-heading" className="leading-[1.125] mt-3 max-w-2xl font-serif tracking-tight text-luxury-dark text-2xl sm:text-3xl lg:text-4xl font-normal">
+@@ -33 +33 @@ export function GiftCertificatesSection({ onChoose }: { onChoose: ChooseBooking
+-          <p className="max-w-md text-base leading-relaxed text-club-secondary">
++          <p className="max-w-md text-sm sm:text-base leading-relaxed text-club-secondary">
+@@ -38 +38 @@ export function GiftCertificatesSection({ onChoose }: { onChoose: ChooseBooking
+-        <ul role="list" className="mt-6 md:mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
++        <ul role="list" className="mt-6 md:mt-8 grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-3">
+@@ -40,3 +40,3 @@ export function GiftCertificatesSection({ onChoose }: { onChoose: ChooseBooking
+-            <li key={benefit.title} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md sm:p-12">
+-              <h3 className="mt-2 font-serif text-2xl font-normal leading-snug text-luxury-dark sm:text-3xl">{benefit.title}</h3>
+-              <p className="mt-4 text-base leading-relaxed text-club-secondary">{benefit.description}</p>
++            <li key={benefit.title} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-5 md:p-6 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md">
++              <h3 className="mt-2 font-serif leading-snug text-luxury-dark text-lg sm:text-xl font-semibold">{benefit.title}</h3>
++              <p className="mt-4 text-sm sm:text-base leading-relaxed text-club-secondary">{benefit.description}</p>
+@@ -47 +47 @@ export function GiftCertificatesSection({ onChoose }: { onChoose: ChooseBooking
+-        <div className="mt-6 md:mt-8 text-center">
++        <div className="mx-auto mt-6 max-w-2xl text-center md:mt-8">
+diff --git a/horse-club-crm/landing/src/components/HeroSection.tsx b/horse-club-crm/landing/src/components/HeroSection.tsx
+index f982130..ed59e9b 100644
+--- a/horse-club-crm/landing/src/components/HeroSection.tsx
++++ b/horse-club-crm/landing/src/components/HeroSection.tsx
+@@ -9,2 +9,2 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
+-    <section id="hero" aria-labelledby="hero-heading" className="landing-hero bg-luxury-bg px-6 pb-12 pt-28 sm:px-10 lg:px-16">
+-      <div className="landing-hero__layout mx-auto grid w-full max-w-7xl items-center gap-6 lg:gap-12">
++    <section id="hero" aria-labelledby="hero-heading" className="landing-hero bg-luxury-bg px-6 pb-10 pt-24 md:pb-16 md:pt-28 sm:px-10 lg:px-16">
++      <div className="landing-hero__layout mx-auto grid w-full max-w-7xl items-center gap-6 lg:gap-8">
+@@ -12,2 +12,2 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
+-          <p className="mb-6 text-sm leading-5 text-luxury-muted">Тамбов · ул. Бастионная, 22АС2</p>
+-          <h1 id="hero-heading" className="landing-hero__heading font-serif font-normal text-luxury-dark">
++          <p className="mb-4 text-sm leading-5 text-luxury-muted">Тамбов · ул. Бастионная, 22АС2</p>
++          <h1 id="hero-heading" className="landing-hero__heading font-serif font-normal text-luxury-dark text-3xl sm:text-4xl lg:text-5xl leading-tight">
+@@ -16 +16 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
+-          <p className="mt-6 max-w-lg text-base leading-relaxed text-luxury-muted sm:text-lg">
++          <p className="mt-4 max-w-lg text-base leading-relaxed text-luxury-muted sm:text-lg">
+@@ -24 +24 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
+-          <div className="mt-8 flex flex-wrap items-center gap-4">
++          <div className="mt-6 flex flex-wrap items-center gap-4">
+@@ -49 +49 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
+-        className="mx-auto mt-8 flex h-11 w-11 items-center justify-center rounded-full border border-luxury-muted text-luxury-dark transition-colors hover:bg-luxury-card">
++        className="mx-auto mt-6 flex h-11 w-11 items-center justify-center rounded-full border border-luxury-muted text-luxury-dark transition-colors hover:bg-luxury-card">
+diff --git a/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx b/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx
+index 826eec8..58de745 100644
+--- a/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx
++++ b/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx
+@@ -109 +109 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-        <div className="flex flex-col items-start justify-between gap-8 sm:flex-row sm:items-end">
++        <div className="flex flex-col items-start justify-between gap-4 md:gap-6 sm:flex-row sm:items-end">
+@@ -112 +112 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-            <h2 className="leading-[1.125] mt-3 font-serif text-[2rem] sm:text-5xl font-normal tracking-tight text-club-ink">
++            <h2 className="leading-[1.125] mt-3 font-serif tracking-tight text-club-ink text-2xl sm:text-3xl lg:text-4xl font-normal">
+@@ -157 +157 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-              <Carousel label="Лошади клуба" initialIndex={carouselPositions.current.horses}
++              <Carousel nativeMobile label="Лошади клуба" initialIndex={carouselPositions.current.horses}
+@@ -169 +169 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                    <div className="relative h-72 w-full overflow-hidden">
++                    <div className="relative h-52 sm:h-60 w-full overflow-hidden">
+@@ -181 +181 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                    <div className="flex flex-1 flex-col justify-between p-7">
++                    <div className="flex flex-1 flex-col justify-between p-5 md:p-6">
+@@ -186 +186 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                        <h3 className="mt-1 font-serif text-2xl font-normal text-club-ink">
++                        <h3 className="mt-1 font-serif text-club-ink text-lg sm:text-xl font-semibold">
+@@ -189 +189 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                        <p className="mt-3 text-base leading-relaxed text-club-secondary line-clamp-2">
++                        <p className="mt-3 text-sm sm:text-base leading-relaxed text-club-secondary line-clamp-2">
+@@ -214 +214 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-              <Carousel label="Тренеры" initialIndex={carouselPositions.current.trainers}
++              <Carousel nativeMobile label="Тренеры" initialIndex={carouselPositions.current.trainers}
+@@ -226 +226 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                    <div className="relative h-72 w-full overflow-hidden">
++                    <div className="relative h-52 sm:h-60 w-full overflow-hidden">
+@@ -238 +238 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                    <div className="flex flex-1 flex-col justify-between p-7">
++                    <div className="flex flex-1 flex-col justify-between p-5 md:p-6">
+@@ -243 +243 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                        <h3 className="mt-1 font-serif text-2xl font-normal text-club-ink">
++                        <h3 className="mt-1 font-serif text-club-ink text-lg sm:text-xl font-semibold">
+@@ -246 +246 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                        <p className="mt-2 text-base font-medium text-club-secondary">
++                        <p className="mt-2 text-sm sm:text-base font-medium text-club-secondary">
+@@ -249 +249 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                        <p className="mt-3 text-base italic leading-relaxed text-club-secondary line-clamp-2">
++                        <p className="mt-3 text-sm sm:text-base italic leading-relaxed text-club-secondary line-clamp-2">
+@@ -323 +323 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-              <div className="flex shrink-0 flex-col justify-between p-5 sm:p-10 md:min-h-0 md:flex-1 md:shrink">
++              <div className="flex shrink-0 flex-col justify-between p-5 md:p-6 md:min-h-0 md:flex-1 md:shrink">
+@@ -329 +329 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                  <h3 className="mt-1 font-serif text-3xl sm:text-4xl font-normal text-club-ink">
++                  <h3 className="mt-1 font-serif text-club-ink text-lg sm:text-xl font-semibold">
+@@ -334 +334 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                    <p className="mt-2 text-base font-semibold text-club-secondary">
++                    <p className="mt-2 text-sm sm:text-base font-semibold text-club-secondary">
+@@ -369 +369 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                    <p className="text-base leading-relaxed text-club-secondary">
++                    <p className="text-sm sm:text-base leading-relaxed text-club-secondary">
+@@ -394 +394 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+-                <div className="mt-8 flex flex-col items-stretch justify-between gap-4 border-t border-black/10 pt-5 sm:flex-row sm:items-center">
++                <div className="mt-6 flex flex-col items-stretch justify-between gap-4 border-t border-black/10 pt-5 sm:flex-row sm:items-center">
+diff --git a/horse-club-crm/landing/src/components/ServicesSection.tsx b/horse-club-crm/landing/src/components/ServicesSection.tsx
+index 4bf46b2..0a89173 100644
+--- a/horse-club-crm/landing/src/components/ServicesSection.tsx
++++ b/horse-club-crm/landing/src/components/ServicesSection.tsx
+@@ -3,2 +3 @@ import type { PublicService } from '../usePublicContent';
+-import { useState, type ReactElement } from 'react';
+-import { motion, AnimatePresence } from 'framer-motion';
++import type { ReactElement } from 'react';
+@@ -7,11 +5,0 @@ import type { ChooseBooking } from '../booking';
+-interface ServiceItem {
+-  id: string;
+-  title: string;
+-  cardTitle: string;
+-  desc: string;
+-  price: string;
+-  duration: string;
+-  image: string;
+-  badge: string;
+-}
+-
+@@ -19,8 +7 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+-  const servicesData: ServiceItem[] = services.map(item => ({
+-    id: item.id, title: item.title, cardTitle: item.title, desc: item.description,
+-    price: item.price, duration: `${item.durationMinutes ? `Длительность: ${item.durationMinutes} минут` : 'Длительность: по согласованию'} · ${item.format || 'Формат: по согласованию'}`,
+-    image: item.imageUrl, badge: item.category,
+-  }));
+-  const [activeTab, setActiveTab] = useState<string>(servicesData[0]?.id || '');
+-  const currentService = servicesData.find((s) => s.id === activeTab) || servicesData[0];
+-  if (!currentService) return <></>;
++  if (services.length === 0) return <></>;
+@@ -29,14 +10,5 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+-    <section id="services" className="relative overflow-hidden bg-club-deep px-4 py-10 md:py-16 text-white sm:px-10 lg:px-16">
+-      <div
+-        aria-hidden="true"
+-        className="pointer-events-none absolute -bottom-32 -left-32 h-[500px] w-[500px] rounded-full bg-club-action/20 blur-3xl"
+-      />
+-
+-      <div className="relative mx-auto max-w-7xl">
+-        <div className="mb-6 md:mb-8 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+-          <h2 className="leading-[1.125] font-serif text-[2rem] sm:text-5xl font-normal tracking-tight text-club-sand">
+-            Услуги
+-          </h2>
+-          <span className="text-sm text-club-sand">
+-            Направления обучения
+-          </span>
++    <section id="services" className="bg-club-deep px-6 py-10 text-white sm:px-10 md:py-16 lg:px-16">
++      <div className="mx-auto max-w-7xl">
++        <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center md:mb-8">
++          <h2 className="font-serif text-2xl font-normal leading-tight tracking-tight text-club-sand sm:text-3xl lg:text-4xl">Услуги</h2>
++          <span className="text-sm text-club-sand">Направления обучения</span>
+@@ -44,101 +16,7 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+-
+-        <div className="grid grid-cols-1 items-start gap-9 lg:grid-cols-12 lg:gap-12">
+-          {/* Левая колонка */}
+-          <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-2 sm:-mx-10 sm:px-10 lg:mx-0 lg:col-span-5 lg:flex-col lg:gap-3 lg:overflow-visible lg:px-0 lg:pb-0">
+-            {servicesData.map((item) => {
+-              const isActive = currentService.id === item.id;
+-              return (
+-                <button
+-                  key={item.id}
+-                  onClick={() => setActiveTab(item.id)}
+-                  type="button"
+-                  aria-pressed={isActive}
+-                  className={`group relative flex shrink-0 snap-start items-center justify-between rounded-full px-5 py-3 text-left transition-all duration-300 lg:w-full lg:rounded-2xl lg:px-7 lg:py-5 ${
+-                    isActive
+-                      ? 'border border-white/20 bg-white/10 text-white shadow-lg backdrop-blur-md'
+-                      : 'text-club-sand hover:text-club-sand hover:bg-white/5'
+-                  }`}
+-                >
+-                  <span className="text-sm font-medium tracking-tight transition-transform duration-300 group-hover:translate-x-1 lg:text-3xl lg:font-light">
+-                    {item.title}
+-                  </span>
+-
+-                  {isActive && (
+-                    <motion.div
+-                      layoutId="active-indicator"
+-                      className="ml-3 flex h-6 w-6 items-center justify-center rounded-full bg-club-sand text-sm font-bold text-club-deep lg:h-7 lg:w-7 lg:text-sm"
+-                    >
+-                      →
+-                    </motion.div>
+-                  )}
+-                </button>
+-              );
+-            })}
+-          </div>
+-
+-          {/* Правая колонка с карточкой */}
+-          <div className="relative pt-2 sm:pt-6 lg:col-span-7">
+-            {/* Парящий конный предмет */}
+-            <div className="pointer-events-none absolute right-2 top-3 z-20 h-28 w-28 sm:-right-3 sm:-top-8 sm:h-48 sm:w-48 lg:-right-10 lg:-top-20 lg:h-72 lg:w-72">
+-              <AnimatePresence mode="wait">
+-                <motion.div
+-                  key={currentService.id}
+-                  initial={{ opacity: 0, y: 25, scale: 0.85, rotate: -6 }}
+-                  animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
+-                  exit={{ opacity: 0, y: -20, scale: 0.88, rotate: 6 }}
+-                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+-                  className="h-full w-full"
+-                >
+-                  <motion.div
+-                    animate={{
+-                      y: [0, -8, 0],
+-                      rotate: [0, 2, -1.5, 0],
+-                    }}
+-                    transition={{
+-                      duration: 4.8,
+-                      repeat: Infinity,
+-                      ease: 'easeInOut',
+-                    }}
+-                    className="flex h-full w-full items-center justify-center"
+-                  >
+-                    <img loading="lazy" decoding="async"
+-                  onError={handleCatalogImageError}
+-                      src={currentService.image}
+-                      alt={currentService.title}
+-                      className="h-full w-full object-contain drop-shadow-[0_20px_25px_rgba(0,0,0,0.45)]"
+-                    />
+-                  </motion.div>
+-                </motion.div>
+-              </AnimatePresence>
+-            </div>
+-
+-            {/* Карточка с зафиксированной минимальной высотой min-h */}
+-            <div className="relative z-10 flex min-h-[500px] flex-col justify-between rounded-[2rem] bg-white p-6 text-club-deep shadow-2xl sm:rounded-[2.8rem] sm:p-12">
+-              <div className="min-h-[19rem] sm:min-h-[18rem]">
+-                <div className="inline-block rounded-full bg-club-sand/60 px-4 py-1 text-sm font-semibold text-club-secondary mb-6">
+-                  {currentService.badge}
+-                </div>
+-
+-                <AnimatePresence mode="wait">
+-                  <motion.div
+-                    key={currentService.id}
+-                    initial={{ opacity: 0, y: 8 }}
+-                    animate={{ opacity: 1, y: 0 }}
+-                    exit={{ opacity: 0, y: -8 }}
+-                    transition={{ duration: 0.3 }}
+-                  >
+-                    {/* Фиксированная минимальная высота для заголовка */}
+-                    <div className="flex min-h-[92px] items-start pr-24 sm:min-h-[108px] sm:pr-36 lg:min-h-[84px] lg:pr-28">
+-                      <h3 className="font-serif text-2xl sm:text-4xl font-normal leading-snug tracking-tight text-club-deep">
+-                        {currentService.cardTitle}
+-                      </h3>
+-                    </div>
+-
+-                    {/* Фиксированная минимальная высота для блока описания */}
+-                    <div className="mt-4 min-h-[132px] max-w-lg sm:min-h-[120px]">
+-                      <p className="text-base sm:text-base leading-relaxed text-club-secondary">
+-                        {currentService.desc}
+-                      </p>
+-                    </div>
+-                  </motion.div>
+-                </AnimatePresence>
++        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
++          {services.map(service => (
++            <article key={service.id} className="flex min-w-0 flex-col rounded-3xl bg-white p-5 text-club-deep md:p-6">
++              <div className="mb-4 flex items-center gap-3">
++                <img src={service.imageUrl} alt="" loading="lazy" decoding="async" onError={handleCatalogImageError}
++                  width={64} height={64} className="h-16 w-16 shrink-0 rounded-xl object-contain" />
++                <span className="rounded-full bg-club-sand/60 px-3 py-1 text-sm font-semibold text-club-secondary">{service.category}</span>
+@@ -146,26 +24,13 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+-
+-              {/* Нижняя плашка всегда зафиксирована внизу карточки */}
+-              <div>
+-                <div className="my-6 h-[1px] w-full bg-black/10" />
+-
+-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+-                  <div>
+-                    <span className="block text-sm text-club-secondary">
+-                      Стоимость:
+-                    </span>
+-                    <span className="text-3xl sm:text-4xl font-light text-club-deep">
+-                      {currentService.price}
+-                    </span>
+-                    <span className="block mt-1 text-sm text-club-secondary">
+-                      {currentService.duration}
+-                    </span>
+-                  </div>
+-
+-                  <a
+-                    href="#booking-form"
+-                    onClick={event => { event.preventDefault(); onChoose('service', { id: currentService.id, name: currentService.title }); }}
+-                    className="inline-flex w-full items-center justify-center rounded-2xl bg-club-action px-6 py-4 text-center text-sm font-semibold text-white shadow-md transition-all hover:scale-105 hover:bg-club-deep active:scale-95 sm:w-auto sm:px-8"
+-                  >
+-                    Записаться на занятие
+-                  </a>
+-                </div>
++              <h3 className="font-serif text-lg font-semibold leading-snug sm:text-xl">{service.title}</h3>
++              <p className="mt-2 max-w-prose text-sm leading-relaxed text-club-secondary sm:text-base">{service.description}</p>
++              <div className="mt-auto pt-4">
++                <p className="text-lg font-semibold sm:text-xl">{service.price}</p>
++                <p className="mt-1 text-sm leading-relaxed text-club-secondary">
++                  {service.durationMinutes ? `Длительность: ${service.durationMinutes} минут` : 'Длительность: по согласованию'}
++                  {' · '}{service.format || 'Формат: по согласованию'}
++                </p>
++                <a href="#booking-form"
++                  onClick={event => { event.preventDefault(); onChoose('service', { id: service.id, name: service.title }); }}
++                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-club-action px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-club-deep active:bg-club-secondary">
++                  Записаться на занятие
++                </a>
+@@ -173,2 +38,2 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+-            </div>
+-          </div>
++            </article>
++          ))}
+diff --git a/horse-club-crm/landing/src/style.css b/horse-club-crm/landing/src/style.css
+index 841779d..63af4fa 100644
+--- a/horse-club-crm/landing/src/style.css
++++ b/horse-club-crm/landing/src/style.css
+@@ -7 +7,3 @@
+-.club-carousel__track { display: flex; gap: 2rem; margin: 0; padding: 0; list-style: none; touch-action: pan-y pinch-zoom; }
++.club-carousel__viewport--native { overflow-x: auto; padding-bottom: 1rem; margin-bottom: 0; }
++.club-carousel__viewport--native .club-carousel__track { touch-action: auto; }
++.club-carousel__track { display: flex; gap: 1rem; margin: 0; padding: 0; list-style: none; touch-action: pan-y pinch-zoom; }
+@@ -20,2 +22,2 @@
+-@media (min-width: 640px) { .club-carousel__slide { flex-basis: calc((100% - 3rem) / 2.2); } }
+-@media (min-width: 1025px) { .club-carousel__slide { flex-basis: calc((100% - 4rem) / 3); } }
++@media (min-width: 640px) { .club-carousel__slide { flex-basis: calc((100% - 1rem) / 2.2); } }
++@media (min-width: 1025px) { .club-carousel__slide { flex-basis: calc((100% - 2rem) / 3); } }
+@@ -97 +99 @@ body {
+-.landing-hero__heading { font-size: 40px; line-height: 1.1; letter-spacing: -.02em; }
++.landing-hero__heading { letter-spacing: -.02em; }
+@@ -108 +109,0 @@ body {
+-  .landing-hero__heading { font-size: clamp(48px, 5vw, 76px); line-height: 1.05; }
+diff --git a/horse-club-crm/landing/tests/carousel.spec.ts b/horse-club-crm/landing/tests/carousel.spec.ts
+index a60b638..ca1a5ee 100644
+--- a/horse-club-crm/landing/tests/carousel.spec.ts
++++ b/horse-club-crm/landing/tests/carousel.spec.ts
+@@ -36,0 +37,10 @@ for (const width of [390, 768, 1440]) {
++    if (width < 640) {
++      await horses.getByRole('button', { name: 'Вправо', exact: true }).click();
++      for (const resizedWidth of [768, width]) {
++        await page.setViewportSize({ width: resizedWidth, height: 900 });
++        await expect(horses.locator('[aria-current="true"]')).toHaveAttribute('aria-label', 'К слайду 2');
++      }
++      await viewport.focus();
++      await page.keyboard.press('Home');
++      await expect(horses.getByRole('button', { name: 'Влево', exact: true })).toBeDisabled();
++    }
+@@ -75 +85 @@ test('touch swipes advance without opening a card; vertical gestures stay availa
+-  await expect(carousel.locator('.club-carousel__track')).toHaveCSS('touch-action', 'pan-y pinch-zoom');
++  await expect(carousel.locator('.club-carousel__track')).toHaveCSS('touch-action', 'auto');
+diff --git a/horse-club-crm/landing/tests/polish.spec.ts b/horse-club-crm/landing/tests/polish.spec.ts
+index 04db940..67df5d5 100644
+--- a/horse-club-crm/landing/tests/polish.spec.ts
++++ b/horse-club-crm/landing/tests/polish.spec.ts
+@@ -35 +35 @@ for (const width of [320, 390, 768, 1440]) {
+-  test(`original card layout, keyboard dialogs and semantic accessibility at ${width}px`, async ({ page }) => {
++  test(`compact card layout, keyboard dialogs and semantic accessibility at ${width}px`, async ({ page }) => {
+@@ -49 +49 @@ for (const width of [320, 390, 768, 1440]) {
+-    // Preserve the original h-72 photo containers instead of enforcing the rejected 4:3 redesign.
++    // Compact photo heights preserve cropping and leave room for card details.
+@@ -53 +53 @@ for (const width of [320, 390, 768, 1440]) {
+-      expect((await media.boundingBox())!.height).toBeCloseTo(288, 0);
++      expect((await media.boundingBox())!.height).toBeCloseTo(width < 640 ? 208 : 240, 0);
+diff --git a/horse-club-crm/landing/tests/public-content.spec.ts b/horse-club-crm/landing/tests/public-content.spec.ts
+index 4b7b3a8..e741349 100644
+--- a/horse-club-crm/landing/tests/public-content.spec.ts
++++ b/horse-club-crm/landing/tests/public-content.spec.ts
+@@ -34 +34 @@ test('loads public records, updates service selection and opens real horse/train
+-  await expect(page.locator('#services').getByRole('button').first()).toBeVisible();
++  await expect(page.locator('#services').getByRole('link').first()).toBeVisible();
+@@ -36 +36 @@ test('loads public records, updates service selection and opens real horse/train
+-  await expect(page.locator('#services').getByRole('button', { name: 'Занятие из CRM' })).toBeVisible();
++  await expect(page.locator('#services').getByRole('heading', { name: 'Занятие из CRM' })).toBeVisible();
+@@ -61 +61 @@ for (const scenario of ['empty', 'error', 'malformed', 'partial']) {
+-    await expect(page.locator('#services').getByRole('button').first()).toBeVisible();
++    await expect(page.locator('#services').getByRole('link').first()).toBeVisible();

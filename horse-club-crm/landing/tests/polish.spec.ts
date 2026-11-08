@@ -32,7 +32,7 @@ async function mockContent(page: Page) {
 }
 
 for (const width of [320, 390, 768, 1440]) {
-  test(`original card layout, keyboard dialogs and semantic accessibility at ${width}px`, async ({ page }) => {
+  test(`compact card layout, keyboard dialogs and semantic accessibility at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await mockContent(page);
@@ -46,11 +46,11 @@ for (const width of [320, 390, 768, 1440]) {
     const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
     expect(axe.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    // Preserve the original h-72 photo containers instead of enforcing the rejected 4:3 redesign.
+    // Compact photo heights preserve cropping and leave room for card details.
     const photos = page.locator('#horses-trainers .club-carousel__slide > button img');
     for (const media of await photos.all()) {
       await expect(media).toHaveCSS('object-fit', 'cover');
-      expect((await media.boundingBox())!.height).toBeCloseTo(288, 0);
+      expect((await media.boundingBox())!.height).toBeCloseTo(width < 640 ? 208 : 240, 0);
     }
     await expect(page.locator('#services img')).toHaveCSS('object-fit', 'contain');
     await page.locator('#horses-trainers').scrollIntoViewIfNeeded();

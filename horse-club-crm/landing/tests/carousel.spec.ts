@@ -34,6 +34,16 @@ for (const width of [390, 768, 1440]) {
     await expect(horses.getByRole('button', { name: 'Вправо', exact: true })).toBeDisabled();
     await page.keyboard.press('Home');
     await expect(horses.getByRole('button', { name: 'Влево', exact: true })).toBeDisabled();
+    if (width < 640) {
+      await horses.getByRole('button', { name: 'Вправо', exact: true }).click();
+      for (const resizedWidth of [768, width]) {
+        await page.setViewportSize({ width: resizedWidth, height: 900 });
+        await expect(horses.locator('[aria-current="true"]')).toHaveAttribute('aria-label', 'К слайду 2');
+      }
+      await viewport.focus();
+      await page.keyboard.press('Home');
+      await expect(horses.getByRole('button', { name: 'Влево', exact: true })).toBeDisabled();
+    }
     await expect(horses.locator('img').first()).toHaveAttribute('src', '/images/horse.jpg');
     await horses.locator('li > button').first().click();
     await expect(page.getByRole('dialog')).toContainText('Лошадь 1');
@@ -72,7 +82,7 @@ test('touch swipes advance without opening a card; vertical gestures stay availa
   await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect(carousel.getByRole('button', { name: 'Влево', exact: true })).toBeEnabled();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(carousel.locator('.club-carousel__track')).toHaveCSS('touch-action', 'pan-y pinch-zoom');
+  await expect(carousel.locator('.club-carousel__track')).toHaveCSS('touch-action', 'auto');
   await context.close();
 });
 

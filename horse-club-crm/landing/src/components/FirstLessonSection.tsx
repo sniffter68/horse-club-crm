@@ -35,10 +35,10 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
     >
       <div className="relative mx-auto max-w-7xl">
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
-          <h2 id="first-lesson-heading" className="leading-[1.125] mt-3 max-w-2xl font-serif text-[2rem] font-normal tracking-tight text-luxury-dark sm:text-5xl">
+          <h2 id="first-lesson-heading" className="leading-[1.125] mt-3 max-w-2xl font-serif tracking-tight text-luxury-dark text-2xl sm:text-3xl lg:text-4xl font-normal">
             Впервые в седле? Это проще и безопаснее, чем кажется
           </h2>
-          <p className="max-w-md text-base leading-relaxed text-club-secondary">
+          <p className="max-w-md text-sm sm:text-base leading-relaxed text-club-secondary">
             Опыт верховой езды не нужен. Мы бережно проведём вас через первое знакомство с лошадью.
           </p>
         </div>
@@ -46,22 +46,22 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
         <div className="mt-6 md:mt-8">
           <Carousel label="Впервые в клубе" ordered>
             {steps.map(step => (
-              <article key={step.number} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md">
+              <article key={step.number} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-5 md:p-6 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md">
                 <div className="flex items-center justify-between gap-4">
                   <span aria-hidden="true" className="font-serif text-3xl font-light text-luxury-brown/70">{step.number}</span>
                   <span className="rounded-full border border-black/5 bg-luxury-card px-3.5 py-1 text-sm font-semibold text-club-secondary">{step.duration}</span>
                 </div>
-                <div className="mt-8">
-                  <h3 className="mt-2 font-serif text-2xl font-normal leading-snug text-luxury-dark sm:text-3xl">{step.title}</h3>
-                  <p className="mt-4 text-base leading-relaxed text-club-secondary">{step.description}</p>
+                <div className="mt-6">
+                  <h3 className="mt-2 font-serif leading-snug text-luxury-dark text-lg sm:text-xl font-semibold">{step.title}</h3>
+                  <p className="mt-4 text-sm sm:text-base leading-relaxed text-club-secondary">{step.description}</p>
                 </div>
               </article>
             ))}
           </Carousel>
         </div>
 
-        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-luxury-bg/50 p-8 backdrop-blur-sm sm:p-10">
-          <h3 className="font-serif text-xl font-normal text-luxury-dark sm:text-2xl">Что надеть и как подготовиться</h3>
+        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-luxury-bg/50 p-5 md:p-6 backdrop-blur-sm">
+          <h3 className="font-serif text-luxury-dark text-lg sm:text-xl font-semibold">Что надеть и как подготовиться</h3>
           <dl className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
             {preparation.map(item => (
               <div key={item.title}>

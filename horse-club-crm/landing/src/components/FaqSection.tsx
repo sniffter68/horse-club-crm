@@ -9,12 +9,12 @@ const questions = [
 ];
 
 export function FaqSection(): ReactElement {
-  return <section id="faq" aria-labelledby="faq-heading" className="bg-luxury-bg px-6 py-10 sm:px-10 lg:px-16">
-    <div className="mx-auto max-w-7xl">
-      <h2 id="faq-heading" className="mb-6 font-serif text-[2rem] sm:text-5xl">Частые вопросы</h2>
+  return <section id="faq" aria-labelledby="faq-heading" className="bg-luxury-bg px-6 py-10 md:py-16 sm:px-10 lg:px-16">
+    <div className="mx-auto max-w-2xl">
+      <h2 id="faq-heading" className="mb-6 md:mb-8 font-serif text-2xl sm:text-3xl lg:text-4xl font-normal">Частые вопросы</h2>
       {questions.map(([question, answer]) => <details key={question} className="border-b border-black/15 py-2">
         <summary className="min-h-11 cursor-pointer py-3 font-semibold hover:text-club-action">{question}</summary>
-        <p className="max-w-3xl pb-4 leading-relaxed text-club-secondary">{answer}</p>
+        <p className="max-w-prose pb-4 text-sm sm:text-base leading-relaxed text-club-secondary">{answer}</p>
       </details>)}
     </div>
   </section>;

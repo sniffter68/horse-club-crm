@@ -5,7 +5,7 @@ import { PrivacyPolicyLink } from './PrivacyPolicyLink';
 export function Footer({ brandName }: { brandName: string }): ReactElement {
   const year = new Intl.DateTimeFormat('ru-RU', { year: 'numeric', timeZone: 'Europe/Moscow' }).format(new Date());
   return <footer className="border-t border-white/10 bg-luxury-deep px-6 py-8 text-sm text-luxury-bg">
-    <div className="mx-auto max-w-7xl space-y-3">
+    <div className="mx-auto max-w-7xl space-y-2">
       <p>© {year} {brandName}. Все права защищены.</p>
       <p>{legal.operatorName}</p>
       <p>{legal.registration}</p>

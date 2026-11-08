@@ -1,177 +1,42 @@
 import { handleCatalogImageError } from '../catalogImage';
 import type { PublicService } from '../usePublicContent';
-import { useState, type ReactElement } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import type { ReactElement } from 'react';
 import type { ChooseBooking } from '../booking';
 
-interface ServiceItem {
-  id: string;
-  title: string;
-  cardTitle: string;
-  desc: string;
-  price: string;
-  duration: string;
-  image: string;
-  badge: string;
-}
-
 export function ServicesSection({ services, onChoose }: { services: PublicService[]; onChoose: ChooseBooking }): ReactElement {
-  const servicesData: ServiceItem[] = services.map(item => ({
-    id: item.id, title: item.title, cardTitle: item.title, desc: item.description,
-    price: item.price, duration: `${item.durationMinutes ? `Длительность: ${item.durationMinutes} минут` : 'Длительность: по согласованию'} · ${item.format || 'Формат: по согласованию'}`,
-    image: item.imageUrl, badge: item.category,
-  }));
-  const [activeTab, setActiveTab] = useState<string>(servicesData[0]?.id || '');
-  const currentService = servicesData.find((s) => s.id === activeTab) || servicesData[0];
-  if (!currentService) return <></>;
+  if (services.length === 0) return <></>;
 
   return (
-    <section id="services" className="relative overflow-hidden bg-club-deep px-4 py-10 md:py-16 text-white sm:px-10 lg:px-16">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -bottom-32 -left-32 h-[500px] w-[500px] rounded-full bg-club-action/20 blur-3xl"
-      />
-
-      <div className="relative mx-auto max-w-7xl">
-        <div className="mb-6 md:mb-8 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-          <h2 className="leading-[1.125] font-serif text-[2rem] sm:text-5xl font-normal tracking-tight text-club-sand">
-            Услуги
-          </h2>
-          <span className="text-sm text-club-sand">
-            Направления обучения
-          </span>
+    <section id="services" className="bg-club-deep px-6 py-10 text-white sm:px-10 md:py-16 lg:px-16">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center md:mb-8">
+          <h2 className="font-serif text-2xl font-normal leading-tight tracking-tight text-club-sand sm:text-3xl lg:text-4xl">Услуги</h2>
+          <span className="text-sm text-club-sand">Направления обучения</span>
         </div>
-
-        <div className="grid grid-cols-1 items-start gap-9 lg:grid-cols-12 lg:gap-12">
-          {/* Левая колонка */}
-          <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-2 sm:-mx-10 sm:px-10 lg:mx-0 lg:col-span-5 lg:flex-col lg:gap-3 lg:overflow-visible lg:px-0 lg:pb-0">
-            {servicesData.map((item) => {
-              const isActive = currentService.id === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  type="button"
-                  aria-pressed={isActive}
-                  className={`group relative flex shrink-0 snap-start items-center justify-between rounded-full px-5 py-3 text-left transition-all duration-300 lg:w-full lg:rounded-2xl lg:px-7 lg:py-5 ${
-                    isActive
-                      ? 'border border-white/20 bg-white/10 text-white shadow-lg backdrop-blur-md'
-                      : 'text-club-sand hover:text-club-sand hover:bg-white/5'
-                  }`}
-                >
-                  <span className="text-sm font-medium tracking-tight transition-transform duration-300 group-hover:translate-x-1 lg:text-3xl lg:font-light">
-                    {item.title}
-                  </span>
-
-                  {isActive && (
-                    <motion.div
-                      layoutId="active-indicator"
-                      className="ml-3 flex h-6 w-6 items-center justify-center rounded-full bg-club-sand text-sm font-bold text-club-deep lg:h-7 lg:w-7 lg:text-sm"
-                    >
-                      →
-                    </motion.div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Правая колонка с карточкой */}
-          <div className="relative pt-2 sm:pt-6 lg:col-span-7">
-            {/* Парящий конный предмет */}
-            <div className="pointer-events-none absolute right-2 top-3 z-20 h-28 w-28 sm:-right-3 sm:-top-8 sm:h-48 sm:w-48 lg:-right-10 lg:-top-20 lg:h-72 lg:w-72">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentService.id}
-                  initial={{ opacity: 0, y: 25, scale: 0.85, rotate: -6 }}
-                  animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
-                  exit={{ opacity: 0, y: -20, scale: 0.88, rotate: 6 }}
-                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-                  className="h-full w-full"
-                >
-                  <motion.div
-                    animate={{
-                      y: [0, -8, 0],
-                      rotate: [0, 2, -1.5, 0],
-                    }}
-                    transition={{
-                      duration: 4.8,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                    }}
-                    className="flex h-full w-full items-center justify-center"
-                  >
-                    <img loading="lazy" decoding="async"
-                  onError={handleCatalogImageError}
-                      src={currentService.image}
-                      alt={currentService.title}
-                      className="h-full w-full object-contain drop-shadow-[0_20px_25px_rgba(0,0,0,0.45)]"
-                    />
-                  </motion.div>
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Карточка с зафиксированной минимальной высотой min-h */}
-            <div className="relative z-10 flex min-h-[500px] flex-col justify-between rounded-[2rem] bg-white p-6 text-club-deep shadow-2xl sm:rounded-[2.8rem] sm:p-12">
-              <div className="min-h-[19rem] sm:min-h-[18rem]">
-                <div className="inline-block rounded-full bg-club-sand/60 px-4 py-1 text-sm font-semibold text-club-secondary mb-6">
-                  {currentService.badge}
-                </div>
-
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={currentService.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    {/* Фиксированная минимальная высота для заголовка */}
-                    <div className="flex min-h-[92px] items-start pr-24 sm:min-h-[108px] sm:pr-36 lg:min-h-[84px] lg:pr-28">
-                      <h3 className="font-serif text-2xl sm:text-4xl font-normal leading-snug tracking-tight text-club-deep">
-                        {currentService.cardTitle}
-                      </h3>
-                    </div>
-
-                    {/* Фиксированная минимальная высота для блока описания */}
-                    <div className="mt-4 min-h-[132px] max-w-lg sm:min-h-[120px]">
-                      <p className="text-base sm:text-base leading-relaxed text-club-secondary">
-                        {currentService.desc}
-                      </p>
-                    </div>
-                  </motion.div>
-                </AnimatePresence>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {services.map(service => (
+            <article key={service.id} className="flex min-w-0 flex-col rounded-3xl bg-white p-5 text-club-deep md:p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <img src={service.imageUrl} alt="" loading="lazy" decoding="async" onError={handleCatalogImageError}
+                  width={64} height={64} className="h-16 w-16 shrink-0 rounded-xl object-contain" />
+                <span className="rounded-full bg-club-sand/60 px-3 py-1 text-sm font-semibold text-club-secondary">{service.category}</span>
               </div>
-
-              {/* Нижняя плашка всегда зафиксирована внизу карточки */}
-              <div>
-                <div className="my-6 h-[1px] w-full bg-black/10" />
-
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-                  <div>
-                    <span className="block text-sm text-club-secondary">
-                      Стоимость:
-                    </span>
-                    <span className="text-3xl sm:text-4xl font-light text-club-deep">
-                      {currentService.price}
-                    </span>
-                    <span className="block mt-1 text-sm text-club-secondary">
-                      {currentService.duration}
-                    </span>
-                  </div>
-
-                  <a
-                    href="#booking-form"
-                    onClick={event => { event.preventDefault(); onChoose('service', { id: currentService.id, name: currentService.title }); }}
-                    className="inline-flex w-full items-center justify-center rounded-2xl bg-club-action px-6 py-4 text-center text-sm font-semibold text-white shadow-md transition-all hover:scale-105 hover:bg-club-deep active:scale-95 sm:w-auto sm:px-8"
-                  >
-                    Записаться на занятие
-                  </a>
-                </div>
+              <h3 className="font-serif text-lg font-semibold leading-snug sm:text-xl">{service.title}</h3>
+              <p className="mt-2 max-w-prose text-sm leading-relaxed text-club-secondary sm:text-base">{service.description}</p>
+              <div className="mt-auto pt-4">
+                <p className="text-lg font-semibold sm:text-xl">{service.price}</p>
+                <p className="mt-1 text-sm leading-relaxed text-club-secondary">
+                  {service.durationMinutes ? `Длительность: ${service.durationMinutes} минут` : 'Длительность: по согласованию'}
+                  {' · '}{service.format || 'Формат: по согласованию'}
+                </p>
+                <a href="#booking-form"
+                  onClick={event => { event.preventDefault(); onChoose('service', { id: service.id, name: service.title }); }}
+                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-club-action px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-club-deep active:bg-club-secondary">
+                  Записаться на занятие
+                </a>
               </div>
-            </div>
-          </div>
+            </article>
+          ))}
         </div>
       </div>
     </section>
