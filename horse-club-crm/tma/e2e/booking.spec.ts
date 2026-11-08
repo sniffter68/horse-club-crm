@@ -1,0 +1,105 @@
+import { expect, test, type Page } from '@playwright/test';
+import type { TelegramWebApp } from '../src/telegram';
+
+declare global {
+  interface Window {
+    __tmaTest: { main(): void; back(): void; active(): boolean; haptics(): number; theme(): void };
+  }
+}
+const serviceId = '11111111-1111-4111-8111-111111111111';
+const trainerId = '22222222-2222-4222-8222-222222222222';
+const bookingId = '33333333-3333-4333-8333-333333333333';
+const start = new Date(Date.now() + 2 * 86400_000).toISOString().slice(0, 10) + 'T12:00:00+03:00';
+const service = { id: serviceId, title: 'Первое знакомство', name: 'Знакомство', description: 'Спокойное занятие для начинающих', price: '1500', durationMinutes: 30 };
+const booking = { id: bookingId, status: 'scheduled', startTime: start, endTime: start, clientConfirmed: false,
+  clientCancellationRequested: false, costAmount: '1500', trainer: { name: 'Анна' },
+  lesson: { status: 'SCHEDULED', deletedAt: null, startTime: start, endTime: start, service } };
+async function setup(page: Page) {
+  await page.route('https://telegram.org/js/telegram-web-app.js', route => route.fulfill({ body: '', contentType: 'text/javascript' }));
+  await page.addInitScript(() => {
+    let main = () => {}, back = () => {}, theme = () => {}, enabled = false, haptics = 0;
+    const app: TelegramWebApp = {
+      initData: 'signed-data-test', initDataUnsafe: { user: { id: 123, first_name: 'Елена', username: 'elena' } },
+      themeParams: { bg_color: '#17241c', text_color: '#f0f4f1', button_color: '#a4d5b8', button_text_color: '#163326', hint_color: '#b3bdb6', secondary_bg_color: '#28332c' },
+      MainButton: { show() {}, hide() {}, showProgress() {}, hideProgress() {},
+        setParams(params) { enabled = params.is_active && params.is_visible; },
+        onClick(callback) { main = callback; }, offClick(callback) { if (main === callback) main = () => {}; } },
+      BackButton: { show() {}, hide() {}, onClick(callback) { back = callback; }, offClick(callback) { if (back === callback) back = () => {}; } },
+      HapticFeedback: { impactOccurred() { haptics++; } }, ready() {}, expand() {}, enableClosingConfirmation() {}, disableClosingConfirmation() {},
+      onEvent(_event, callback) { theme = callback; }, offEvent() {},
+    };
+    window.Telegram = { WebApp: app };
+    window.__tmaTest = { main() { if (enabled) main(); }, back() { back(); }, active: () => enabled, haptics: () => haptics, theme() { app.themeParams.bg_color = '#f7f4f0'; theme(); } };
+  });
+  await page.route('**/api/tma/services', route => route.fulfill({ json: { services: [service], consentVersion: '2026-09-19' } }));
+  await page.route('**/api/tma/slots?**', route => route.fulfill({ json: { slots: [{ startTime: start, endTime: start, trainers: [{ id: trainerId, name: 'Анна' }] }] } }));
+  await page.route('**/api/tma/my-bookings?**', route => route.fulfill({ json: { bookings: [booking], hasMore: false } }));
+}
+async function advance(page: Page) {
+  await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(true);
+  await page.evaluate(() => window.__tmaTest.main());
+}
+async function checkout(page: Page) {
+  await page.goto('');
+  await page.getByRole('button', { name: /Первое знакомство 30/ }).click(); await advance(page);
+  await expect(page.getByRole('heading', { name: 'Когда приедете?' })).toBeVisible();
+  await page.getByRole('button', { name: '12:00' }).click();
+  await page.getByLabel('Тренер').selectOption(trainerId); await advance(page);
+  await expect(page.getByLabel('Ваше имя')).toHaveValue('Елена');
+}
+test('native Telegram flow creates once, shows success and requests cancellation at narrow width', async ({ page }) => {
+  await setup(page); let writes = 0, cancellations = 0;
+  await page.route('**/api/tma/bookings', async route => {
+    writes++; const body: unknown = route.request().postDataJSON();
+    expect(body).toMatchObject({ serviceId, trainerId, consentAccepted: true });
+    expect(route.request().headers()['x-telegram-init-data']).toBe('signed-data-test');
+    await new Promise(resolve => setTimeout(resolve, 100)); await route.fulfill({ json: booking, status: 201 });
+  });
+  await page.route(`**/bookings/${bookingId}/cancel-request`, route => { cancellations++; return route.fulfill({ json: { ...booking, clientCancellationRequested: true } }); });
+  await checkout(page);
+  await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(false);
+  await page.getByLabel('Телефон', { exact: true }).fill('+79991234567'); await page.getByRole('checkbox').check();
+  await advance(page); await page.evaluate(() => window.__tmaTest.main());
+  await expect(page.getByRole('heading', { name: 'Ждём вас в клубе' })).toBeVisible(); expect(writes).toBe(1);
+  await page.getByRole('button', { name: 'Перейти в мои записи' }).click();
+  await expect(page.getByText('Ожидает', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Отменить занятие' }).click();
+  await page.getByRole('button', { name: 'Запросить отмену' }).click();
+  await expect(page.getByText('Запрошена отмена', { exact: true })).toBeVisible(); expect(cancellations).toBe(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/tma-my-bookings.png', fullPage: true });
+});
+test('server error retains phone and consent, retry uses the same idempotency key', async ({ page }) => {
+  await setup(page); const ids: unknown[] = [];
+  await page.route('**/api/tma/bookings', route => {
+    const body: { requestId: string } = route.request().postDataJSON(); ids.push(body.requestId);
+    return route.fulfill(ids.length === 1 ? { status: 503, json: { message: 'Соединение прервано. Повторите запись' } } : { status: 201, json: booking });
+  });
+  await checkout(page); await page.getByLabel('Телефон', { exact: true }).fill('+79991234567'); await page.getByRole('checkbox').check();
+  await advance(page); await expect(page.getByRole('alert')).toContainText('Соединение прервано');
+  await expect(page.getByLabel('Телефон', { exact: true })).toHaveValue('+79991234567'); await expect(page.getByRole('checkbox')).toBeChecked();
+  await advance(page); await expect(page.getByRole('heading', { name: 'Ждём вас в клубе' })).toBeVisible();
+  expect(ids).toHaveLength(2); expect(ids[0]).toBe(ids[1]);
+});
+test('empty slots, loading, error retry, native back and dynamic theme', async ({ page }) => {
+  await setup(page); let calls = 0;
+  await page.route('**/api/tma/slots?**', async route => {
+    calls++; await new Promise(resolve => setTimeout(resolve, 100));
+    await route.fulfill(calls === 1 ? { status: 503, json: { message: 'Нет соединения' } } : { json: { slots: [] } });
+  });
+  await page.goto(''); await page.getByRole('button', { name: /Первое знакомство 30/ }).focus(); await page.keyboard.press('Enter'); await advance(page);
+  await expect(page.getByRole('status')).toContainText('Проверяем');
+  await expect(page.getByRole('alert')).toContainText('Нет соединения');
+  await page.getByRole('button', { name: 'Повторить загрузку' }).click(); await expect(page.getByText('Свободного времени нет.', { exact: false })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(false);
+  await page.evaluate(() => window.__tmaTest.back()); await expect(page.getByRole('heading', { name: 'Время для лошадей' })).toBeVisible();
+  await page.evaluate(() => window.__tmaTest.theme());
+  expect(await page.evaluate(() => document.documentElement.style.getPropertyValue('--tma-bg'))).toBe('#f7f4f0');
+  expect(await page.evaluate(() => window.__tmaTest.haptics())).toBeGreaterThan(0);
+});
+test('outside Telegram shows clear entry guidance and makes no unauthenticated API calls', async ({ page }) => {
+  let calls = 0;
+  await page.route('https://telegram.org/**', route => route.fulfill({ body: '', contentType: 'text/javascript' }));
+  await page.route('**/api/tma/**', route => { calls++; return route.abort(); });
+  await page.goto(''); await expect(page.getByRole('alert')).toContainText('Откройте запись'); expect(calls).toBe(0);
+});

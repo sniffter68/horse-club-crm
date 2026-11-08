@@ -1,4 +1,5 @@
 import { PublicModule } from './public/public.module';
+import { TelegramBotModule } from './modules/telegram-bot/telegram-bot.module';
 import { StaffModule } from './staff/staff.module';
 import { UploadModule } from './upload/upload.module';
 import { Module } from '@nestjs/common';
@@ -36,6 +37,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     BoardingModule,
     LeadsModule,
     PublicModule,
+    TelegramBotModule,
     VkBotModule,
     PrismaModule,
     CommonModule,

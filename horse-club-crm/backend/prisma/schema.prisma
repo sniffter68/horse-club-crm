@@ -328,6 +328,8 @@ enum ClientType {
 }
 
 model Client {
+  telegramUserId String? @unique
+  telegramUsername String?
   preferredTrainerId String? @db.Uuid
   preferredHorseId String? @db.Uuid
   preferredTrainer Trainer? @relation("ClientPreferredTrainer", fields: [preferredTrainerId], references: [id], onDelete: SetNull)
@@ -487,6 +489,9 @@ model PricingPlan {
 }
 
 model Booking {
+  telegramRequestId String? @unique @db.Uuid
+  telegramConsentVersion String?
+  telegramConsentedAt DateTime? @db.Timestamptz(6)
   financialActorId String? @db.Uuid
   prepaymentAmount Decimal @default(0) @db.Decimal(12, 2)
   prepaymentMethod PaymentMethod?

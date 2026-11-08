@@ -1,0 +1,71 @@
+@import 'tailwindcss/theme' layer(theme);
+@import 'tailwindcss/utilities' layer(utilities) source('./');
+
+:root {
+  color-scheme: light dark;
+  --tma-bg: #f7f4f0;
+  --tma-text: #3a2f2b;
+  --tma-button: #234d3c;
+  --tma-button-text: #ffffff;
+  --tma-hint: #6c655f;
+  --tma-surface: #ffffff;
+  --tma-border: color-mix(in srgb, var(--tma-text) 22%, transparent);
+  --tma-success: #3e5f48;
+  --tma-success-bg: #e7f0e9;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--tma-bg);
+  color: var(--tma-text);
+  scrollbar-color: var(--tma-hint) var(--tma-bg);
+  scrollbar-width: thin;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 280px; }
+button, input, select { color: inherit; }
+button, fieldset { margin: 0; }
+fieldset { padding: 0; border: 0; }
+main { padding-bottom: calc(2rem + env(safe-area-inset-bottom)); padding-top: max(1.5rem, env(safe-area-inset-top)); }
+h1 { font: 400 clamp(1.8rem, 8vw, 2.6rem)/1.15 Georgia, serif; margin: .5rem 0 1rem; }
+h2 { font-size: 1.1rem; font-weight: 650; }
+p { line-height: 1.55; }
+button, input, select { font: inherit; }
+button { cursor: pointer; touch-action: manipulation; transition: background-color .15s; }
+button:disabled { cursor: default; opacity: .5; }
+button:enabled:hover { filter: brightness(.95); }
+button:enabled:active { filter: brightness(.9); }
+:focus-visible { outline: 3px solid var(--tma-button); outline-offset: 3px; }
+h1:focus { outline: none; }
+a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.club-mark { font: 700 1.6rem/1 Georgia, serif; letter-spacing: .1em; }
+.club-mark span { display: block; margin-top: .5rem; font: 600 .55rem/1.4 sans-serif; letter-spacing: .12em; }
+.eyebrow { font-size: .7rem; font-weight: 650; letter-spacing: .09em; text-transform: uppercase; color: var(--tma-hint); }
+.hint { color: var(--tma-hint); font-size: .85rem; }
+.quiet, .choice, .summary, .field input, .field select { border: 1px solid var(--tma-border); background: var(--tma-surface); border-radius: .75rem; }
+.quiet { padding: .65rem .85rem; min-height: 44px; background: transparent; }
+.choice { border-radius: 1rem; padding: 1rem; text-align: left; }
+.choice[aria-pressed='true'] { border: 2px solid var(--tma-button); padding: calc(1rem - 1px); box-shadow: inset 3px 0 var(--tma-button); }
+.service { display: flex; align-items: center; justify-content: space-between; gap: 1rem; width: 100%; }
+.service strong { font-size: 1.05rem; font-weight: 650; display: block; }
+.price { white-space: nowrap; font-size: .85rem; font-weight: 600; }
+.slot { text-align: center; min-height: 48px; }
+.field { display: flex; flex-direction: column; gap: .5rem; font-weight: 600; }
+.field input, .field select { min-height: 48px; width: 100%; min-width: 0; padding: .75rem; font-weight: 400; }
+.field input[readonly] { color: var(--tma-hint); }
+.primary { min-height: 50px; border-radius: .75rem; border: 0; background: var(--tma-button); color: var(--tma-button-text); font-weight: 650; padding: .8rem 1rem; }
+.summary { border-radius: 1rem; padding: 1.25rem; overflow-wrap: anywhere; }
+.summary p { margin-top: .4rem; }
+.badge { display: inline-block; border-radius: 999px; color: var(--tma-success); background: var(--tma-success-bg); font-size: .75rem; padding: .35rem .7rem; }
+.notice { border-left: 3px solid var(--tma-button); padding: .75rem 1rem; margin: 1rem 0; font-size: .85rem; }
+.consent { display: flex; gap: .75rem; align-items: flex-start; font-size: .85rem; line-height: 1.55; cursor: pointer; }
+.consent input { width: 24px; height: 24px; flex-shrink: 0; accent-color: var(--tma-button); }
+.feedback { min-height: 3rem; margin: 1rem 0; font-size: .9rem; }
+.danger { font-weight: 650; }
+.stack { display: grid; gap: .75rem; }
+.formats { display: flex; gap: .5rem; overflow-x: auto; padding: .25rem; }
+.formats button { flex-shrink: 0; font-size: .75rem; }
+.formats [aria-pressed='true'] { background: var(--tma-button); color: var(--tma-button-text); }
+@media (prefers-color-scheme: dark) {
+  :root { --tma-bg: #1c2420; --tma-text: #edf2ed; --tma-button: #a4d5b8; --tma-button-text: #163326; --tma-hint: #b3bdb6; --tma-surface: #28332c; }
+}
+@media (max-width: 350px) { .service { flex-direction: column; align-items: flex-start; gap: .5rem; } }
+@media (prefers-reduced-motion: reduce) { button { transition: none; } }
+@media (forced-colors: active) { :root { scrollbar-color: auto; } .choice[aria-pressed='true'] { outline: 2px solid Highlight; } }

@@ -74,6 +74,8 @@ async function main() {
   if (!ready) throw new Error('PostgreSQL is not ready');
   run('npm', ['--prefix', 'frontend', 'ci']);
   run('npm', ['--prefix', 'frontend', 'run', 'build']);
+  run('npm', ['--prefix', 'tma', 'ci']);
+  run('npm', ['--prefix', 'tma', 'run', 'build']);
   run('npm', ['--prefix', 'landing', 'ci']);
   const landingEnv = landingBuildEnv({ services: { backend: { environment: process.env } } });
   run('npm', ['--prefix', 'landing', 'run', 'build'], { env: landingEnv });

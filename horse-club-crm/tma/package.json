@@ -1,0 +1,29 @@
+{
+  "name": "horse-club-telegram-mini-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5175",
+    "typecheck": "tsc --noEmit",
+    "lint": "node ../frontend/node_modules/oxlint/bin/oxlint src vite.config.ts e2e",
+    "test": "node --test test/*.test.cjs",
+    "test:e2e": "playwright test",
+    "build": "npm run typecheck && vite build && node scripts/check-size.cjs",
+    "preview": "vite preview --host 127.0.0.1 --port 5175"
+  },
+  "dependencies": {
+    "react": "17.0.2",
+    "react-dom": "17.0.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "^24.13.3",
+    "@types/react": "^17.0.93",
+    "@types/react-dom": "^17.0.26",
+    "tailwindcss": "^4.1.0",
+    "terser": "^5.51.2",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2"
+  }
+}

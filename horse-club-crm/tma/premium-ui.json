@@ -1,0 +1,11 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["src"],
+  "locale": "ru-RU",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": ["Select/Listbox", "Date", "Form", "Scrollbar", "Toast", "CRUD"],
+  "ownership": { "Select/Listbox": "native", "Date": "native" },
+  "requiredCommands": ["unit", "typecheck", "build"],
+  "commands": { "unit": "npm --prefix tma test", "typecheck": "npm --prefix tma run typecheck", "build": "npm --prefix tma run build" },
+  "evidence": { "crudFullFlow": "e2e/booking.spec.ts", "failurePaths": "e2e/booking.spec.ts" }
+}

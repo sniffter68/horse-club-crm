@@ -46,6 +46,16 @@
 
 {$CRM_SITE} {
 	import common
+	@tma path /tma /tma/*
+	handle @tma {
+		# Telegram Web/Desktop embeds the Mini App. Relax framing only here.
+		header -X-Frame-Options
+		header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors https://web.telegram.org https://*.telegram.org; form-action 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'"
+		root * /var/www/crm-dist
+		try_files {path} /tma/index.html
+		header Cache-Control "no-cache"
+		file_server
+	}
 	handle {
 		root * /var/www/crm-dist
 		try_files {path} /index.html
