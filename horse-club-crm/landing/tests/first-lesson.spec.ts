@@ -5,10 +5,10 @@ for (const width of [320, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.route('**/api/public/content', route => route.fulfill({ json: { horses: [], trainers: [], services: [] } }));
     await page.goto('/');
-    const section = page.locator('#first-lesson');
+    const section = page.locator('#preparation');
     await expect(section.locator('ol > li')).toHaveCount(4);
     await expect(section.locator('dl > div')).toHaveCount(3);
-    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('faq');
+    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('reviews');
     await section.scrollIntoViewIfNeeded();
     const bounds = await section.locator('ol').boundingBox();
     expect(bounds).not.toBeNull();

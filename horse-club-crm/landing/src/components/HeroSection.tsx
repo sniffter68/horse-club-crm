@@ -21,7 +21,7 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
             <li>• Забота о лошадях</li>
           </ul>
           <div className="mt-6 flex flex-wrap items-center gap-4">
-            <a href="#booking-form"
+            <a href="#booking"
               onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
               className="inline-flex min-h-12 items-center justify-center rounded-xl bg-luxury-brown px-6 py-3 text-[15px] font-medium text-white transition-colors hover:bg-luxury-dark active:bg-luxury-deep">
               Записаться на первое занятие

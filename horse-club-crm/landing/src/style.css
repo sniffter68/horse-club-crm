@@ -64,6 +64,7 @@ html {
   background: var(--color-club-paper);
   overflow-x: hidden;
   scroll-padding-top: 6rem;
+  scroll-behavior: smooth;
 }
 
 body {

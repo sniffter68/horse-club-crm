@@ -54,7 +54,7 @@ export function GiftCertificatesSection({ onChoose }: { onChoose: ChooseBooking 
           </select>
           <p className="mb-4 text-sm text-club-secondary">Стоимость равна номиналу. Доступность номинала и способ оплаты подтвердит администратор.</p>
           <a
-            href="#booking-form"
+            href="#booking"
             onClick={event => { event.preventDefault(); onChoose('service', { id: 'gift-certificate', name: `Подарочный сертификат на ${Number(amount).toLocaleString('ru-RU')} ₽` }); }}
             className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 hover:bg-club-secondary active:scale-95"
           >

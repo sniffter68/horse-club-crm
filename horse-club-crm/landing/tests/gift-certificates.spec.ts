@@ -10,7 +10,7 @@ for (const width of [320, 768, 1440]) {
     await expect(section).toContainText('На любую услугу или сумму');
     await expect(section).toContainText('Бумажный или электронный');
     await expect(section).toContainText('Срок действия — 6 месяцев');
-    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('first-lesson');
+    expect(await section.evaluate(element => element.parentElement?.id)).toBe('services');
     await section.scrollIntoViewIfNeeded();
     expect(await section.evaluate(element => Array.from(element.querySelectorAll('li, h2, h3, p, a')).every(child => {
       const rect = child.getBoundingClientRect();

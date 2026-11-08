@@ -21,9 +21,9 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
       'Фотосессия с лошадьми', 'Групповая экскурсия', 'Прогулка в лес',
     ]);
     await services.getByRole('button', { name: 'Прогулка в лес', exact: true }).click();
-    for (const section of ['#hero', '#first-lesson']) {
+    for (const section of ['#hero', '#preparation']) {
       const cta = page.locator(section).getByRole('link', { name: 'Записаться на первое занятие', exact: true });
-      await expect(cta).toHaveAttribute('href', '#booking-form');
+      await expect(cta).toHaveAttribute('href', '#booking');
       await cta.click();
       await expect(page.locator('#booking-heading')).toBeFocused();
       await expect(page.locator('#booking-form')).toContainText(`Выбранная услуга: ${firstLesson}`);

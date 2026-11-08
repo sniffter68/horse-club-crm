@@ -80,7 +80,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
 
   const bookingPanel = (
     <div id="booking-form" className="scroll-mt-20 lg:col-span-7">
-      <div className="relative rounded-[2.8rem] bg-white p-5 md:p-6 text-club-deep shadow-2xl">
+      <div id="booking" className="relative scroll-mt-20 rounded-[2.8rem] bg-white p-5 md:p-6 text-club-deep shadow-2xl">
         <AnimatePresence mode="wait">
           {isSubmitted ? (
             <motion.div

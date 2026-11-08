@@ -20,7 +20,7 @@ export function bookingNotes(selection: BookingSelection, notes: string): string
 export function scrollToBooking(): void {
   requestAnimationFrame(() => {
     document.getElementById('booking-heading')?.focus({ preventScroll: true });
-    document.getElementById('booking-form')?.scrollIntoView({
+    document.getElementById('booking')?.scrollIntoView({
       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start',
     });
   });

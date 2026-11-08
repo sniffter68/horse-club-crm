@@ -16,16 +16,16 @@ for (const [width, columns] of [[320, 1], [640, 2], [900, 3], [1440, 5]] as cons
       expect(box.height).toBeGreaterThanOrEqual(44);
     }
     await expect(footer.getByRole('link', { name: 'MAX', exact: true })).toHaveAttribute('href', 'https://max.ru/join/Evl2Mp0moqVwQAeBIPaY5ozOrE6rs83dO45_5SrqAvo');
-    await expect(footer.getByRole('link', { name: 'Отзывы', exact: true })).toHaveAttribute('href', 'https://vk.ru/reviews-226780791');
+    await expect(footer.getByRole('link', { name: 'Отзывы', exact: true })).toHaveAttribute('href', '#reviews');
     const policy = footer.getByRole('link', { name: 'Политика конфиденциальности' });
     await policy.click();
     await expect(page.getByRole('dialog')).toContainText('152-ФЗ');
     await page.keyboard.press('Escape');
     await expect(policy).toBeFocused();
     await footer.getByRole('link', { name: 'Тренеры', exact: true }).click();
-    await expect(page.locator('#trainers')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#coaches')).toBeInViewport();
     await footer.getByRole('link', { name: 'Лошади', exact: true }).click();
-    await expect(page.locator('#horses')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#horses')).toBeInViewport();
     await footer.scrollIntoViewIfNeeded();
     await footer.screenshot({ path: test.info().outputPath(`footer-${width}.png`) });
   });

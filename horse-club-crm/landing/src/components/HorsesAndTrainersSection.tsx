@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, 
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ChooseBooking } from '../booking';
 
-type TabType = 'horses' | 'trainers';
+type CatalogKind = 'horses' | 'trainers';
 
 interface HorseItem {
   id: string;
@@ -37,7 +37,17 @@ interface TrainerItem {
 
 type ModalItem = HorseItem | TrainerItem;
 
-export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horses: PublicHorse[]; trainers: PublicTrainer[]; onChoose: ChooseBooking }): ReactElement {
+interface CatalogProps { horses: PublicHorse[]; trainers: PublicTrainer[]; onChoose: ChooseBooking }
+
+export function HorsesCatalogSection(props: CatalogProps): ReactElement {
+  return <CatalogSection {...props} catalog="horses" />;
+}
+
+export function CoachesSection(props: CatalogProps): ReactElement {
+  return <CatalogSection {...props} catalog="trainers" />;
+}
+
+function CatalogSection({ horses, trainers, onChoose, catalog }: CatalogProps & { catalog: CatalogKind }): ReactElement {
   const horsesData: HorseItem[] = horses.map(item => ({
     id: item.id, type: 'horse', name: item.name, breed: item.breed, discipline: item.role,
     age: '', height: '', suit: '', character: item.description,
@@ -48,8 +58,6 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
     qualification: item.qualification, quote: '', fullBio: item.description,
     specialization: item.specializations, image: item.imageUrl,
   }));
-  const carouselPositions = useRef({ horses: 0, trainers: 0 });
-  const [tab, setTab] = useState<TabType>('horses');
   const [selectedItem, setSelectedItem] = useState<ModalItem | null>(null);
   const modalTriggerRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -103,51 +111,21 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
   };
 
   return (
-    <section id="horses-trainers" className="relative overflow-hidden bg-club-sand px-6 py-10 md:py-16 sm:px-10 lg:px-16">
+    <section id={catalog === 'horses' ? 'horses' : 'coaches'} className="relative overflow-hidden bg-club-sand px-6 py-10 md:py-16 sm:px-10 lg:px-16">
       <div className="mx-auto max-w-7xl">
-        {/* Заголовок и переключатель */}
+        {/* Заголовок каталога */}
         <div className="flex flex-col items-start justify-between gap-4 md:gap-6 sm:flex-row sm:items-end">
           <div>
             <span className="text-sm text-club-action">Команда клуба</span>
             <h2 className="leading-[1.125] mt-3 font-serif tracking-tight text-club-ink text-2xl sm:text-3xl lg:text-4xl font-normal">
-              Лошади и наставники
+              {catalog === 'horses' ? 'Лошади клуба' : 'Тренеры и наставники'}
             </h2>
-          </div>
-
-          {/* Таб-переключатель */}
-          <div className="inline-flex rounded-full border border-black/10 bg-white/70 p-1.5 backdrop-blur-md">
-            <button
-              type="button"
-              aria-pressed={tab === 'horses'}
-              id="horses"
-              onClick={() => setTab('horses')}
-              className={`rounded-full px-6 py-2.5 text-sm font-medium   transition-all duration-300 ${
-                tab === 'horses'
-                  ? 'bg-club-ink text-white shadow-sm'
-                  : 'text-club-secondary hover:text-club-ink'
-              }`}
-            >
-              Лошади клуба
-            </button>
-            <button
-              type="button"
-              aria-pressed={tab === 'trainers'}
-              id="trainers"
-              onClick={() => setTab('trainers')}
-              className={`rounded-full px-6 py-2.5 text-sm font-medium   transition-all duration-300 ${
-                tab === 'trainers'
-                  ? 'bg-club-ink text-white shadow-sm'
-                  : 'text-club-secondary hover:text-club-ink'
-              }`}
-            >
-              Тренеры
-            </button>
           </div>
         </div>
 
         {/* Сетка карточек с кликом для раскрытия */}
         <AnimatePresence mode="wait">
-          {tab === 'horses' ? (
+          {catalog === 'horses' ? (
             <motion.div
               key="horses-grid"
               initial={{ opacity: 0, y: 20 }}
@@ -156,8 +134,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
               transition={{ duration: 0.45 }}
               className="mt-6 md:mt-8"
             >
-              <Carousel nativeMobile label="Лошади клуба" initialIndex={carouselPositions.current.horses}
-                onIndexChange={index => { carouselPositions.current.horses = index; }}>
+              <Carousel nativeMobile label="Лошади клуба">
                 {horsesData.map((horse) => (
                   <button
                     key={horse.id}
@@ -213,8 +190,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
               transition={{ duration: 0.45 }}
               className="mt-6 md:mt-8"
             >
-              <Carousel nativeMobile label="Тренеры" initialIndex={carouselPositions.current.trainers}
-                onIndexChange={index => { carouselPositions.current.trainers = index; }}>
+              <Carousel nativeMobile label="Тренеры">
                 {trainersData.map((trainer) => (
                   <button
                     key={trainer.id}
@@ -399,7 +375,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
                   </div>
 
                   <a
-                    href="#booking-form"
+                    href="#booking"
                     onClick={event => {
                       event.preventDefault();
                       setSelectedItem(null);

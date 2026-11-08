@@ -16,9 +16,10 @@ interface NavigationItem {
 }
 
 const navigationItems: NavigationItem[] = [
-  { label: 'Услуги', href: '#services' },
-  { label: 'Лошади и тренеры', href: '#horses-trainers' },
   { label: 'О клубе', href: '#about' },
+  { label: 'Услуги', href: '#services' },
+  { label: 'Лошади', href: '#horses' },
+  { label: 'Тренеры', href: '#coaches' },
   { label: 'Контакты', href: '#contacts' },
 ];
 
@@ -186,7 +187,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
                   </div>
 
                   <a
-                    href="#booking-form"
+                    href="#booking"
                     onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
                     className="rounded-full bg-club-ink px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-club-action active:scale-95"
                   >
@@ -226,7 +227,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
       </header>
 
       {!isOpen && <nav aria-label="Быстрая запись" className="mobile-booking fixed inset-x-4 bottom-3 z-50 flex items-center gap-2 rounded-2xl border border-white/15 bg-club-deep p-2 text-white shadow-lg lg:hidden">
-        <a href="#booking-form" onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
+        <a href="#booking" onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
           className="flex min-h-11 flex-1 items-center justify-center rounded-xl bg-club-action px-4 font-semibold hover:bg-club-secondary">Записаться</a>
         <a href={`tel:${landingData.contacts.phone.replace(/[^+\d]/g, '')}`} aria-label="Позвонить в клуб"
           className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/30 hover:bg-white/10"><Phone aria-hidden="true" size={20} /></a>
@@ -272,7 +273,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
               </div>
 
               <motion.a
-                href="#booking-form"
+                href="#booking"
                 onClick={event => { event.preventDefault(); setIsOpen(false); onBookFirstLesson(); }}
                 whileHover={{ scale: 1.015 }}
                 whileTap={{ scale: 0.98 }}

@@ -145,7 +145,7 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
             </p>
           </div>
           <a
-            href="#booking-form"
+            href="#booking"
             onClick={event => { event.preventDefault(); onChoose('service', otherServices[3]); }}
             className="shrink-0 rounded-full bg-club-ink px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-club-secondary hover:scale-105 active:scale-95"
           >

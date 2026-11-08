@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const width of [390, 768, 1440]) {
-  test(`carousel layout, boundaries, keyboard and tab restoration at ${width}px`, async ({ page }) => {
+  test(`carousel layout, boundaries, keyboard and independent positions at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/');
     const horses = page.getByRole('region', { name: 'Лошади клуба', exact: true });
@@ -23,11 +23,9 @@ for (const width of [390, 768, 1440]) {
     await expect(horses.getByRole('button', { name: 'Влево', exact: true })).toBeDisabled();
     await horses.getByRole('button', { name: 'Вправо', exact: true }).click();
     await expect(horses.locator('[aria-current="true"]')).toHaveAttribute('aria-label', 'К слайду 2');
-    await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
     const trainers = page.getByRole('region', { name: 'Тренеры', exact: true });
     await expect(trainers).toBeVisible();
     await trainers.getByRole('button', { name: 'Вправо', exact: true }).click();
-    await page.getByRole('button', { name: 'Лошади клуба', exact: true }).click();
     await expect(horses.locator('[aria-current="true"]')).toHaveAttribute('aria-label', 'К слайду 2');
     await viewport.focus();
     await page.keyboard.press('End');

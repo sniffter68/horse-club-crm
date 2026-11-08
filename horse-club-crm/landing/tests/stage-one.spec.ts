@@ -70,7 +70,6 @@ test('landing text meets AA contrast after reveals and in the booking form', asy
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.route('**/api/public/content', route => route.fulfill({ json: {} }));
   await page.goto('/');
-  await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
   for (const id of ['services', 'horses-trainers', 'about', 'first-lesson', 'gift-certificates', 'contacts']) {
     await page.locator(`#${id}`).scrollIntoViewIfNeeded();
   }

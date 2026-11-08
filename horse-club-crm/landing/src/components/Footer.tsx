@@ -7,10 +7,12 @@ import { PrivacyPolicyLink } from './PrivacyPolicyLink';
 const navigation = [
   { label: 'О клубе', href: '#about' },
   { label: 'Услуги клуба', href: '#services' },
-  { label: 'Тренеры', href: '#trainers' },
   { label: 'Лошади', href: '#horses' },
-  { label: 'Отзывы', href: 'https://vk.ru/reviews-226780791' },
+  { label: 'Тренеры', href: '#coaches' },
+  { label: 'Подготовка к визиту', href: '#preparation' },
+  { label: 'Отзывы', href: '#reviews' },
   { label: 'FAQ', href: '#faq' },
+  { label: 'Онлайн-запись', href: '#booking' },
   { label: 'Контакты', href: '#contacts' },
 ];
 
@@ -19,8 +21,7 @@ function scrollToSection(event: MouseEvent<HTMLAnchorElement>): void {
   const target = document.getElementById(event.currentTarget.hash.slice(1));
   if (!target) return;
   event.preventDefault();
-  if (target instanceof HTMLButtonElement) target.click();
-  (target.closest('section') ?? target).scrollIntoView({
+  target.scrollIntoView({
     behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start',
   });
 }
@@ -62,7 +63,7 @@ export function Footer({ brandName }: { brandName: string }): ReactElement {
         <h4 id="footer-clients" className="mb-3 font-serif text-lg font-normal text-club-ink">Для клиентов:</h4>
         <ul>
           <li><PrivacyPolicyLink>Политика конфиденциальности</PrivacyPolicyLink></li>
-          <li><a href="#first-lesson" onClick={scrollToSection}>Правила посещения клуба и техника безопасности</a></li>
+          <li><a href="#preparation" onClick={scrollToSection}>Правила посещения клуба и техника безопасности</a></li>
         </ul>
         <div className="mt-5 space-y-1">
           <p>{legal.operatorName}</p><p>{legal.registration}</p><p>{legal.operatorAddress}</p>

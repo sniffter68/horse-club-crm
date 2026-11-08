@@ -13,8 +13,7 @@ test('resolves uploaded photos against the API origin and displays them in all c
   await page.goto('/');
   await expect(page.locator('#services img').first()).toHaveAttribute('src', photo);
   await expect(page.locator('#horses-trainers img').first()).toHaveAttribute('src', photo);
-  await page.locator('#horses-trainers').getByRole('button', { name: 'Тренеры', exact: true }).click();
-  await expect(page.locator('#horses-trainers img').first()).toHaveAttribute('src', photo);
+  await expect(page.locator('#coaches img').first()).toHaveAttribute('src', photo);
   const urls = [resolveCatalogImage(photo, 'https://api.example.com/api'), resolveCatalogImage(photo, '/api'),
     resolveCatalogImage('https://cdn.example.com/photo.jpg'), resolveCatalogImage('//evil.example/photo.jpg')];
   expect(urls).toEqual([`https://api.example.com${photo}`, photo, 'https://cdn.example.com/photo.jpg', '/images/horse.jpg']);
@@ -39,7 +38,6 @@ test('loads public records, updates service selection and opens real horse/train
   await page.getByRole('button').filter({ has: page.getByRole('heading', { name: 'Лошадь из CRM' }) }).click();
   await expect(page.getByRole('dialog')).toContainText('Описание лошади из базы');
   await page.keyboard.press('Escape');
-  await page.locator('#horses-trainers').getByRole('button', { name: 'Тренеры', exact: true }).click();
   await page.getByRole('button').filter({ has: page.getByRole('heading', { name: 'Тренер из CRM' }) }).click();
   await expect(page.getByRole('dialog')).toContainText('Биография из базы');
   await expect(page.getByRole('dialog')).toContainText('КМС');

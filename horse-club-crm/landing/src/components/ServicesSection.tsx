@@ -7,7 +7,7 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
   if (services.length === 0) return <></>;
 
   return (
-    <section id="services" aria-labelledby="services-heading" className="bg-club-deep px-6 py-10 text-white sm:px-10 md:py-16 lg:px-16">
+    <section aria-labelledby="services-heading" className="bg-club-deep px-6 py-10 text-white sm:px-10 md:py-16 lg:px-16">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center md:mb-8">
           <h2 id="services-heading" className="font-serif text-2xl font-normal leading-tight tracking-tight text-club-sand sm:text-3xl lg:text-4xl">Услуги</h2>

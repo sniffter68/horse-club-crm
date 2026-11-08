@@ -4,13 +4,14 @@ import { firstLesson, scrollToBooking, type BookingSelection, type ChooseBooking
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { ServicesSection } from './components/ServicesSection';
-import { HorsesAndTrainersSection } from './components/HorsesAndTrainersSection';
+import { HorsesCatalogSection, CoachesSection } from './components/HorsesAndTrainersSection';
 import { ClubStandardsSection } from './components/ClubStandardsSection';
 import { FirstLessonSection } from './components/FirstLessonSection';
 import { GiftCertificatesSection } from './components/GiftCertificatesSection';
 import { ContactsSection } from './components/ContactsSection';
 import { Footer } from './components/Footer';
 import { FaqSection } from './components/FaqSection';
+import { ReviewsSection } from './components/ReviewsSection';
 import { ScrollToTop } from './components/ScrollToTop';
 
 export function App(): ReactElement {
@@ -31,20 +32,20 @@ export function App(): ReactElement {
         {/* 1. Секция Hero с кинематографичным взмыванием всадника */}
         <HeroSection onBookFirstLesson={bookFirstLesson} />
 
-        {/* 2. Тёмная секция услуг с интерактивными парящими предметами */}
-        <ServicesSection services={content.services} onChoose={(kind, choice) => {
-          setSelection(previous => ({ ...previous, [kind]: choice }));
-          setQuickBookingOpen(true);
-        }} />
-
-        {/* 3. Каталог лошадей и тренеров с модальными окнами */}
-        <HorsesAndTrainersSection horses={content.horses} trainers={content.trainers} onChoose={choose} />
-
-        {/* 4. Блок "Стандарты клуба" (архитектура, еврогрунт, гуманный тренинг) */}
         <ClubStandardsSection onChoose={choose} />
-
-        <GiftCertificatesSection onChoose={choose} />
+        <section id="services">
+          <ServicesSection services={content.services} onChoose={(kind, choice) => {
+            setSelection(previous => ({ ...previous, [kind]: choice }));
+            setQuickBookingOpen(true);
+          }} />
+          <GiftCertificatesSection onChoose={choose} />
+        </section>
+        <div id="horses-trainers">
+          <HorsesCatalogSection horses={content.horses} trainers={content.trainers} onChoose={choose} />
+          <CoachesSection horses={content.horses} trainers={content.trainers} onChoose={choose} />
+        </div>
         <FirstLessonSection onBookFirstLesson={bookFirstLesson} />
+        <ReviewsSection />
         <FaqSection />
 
         {/* 5. Премиальный блок контактов с интерактивной формой бронирования */}

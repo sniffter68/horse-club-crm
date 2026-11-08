@@ -68,7 +68,6 @@ for (const width of [320, 390, 768, 1440]) {
     expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations).toEqual([]);
     await page.keyboard.press('Escape');
     await expect(open).toBeFocused();
-    await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
     await expect(page.locator('#horses-trainers')).toContainText('КМС');
     await expect(page.locator('#horses-trainers')).toContainText('Старший тренер');
     await expect(page.locator('#horses-trainers')).not.toContainText('UNKNOWN_INTERNAL_CODE');
@@ -102,8 +101,6 @@ test('card choices survive form errors, preserve the comment and reach the lead 
   await page.locator('#horses-trainers .club-carousel__slide > button').filter({ has: page.getByRole('heading', { name: 'Мирабель', exact: true }) }).click();
   await page.getByRole('dialog').getByRole('link', { name: 'Записаться', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
-  // The original tabs crossfade: wait for the trainer card, not the exiting horse grid.
   await page.locator('#horses-trainers .club-carousel__slide > button').filter({ has: page.getByRole('heading', { name: 'Екатерина', exact: true }) }).click();
   await page.getByRole('dialog').getByRole('link', { name: 'Записаться', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);

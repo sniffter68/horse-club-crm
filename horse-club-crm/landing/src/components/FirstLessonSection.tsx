@@ -29,11 +29,11 @@ const preparation = [
 export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
   return (
     <section
-      id="first-lesson"
+      id="preparation"
       aria-labelledby="first-lesson-heading"
       className="relative overflow-hidden border-t border-black/5 bg-luxury-card px-6 py-10 md:py-16 text-luxury-dark sm:px-10 lg:px-16"
     >
-      <div className="relative mx-auto max-w-7xl">
+      <div id="first-lesson" className="relative mx-auto max-w-7xl">
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
           <h2 id="first-lesson-heading" className="leading-[1.125] mt-3 max-w-2xl font-serif tracking-tight text-luxury-dark text-2xl sm:text-3xl lg:text-4xl font-normal">
             Впервые в седле? Это проще и безопаснее, чем кажется
@@ -74,7 +74,7 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
 
         <div className="mt-6 md:mt-8 text-center">
           <a
-            href="#booking-form"
+            href="#booking"
             onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
             className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 hover:bg-club-secondary active:scale-95"
           >
