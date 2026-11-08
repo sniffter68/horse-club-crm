@@ -502,6 +502,8 @@ model Booking {
   status              BookingStatus       @default(scheduled)
   costAmount          Decimal             @default(0) @db.Decimal(14, 2)
   cancellationReason  String?
+  clientConfirmed     Boolean             @default(false)
+  clientCancellationRequested Boolean     @default(false)
   trainer             Trainer             @relation(fields: [trainerId], references: [id], onDelete: Restrict)
   arena               Arena?              @relation(fields: [arenaId], references: [id], onDelete: Restrict)
   transactions        LedgerTransaction[]

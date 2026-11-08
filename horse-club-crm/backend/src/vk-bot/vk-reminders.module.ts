@@ -33,7 +33,7 @@ export class VkReminders implements OnModuleInit {
     // Lesson is authoritative for legacy participants; standalone bookings own their time.
     const bookings = await this.prisma.booking.findMany({
       where: {
-        status: 'scheduled', attendanceStatus: 'PENDING', client: { vkUserId: { not: null } },
+        status: 'scheduled', attendanceStatus: 'PENDING', clientCancellationRequested: false, client: { vkUserId: { not: null } },
         OR: [
           { lesson: { is: { status: 'SCHEDULED', startTime } } },
           { lessonId: null, startTime },

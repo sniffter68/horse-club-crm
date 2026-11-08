@@ -5,6 +5,7 @@ const { Test } = require('@nestjs/testing');
 const request = require('supertest');
 const { VkBotController } = require('../dist/vk-bot/vk-bot.controller');
 const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
+const { VkBookingResponseService } = require('../dist/vk-bot/vk-booking-response.service');
 const { PrismaService } = require('../dist/prisma/prisma.service');
 const { VkLinkService } = require('../dist/vk-bot/vk-link.service');
 const { MembershipLedgerService } = require('../dist/memberships/membership-ledger.service');
@@ -16,7 +17,7 @@ before(async () => {
   const module = await Test.createTestingModule({ controllers: [VkBotController], providers: [VkBotService, { provide: require('../dist/vk-bot/vk-identity.service').VkIdentityService, useValue: { identify: async vkId => { lookup.push({ where: { vkId } }); return { type: 'CLIENT', clientId: 'client', name: 'Анна' }; } } },
     { provide: VkLinkService, useValue: { bind: async (sender, phone, code) => {
       assert.equal(sender, 42); assert.equal(phone, '+79991234567'); assert.equal(code, '1234'); return 'CLIENT';
-    } } }, { provide: MembershipLedgerService, useValue: {} }, { provide: LeadsService, useValue: {} },
+    } } }, { provide: MembershipLedgerService, useValue: {} }, { provide: LeadsService, useValue: {} }, VkBookingResponseService,
     { provide: PrismaService, useValue: { trainer: { findUnique: async () => null }, client: { findUnique: async args => { lookup.push(args); return { id: 'client', firstName: 'Анна' }; } } } }] }).compile();
   bot = module.get(VkBotService);
   bot.prisma.vkConversationState = require('./helpers/vk-identity.cjs').idleConversation();

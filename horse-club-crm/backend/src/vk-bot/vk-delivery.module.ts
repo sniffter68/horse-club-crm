@@ -6,6 +6,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { reminderKey, reminderKind } from './vk-reminder-key';
+import { reminderKeyboard } from './vk-booking-response';
 
 // Persist alongside the business change; VK is contacted only after commit.
 export async function queueVkNotification(tx: Prisma.TransactionClient, key: string, peerId: bigint, message: string): Promise<void> {
@@ -60,7 +61,7 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
       where: { id: row.key.split(':')[1] }, include: { lesson: true, client: true },
     });
     const start = booking?.lesson?.startTime || booking?.startTime;
-    if (booking && start && start > new Date() && booking.status === 'scheduled' && booking.attendanceStatus === 'PENDING'
+    if (booking && start && start > new Date() && booking.status === 'scheduled' && booking.attendanceStatus === 'PENDING' && !booking.clientCancellationRequested
       && (!booking.lesson || booking.lesson.status === 'SCHEDULED') && booking.client.vkUserId === row.peerId
       && reminderKey(kind, booking.id, start, row.peerId) === row.key) return false;
     await this.prisma.vkNotification.deleteMany({ where: { id: row.id, sentAt: null } });
@@ -92,7 +93,9 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
             });
             if (claimed.count === 0) continue;
           }
-          await this.vk.api.messages.send({ peer_id: Number(row.peerId), message: row.message, random_id: createHash('sha256').update(row.id).digest().readInt32BE(0) || 1 });
+          await this.vk.api.messages.send({ peer_id: Number(row.peerId), message: row.message,
+            ...(isReminder ? { keyboard: reminderKeyboard(row.key.split(':')[1]) } : {}),
+            random_id: createHash('sha256').update(row.id).digest().readInt32BE(0) || 1 });
           await this.prisma.vkNotification.update({ where: { id: row.id }, data: { sentAt: new Date() } });
           this.logger.log({ event: 'vk_notification_sent', notificationId: row.id, key: row.key, peerId: String(row.peerId) });
         } catch (error: unknown) {

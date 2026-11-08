@@ -14,6 +14,8 @@ import { queueVkAdminChatNotification } from './vk-delivery.module';
 import { currentLeadConsentVersion as consentVersion } from '../common/lead-consent';
 import { membershipAccessWhere } from '../memberships/membership-access';
 import { splitVkText } from './vk-message-text';
+import { parseBookingResponse } from './vk-booking-response';
+import { VkBookingResponseService } from './vk-booking-response.service';
 
 function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
 const welcome = welcomeMenu();
@@ -40,7 +42,8 @@ export class VkBotService {
   private readonly firstNames = new Map<number, { value: Promise<string | undefined>; expiresAt: number }>();
   constructor(private readonly prisma: PrismaService, private readonly links: VkLinkService,
     private readonly ledger: MembershipLedgerService, private readonly leads: LeadsService,
-    private readonly identity: VkIdentityService = new VkIdentityService(prisma)) {
+    private readonly identity: VkIdentityService = new VkIdentityService(prisma),
+    private readonly bookingResponses: VkBookingResponseService = new VkBookingResponseService(prisma)) {
     const token = vkGroupToken();
     if (token) this.vk = new VK({ token, apiVersion: '5.199', apiTimeout: 5000, apiRetryLimit: 0 });
   }
@@ -138,6 +141,12 @@ export class VkBotService {
     if (typeof sender !== 'number' || !Number.isSafeInteger(sender) || typeof peer !== 'number' || !Number.isSafeInteger(peer)
       || typeof text !== 'string' || typeof eventId !== 'string' || !eventId || eventId.length > 200) throw new BadRequestException('Некорректное сообщение VK');
     if (sender <= 0 || peer !== sender || out === 1) return;
+    let bookingPayload: unknown = payload;
+    if (typeof payload === 'string') {
+      try { bookingPayload = JSON.parse(payload); }
+      catch { bookingPayload = undefined; } // Preserve text commands with legacy/non-JSON payloads.
+    }
+    if (bookingPayload !== undefined && await this.replyBookingResponse(sender, eventId, bookingPayload) !== undefined) return;
     const resetText = ['меню', '/start'].includes(text.trim().toLowerCase());
     let resetPause = resetText;
     let command = normalizeVkCommand(text);
@@ -343,7 +352,15 @@ export class VkBotService {
   }
   async handleEvent(object: unknown): Promise<void> {
     if (!record(object) || typeof object.user_id !== 'number' || !Number.isSafeInteger(object.user_id) || object.user_id <= 0
-      || object.peer_id !== object.user_id || typeof object.event_id !== 'string' || !object.event_id || !record(object.payload)) throw new BadRequestException('Некорректное нажатие VK');
+      || object.peer_id !== object.user_id || typeof object.event_id !== 'string' || !object.event_id || object.event_id.length > 200) throw new BadRequestException('Некорректное нажатие VK');
+    const response = await this.replyBookingResponse(object.user_id, object.event_id, object.payload);
+    if (response !== undefined) {
+      if (!this.vk) throw new ServiceUnavailableException('VK-бот не настроен');
+      await this.vk.api.messages.sendMessageEventAnswer({ event_id: object.event_id, user_id: object.user_id, peer_id: object.user_id,
+        event_data: JSON.stringify({ type: 'show_snackbar', text: response.slice(0, 90) }) });
+      return;
+    }
+    if (!record(object.payload)) throw new BadRequestException('Некорректные данные кнопки VK');
     const { bookingId, attended, action } = object.payload;
     if (action !== 'attendance' || typeof bookingId !== 'string' || !isUUID(bookingId) || typeof attended !== 'boolean') throw new BadRequestException('Неизвестная команда');
     let answer = 'Посещение отмечено';
@@ -362,5 +379,19 @@ export class VkBotService {
       await this.vk.api.messages.sendMessageEventAnswer({ event_id: object.event_id, user_id: object.user_id, peer_id: object.user_id,
         event_data: JSON.stringify({ type: 'show_snackbar', text: answer.slice(0, 90) }) });
     } catch { throw new ServiceUnavailableException('Не удалось подтвердить действие VK'); }
+  }
+
+  private async replyBookingResponse(sender: number, eventId: string, payload: unknown): Promise<string | undefined> {
+    let answer: string;
+    try {
+      const response = parseBookingResponse(payload);
+      if (!response) return undefined;
+      answer = await this.bookingResponses.respond(sender, response);
+    } catch (error: unknown) {
+      if (!(error instanceof HttpException)) throw error;
+      answer = error.message;
+    }
+    await this.send(sender, eventId, answer);
+    return answer;
   }
 }
