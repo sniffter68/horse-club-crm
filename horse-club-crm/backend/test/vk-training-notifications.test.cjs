@@ -95,7 +95,7 @@ test('standalone scheduled booking queues trainer and client cards in its transa
   assert.match([...rows.values()][0].message, /Тип занятия: Выездка/);
 });
 
-test('VK 901 is logged with recipient and code, retries persist, and another recipient still receives confirmation', async () => {
+test('VK 901 is logged with recipient and code, stops retries, and another recipient still receives confirmation', async () => {
   const { tx, rows } = queue();
   const value = training(); value.participants.length = 1;
   await queueTrainingConfirmation(tx, 'lesson:1:created', value);
@@ -111,7 +111,7 @@ test('VK 901 is logged with recipient and code, retries persist, and another rec
   } } } };
   await assert.doesNotReject(delivery.flush());
   assert.deepEqual(sent.map(row => row.peer_id), [77, 42]);
-  assert.ok(updates.some(row => row.data.nextAttemptAt instanceof Date));
+  assert.ok(updates.some(row => row.data.attemptCount === 5 && !('nextAttemptAt' in row.data)));
   assert.ok(updates.some(row => row.data.sentAt instanceof Date));
   assert.ok(logs.some(entry => entry.message === 'Не удалось отправить VK-уведомление для userId: 77'
     && entry.errorCode === 901 && entry.notificationId === 'lesson:1:created:trainer:77'));

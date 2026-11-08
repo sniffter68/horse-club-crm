@@ -197,7 +197,7 @@ test('blocked VK delivery records a single attempt, logs a warning and sends the
   } } } };
   await assert.doesNotReject(delivery.flush());
   const [first, second] = [...h.rows.values()];
-  assert.equal(first.sentAt, null); assert.equal(first.attemptCount, 1);
+  assert.equal(first.sentAt, null); assert.equal(first.attemptCount, 5);
   assert.ok(second.sentAt instanceof Date);
   assert.deepEqual(sent.map(row => row.peer_id), [43]);
   assert.equal(warnings[0].errorCode, 901);

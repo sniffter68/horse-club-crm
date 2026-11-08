@@ -8,6 +8,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { reminderKey, reminderKind } from './vk-reminder-key';
 import { reminderKeyboard } from './vk-booking-response';
 
+const MAX_ATTEMPTS = 5;
+const FATAL_VK_ERROR_CODES = new Set([900, 901, 902]);
+
 // Persist alongside the business change; VK is contacted only after commit.
 export async function queueVkNotification(tx: Prisma.TransactionClient, key: string, peerId: bigint, message: string): Promise<void> {
   await tx.vkNotification.upsert({ where: { key }, update: {}, create: { key, peerId, message } });
@@ -74,7 +77,7 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
     this.running = true;
     try {
       const rows = await this.prisma.vkNotification.findMany({ where: {
-        sentAt: null, nextAttemptAt: { lte: new Date() },
+        sentAt: null, attemptCount: { lt: MAX_ATTEMPTS }, nextAttemptAt: { lte: new Date() },
         OR: [
           { NOT: { OR: [{ key: { startsWith: 'reminder24h:' } }, { key: { startsWith: 'reminder2h:' } }] } },
           { attemptCount: 0 },
@@ -99,19 +102,27 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
           await this.prisma.vkNotification.update({ where: { id: row.id }, data: { sentAt: new Date() } });
           this.logger.log({ event: 'vk_notification_sent', notificationId: row.id, key: row.key, peerId: String(row.peerId) });
         } catch (error: unknown) {
+          const errorCode = typeof error === 'object' && error !== null && 'code' in error
+            && typeof error.code === 'number' ? error.code : undefined;
+          const fatal = errorCode !== undefined && FATAL_VK_ERROR_CODES.has(errorCode);
+          const attemptCount = row.attemptCount + 1;
+          const retryStopped = fatal || isReminder || attemptCount >= MAX_ATTEMPTS;
           // Failed recipients must not occupy every slot in the next batch.
           const delay = Math.min(3600000, 10000 * 2 ** Math.min(row.attemptCount, 9));
           try {
-            if (!isReminder) {
+            if (!isReminder || fatal) {
               await this.prisma.vkNotification.update({ where: { id: row.id }, data: {
-                attemptCount: { increment: 1 }, nextAttemptAt: new Date(Date.now() + delay),
+                // MAX_ATTEMPTS is the persisted terminal state; sentAt stays null.
+                attemptCount: fatal ? MAX_ATTEMPTS : { increment: 1 },
+                ...(!retryStopped ? { nextAttemptAt: new Date(Date.now() + delay) } : {}),
               } });
             }
           } catch { this.logger.warn('Не удалось обновить время повторной доставки VK'); }
           this.logger.warn({
             message: `Не удалось отправить VK-уведомление для userId: ${row.peerId}`,
-            event: 'vk_notification_failed', notificationId: row.id, key: row.key, peerId: String(row.peerId), attemptCount: row.attemptCount + 1,
-            errorCode: typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined,
+            event: 'vk_notification_failed', notificationId: row.id, key: row.key, peerId: String(row.peerId), attemptCount,
+            errorCode, retryStopped,
+            reason: fatal ? 'fatal_vk_api_error' : retryStopped ? 'max_attempts' : 'temporary_error',
             errorMessage: error instanceof Error ? error.message : 'Неизвестная ошибка VK',
           });
         }
