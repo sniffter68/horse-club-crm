@@ -17,7 +17,7 @@ test('resolves uploaded photos against the API origin and displays them in all c
   await expect(page.locator('#horses-trainers img').first()).toHaveAttribute('src', photo);
   const urls = [resolveCatalogImage(photo, 'https://api.example.com/api'), resolveCatalogImage(photo, '/api'),
     resolveCatalogImage('https://cdn.example.com/photo.jpg'), resolveCatalogImage('//evil.example/photo.jpg')];
-  expect(urls).toEqual([`https://api.example.com${photo}`, photo, 'https://cdn.example.com/photo.jpg', '/images/catalog-placeholder.svg']);
+  expect(urls).toEqual([`https://api.example.com${photo}`, photo, 'https://cdn.example.com/photo.jpg', '/images/horse.jpg']);
 });
 
 const content = {

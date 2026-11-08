@@ -9,8 +9,10 @@ import { ClubStandardsSection } from './components/ClubStandardsSection';
 import { FirstLessonSection } from './components/FirstLessonSection';
 import { GiftCertificatesSection } from './components/GiftCertificatesSection';
 import { ContactsSection } from './components/ContactsSection';
+import { Footer } from './components/Footer';
+import { FaqSection } from './components/FaqSection';
 
-export default function App(): ReactElement {
+export function App(): ReactElement {
   const content = usePublicContent();
   const [selection, setSelection] = useState<BookingSelection>({});
   const choose: ChooseBooking = (kind, choice) => {
@@ -36,8 +38,9 @@ export default function App(): ReactElement {
         {/* 4. Блок "Стандарты клуба" (архитектура, еврогрунт, гуманный тренинг) */}
         <ClubStandardsSection onChoose={choose} />
 
+        <GiftCertificatesSection onChoose={choose} />
         <FirstLessonSection onBookFirstLesson={bookFirstLesson} />
-        <GiftCertificatesSection />
+        <FaqSection />
 
         {/* 5. Премиальный блок контактов с интерактивной формой бронирования */}
         <ContactsSection services={content.services} selection={selection}
@@ -47,25 +50,7 @@ export default function App(): ReactElement {
       </main>
 
       {/* Футер */}
-      <footer className="border-t border-white/10 bg-luxury-deep px-6 py-8 text-center text-sm text-luxury-bg">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
-          <p>© 2026 СЛКС Тамбов. Конный клуб и спортивная школа верховой езды.</p>
-          <div className="flex items-center gap-6">
-            <a href="#services" className="transition-colors hover:text-white">
-              Услуги
-            </a>
-            <a href="#horses-trainers" className="transition-colors hover:text-white">
-              Лошади
-            </a>
-            <a href="#about" className="transition-colors hover:text-white">
-              Стандарты
-            </a>
-            <a href="#contacts" className="transition-colors hover:text-white">
-              Контакты
-            </a>
-          </div>
-        </div>
-      </footer>
+      <Footer brandName="СЛКС Тамбов" />
     </div>
   );
 }

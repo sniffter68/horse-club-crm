@@ -10,7 +10,7 @@ for (const width of [320, 768, 1440]) {
     await expect(section).toContainText('На любую услугу или сумму');
     await expect(section).toContainText('Бумажный или электронный');
     await expect(section).toContainText('Срок действия — 6 месяцев');
-    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('contacts');
+    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('first-lesson');
     await section.scrollIntoViewIfNeeded();
     expect(await section.evaluate(element => Array.from(element.querySelectorAll('li, h2, h3, p, a')).every(child => {
       const rect = child.getBoundingClientRect();
@@ -20,7 +20,7 @@ for (const width of [320, 768, 1440]) {
 
     await page.getByLabel('Ваше имя').fill('Анна');
     await page.getByLabel('Пожелания к занятию').fill('Сертификат в подарок');
-    const order = section.getByRole('link', { name: 'Заказать сертификат' });
+    const order = section.getByRole('link', { name: 'Купить сертификат' });
     await order.focus();
     await order.press('Enter');
     await expect(page.locator('#booking-heading')).toBeFocused();
@@ -37,7 +37,7 @@ test('certificate order respects reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.route('**/api/public/content', route => route.fulfill({ json: { horses: [], trainers: [], services: [] } }));
   await page.goto('/');
-  await page.getByRole('link', { name: 'Заказать сертификат' }).click();
+  await page.getByRole('link', { name: 'Купить сертификат' }).click();
   await expect(page.locator('#booking-heading')).toBeFocused();
   await expect(page.locator('#booking-form')).toBeInViewport();
 });

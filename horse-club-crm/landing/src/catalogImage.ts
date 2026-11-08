@@ -1,6 +1,6 @@
 import type { SyntheticEvent } from 'react';
 
-export const catalogPlaceholder = '/images/catalog-placeholder.svg';
+export const catalogPlaceholder = `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`;
 
 export function resolveCatalogImage(value: unknown, apiBase = '/api'): string {
   const url = typeof value === 'string' ? value.trim() : '';

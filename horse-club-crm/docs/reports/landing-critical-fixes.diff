@@ -1,0 +1,1051 @@
+diff --git a/landing/DESIGN.md b/landing/DESIGN.md
+index 642cea4..ebbdaac 100644
+--- a/landing/DESIGN.md
++++ b/landing/DESIGN.md
+@@ -11,3 +11,5 @@
+ Переход фокусирует заголовок формы, контейнер имеет scroll-margin-top 5rem. Ошибки сохраняют данные, успешный ответ API объясняет звонок администратора для согласования времени. Защита от повторной отправки и проверка UUID перед передачей serviceId принадлежат форме; HTTP-контракт остаётся в `src/lead.ts`.
+ 
+ Проверки: `npm run typecheck`, `npm run lint`, `npm run build`, `npm test`. `tests/booking-cro.spec.ts` проверяет путь на 375px, обычную и уменьшенную анимацию, уникальные варианты, отсутствие ID дисциплины в заявке первого занятия, политику и подтверждение API. Остальные сценарии проверяют ошибки, повтор и сохранение контекста CRM.
++
++Исправления ассетов и записи: статичные фотографии конной тематики берутся из public/images, BASE_URL сохраняет корректные пути Vite; Hero использует импорт из src/assets. Подготовка находится один раз перед FAQ/записью; пять вопросов используют нативный details/summary. Мобильная плашка записи и звонка резервирует место внизу, учитывает safe area. Политика переиспользует PrivacyPolicyLink с уникальным dialog для каждого экземпляра; открытие политики не отмечает согласие. Возраст необязателен и передаётся в notes, сертификат — в выбранной услуге. Реквизиты используют существующие VITE_LEGAL_* с подтверждёнными значениями клуба по умолчанию; Telegram допускает VITE_TELEGRAM_URL, иначе открывает контакт по публичному телефону клуба. Номиналы 2/4/6 тысяч показаны как желаемые и требуют подтверждения администратора.
+diff --git a/landing/src/App.tsx b/landing/src/App.tsx
+index 81794b7..a780764 100644
+--- a/landing/src/App.tsx
++++ b/landing/src/App.tsx
+@@ -9,8 +9,10 @@ import { ClubStandardsSection } from './components/ClubStandardsSection';
+ import { FirstLessonSection } from './components/FirstLessonSection';
+ import { GiftCertificatesSection } from './components/GiftCertificatesSection';
+ import { ContactsSection } from './components/ContactsSection';
++import { Footer } from './components/Footer';
++import { FaqSection } from './components/FaqSection';
+ 
+-export default function App(): ReactElement {
++export function App(): ReactElement {
+   const content = usePublicContent();
+   const [selection, setSelection] = useState<BookingSelection>({});
+   const choose: ChooseBooking = (kind, choice) => {
+@@ -36,8 +38,9 @@ export default function App(): ReactElement {
+         {/* 4. Блок "Стандарты клуба" (архитектура, еврогрунт, гуманный тренинг) */}
+         <ClubStandardsSection onChoose={choose} />
+ 
++        <GiftCertificatesSection onChoose={choose} />
+         <FirstLessonSection onBookFirstLesson={bookFirstLesson} />
+-        <GiftCertificatesSection />
++        <FaqSection />
+ 
+         {/* 5. Премиальный блок контактов с интерактивной формой бронирования */}
+         <ContactsSection services={content.services} selection={selection}
+@@ -47,25 +50,7 @@ export default function App(): ReactElement {
+       </main>
+ 
+       {/* Футер */}
+-      <footer className="border-t border-white/10 bg-luxury-deep px-6 py-8 text-center text-sm text-luxury-bg">
+-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
+-          <p>© 2026 СЛКС Тамбов. Конный клуб и спортивная школа верховой езды.</p>
+-          <div className="flex items-center gap-6">
+-            <a href="#services" className="transition-colors hover:text-white">
+-              Услуги
+-            </a>
+-            <a href="#horses-trainers" className="transition-colors hover:text-white">
+-              Лошади
+-            </a>
+-            <a href="#about" className="transition-colors hover:text-white">
+-              Стандарты
+-            </a>
+-            <a href="#contacts" className="transition-colors hover:text-white">
+-              Контакты
+-            </a>
+-          </div>
+-        </div>
+-      </footer>
++      <Footer brandName="СЛКС Тамбов" />
+     </div>
+   );
+ }
+diff --git a/landing/src/catalogImage.ts b/landing/src/catalogImage.ts
+index 72ddc82..84ff293 100644
+--- a/landing/src/catalogImage.ts
++++ b/landing/src/catalogImage.ts
+@@ -1,6 +1,6 @@
+ import type { SyntheticEvent } from 'react';
+ 
+-export const catalogPlaceholder = '/images/catalog-placeholder.svg';
++export const catalogPlaceholder = `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`;
+ 
+ export function resolveCatalogImage(value: unknown, apiBase = '/api'): string {
+   const url = typeof value === 'string' ? value.trim() : '';
+diff --git a/landing/src/components/ClubStandardsSection.tsx b/landing/src/components/ClubStandardsSection.tsx
+index 23c0171..876f462 100644
+--- a/landing/src/components/ClubStandardsSection.tsx
++++ b/landing/src/components/ClubStandardsSection.tsx
+@@ -19,7 +19,7 @@ const standards: StandardItem[] = [
+     category: 'Амортизация и грунт',
+     title: 'Еврогрунт с немецким геотекстилем',
+     description:
+-      'Специально подготовленная смесь кварцевого песка и синтетических волокон с регулярным боронованием и обеспыливанием. Обеспечивает бережную амортизацию и снижает ударную нагрузку на связки и суставы до 40%.',
++      'Специально подготовленная смесь кварцевого песка и синтетических волокон с регулярным боронованием и обеспыливанием. Подготовлен для комфортной работы лошадей и всадников.',
+     metricLabel: 'Крытый манеж',
+     metricValue: '1 800 м²',
+     tag: 'Защита суставов',
+@@ -80,7 +80,7 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+             </h2>
+           </div>
+           <p className="max-w-md text-base leading-relaxed text-club-secondary">
+-            Безупречная среда для лошадей турнирного класса и всадников, ценящих приватность, комфорт и безопасность высочайшего уровня.
++            Профессиональные тренеры, бережный подход к всадникам любого уровня подготовки и забота о лошадях.
+           </p>
+         </div>
+ 
+diff --git a/landing/src/components/ContactsSection.tsx b/landing/src/components/ContactsSection.tsx
+index 7132302..1e3d776 100644
+--- a/landing/src/components/ContactsSection.tsx
++++ b/landing/src/components/ContactsSection.tsx
+@@ -20,6 +20,8 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+   const [name, setName] = useState<string>('');
+   const [phone, setPhone] = useState<string>('');
+   const [notes, setNotes] = useState<string>('');
++  const [age, setAge] = useState('');
++  const notesWithAge = [age && `Возраст всадника: ${age}`, notes].filter(Boolean).join('\n');
+   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+   const [loading, setLoading] = useState(false);
+   const [error, setError] = useState('');
+@@ -38,7 +40,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+     const form = e.currentTarget;
+     const invalid = !name.trim() ? ['Укажите имя', 'contact-name']
+       : phoneDigits(phone).length !== 11 ? ['Укажите телефон полностью: +7 и 10 цифр', 'contact-phone']
+-      : bookingNotes(selection, notes).length > 2000 ? ['Сократите комментарий: вместе с выбранной лошадью и тренером допускается 2000 символов', 'contact-notes']
++      : bookingNotes(selection, notesWithAge).length > 2000 ? ['Сократите комментарий: вместе с выбранной лошадью и тренером допускается 2000 символов', 'contact-notes']
+       : !consent ? ['Подтвердите согласие, чтобы отправить заявку', 'personal-data-consent'] : null;
+     if (invalid) {
+       setError(invalid[0]);
+@@ -53,7 +55,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+     try {
+       await sendLead({ name: name.trim(), phone: `+${phoneDigits(phone)}`, direction: selectedService.slice(0, 100),
+         ...(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(selection.service?.id || '') ? { serviceId: selection.service!.id } : {}),
+-        notes: bookingNotes(selection, notes) || undefined, source: 'landing', consentAccepted: true, consentVersion: legal.consentVersion });
++        notes: bookingNotes(selection, notesWithAge) || undefined, source: 'landing', consentAccepted: true, consentVersion: legal.consentVersion });
+       setIsSubmitted(true);
+     } catch (cause) {
+       setError(cause instanceof Error ? cause.message : 'Не удалось отправить заявку. Попробуйте ещё раз.');
+@@ -157,6 +159,8 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                   >
+                     ВКонтакте
+                   </a>
++                  <a href={landingData.contacts.telegram} target="_blank" rel="noreferrer"
++                    className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-white">Telegram</a>
+                 </div>
+                 <span className="mt-1 block text-sm text-club-sand">
+                   События и жизнь клуба
+@@ -164,16 +168,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+               </div>
+             </div>
+ 
+-            {/* Памятка первого визита */}
+-            <div className="rounded-3xl border border-white/10 bg-club-action/15 p-6 text-sm text-club-sand/90">
+-              <div className="flex items-center gap-2 font-semibold text-white mb-2">
+-                <span>✦</span>
+-                <span>Рекомендации к первому визиту</span>
+-              </div>
+-              <p className="leading-relaxed">
+-                Шлем и защитный жилет предоставляются клубом бесплатно. Для первой тренировки подойдут эластичные брюки без грубых внутренних швов и закрытая обувь на небольшом плоском каблуке (1-2 см).
+-              </p>
+-            </div>
++
+           </div>
+ 
+           {/* Правая колонка: Форма записи */}
+@@ -205,6 +200,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                         setName('');
+                         setPhone('');
+                         setNotes('');
++                        setAge('');
+                         setConsent(false);
+                         setError('');
+                         onReset();
+@@ -313,6 +309,17 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                       </div>
+                     </div>
+ 
++                    <div>
++                      <label htmlFor="rider-age" className="mb-1.5 block text-sm font-semibold text-club-secondary">Возраст всадника (необязательно, для детей)</label>
++                      <select id="rider-age" value={age} onChange={event => setAge(event.target.value)} disabled={loading}
++                        className="min-h-11 w-full rounded-2xl border border-black/10 bg-club-paper px-4 py-3 text-base">
++                        <option value="">Не указан</option>
++                        <option value="до 3 лет">До 3 лет — уточнить возможность</option>
++                        <option value="3–6 лет">3–6 лет</option>
++                        <option value="7–12 лет">7–12 лет</option>
++                        <option value="13–17 лет">13–17 лет</option>
++                      </select>
++                    </div>
+                     {/* Пожелания / комментарий */}
+                     <div>
+                       <label htmlFor="contact-notes" className="block text-sm font-semibold text-club-secondary mb-1.5">
+@@ -334,13 +341,13 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+ 
+                     {/* Кнопка отправки и согласие */}
+                     <div className="pt-2">
+-                      <label className="mb-4 flex items-start gap-3 text-sm text-club-secondary">
++                      <div className="mb-4 flex items-start gap-3 text-sm text-club-secondary">
+                         <input id="personal-data-consent" type="checkbox" checked={consent} disabled={loading}
+                           aria-invalid={invalidField === 'personal-data-consent'}
+                           aria-describedby={invalidField === 'personal-data-consent' ? 'contact-error' : undefined}
+-                          onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 accent-club-action" />
+-                        <span>Я даю согласие на обработку персональных данных для рассмотрения заявки.</span>
+-                      </label>
++                          onChange={(e) => setConsent(e.target.checked)} className="h-11 w-11 shrink-0 cursor-pointer accent-club-action" />
++                        <div><label htmlFor="personal-data-consent" className="cursor-pointer">Я согласен на обработку персональных данных в соответствии с </label><PrivacyPolicyLink /></div>
++                      </div>
+                       <div className="min-h-12 text-sm text-[#8C3838]" aria-live="polite">
+                         {error && <p id="contact-error" role="alert">{error}</p>}
+                       </div>
+@@ -353,7 +360,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                       </button>
+ 
+                       <div className="mt-3 text-center text-sm text-club-secondary">
+-                        Нажимая кнопку, вы соглашаетесь с <PrivacyPolicyLink />
++                        Перезвоним или напишем в течение 15 минут
+                       </div>
+                     </div>
+                   </motion.form>
+diff --git a/landing/src/components/FaqSection.tsx b/landing/src/components/FaqSection.tsx
+new file mode 100644
+index 0000000..d107b6c
+--- /dev/null
++++ b/landing/src/components/FaqSection.tsx
+@@ -0,0 +1,21 @@
++import type { ReactElement } from 'react';
++
++const questions = [
++  ['С какого возраста можно детям?', 'Катание в поводу доступно детям от 3 лет. Возраст, готовность ребёнка и формат занятия обсудите с администратором; для несовершеннолетнего заявку оставляет родитель или законный представитель.'],
++  ['Есть ли ограничения по весу?', 'Допустимую нагрузку определяет тренер с учётом лошади и формата занятия. Уточните возможность записи у администратора до визита.'],
++  ['Что надеть на первый урок?', 'Требования к одежде и обуви собраны в памятке «Что надеть и как подготовиться» перед этим разделом. Защитный шлем подберём в клубе.'],
++  ['Нужна ли медицинская справка?', 'Требования зависят от формата занятий. До записи уточните у администратора, нужна ли справка. При сомнениях о допустимости нагрузки посоветуйтесь с врачом.'],
++  ['Как перенести или отменить занятие?', 'Свяжитесь с администратором по телефону или в мессенджере как можно раньше. Условия переноса и отмены уточните при подтверждении записи.'],
++];
++
++export function FaqSection(): ReactElement {
++  return <section id="faq" aria-labelledby="faq-heading" className="bg-luxury-bg px-6 py-10 sm:px-10 lg:px-16">
++    <div className="mx-auto max-w-7xl">
++      <h2 id="faq-heading" className="mb-6 font-serif text-[2rem] sm:text-5xl">Частые вопросы</h2>
++      {questions.map(([question, answer]) => <details key={question} className="border-b border-black/15 py-2">
++        <summary className="min-h-11 cursor-pointer py-3 font-semibold hover:text-club-action">{question}</summary>
++        <p className="max-w-3xl pb-4 leading-relaxed text-club-secondary">{answer}</p>
++      </details>)}
++    </div>
++  </section>;
++}
+diff --git a/landing/src/components/FirstLessonSection.tsx b/landing/src/components/FirstLessonSection.tsx
+index 4c598ee..f5ed96b 100644
+--- a/landing/src/components/FirstLessonSection.tsx
++++ b/landing/src/components/FirstLessonSection.tsx
+@@ -3,8 +3,8 @@ import { type ReactElement } from 'react';
+ 
+ const steps = [
+   {
+-    number: '01', title: 'Что надеть', duration: 'До поездки',
+-    description: 'Выберите длинные удобные брюки и закрытые кроссовки или ботинки на плоской подошве. Защитный шлем бесплатно подберём в клубе.',
++    number: '01', title: 'Обсудите занятие', duration: 'До поездки',
++    description: 'Расскажите администратору о своём опыте и пожеланиях. Вместе выберем подходящее занятие.',
+   },
+   {
+     number: '02', title: 'Прибытие за 15 минут', duration: '15 мин до занятия',
+@@ -22,7 +22,7 @@ const steps = [
+ 
+ const preparation = [
+   { title: 'Одежда', description: 'Длинные удобные брюки или плотные спортивные штаны (не шорты).' },
+-  { title: 'Обувь', description: 'Закрытые кроссовки или ботинки на плоской подошве.' },
++  { title: 'Обувь', description: 'Обувь на гладкой подошве с небольшим каблуком 1–2 см (кроссовки без выраженного протектора допустимы для первого раза; обувь на платформе, высоком каблуке или сланцы строго запрещены).' },
+   { title: 'Лакомство', description: 'По желанию — мытая морковь или яблоки, нарезанные дольками.' },
+ ];
+ 
+@@ -39,7 +39,7 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
+             Впервые в седле? Это проще и безопаснее, чем кажется
+           </h2>
+           <p className="max-w-md text-base leading-relaxed text-club-secondary">
+-            70% наших гостей приходят без опыта верховой езды. Мы бережно проведём вас через каждое мгновение первого знакомства с лошадью.
++            Опыт верховой езды не нужен. Мы бережно проведём вас через первое знакомство с лошадью.
+           </p>
+         </div>
+ 
+@@ -61,7 +61,7 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
+         </div>
+ 
+         <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-luxury-bg/50 p-8 backdrop-blur-sm sm:p-10">
+-          <h3 className="font-serif text-xl font-normal text-luxury-dark sm:text-2xl">Как подготовиться к визиту</h3>
++          <h3 className="font-serif text-xl font-normal text-luxury-dark sm:text-2xl">Что надеть и как подготовиться</h3>
+           <dl className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+             {preparation.map(item => (
+               <div key={item.title}>
+diff --git a/landing/src/components/Footer.tsx b/landing/src/components/Footer.tsx
+index d59045d..83cd947 100644
+--- a/landing/src/components/Footer.tsx
++++ b/landing/src/components/Footer.tsx
+@@ -1,43 +1,20 @@
+ import type { ReactElement } from 'react';
++import { legal } from '../legal';
++import { PrivacyPolicyLink } from './PrivacyPolicyLink';
+ 
+-interface FooterProps {
+-  brandName: string;
+-}
+-
+-export function Footer({ brandName }: FooterProps): ReactElement {
+-  const currentYear = new Date().getFullYear();
+-
+-  return (
+-    <footer className="border-t border-luxury-border bg-luxury-bg px-6 py-12 sm:px-10 lg:px-12">
+-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 sm:flex-row">
+-        <div className="flex items-center gap-3">
+-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-luxury-dark text-[11px] font-semibold tracking-wider text-luxury-bg">
+-            СЛ
+-          </span>
+-          <span className="text-sm font-semibold tracking-tight text-luxury-dark">
+-            {brandName}
+-          </span>
+-        </div>
+-
+-        <p className="text-xs text-luxury-muted">
+-          © {currentYear} {brandName}. Все права защищены.
+-        </p>
+-
+-        <div className="flex items-center gap-6 text-xs text-luxury-muted">
+-          <a
+-            href="#contacts"
+-            className="transition-colors hover:text-luxury-dark"
+-          >
+-            Политика конфиденциальности
+-          </a>
+-          <a
+-            href="#contacts"
+-            className="transition-colors hover:text-luxury-dark"
+-          >
+-            Правила посещения
+-          </a>
+-        </div>
++export function Footer({ brandName }: { brandName: string }): ReactElement {
++  const year = new Intl.DateTimeFormat('ru-RU', { year: 'numeric', timeZone: 'Europe/Moscow' }).format(new Date());
++  return <footer className="border-t border-white/10 bg-luxury-deep px-6 py-8 text-sm text-luxury-bg">
++    <div className="mx-auto max-w-7xl space-y-3">
++      <p>© {year} {brandName}. Все права защищены.</p>
++      <p>{legal.operatorName}</p>
++      <p>{legal.registration}</p>
++      <p>{legal.operatorAddress}</p>
++      <div className="flex flex-wrap items-center gap-x-6">
++        <PrivacyPolicyLink>Политика обработки персональных данных</PrivacyPolicyLink>
++        <a className="inline-flex min-h-11 items-center underline hover:text-white" href={`mailto:${legal.privacyEmail}`}>{legal.privacyEmail}</a>
++        <a className="inline-flex min-h-11 items-center hover:text-white" href="#contacts">Контакты</a>
+       </div>
+-    </footer>
+-  );
+-}
+\ No newline at end of file
++    </div>
++  </footer>;
++}
+diff --git a/landing/src/components/GiftCertificatesSection.tsx b/landing/src/components/GiftCertificatesSection.tsx
+index 5004020..907665f 100644
+--- a/landing/src/components/GiftCertificatesSection.tsx
++++ b/landing/src/components/GiftCertificatesSection.tsx
+@@ -1,5 +1,6 @@
+ import { type ReactElement } from 'react';
+-import { scrollToBooking } from '../booking';
++import { useState } from 'react';
++import type { ChooseBooking } from '../booking';
+ 
+ const benefits = [
+   {
+@@ -16,7 +17,8 @@ const benefits = [
+   },
+ ];
+ 
+-export function GiftCertificatesSection(): ReactElement {
++export function GiftCertificatesSection({ onChoose }: { onChoose: ChooseBooking }): ReactElement {
++  const [amount, setAmount] = useState('2000');
+   return (
+     <section
+       id="gift-certificates"
+@@ -43,12 +45,20 @@ export function GiftCertificatesSection(): ReactElement {
+         </ul>
+ 
+         <div className="mt-6 md:mt-8 text-center">
++          <label htmlFor="gift-amount" className="mb-2 block font-semibold">Желаемый номинал</label>
++          <select id="gift-amount" value={amount} onChange={event => setAmount(event.target.value)}
++            className="mb-3 min-h-11 rounded-xl border border-black/20 bg-white px-4 py-3">
++            <option value="2000">2 000 ₽</option>
++            <option value="4000">4 000 ₽</option>
++            <option value="6000">6 000 ₽</option>
++          </select>
++          <p className="mb-4 text-sm text-club-secondary">Стоимость равна номиналу. Доступность номинала и способ оплаты подтвердит администратор.</p>
+           <a
+             href="#booking-form"
+-            onClick={event => { event.preventDefault(); scrollToBooking(); }}
++            onClick={event => { event.preventDefault(); onChoose('service', { id: 'gift-certificate', name: `Подарочный сертификат на ${Number(amount).toLocaleString('ru-RU')} ₽` }); }}
+             className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 hover:bg-club-secondary active:scale-95"
+           >
+-            Заказать сертификат
++            Купить сертификат
+           </a>
+         </div>
+       </div>
+diff --git a/landing/src/components/HeroSection.tsx b/landing/src/components/HeroSection.tsx
+index a5f2c53..f982130 100644
+--- a/landing/src/components/HeroSection.tsx
++++ b/landing/src/components/HeroSection.tsx
+@@ -1,5 +1,6 @@
+ import { useState, type ReactElement } from 'react';
+ import riderImg from '../assets/rider.png';
++import { handleCatalogImageError } from '../catalogImage';
+ 
+ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
+   const [motionPaused, setMotionPaused] = useState(false);
+@@ -32,7 +33,7 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
+           </div>
+         </div>
+         <div className="landing-hero__visual relative min-w-0 overflow-hidden">
+-          <img src={riderImg} alt="Всадник СЛКС Тамбов" loading="eager" fetchPriority="high"
++          <img onError={handleCatalogImageError} src={riderImg} alt="Всадник СЛКС Тамбов" loading="eager" fetchPriority="high"
+             width={1122} height={1402}
+             className={`landing-hero__rider h-full w-full object-contain${motionPaused ? ' landing-hero__rider--paused' : ''}`} />
+           <button type="button" aria-pressed={motionPaused}
+diff --git a/landing/src/components/Navbar.tsx b/landing/src/components/Navbar.tsx
+index 90d07f0..e63a7f5 100644
+--- a/landing/src/components/Navbar.tsx
++++ b/landing/src/components/Navbar.tsx
+@@ -6,6 +6,9 @@ import {
+   type ReactElement,
+ } from 'react';
+ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
++import { landingData } from '../data/landingContent';
++import { handleCatalogImageError } from '../catalogImage';
++import { Phone } from 'lucide-react';
+ 
+ interface NavigationItem {
+   label: string;
+@@ -32,7 +35,7 @@ function Brand({ inverse = false }: BrandProps): ReactElement {
+         }`}
+       >
+         <img
+-          src="/images/slks-logo-transparent.png"
++          src={`${import.meta.env.BASE_URL}images/slks-logo-transparent.png`} onError={handleCatalogImageError}
+           alt=""
+           aria-hidden="true"
+           className="h-8 w-8 object-contain"
+@@ -222,6 +225,12 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+         </div>
+       </header>
+ 
++      {!isOpen && <nav aria-label="Быстрая запись" className="mobile-booking fixed inset-x-4 bottom-3 z-50 flex items-center gap-2 rounded-2xl border border-white/15 bg-club-deep p-2 text-white shadow-lg lg:hidden">
++        <a href="#booking-form" onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
++          className="flex min-h-11 flex-1 items-center justify-center rounded-xl bg-club-action px-4 font-semibold hover:bg-club-secondary">Записаться</a>
++        <a href={`tel:${landingData.contacts.phone.replace(/[^+\d]/g, '')}`} aria-label="Позвонить в клуб"
++          className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/30 hover:bg-white/10"><Phone aria-hidden="true" size={20} /></a>
++      </nav>}
+       <AnimatePresence>
+         {isOpen && (
+           <motion.div
+diff --git a/landing/src/components/PrivacyPolicyLink.tsx b/landing/src/components/PrivacyPolicyLink.tsx
+index d851519..71ea87d 100644
+--- a/landing/src/components/PrivacyPolicyLink.tsx
++++ b/landing/src/components/PrivacyPolicyLink.tsx
+@@ -1,20 +1,21 @@
+-import { useRef } from 'react';
++import { useId, useRef, type ReactElement } from 'react';
+ import { privacyPolicy } from '../legal';
+ 
+-export function PrivacyPolicyLink() {
++export function PrivacyPolicyLink({ children = 'Политикой конфиденциальности' }: { children?: string }): ReactElement {
++  const id = useId();
+   const dialog = useRef<HTMLDialogElement>(null);
+   return <>
+-    <a href="#privacy" className="text-club-secondary underline underline-offset-4 hover:text-club-deep"
++    <a href={`#${id}`} className="inline-flex min-h-11 items-center underline underline-offset-4 hover:opacity-80"
+       onClick={event => { event.preventDefault(); dialog.current?.showModal(); }}>
+-      Политикой конфиденциальности
++      {children}
+     </a>
+-    <dialog ref={dialog} id="privacy" aria-labelledby="privacy-heading"
++    <dialog ref={dialog} id={id} aria-labelledby={`${id}-heading`}
+       className="fixed inset-0 m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-2xl overflow-auto rounded-3xl bg-white p-6 text-left text-sm leading-relaxed text-club-ink shadow-xl backdrop:bg-black/60">
+       <div className="sticky top-0 flex justify-end bg-white pb-3">
+         <button type="button" autoFocus onClick={() => dialog.current?.close()}
+           className="min-h-11 cursor-pointer rounded-full border border-black/20 px-5 hover:bg-club-paper">Закрыть</button>
+       </div>
+-      <h2 id="privacy-heading" className="leading-[1.125] mb-4 font-serif text-2xl">Политика конфиденциальности</h2>
++      <h2 id={`${id}-heading`} className="leading-[1.125] mb-4 font-serif text-2xl">Политика конфиденциальности</h2>
+       <div className="space-y-3" dangerouslySetInnerHTML={{ __html: privacyPolicy() }} />
+     </dialog>
+   </>;
+diff --git a/landing/src/components/ServicesSection.tsx b/landing/src/components/ServicesSection.tsx
+index 2d5bfac..4bf46b2 100644
+--- a/landing/src/components/ServicesSection.tsx
++++ b/landing/src/components/ServicesSection.tsx
+@@ -18,7 +18,7 @@ interface ServiceItem {
+ export function ServicesSection({ services, onChoose }: { services: PublicService[]; onChoose: ChooseBooking }): ReactElement {
+   const servicesData: ServiceItem[] = services.map(item => ({
+     id: item.id, title: item.title, cardTitle: item.title, desc: item.description,
+-    price: item.price, duration: item.durationMinutes ? `Длительность: ${item.durationMinutes} мин` : '',
++    price: item.price, duration: `${item.durationMinutes ? `Длительность: ${item.durationMinutes} минут` : 'Длительность: по согласованию'} · ${item.format || 'Формат: по согласованию'}`,
+     image: item.imageUrl, badge: item.category,
+   }));
+   const [activeTab, setActiveTab] = useState<string>(servicesData[0]?.id || '');
+diff --git a/landing/src/content.ts b/landing/src/content.ts
+index ea1ae97..5358c63 100644
+--- a/landing/src/content.ts
++++ b/landing/src/content.ts
+@@ -39,7 +39,7 @@ export const club = {
+   mapUrl: 'https://yandex.ru/maps/-/CDu1UB3c',
+ 
+   heroMedia:
+-    'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=2000',
++    `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+ 
+   infrastructure: [
+     {
+@@ -49,7 +49,7 @@ export const club = {
+       description:
+         'Оборудованный манеж со специализированным еврогрунтом для круглогодичных комфортных тренировок и конкура.',
+       imageUrl:
+-        'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&q=80&w=1200',
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+       specs: [
+         { label: 'Покрытие', value: 'Специальный еврогрунт' },
+         { label: 'Направления', value: 'Конкур и базовая выездка' },
+@@ -63,7 +63,7 @@ export const club = {
+       description:
+         'Просторные светлые денники с регулярной отбивкой, сбалансированным рационом, выгулом и ветеринарным контролем.',
+       imageUrl:
+-        'https://images.unsplash.com/photo-1598974357801-cbca100e65d3?auto=format&fit=crop&q=80&w=1200',
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+       specs: [
+         { label: 'Уход', value: 'Ежедневная отбивка' },
+         { label: 'Кормление', value: 'Индивидуальный рацион' },
+@@ -77,7 +77,7 @@ export const club = {
+       description:
+         'Бережное обучение верховой езде для самых маленьких, развивающая гимнастика на лошади и семейные фотосессии.',
+       imageUrl:
+-        'https://images.unsplash.com/photo-1551884170-09fb70a3a2ed?auto=format&fit=crop&q=80&w=1200',
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+       specs: [
+         { label: 'Возраст', value: 'Дети от 3-х лет' },
+         { label: 'Лошади', value: 'Пони и спокойные кони' },
+@@ -96,7 +96,7 @@ export const club = {
+       description:
+         'Первое знакомство с лошадью, постановка базового баланса и правильной посадки под контролем опытного наставника.',
+       imageUrl:
+-        'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=800',
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       key: 'membership',
+@@ -107,7 +107,7 @@ export const club = {
+       description:
+         'Системный тренинг по абонементу: совершенствование навыков управления, преодоление препятствий и конкур.',
+       imageUrl:
+-        'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&q=80&w=800',
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       key: 'kids-lead',
+@@ -118,7 +118,7 @@ export const club = {
+       description:
+         'Спокойная прогулка в поводу на пони или надежной лошади в сопровождении инструктора.',
+       imageUrl:
+-        'https://images.unsplash.com/photo-1598974357801-cbca100e65d3?auto=format&fit=crop&q=80&w=800',
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       key: 'vaulting',
+@@ -129,7 +129,7 @@ export const club = {
+       description:
+         'Вольтижировка: упражнения на шагающей или рысящей лошади для развития чувства баланса, гибкости и уверенности.',
+       imageUrl:
+-        'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=800',
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       key: 'photo',
+@@ -140,7 +140,7 @@ export const club = {
+       description:
+         'Аренда грациозных ухоженных скакунов для индивидуальных, свадебных или семейных съемок.',
+       imageUrl:
+-        'https://images.unsplash.com/photo-1551884170-09fb70a3a2ed?auto=format&fit=crop&q=80&w=800',
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       key: 'rent',
+@@ -151,7 +151,7 @@ export const club = {
+       description:
+         'Полный пансион для вашей лошади: светлый денник, качественные корма, выгул в левадах и пользование манежем.',
+       imageUrl:
+-        'https://images.unsplash.com/photo-1598974357801-cbca100e65d3?auto=format&fit=crop&q=80&w=800',
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+   ] satisfies Direction[],
+ 
+diff --git a/landing/src/data/landingContent.ts b/landing/src/data/landingContent.ts
+index 17ff246..8680783 100644
+--- a/landing/src/data/landingContent.ts
++++ b/landing/src/data/landingContent.ts
+@@ -30,6 +30,8 @@ export interface InfrastructureCard {
+ }
+ 
+ export interface ServiceItem {
++  durationMinutes?: number;
++  format?: string;
+   id: string;
+   title: string;
+   category: string;
+@@ -60,6 +62,7 @@ export interface ContactInfo {
+   altPhone: string;
+   workingHours: string;
+   vkGroup: string;
++  telegram: string;
+   yandexMapsUrl: string;
+   coordinates: [number, number];
+   mapCoords: [number, number];
+@@ -89,7 +92,7 @@ export interface LandingData {
+ export const landingData: LandingData = {
+   brand: {
+     name: "СЛКС Тамбов",
+-    logoUrl: "/slks-logo.svg",
++    logoUrl: `${(import.meta.env?.BASE_URL || '/')}images/slks-logo-transparent.png`,
+   },
+   navigation: [
+     { id: "hero", label: "Главная", href: "#hero" },
+@@ -107,7 +110,7 @@ export const landingData: LandingData = {
+     primaryCtaText: "Записаться на занятие",
+     secondaryCtaText: "Инфраструктура",
+     mediaUrl:
+-      "https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&q=80&w=1200",
++      `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     metrics: [
+       { value: "100%", label: "Безопасность и еврогрунт" },
+       { value: "3+", label: "Лет: пони-клуб для детей" },
+@@ -128,7 +131,7 @@ export const landingData: LandingData = {
+       description:
+         "Специализированный еврогрунт с регулярным боронованием и увлажнением для максимальной защиты суставов лошадей.",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=1000",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+       specs: [
+         { label: "Покрытие", value: "Еврогрунт" },
+         { label: "Направление", value: "Конкур / Езда" },
+@@ -142,7 +145,7 @@ export const landingData: LandingData = {
+       description:
+         "Просторные вентилируемые денники 3×4 м, автоматические поилки, качественные корма и ежедневный выгул в левадах.",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1598974357801-cbca100e65d3?auto=format&fit=crop&q=80&w=1000",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+       specs: [
+         { label: "Денники", value: "3×4 метра" },
+         { label: "Кормление", value: "Индивидуальный рацион" },
+@@ -156,7 +159,7 @@ export const landingData: LandingData = {
+       description:
+         "Бережное обучение верховой езде для самых маленьких всадников в игровой форме под постоянным контролем тренера.",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1551884170-09fb70a3a2ed?auto=format&fit=crop&q=80&w=1000",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+       specs: [
+         { label: "Возраст", value: "Дети от 3 лет" },
+         { label: "Формат", value: "В поводу" },
+@@ -173,33 +176,39 @@ export const landingData: LandingData = {
+   services: [
+     {
+       id: "single-lesson",
++      durationMinutes: 45,
++      format: "Индивидуально / манеж",
+       title: "Разовое индивидуальное занятие",
+       category: "Обучение",
+       price: "2 000 ₽",
+       description:
+         "Работа с тренером один на один. Правильная посадка, базовый баланс и управление на шагу и рыси.",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=800",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       id: "subscription",
++      durationMinutes: 45,
++      format: "Индивидуально / манеж",
+       title: "Абонемент на тренировки",
+       category: "Спорт",
+       price: "от 1 800 ₽ / занятие",
+       description:
+         "Системный курс верховой езды и преодоления препятствий (конкур) для уверенного спортивного роста.",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&q=80&w=800",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       id: "kids",
++      durationMinutes: 20,
++      format: "Катание в поводу с инструктором",
+       title: "Катание в поводу для детей",
+       category: "Для детей",
+       price: "1 500 ₽",
+       description:
+         "Спокойная прогулка на пони или лошади в сопровождении опытного инструктора. Первые яркие впечатления.",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1551884170-09fb70a3a2ed?auto=format&fit=crop&q=80&w=800",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       id: "vaulting",
+@@ -209,7 +218,7 @@ export const landingData: LandingData = {
+       description:
+         "Развивающая гимнастика на движущейся лошади. Развивает гибкость, координацию и снимает страх высоты.",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1566251037378-5e04e3bec343?auto=format&fit=crop&q=80&w=800",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       id: "photo",
+@@ -219,7 +228,7 @@ export const landingData: LandingData = {
+       description:
+         "Ухоженные грациозные лошади клуба для индивидуальных, свадебных и семейных памятных съемок.",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1527153857715-3908f2ae5e81?auto=format&fit=crop&q=80&w=800",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       id: "boarding",
+@@ -229,7 +238,7 @@ export const landingData: LandingData = {
+       description:
+         "Полный пансион в светлой конюшне: пятиразовое сбалансированное питание, отбивка, выгул и манеж.",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1598974357801-cbca100e65d3?auto=format&fit=crop&q=80&w=800",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+   ],
+   horsesSection: {
+@@ -245,7 +254,7 @@ export const landingData: LandingData = {
+       breed: "Тракененская порода",
+       role: "Конкур / Старший состав",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&q=80&w=800",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       id: "horse-2",
+@@ -253,7 +262,7 @@ export const landingData: LandingData = {
+       breed: "Ганноверская порода",
+       role: "Выездка / Обучение",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=800",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       id: "horse-3",
+@@ -261,7 +270,7 @@ export const landingData: LandingData = {
+       breed: "Шетлендский пони",
+       role: "Любимец пони-клуба",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1551884170-09fb70a3a2ed?auto=format&fit=crop&q=80&w=800",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+   ],
+   trainersSection: {
+@@ -277,7 +286,7 @@ export const landingData: LandingData = {
+       role: "Старший тренер / Конкур",
+       experience: "Опыт более 12 лет",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+     {
+       id: "trainer-2",
+@@ -285,7 +294,7 @@ export const landingData: LandingData = {
+       role: "Инструктор пони-клуба и начальной подготовки",
+       experience: "Опыт более 8 лет",
+       imageUrl:
+-        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=800",
++        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
+     },
+   ],
+   contacts: {
+@@ -294,6 +303,7 @@ export const landingData: LandingData = {
+     altPhone: "+7 (902) 936-47-27",
+     workingHours: "Ежедневно с 09:00 до 19:00 (по предварительной записи)",
+     vkGroup: "https://vk.com/soyuz68ru",
++    telegram: import.meta.env?.VITE_TELEGRAM_URL?.trim() || "https://t.me/+79156720030",
+     yandexMapsUrl: "https://yandex.ru/maps/?text=%D0%A1%D0%BE%D1%8E%D0%B7%20%D0%BB%D1%8E%D0%B1%D0%B8%D1%82%D0%B5%D0%BB%D0%B5%D0%B9%20%D0%BA%D0%BE%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE%20%D1%81%D0%BF%D0%BE%D1%80%D1%82%D0%B0%20%D0%A2%D0%B0%D0%BC%D0%B1%D0%BE%D0%B2&ll=41.369035%2C52.745154&z=16",
+     coordinates: [52.745154, 41.369035],
+     mapCoords: [52.745154, 41.369035],
+diff --git a/landing/src/legal.ts b/landing/src/legal.ts
+index e24a3e1..b2639b5 100644
+--- a/landing/src/legal.ts
++++ b/landing/src/legal.ts
+@@ -2,12 +2,12 @@ const value = (name: keyof ImportMetaEnv): string => String(import.meta.env[name
+ const escape = (text: string): string => text.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!)
+ 
+ export const legal = {
+-  operatorName: value('VITE_LEGAL_OPERATOR_NAME'),
+-  operatorAddress: value('VITE_LEGAL_OPERATOR_ADDRESS'),
+-  registration: value('VITE_LEGAL_OPERATOR_REGISTRATION'),
+-  privacyEmail: value('VITE_LEGAL_PRIVACY_EMAIL'),
+-  siteUrl: value('VITE_LEGAL_SITE_URL'),
+-  dataLocation: value('VITE_LEGAL_DATA_LOCATION'),
++  operatorName: value('VITE_LEGAL_OPERATOR_NAME') || 'Общество с ограниченной ответственностью «Союз любителей конного спорта»',
++  operatorAddress: value('VITE_LEGAL_OPERATOR_ADDRESS') || '392029, Тамбовская область, г. о. город Тамбов, г. Тамбов, ул. Бастионная, д. 22А',
++  registration: value('VITE_LEGAL_OPERATOR_REGISTRATION') || 'ИНН 6800012870, КПП 680001001, ОГРН 1246800005319',
++  privacyEmail: value('VITE_LEGAL_PRIVACY_EMAIL') || 'marat.chernyshov@bk.ru',
++  siteUrl: value('VITE_LEGAL_SITE_URL') || 'https://club.horseclub68.ru',
++  dataLocation: value('VITE_LEGAL_DATA_LOCATION') || 'Российская Федерация',
+   consentVersion: value('VITE_LEGAL_CONSENT_VERSION') || '2026-09-19',
+   effectiveDate: value('VITE_LEGAL_EFFECTIVE_DATE') || '19 сентября 2026 года',
+ }
+diff --git a/landing/src/main.tsx b/landing/src/main.tsx
+index fc315de..5e9a922 100644
+--- a/landing/src/main.tsx
++++ b/landing/src/main.tsx
+@@ -1,6 +1,6 @@
+ import { StrictMode } from 'react';
+ import { createRoot } from 'react-dom/client';
+-import App from './App';
++import { App } from './App';
+ import './style.css';
+ import { MotionConfig } from 'framer-motion';
+ 
+diff --git a/landing/src/style.css b/landing/src/style.css
+index e39356f..841779d 100644
+--- a/landing/src/style.css
++++ b/landing/src/style.css
+@@ -153,3 +153,13 @@ body {
+     display: none;
+   }
+ }
++
++/* Reserve space for the mobile contact bar and keep touch targets operable. */
++@media (max-width: 1023px) {
++  .landing-shell { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
++  .landing-shell :is(a, button, summary) { min-height: 44px; min-width: 44px; }
++  .landing-shell a { display: inline-flex; align-items: center; }
++  .mobile-booking { bottom: max(12px, env(safe-area-inset-bottom)); }
++  .mobile-booking a { display: flex; }
++  html:has(.landing-shell) { scroll-padding-bottom: 100px; }
++}
+diff --git a/landing/tests/booking-cro.spec.ts b/landing/tests/booking-cro.spec.ts
+index ee4708a..78086df 100644
+--- a/landing/tests/booking-cro.spec.ts
++++ b/landing/tests/booking-cro.spec.ts
+@@ -56,7 +56,7 @@ test('first lesson submits without a discipline ID and policy opens with keyboar
+   await expect(policy).toBeFocused();
+   await page.getByLabel('Ваше имя').fill('Анна');
+   await page.getByLabel(/^Телефон/).fill('89991234567');
+-  await page.getByLabel('Я даю согласие').check();
++  await page.getByLabel('Я согласен на обработку персональных данных').check();
+   await page.getByRole('button', { name: 'Оставить заявку на первое занятие', exact: true }).click();
+   await expect(page.getByRole('status')).toContainText('Заявка принята!');
+   await expect(page.getByRole('status')).toContainText('чтобы согласовать дату и время первого занятия');
+diff --git a/landing/tests/carousel.spec.ts b/landing/tests/carousel.spec.ts
+index 077aa98..a60b638 100644
+--- a/landing/tests/carousel.spec.ts
++++ b/landing/tests/carousel.spec.ts
+@@ -34,7 +34,7 @@ for (const width of [390, 768, 1440]) {
+     await expect(horses.getByRole('button', { name: 'Вправо', exact: true })).toBeDisabled();
+     await page.keyboard.press('Home');
+     await expect(horses.getByRole('button', { name: 'Влево', exact: true })).toBeDisabled();
+-    await expect(horses.locator('img').first()).toHaveAttribute('src', '/images/catalog-placeholder.svg');
++    await expect(horses.locator('img').first()).toHaveAttribute('src', '/images/horse.jpg');
+     await horses.locator('li > button').first().click();
+     await expect(page.getByRole('dialog')).toContainText('Лошадь 1');
+     await page.keyboard.press('Escape');
+@@ -86,5 +86,5 @@ test('single-card catalogs do not show unnecessary navigation', async ({ page })
+   await expect(carousel.locator('li')).toHaveCount(1);
+   await expect(carousel.getByRole('button', { name: 'Вправо', exact: true })).toHaveCount(0);
+   await carousel.scrollIntoViewIfNeeded();
+-  await expect(carousel.locator('img')).toHaveAttribute('src', '/images/catalog-placeholder.svg');
++  await expect(carousel.locator('img')).toHaveAttribute('src', '/images/horse.jpg');
+ });
+diff --git a/landing/tests/first-lesson.spec.ts b/landing/tests/first-lesson.spec.ts
+index 9047a93..3a03666 100644
+--- a/landing/tests/first-lesson.spec.ts
++++ b/landing/tests/first-lesson.spec.ts
+@@ -8,7 +8,7 @@ for (const width of [320, 768, 1440]) {
+     const section = page.locator('#first-lesson');
+     await expect(section.locator('ol > li')).toHaveCount(4);
+     await expect(section.locator('dl > div')).toHaveCount(3);
+-    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('gift-certificates');
++    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('faq');
+     await section.scrollIntoViewIfNeeded();
+     const bounds = await section.locator('ol').boundingBox();
+     expect(bounds).not.toBeNull();
+diff --git a/landing/tests/gift-certificates.spec.ts b/landing/tests/gift-certificates.spec.ts
+index 349b983..33ac57a 100644
+--- a/landing/tests/gift-certificates.spec.ts
++++ b/landing/tests/gift-certificates.spec.ts
+@@ -10,7 +10,7 @@ for (const width of [320, 768, 1440]) {
+     await expect(section).toContainText('На любую услугу или сумму');
+     await expect(section).toContainText('Бумажный или электронный');
+     await expect(section).toContainText('Срок действия — 6 месяцев');
+-    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('contacts');
++    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('first-lesson');
+     await section.scrollIntoViewIfNeeded();
+     expect(await section.evaluate(element => Array.from(element.querySelectorAll('li, h2, h3, p, a')).every(child => {
+       const rect = child.getBoundingClientRect();
+@@ -20,7 +20,7 @@ for (const width of [320, 768, 1440]) {
+ 
+     await page.getByLabel('Ваше имя').fill('Анна');
+     await page.getByLabel('Пожелания к занятию').fill('Сертификат в подарок');
+-    const order = section.getByRole('link', { name: 'Заказать сертификат' });
++    const order = section.getByRole('link', { name: 'Купить сертификат' });
+     await order.focus();
+     await order.press('Enter');
+     await expect(page.locator('#booking-heading')).toBeFocused();
+@@ -37,7 +37,7 @@ test('certificate order respects reduced motion', async ({ page }) => {
+   await page.emulateMedia({ reducedMotion: 'reduce' });
+   await page.route('**/api/public/content', route => route.fulfill({ json: { horses: [], trainers: [], services: [] } }));
+   await page.goto('/');
+-  await page.getByRole('link', { name: 'Заказать сертификат' }).click();
++  await page.getByRole('link', { name: 'Купить сертификат' }).click();
+   await expect(page.locator('#booking-heading')).toBeFocused();
+   await expect(page.locator('#booking-form')).toBeInViewport();
+ });
+diff --git a/landing/tests/landing-fixes.spec.ts b/landing/tests/landing-fixes.spec.ts
+new file mode 100644
+index 0000000..e6b9d91
+--- /dev/null
++++ b/landing/tests/landing-fixes.spec.ts
+@@ -0,0 +1,81 @@
++import { expect, test } from '@playwright/test';
++
++test.beforeEach(async ({ page }) => {
++  await page.setViewportSize({ width: 375, height: 812 });
++  await page.emulateMedia({ reducedMotion: 'reduce' });
++  await page.route('**/api/public/content', route => route.fulfill({ json: { horses: [], trainers: [], services: [] } }));
++});
++
++test('local assets load and broken catalog, logo and hero images recover once', async ({ page }) => {
++  await page.goto('/');
++  const hero = page.locator('#hero img');
++  const logo = page.locator('header img').first();
++  for (const img of [hero, logo]) {
++    await expect.poll(() => img.evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBe(true);
++    const url = await img.getAttribute('src');
++    expect((await page.request.get(url!)).status()).toBe(200);
++    await img.evaluate((element: HTMLImageElement) => { element.src = '/missing-image.png'; });
++    await expect(img).toHaveAttribute('src', '/images/horse.jpg');
++  }
++  await page.locator('#horses-trainers').scrollIntoViewIfNeeded();
++  const horse = page.getByRole('region', { name: 'Лошади клуба', exact: true }).locator('img').first();
++  await expect(horse).toHaveAttribute('src', '/images/horse.jpg');
++  await horse.evaluate((element: HTMLImageElement) => { element.src = '/missing-horse.png'; });
++  await expect(horse).toHaveAttribute('src', '/images/horse.jpg');
++});
++
++test('policy links are independent of consent; preparation and FAQ have one source', async ({ page }) => {
++  await page.goto('/');
++  const consent = page.locator('#personal-data-consent');
++  await expect(consent).not.toBeChecked();
++  const policy = page.getByRole('link', { name: 'Политикой конфиденциальности', exact: true });
++  await policy.click();
++  await expect(page.getByRole('dialog')).toContainText('Тестовый оператор');
++  await page.keyboard.press('Escape');
++  await expect(policy).toBeFocused();
++  await expect(consent).not.toBeChecked();
++  await expect(page.getByText('Нажимая кнопку', { exact: false })).toHaveCount(0);
++  await expect(page.getByRole('heading', { name: 'Что надеть и как подготовиться', exact: true })).toHaveCount(1);
++  await expect(page.getByText('Обувь на гладкой подошве', { exact: false })).toHaveCount(1);
++  const questions = page.locator('#faq details');
++  await expect(questions).toHaveCount(5);
++  for (const question of await questions.all()) {
++    await question.locator('summary').click();
++    await expect(question).toHaveAttribute('open', '');
++  }
++  await page.locator('footer').getByRole('link', { name: 'Политика обработки персональных данных' }).click();
++  await expect(page.getByRole('dialog')).toBeVisible();
++  await page.keyboard.press('Escape');
++});
++
++test('mobile actions meet 44px targets and certificate plus age reach the API', async ({ page }) => {
++  let payload: Record<string, unknown> = {};
++  await page.route('**/api/leads', route => {
++    payload = route.request().postDataJSON();
++    return route.fulfill({ status: 201, json: { success: true } });
++  });
++  await page.goto('/');
++  const bar = page.getByRole('navigation', { name: 'Быстрая запись' });
++  for (const action of await bar.getByRole('link').all()) {
++    const box = (await action.boundingBox())!;
++    expect(box.height).toBeGreaterThanOrEqual(44);
++    expect(box.width).toBeGreaterThanOrEqual(44);
++  }
++  await expect(bar.getByRole('link', { name: 'Позвонить в клуб' })).toHaveAttribute('href', 'tel:+79156720030');
++  await bar.getByRole('link', { name: 'Записаться', exact: true }).click();
++  await expect(page.locator('#booking-heading')).toBeFocused();
++  await page.getByLabel('Желаемый номинал').selectOption('4000');
++  await page.getByRole('link', { name: 'Купить сертификат' }).click();
++  await expect(page.locator('#booking-form')).toContainText('Подарочный сертификат на 4');
++  await page.getByLabel('Ваше имя').fill('Анна');
++  await page.getByLabel(/^Телефон/).fill('89991234567');
++  await page.getByLabel('Возраст всадника').selectOption('7–12 лет');
++  await page.locator('#personal-data-consent').check();
++  await page.getByRole('button', { name: 'Оставить заявку на первое занятие' }).click();
++  await expect(page.getByRole('status')).toContainText('Заявка принята');
++  expect(payload.notes).toBe('Возраст всадника: 7–12 лет');
++  expect(payload.direction).toContain('Подарочный сертификат на 4');
++  expect(payload).not.toHaveProperty('serviceId');
++  await expect(page.getByRole('link', { name: 'Telegram', exact: true })).toHaveAttribute('href', /^https:\/\/t.me\//);
++  await page.screenshot({ path: test.info().outputPath('mobile-success.png'), fullPage: true });
++});
+diff --git a/landing/tests/landing.spec.ts b/landing/tests/landing.spec.ts
+index bed59b2..6cea6d1 100644
+--- a/landing/tests/landing.spec.ts
++++ b/landing/tests/landing.spec.ts
+@@ -11,7 +11,7 @@ async function fillForm(page: import('@playwright/test').Page) {
+   await page.getByText('Выбрать другую услугу', { exact: true }).click();
+   await page.locator('#contacts').getByRole('button', { name: 'Индивидуальная тренировка', exact: true }).click();
+   await page.getByLabel('Пожелания к занятию').fill('Первое занятие');
+-  await page.getByLabel('Я даю согласие').check();
++  await page.getByLabel('Я согласен на обработку персональных данных').check();
+ }
+ 
+ for (const width of [320, 390, 768, 1440]) {
+@@ -74,7 +74,7 @@ test('preserves form after server error and supports retry', async ({ page }) =>
+ 
+ test('requires separate consent and focuses its checkbox', async ({ page }) => {
+   await fillForm(page);
+-  await page.getByLabel('Я даю согласие').uncheck();
++  await page.getByLabel('Я согласен на обработку персональных данных').uncheck();
+   await page.getByRole('button', { name: 'Оставить заявку на первое занятие' }).click();
+   await expect(page.getByRole('alert')).toHaveText('Подтвердите согласие, чтобы отправить заявку');
+   await expect(page.locator('#personal-data-consent')).toBeFocused();
+diff --git a/landing/tests/live.spec.ts b/landing/tests/live.spec.ts
+index a29ba8d..fcbfde4 100644
+--- a/landing/tests/live.spec.ts
++++ b/landing/tests/live.spec.ts
+@@ -14,7 +14,7 @@ test('real API accepts a public lead from the landing form', async ({ page }) =>
+     await page.goto('/')
+     await page.locator('#contact-name').fill(name)
+     await page.locator('#contact-phone').fill(phone)
+-    await page.getByLabel('Я даю согласие на обработку персональных данных для рассмотрения заявки.').check()
++    await page.getByLabel('Я согласен на обработку персональных данных в соответствии с').check()
+     const response = page.waitForResponse(response => response.url().endsWith('/api/leads') && response.request().method() === 'POST')
+     await page.getByRole('button', { name: 'Оставить заявку на первое занятие' }).click()
+     const saved = await response
+diff --git a/landing/tests/polish.spec.ts b/landing/tests/polish.spec.ts
+index 3e0dd1b..04db940 100644
+--- a/landing/tests/polish.spec.ts
++++ b/landing/tests/polish.spec.ts
+@@ -108,7 +108,7 @@ test('card choices survive form errors, preserve the comment and reach the lead
+   await expect(page.getByRole('dialog')).toHaveCount(0);
+   await expect(page.getByLabel('Пожелания к занятию')).toHaveValue('В субботу');
+   await expect(page.locator('#contacts')).toContainText('Тренер: Екатерина');
+-  await page.getByLabel('Я даю согласие').check();
++  await page.getByLabel('Я согласен на обработку персональных данных').check();
+   await page.getByRole('button', { name: 'Оставить заявку на первое занятие' }).click();
+   await expect(page.getByRole('alert')).toBeVisible();
+   await expect(page.locator('#contacts')).toContainText('Лошадь: Мирабель');
+diff --git a/landing/tests/public-content.spec.ts b/landing/tests/public-content.spec.ts
+index f627d50..4b7b3a8 100644
+--- a/landing/tests/public-content.spec.ts
++++ b/landing/tests/public-content.spec.ts
+@@ -17,7 +17,7 @@ test('resolves uploaded photos against the API origin and displays them in all c
+   await expect(page.locator('#horses-trainers img').first()).toHaveAttribute('src', photo);
+   const urls = [resolveCatalogImage(photo, 'https://api.example.com/api'), resolveCatalogImage(photo, '/api'),
+     resolveCatalogImage('https://cdn.example.com/photo.jpg'), resolveCatalogImage('//evil.example/photo.jpg')];
+-  expect(urls).toEqual([`https://api.example.com${photo}`, photo, 'https://cdn.example.com/photo.jpg', '/images/catalog-placeholder.svg']);
++  expect(urls).toEqual([`https://api.example.com${photo}`, photo, 'https://cdn.example.com/photo.jpg', '/images/horse.jpg']);
+ });
+ 
+ const content = {

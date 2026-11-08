@@ -56,7 +56,7 @@ test('first lesson submits without a discipline ID and policy opens with keyboar
   await expect(policy).toBeFocused();
   await page.getByLabel('Ваше имя').fill('Анна');
   await page.getByLabel(/^Телефон/).fill('89991234567');
-  await page.getByLabel('Я даю согласие').check();
+  await page.getByLabel('Я согласен на обработку персональных данных').check();
   await page.getByRole('button', { name: 'Оставить заявку на первое занятие', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Заявка принята!');
   await expect(page.getByRole('status')).toContainText('чтобы согласовать дату и время первого занятия');

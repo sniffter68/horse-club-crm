@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import riderImg from '../assets/rider.png';
+import { handleCatalogImageError } from '../catalogImage';
 
 export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
   const [motionPaused, setMotionPaused] = useState(false);
@@ -32,7 +33,7 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
           </div>
         </div>
         <div className="landing-hero__visual relative min-w-0 overflow-hidden">
-          <img src={riderImg} alt="Всадник СЛКС Тамбов" loading="eager" fetchPriority="high"
+          <img onError={handleCatalogImageError} src={riderImg} alt="Всадник СЛКС Тамбов" loading="eager" fetchPriority="high"
             width={1122} height={1402}
             className={`landing-hero__rider h-full w-full object-contain${motionPaused ? ' landing-hero__rider--paused' : ''}`} />
           <button type="button" aria-pressed={motionPaused}

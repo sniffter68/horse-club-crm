@@ -3,8 +3,8 @@ import { type ReactElement } from 'react';
 
 const steps = [
   {
-    number: '01', title: 'Что надеть', duration: 'До поездки',
-    description: 'Выберите длинные удобные брюки и закрытые кроссовки или ботинки на плоской подошве. Защитный шлем бесплатно подберём в клубе.',
+    number: '01', title: 'Обсудите занятие', duration: 'До поездки',
+    description: 'Расскажите администратору о своём опыте и пожеланиях. Вместе выберем подходящее занятие.',
   },
   {
     number: '02', title: 'Прибытие за 15 минут', duration: '15 мин до занятия',
@@ -22,7 +22,7 @@ const steps = [
 
 const preparation = [
   { title: 'Одежда', description: 'Длинные удобные брюки или плотные спортивные штаны (не шорты).' },
-  { title: 'Обувь', description: 'Закрытые кроссовки или ботинки на плоской подошве.' },
+  { title: 'Обувь', description: 'Обувь на гладкой подошве с небольшим каблуком 1–2 см (кроссовки без выраженного протектора допустимы для первого раза; обувь на платформе, высоком каблуке или сланцы строго запрещены).' },
   { title: 'Лакомство', description: 'По желанию — мытая морковь или яблоки, нарезанные дольками.' },
 ];
 
@@ -39,7 +39,7 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
             Впервые в седле? Это проще и безопаснее, чем кажется
           </h2>
           <p className="max-w-md text-base leading-relaxed text-club-secondary">
-            70% наших гостей приходят без опыта верховой езды. Мы бережно проведём вас через каждое мгновение первого знакомства с лошадью.
+            Опыт верховой езды не нужен. Мы бережно проведём вас через первое знакомство с лошадью.
           </p>
         </div>
 
@@ -61,7 +61,7 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
         </div>
 
         <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-luxury-bg/50 p-8 backdrop-blur-sm sm:p-10">
-          <h3 className="font-serif text-xl font-normal text-luxury-dark sm:text-2xl">Как подготовиться к визиту</h3>
+          <h3 className="font-serif text-xl font-normal text-luxury-dark sm:text-2xl">Что надеть и как подготовиться</h3>
           <dl className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
             {preparation.map(item => (
               <div key={item.title}>

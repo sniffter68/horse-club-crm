@@ -6,6 +6,9 @@ import {
   type ReactElement,
 } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { landingData } from '../data/landingContent';
+import { handleCatalogImageError } from '../catalogImage';
+import { Phone } from 'lucide-react';
 
 interface NavigationItem {
   label: string;
@@ -32,7 +35,7 @@ function Brand({ inverse = false }: BrandProps): ReactElement {
         }`}
       >
         <img
-          src="/images/slks-logo-transparent.png"
+          src={`${import.meta.env.BASE_URL}images/slks-logo-transparent.png`} onError={handleCatalogImageError}
           alt=""
           aria-hidden="true"
           className="h-8 w-8 object-contain"
@@ -222,6 +225,12 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
         </div>
       </header>
 
+      {!isOpen && <nav aria-label="Быстрая запись" className="mobile-booking fixed inset-x-4 bottom-3 z-50 flex items-center gap-2 rounded-2xl border border-white/15 bg-club-deep p-2 text-white shadow-lg lg:hidden">
+        <a href="#booking-form" onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
+          className="flex min-h-11 flex-1 items-center justify-center rounded-xl bg-club-action px-4 font-semibold hover:bg-club-secondary">Записаться</a>
+        <a href={`tel:${landingData.contacts.phone.replace(/[^+\d]/g, '')}`} aria-label="Позвонить в клуб"
+          className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/30 hover:bg-white/10"><Phone aria-hidden="true" size={20} /></a>
+      </nav>}
       <AnimatePresence>
         {isOpen && (
           <motion.div

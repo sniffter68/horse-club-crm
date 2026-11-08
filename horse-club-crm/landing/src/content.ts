@@ -39,7 +39,7 @@ export const club = {
   mapUrl: 'https://yandex.ru/maps/-/CDu1UB3c',
 
   heroMedia:
-    'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=2000',
+    `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
 
   infrastructure: [
     {
@@ -49,7 +49,7 @@ export const club = {
       description:
         'Оборудованный манеж со специализированным еврогрунтом для круглогодичных комфортных тренировок и конкура.',
       imageUrl:
-        'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&q=80&w=1200',
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
       specs: [
         { label: 'Покрытие', value: 'Специальный еврогрунт' },
         { label: 'Направления', value: 'Конкур и базовая выездка' },
@@ -63,7 +63,7 @@ export const club = {
       description:
         'Просторные светлые денники с регулярной отбивкой, сбалансированным рационом, выгулом и ветеринарным контролем.',
       imageUrl:
-        'https://images.unsplash.com/photo-1598974357801-cbca100e65d3?auto=format&fit=crop&q=80&w=1200',
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
       specs: [
         { label: 'Уход', value: 'Ежедневная отбивка' },
         { label: 'Кормление', value: 'Индивидуальный рацион' },
@@ -77,7 +77,7 @@ export const club = {
       description:
         'Бережное обучение верховой езде для самых маленьких, развивающая гимнастика на лошади и семейные фотосессии.',
       imageUrl:
-        'https://images.unsplash.com/photo-1551884170-09fb70a3a2ed?auto=format&fit=crop&q=80&w=1200',
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
       specs: [
         { label: 'Возраст', value: 'Дети от 3-х лет' },
         { label: 'Лошади', value: 'Пони и спокойные кони' },
@@ -96,7 +96,7 @@ export const club = {
       description:
         'Первое знакомство с лошадью, постановка базового баланса и правильной посадки под контролем опытного наставника.',
       imageUrl:
-        'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=800',
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       key: 'membership',
@@ -107,7 +107,7 @@ export const club = {
       description:
         'Системный тренинг по абонементу: совершенствование навыков управления, преодоление препятствий и конкур.',
       imageUrl:
-        'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&q=80&w=800',
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       key: 'kids-lead',
@@ -118,7 +118,7 @@ export const club = {
       description:
         'Спокойная прогулка в поводу на пони или надежной лошади в сопровождении инструктора.',
       imageUrl:
-        'https://images.unsplash.com/photo-1598974357801-cbca100e65d3?auto=format&fit=crop&q=80&w=800',
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       key: 'vaulting',
@@ -129,7 +129,7 @@ export const club = {
       description:
         'Вольтижировка: упражнения на шагающей или рысящей лошади для развития чувства баланса, гибкости и уверенности.',
       imageUrl:
-        'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=800',
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       key: 'photo',
@@ -140,7 +140,7 @@ export const club = {
       description:
         'Аренда грациозных ухоженных скакунов для индивидуальных, свадебных или семейных съемок.',
       imageUrl:
-        'https://images.unsplash.com/photo-1551884170-09fb70a3a2ed?auto=format&fit=crop&q=80&w=800',
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       key: 'rent',
@@ -151,7 +151,7 @@ export const club = {
       description:
         'Полный пансион для вашей лошади: светлый денник, качественные корма, выгул в левадах и пользование манежем.',
       imageUrl:
-        'https://images.unsplash.com/photo-1598974357801-cbca100e65d3?auto=format&fit=crop&q=80&w=800',
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
   ] satisfies Direction[],
 

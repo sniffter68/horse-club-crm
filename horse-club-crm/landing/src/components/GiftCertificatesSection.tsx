@@ -1,5 +1,6 @@
 import { type ReactElement } from 'react';
-import { scrollToBooking } from '../booking';
+import { useState } from 'react';
+import type { ChooseBooking } from '../booking';
 
 const benefits = [
   {
@@ -16,7 +17,8 @@ const benefits = [
   },
 ];
 
-export function GiftCertificatesSection(): ReactElement {
+export function GiftCertificatesSection({ onChoose }: { onChoose: ChooseBooking }): ReactElement {
+  const [amount, setAmount] = useState('2000');
   return (
     <section
       id="gift-certificates"
@@ -43,12 +45,20 @@ export function GiftCertificatesSection(): ReactElement {
         </ul>
 
         <div className="mt-6 md:mt-8 text-center">
+          <label htmlFor="gift-amount" className="mb-2 block font-semibold">Желаемый номинал</label>
+          <select id="gift-amount" value={amount} onChange={event => setAmount(event.target.value)}
+            className="mb-3 min-h-11 rounded-xl border border-black/20 bg-white px-4 py-3">
+            <option value="2000">2 000 ₽</option>
+            <option value="4000">4 000 ₽</option>
+            <option value="6000">6 000 ₽</option>
+          </select>
+          <p className="mb-4 text-sm text-club-secondary">Стоимость равна номиналу. Доступность номинала и способ оплаты подтвердит администратор.</p>
           <a
             href="#booking-form"
-            onClick={event => { event.preventDefault(); scrollToBooking(); }}
+            onClick={event => { event.preventDefault(); onChoose('service', { id: 'gift-certificate', name: `Подарочный сертификат на ${Number(amount).toLocaleString('ru-RU')} ₽` }); }}
             className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 hover:bg-club-secondary active:scale-95"
           >
-            Заказать сертификат
+            Купить сертификат
           </a>
         </div>
       </div>

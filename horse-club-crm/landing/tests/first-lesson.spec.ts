@@ -8,7 +8,7 @@ for (const width of [320, 768, 1440]) {
     const section = page.locator('#first-lesson');
     await expect(section.locator('ol > li')).toHaveCount(4);
     await expect(section.locator('dl > div')).toHaveCount(3);
-    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('gift-certificates');
+    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('faq');
     await section.scrollIntoViewIfNeeded();
     const bounds = await section.locator('ol').boundingBox();
     expect(bounds).not.toBeNull();

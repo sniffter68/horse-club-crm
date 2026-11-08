@@ -2,12 +2,12 @@ const value = (name: keyof ImportMetaEnv): string => String(import.meta.env[name
 const escape = (text: string): string => text.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!)
 
 export const legal = {
-  operatorName: value('VITE_LEGAL_OPERATOR_NAME'),
-  operatorAddress: value('VITE_LEGAL_OPERATOR_ADDRESS'),
-  registration: value('VITE_LEGAL_OPERATOR_REGISTRATION'),
-  privacyEmail: value('VITE_LEGAL_PRIVACY_EMAIL'),
-  siteUrl: value('VITE_LEGAL_SITE_URL'),
-  dataLocation: value('VITE_LEGAL_DATA_LOCATION'),
+  operatorName: value('VITE_LEGAL_OPERATOR_NAME') || 'Общество с ограниченной ответственностью «Союз любителей конного спорта»',
+  operatorAddress: value('VITE_LEGAL_OPERATOR_ADDRESS') || '392029, Тамбовская область, г. о. город Тамбов, г. Тамбов, ул. Бастионная, д. 22А',
+  registration: value('VITE_LEGAL_OPERATOR_REGISTRATION') || 'ИНН 6800012870, КПП 680001001, ОГРН 1246800005319',
+  privacyEmail: value('VITE_LEGAL_PRIVACY_EMAIL') || 'marat.chernyshov@bk.ru',
+  siteUrl: value('VITE_LEGAL_SITE_URL') || 'https://club.horseclub68.ru',
+  dataLocation: value('VITE_LEGAL_DATA_LOCATION') || 'Российская Федерация',
   consentVersion: value('VITE_LEGAL_CONSENT_VERSION') || '2026-09-19',
   effectiveDate: value('VITE_LEGAL_EFFECTIVE_DATE') || '19 сентября 2026 года',
 }

@@ -30,6 +30,8 @@ export interface InfrastructureCard {
 }
 
 export interface ServiceItem {
+  durationMinutes?: number;
+  format?: string;
   id: string;
   title: string;
   category: string;
@@ -60,6 +62,7 @@ export interface ContactInfo {
   altPhone: string;
   workingHours: string;
   vkGroup: string;
+  telegram: string;
   yandexMapsUrl: string;
   coordinates: [number, number];
   mapCoords: [number, number];
@@ -89,7 +92,7 @@ export interface LandingData {
 export const landingData: LandingData = {
   brand: {
     name: "СЛКС Тамбов",
-    logoUrl: "/slks-logo.svg",
+    logoUrl: `${(import.meta.env?.BASE_URL || '/')}images/slks-logo-transparent.png`,
   },
   navigation: [
     { id: "hero", label: "Главная", href: "#hero" },
@@ -107,7 +110,7 @@ export const landingData: LandingData = {
     primaryCtaText: "Записаться на занятие",
     secondaryCtaText: "Инфраструктура",
     mediaUrl:
-      "https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&q=80&w=1200",
+      `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     metrics: [
       { value: "100%", label: "Безопасность и еврогрунт" },
       { value: "3+", label: "Лет: пони-клуб для детей" },
@@ -128,7 +131,7 @@ export const landingData: LandingData = {
       description:
         "Специализированный еврогрунт с регулярным боронованием и увлажнением для максимальной защиты суставов лошадей.",
       imageUrl:
-        "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=1000",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
       specs: [
         { label: "Покрытие", value: "Еврогрунт" },
         { label: "Направление", value: "Конкур / Езда" },
@@ -142,7 +145,7 @@ export const landingData: LandingData = {
       description:
         "Просторные вентилируемые денники 3×4 м, автоматические поилки, качественные корма и ежедневный выгул в левадах.",
       imageUrl:
-        "https://images.unsplash.com/photo-1598974357801-cbca100e65d3?auto=format&fit=crop&q=80&w=1000",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
       specs: [
         { label: "Денники", value: "3×4 метра" },
         { label: "Кормление", value: "Индивидуальный рацион" },
@@ -156,7 +159,7 @@ export const landingData: LandingData = {
       description:
         "Бережное обучение верховой езде для самых маленьких всадников в игровой форме под постоянным контролем тренера.",
       imageUrl:
-        "https://images.unsplash.com/photo-1551884170-09fb70a3a2ed?auto=format&fit=crop&q=80&w=1000",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
       specs: [
         { label: "Возраст", value: "Дети от 3 лет" },
         { label: "Формат", value: "В поводу" },
@@ -173,33 +176,39 @@ export const landingData: LandingData = {
   services: [
     {
       id: "single-lesson",
+      durationMinutes: 45,
+      format: "Индивидуально / манеж",
       title: "Разовое индивидуальное занятие",
       category: "Обучение",
       price: "2 000 ₽",
       description:
         "Работа с тренером один на один. Правильная посадка, базовый баланс и управление на шагу и рыси.",
       imageUrl:
-        "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=800",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       id: "subscription",
+      durationMinutes: 45,
+      format: "Индивидуально / манеж",
       title: "Абонемент на тренировки",
       category: "Спорт",
       price: "от 1 800 ₽ / занятие",
       description:
         "Системный курс верховой езды и преодоления препятствий (конкур) для уверенного спортивного роста.",
       imageUrl:
-        "https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&q=80&w=800",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       id: "kids",
+      durationMinutes: 20,
+      format: "Катание в поводу с инструктором",
       title: "Катание в поводу для детей",
       category: "Для детей",
       price: "1 500 ₽",
       description:
         "Спокойная прогулка на пони или лошади в сопровождении опытного инструктора. Первые яркие впечатления.",
       imageUrl:
-        "https://images.unsplash.com/photo-1551884170-09fb70a3a2ed?auto=format&fit=crop&q=80&w=800",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       id: "vaulting",
@@ -209,7 +218,7 @@ export const landingData: LandingData = {
       description:
         "Развивающая гимнастика на движущейся лошади. Развивает гибкость, координацию и снимает страх высоты.",
       imageUrl:
-        "https://images.unsplash.com/photo-1566251037378-5e04e3bec343?auto=format&fit=crop&q=80&w=800",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       id: "photo",
@@ -219,7 +228,7 @@ export const landingData: LandingData = {
       description:
         "Ухоженные грациозные лошади клуба для индивидуальных, свадебных и семейных памятных съемок.",
       imageUrl:
-        "https://images.unsplash.com/photo-1527153857715-3908f2ae5e81?auto=format&fit=crop&q=80&w=800",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       id: "boarding",
@@ -229,7 +238,7 @@ export const landingData: LandingData = {
       description:
         "Полный пансион в светлой конюшне: пятиразовое сбалансированное питание, отбивка, выгул и манеж.",
       imageUrl:
-        "https://images.unsplash.com/photo-1598974357801-cbca100e65d3?auto=format&fit=crop&q=80&w=800",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
   ],
   horsesSection: {
@@ -245,7 +254,7 @@ export const landingData: LandingData = {
       breed: "Тракененская порода",
       role: "Конкур / Старший состав",
       imageUrl:
-        "https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&q=80&w=800",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       id: "horse-2",
@@ -253,7 +262,7 @@ export const landingData: LandingData = {
       breed: "Ганноверская порода",
       role: "Выездка / Обучение",
       imageUrl:
-        "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=800",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       id: "horse-3",
@@ -261,7 +270,7 @@ export const landingData: LandingData = {
       breed: "Шетлендский пони",
       role: "Любимец пони-клуба",
       imageUrl:
-        "https://images.unsplash.com/photo-1551884170-09fb70a3a2ed?auto=format&fit=crop&q=80&w=800",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
   ],
   trainersSection: {
@@ -277,7 +286,7 @@ export const landingData: LandingData = {
       role: "Старший тренер / Конкур",
       experience: "Опыт более 12 лет",
       imageUrl:
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
     {
       id: "trainer-2",
@@ -285,7 +294,7 @@ export const landingData: LandingData = {
       role: "Инструктор пони-клуба и начальной подготовки",
       experience: "Опыт более 8 лет",
       imageUrl:
-        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=800",
+        `${(import.meta.env?.BASE_URL || '/')}images/horse.jpg`,
     },
   ],
   contacts: {
@@ -294,6 +303,7 @@ export const landingData: LandingData = {
     altPhone: "+7 (902) 936-47-27",
     workingHours: "Ежедневно с 09:00 до 19:00 (по предварительной записи)",
     vkGroup: "https://vk.com/soyuz68ru",
+    telegram: import.meta.env?.VITE_TELEGRAM_URL?.trim() || "https://t.me/+79156720030",
     yandexMapsUrl: "https://yandex.ru/maps/?text=%D0%A1%D0%BE%D1%8E%D0%B7%20%D0%BB%D1%8E%D0%B1%D0%B8%D1%82%D0%B5%D0%BB%D0%B5%D0%B9%20%D0%BA%D0%BE%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE%20%D1%81%D0%BF%D0%BE%D1%80%D1%82%D0%B0%20%D0%A2%D0%B0%D0%BC%D0%B1%D0%BE%D0%B2&ll=41.369035%2C52.745154&z=16",
     coordinates: [52.745154, 41.369035],
     mapCoords: [52.745154, 41.369035],

@@ -11,7 +11,7 @@ async function fillForm(page: import('@playwright/test').Page) {
   await page.getByText('Выбрать другую услугу', { exact: true }).click();
   await page.locator('#contacts').getByRole('button', { name: 'Индивидуальная тренировка', exact: true }).click();
   await page.getByLabel('Пожелания к занятию').fill('Первое занятие');
-  await page.getByLabel('Я даю согласие').check();
+  await page.getByLabel('Я согласен на обработку персональных данных').check();
 }
 
 for (const width of [320, 390, 768, 1440]) {
@@ -74,7 +74,7 @@ test('preserves form after server error and supports retry', async ({ page }) =>
 
 test('requires separate consent and focuses its checkbox', async ({ page }) => {
   await fillForm(page);
-  await page.getByLabel('Я даю согласие').uncheck();
+  await page.getByLabel('Я согласен на обработку персональных данных').uncheck();
   await page.getByRole('button', { name: 'Оставить заявку на первое занятие' }).click();
   await expect(page.getByRole('alert')).toHaveText('Подтвердите согласие, чтобы отправить заявку');
   await expect(page.locator('#personal-data-consent')).toBeFocused();

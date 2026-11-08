@@ -153,3 +153,13 @@ body {
     display: none;
   }
 }
+
+/* Reserve space for the mobile contact bar and keep touch targets operable. */
+@media (max-width: 1023px) {
+  .landing-shell { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .landing-shell :is(a, button, summary) { min-height: 44px; min-width: 44px; }
+  .landing-shell a { display: inline-flex; align-items: center; }
+  .mobile-booking { bottom: max(12px, env(safe-area-inset-bottom)); }
+  .mobile-booking a { display: flex; }
+  html:has(.landing-shell) { scroll-padding-bottom: 100px; }
+}

@@ -108,7 +108,7 @@ test('card choices survive form errors, preserve the comment and reach the lead 
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByLabel('Пожелания к занятию')).toHaveValue('В субботу');
   await expect(page.locator('#contacts')).toContainText('Тренер: Екатерина');
-  await page.getByLabel('Я даю согласие').check();
+  await page.getByLabel('Я согласен на обработку персональных данных').check();
   await page.getByRole('button', { name: 'Оставить заявку на первое занятие' }).click();
   await expect(page.getByRole('alert')).toBeVisible();
   await expect(page.locator('#contacts')).toContainText('Лошадь: Мирабель');

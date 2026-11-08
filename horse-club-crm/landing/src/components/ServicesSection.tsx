@@ -18,7 +18,7 @@ interface ServiceItem {
 export function ServicesSection({ services, onChoose }: { services: PublicService[]; onChoose: ChooseBooking }): ReactElement {
   const servicesData: ServiceItem[] = services.map(item => ({
     id: item.id, title: item.title, cardTitle: item.title, desc: item.description,
-    price: item.price, duration: item.durationMinutes ? `Длительность: ${item.durationMinutes} мин` : '',
+    price: item.price, duration: `${item.durationMinutes ? `Длительность: ${item.durationMinutes} минут` : 'Длительность: по согласованию'} · ${item.format || 'Формат: по согласованию'}`,
     image: item.imageUrl, badge: item.category,
   }));
   const [activeTab, setActiveTab] = useState<string>(servicesData[0]?.id || '');

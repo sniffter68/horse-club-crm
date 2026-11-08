@@ -34,7 +34,7 @@ for (const width of [390, 768, 1440]) {
     await expect(horses.getByRole('button', { name: 'Вправо', exact: true })).toBeDisabled();
     await page.keyboard.press('Home');
     await expect(horses.getByRole('button', { name: 'Влево', exact: true })).toBeDisabled();
-    await expect(horses.locator('img').first()).toHaveAttribute('src', '/images/catalog-placeholder.svg');
+    await expect(horses.locator('img').first()).toHaveAttribute('src', '/images/horse.jpg');
     await horses.locator('li > button').first().click();
     await expect(page.getByRole('dialog')).toContainText('Лошадь 1');
     await page.keyboard.press('Escape');
@@ -86,5 +86,5 @@ test('single-card catalogs do not show unnecessary navigation', async ({ page })
   await expect(carousel.locator('li')).toHaveCount(1);
   await expect(carousel.getByRole('button', { name: 'Вправо', exact: true })).toHaveCount(0);
   await carousel.scrollIntoViewIfNeeded();
-  await expect(carousel.locator('img')).toHaveAttribute('src', '/images/catalog-placeholder.svg');
+  await expect(carousel.locator('img')).toHaveAttribute('src', '/images/horse.jpg');
 });

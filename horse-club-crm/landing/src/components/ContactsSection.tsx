@@ -20,6 +20,8 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
   const [name, setName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [age, setAge] = useState('');
+  const notesWithAge = [age && `Возраст всадника: ${age}`, notes].filter(Boolean).join('\n');
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -38,7 +40,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
     const form = e.currentTarget;
     const invalid = !name.trim() ? ['Укажите имя', 'contact-name']
       : phoneDigits(phone).length !== 11 ? ['Укажите телефон полностью: +7 и 10 цифр', 'contact-phone']
-      : bookingNotes(selection, notes).length > 2000 ? ['Сократите комментарий: вместе с выбранной лошадью и тренером допускается 2000 символов', 'contact-notes']
+      : bookingNotes(selection, notesWithAge).length > 2000 ? ['Сократите комментарий: вместе с выбранной лошадью и тренером допускается 2000 символов', 'contact-notes']
       : !consent ? ['Подтвердите согласие, чтобы отправить заявку', 'personal-data-consent'] : null;
     if (invalid) {
       setError(invalid[0]);
@@ -53,7 +55,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
     try {
       await sendLead({ name: name.trim(), phone: `+${phoneDigits(phone)}`, direction: selectedService.slice(0, 100),
         ...(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(selection.service?.id || '') ? { serviceId: selection.service!.id } : {}),
-        notes: bookingNotes(selection, notes) || undefined, source: 'landing', consentAccepted: true, consentVersion: legal.consentVersion });
+        notes: bookingNotes(selection, notesWithAge) || undefined, source: 'landing', consentAccepted: true, consentVersion: legal.consentVersion });
       setIsSubmitted(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Не удалось отправить заявку. Попробуйте ещё раз.');
@@ -157,6 +159,8 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                   >
                     ВКонтакте
                   </a>
+                  <a href={landingData.contacts.telegram} target="_blank" rel="noreferrer"
+                    className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-white">Telegram</a>
                 </div>
                 <span className="mt-1 block text-sm text-club-sand">
                   События и жизнь клуба
@@ -164,16 +168,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
               </div>
             </div>
 
-            {/* Памятка первого визита */}
-            <div className="rounded-3xl border border-white/10 bg-club-action/15 p-6 text-sm text-club-sand/90">
-              <div className="flex items-center gap-2 font-semibold text-white mb-2">
-                <span>✦</span>
-                <span>Рекомендации к первому визиту</span>
-              </div>
-              <p className="leading-relaxed">
-                Шлем и защитный жилет предоставляются клубом бесплатно. Для первой тренировки подойдут эластичные брюки без грубых внутренних швов и закрытая обувь на небольшом плоском каблуке (1-2 см).
-              </p>
-            </div>
+
           </div>
 
           {/* Правая колонка: Форма записи */}
@@ -205,6 +200,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                         setName('');
                         setPhone('');
                         setNotes('');
+                        setAge('');
                         setConsent(false);
                         setError('');
                         onReset();
@@ -313,6 +309,17 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                       </div>
                     </div>
 
+                    <div>
+                      <label htmlFor="rider-age" className="mb-1.5 block text-sm font-semibold text-club-secondary">Возраст всадника (необязательно, для детей)</label>
+                      <select id="rider-age" value={age} onChange={event => setAge(event.target.value)} disabled={loading}
+                        className="min-h-11 w-full rounded-2xl border border-black/10 bg-club-paper px-4 py-3 text-base">
+                        <option value="">Не указан</option>
+                        <option value="до 3 лет">До 3 лет — уточнить возможность</option>
+                        <option value="3–6 лет">3–6 лет</option>
+                        <option value="7–12 лет">7–12 лет</option>
+                        <option value="13–17 лет">13–17 лет</option>
+                      </select>
+                    </div>
                     {/* Пожелания / комментарий */}
                     <div>
                       <label htmlFor="contact-notes" className="block text-sm font-semibold text-club-secondary mb-1.5">
@@ -334,13 +341,13 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
 
                     {/* Кнопка отправки и согласие */}
                     <div className="pt-2">
-                      <label className="mb-4 flex items-start gap-3 text-sm text-club-secondary">
+                      <div className="mb-4 flex items-start gap-3 text-sm text-club-secondary">
                         <input id="personal-data-consent" type="checkbox" checked={consent} disabled={loading}
                           aria-invalid={invalidField === 'personal-data-consent'}
                           aria-describedby={invalidField === 'personal-data-consent' ? 'contact-error' : undefined}
-                          onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 accent-club-action" />
-                        <span>Я даю согласие на обработку персональных данных для рассмотрения заявки.</span>
-                      </label>
+                          onChange={(e) => setConsent(e.target.checked)} className="h-11 w-11 shrink-0 cursor-pointer accent-club-action" />
+                        <div><label htmlFor="personal-data-consent" className="cursor-pointer">Я согласен на обработку персональных данных в соответствии с </label><PrivacyPolicyLink /></div>
+                      </div>
                       <div className="min-h-12 text-sm text-[#8C3838]" aria-live="polite">
                         {error && <p id="contact-error" role="alert">{error}</p>}
                       </div>
@@ -353,7 +360,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
                       </button>
 
                       <div className="mt-3 text-center text-sm text-club-secondary">
-                        Нажимая кнопку, вы соглашаетесь с <PrivacyPolicyLink />
+                        Перезвоним или напишем в течение 15 минут
                       </div>
                     </div>
                   </motion.form>
