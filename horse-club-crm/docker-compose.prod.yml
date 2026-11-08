@@ -20,6 +20,7 @@ services:
       options: { max-size: '10m', max-file: '3' }
 
   migrate:
+    profiles: [migration]
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
@@ -69,7 +70,6 @@ services:
       PUBLIC_LEADS_ENABLED: ${PUBLIC_LEADS_ENABLED:?Set PUBLIC_LEADS_ENABLED=true to accept landing applications or false for maintenance}
     depends_on:
       postgres: { condition: service_healthy }
-      migrate: { condition: service_completed_successfully }
     networks: [crm_network]
     read_only: true
     volumes:

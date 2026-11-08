@@ -24,13 +24,14 @@ docker() {
     fi
     case "$FAIL_STAGE" in
       config) [[ "$*" != *"config --quiet"* ]] ;;
+      migration) [[ "$*" != *"run --rm --build migrate"* ]] ;;
       backend) [[ "$*" != *"up -d --build --wait backend"* ]] ;;
       caddy) [[ "$*" != *"up -d --force-recreate caddy"* ]] ;;
       *) return 0 ;;
     esac
 }
 ''', encoding='utf-8')
-    for stage in ['success', 'config', 'pipeline', 'frontend', 'backend', 'caddy', 'native']:
+    for stage in ['success', 'config', 'pipeline', 'frontend', 'migration', 'backend', 'caddy', 'native']:
         env = dict(os.environ, BASH_ENV=env_script.as_posix(), FAIL_STAGE=stage, ENV_FILE='no-such-test-env')
         result = subprocess.run([bash, str(root / 'deploy.sh')], env=env, capture_output=True, text=True)
         output = result.stdout + result.stderr
@@ -46,6 +47,8 @@ docker() {
             assert result.returncode != 0, output
             assert 'Deployment failed:' in output and 'command:' in output, output
             assert 'Deployment successful:' not in output
+            if stage == 'migration':
+                assert 'up -d --build --wait backend' not in output, output
             if stage != 'caddy':
                 assert 'up -d --force-recreate caddy' not in output
         print(f'deploy.sh {stage}: passed')

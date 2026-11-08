@@ -40,7 +40,11 @@ echo "===> 2.1. Building landing dist..."
 npm --prefix landing ci
 "${compose[@]}" config --format json | node scripts/build-landing.cjs
 
-echo "===> 3. Building backend, applying migrations and waiting for health..."
+echo "===> 3. Applying migrations in a disposable container..."
+"${compose[@]}" up -d --wait postgres
+"${compose[@]}" run --rm --build migrate
+
+echo "===> 3.0. Building backend and waiting for health..."
 "${compose[@]}" up -d --build --wait backend
 
 echo "===> 3.1. Checking running public lead endpoint (without storing a test application)..."

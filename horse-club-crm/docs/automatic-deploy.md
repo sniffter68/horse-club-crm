@@ -1,5 +1,17 @@
 # Автоматический деплой
 
+## Отдельный шаг миграций Docker Compose
+
+В production сервис `migrate` включён в профиль `migration`, не имеет фиксированного `container_name` и использует `restart: 'no'`. Backend зависит только от готовности PostgreSQL. Обычный `compose up` не запускает миграции.
+
+`deploy.sh` сначала дожидается PostgreSQL, затем выполняет `docker compose run --rm --build migrate` и только после успешного завершения обновляет backend. Для ручного запуска из корня проекта:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --build migrate
+```
+
+Compose создаёт одноразовый контейнер с уникальным именем и удаляет его после завершения. При ошибке миграции `deploy.sh` завершается до обновления backend. Перед прямым запуском новой версии backend миграции нужно выполнить отдельно.
+
 ## Prisma и варианты запуска (01.11.2026)
 
 Workflow готовит движки закреплённой в `backend/package.json` Prisma 6.19.3 на Ubuntu runner,
