@@ -5,7 +5,7 @@ import { VK } from 'vk-io';
 import type { Prisma } from '@prisma/client';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
-import { reminder24hKey } from './vk-reminder-key';
+import { reminderKey, reminderKind } from './vk-reminder-key';
 
 // Persist alongside the business change; VK is contacted only after commit.
 export async function queueVkNotification(tx: Prisma.TransactionClient, key: string, peerId: bigint, message: string): Promise<void> {
@@ -54,14 +54,15 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
   }
   onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
   private async discardStaleReminder(row: { id: string; key: string; peerId: bigint }): Promise<boolean> {
-    if (!row.key.startsWith('reminder24h:')) return false;
+    const kind = reminderKind(row.key);
+    if (!kind) return false;
     const booking = await this.prisma.booking.findUnique({
       where: { id: row.key.split(':')[1] }, include: { lesson: true, client: true },
     });
     const start = booking?.lesson?.startTime || booking?.startTime;
     if (booking && start && start > new Date() && booking.status === 'scheduled' && booking.attendanceStatus === 'PENDING'
       && (!booking.lesson || booking.lesson.status === 'SCHEDULED') && booking.client.vkUserId === row.peerId
-      && reminder24hKey(booking.id, start, row.peerId) === row.key) return false;
+      && reminderKey(kind, booking.id, start, row.peerId) === row.key) return false;
     await this.prisma.vkNotification.deleteMany({ where: { id: row.id, sentAt: null } });
     this.logger.warn({ event: 'vk_reminder_discarded', notificationId: row.id, key: row.key,
       message: 'Напоминание снято: занятие или получатель изменились либо время занятия уже наступило' });
@@ -71,10 +72,26 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
     if (this.running || !this.vk) return;
     this.running = true;
     try {
-      const rows = await this.prisma.vkNotification.findMany({ where: { sentAt: null, nextAttemptAt: { lte: new Date() } }, orderBy: { createdAt: 'asc' }, take: 20 });
+      const rows = await this.prisma.vkNotification.findMany({ where: {
+        sentAt: null, nextAttemptAt: { lte: new Date() },
+        OR: [
+          { NOT: { OR: [{ key: { startsWith: 'reminder24h:' } }, { key: { startsWith: 'reminder2h:' } }] } },
+          { attemptCount: 0 },
+        ],
+      }, orderBy: { createdAt: 'asc' }, take: 20 });
       for (const row of rows) {
+        const isReminder = reminderKind(row.key) !== undefined;
         try {
           if (await this.discardStaleReminder(row)) continue;
+          if (isReminder) {
+            // Persist the attempt before contacting VK. Atomic claim prevents duplicate
+            // attempts across workers and restarts, including blocked private messages.
+            const claimed = await this.prisma.vkNotification.updateMany({
+              where: { id: row.id, sentAt: null, attemptCount: 0 },
+              data: { attemptCount: { increment: 1 } },
+            });
+            if (claimed.count === 0) continue;
+          }
           await this.vk.api.messages.send({ peer_id: Number(row.peerId), message: row.message, random_id: createHash('sha256').update(row.id).digest().readInt32BE(0) || 1 });
           await this.prisma.vkNotification.update({ where: { id: row.id }, data: { sentAt: new Date() } });
           this.logger.log({ event: 'vk_notification_sent', notificationId: row.id, key: row.key, peerId: String(row.peerId) });
@@ -82,9 +99,11 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
           // Failed recipients must not occupy every slot in the next batch.
           const delay = Math.min(3600000, 10000 * 2 ** Math.min(row.attemptCount, 9));
           try {
-            await this.prisma.vkNotification.update({ where: { id: row.id }, data: {
-              attemptCount: { increment: 1 }, nextAttemptAt: new Date(Date.now() + delay),
-            } });
+            if (!isReminder) {
+              await this.prisma.vkNotification.update({ where: { id: row.id }, data: {
+                attemptCount: { increment: 1 }, nextAttemptAt: new Date(Date.now() + delay),
+              } });
+            }
           } catch { this.logger.warn('Не удалось обновить время повторной доставки VK'); }
           this.logger.warn({
             message: `Не удалось отправить VK-уведомление для userId: ${row.peerId}`,

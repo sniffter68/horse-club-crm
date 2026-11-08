@@ -2,6 +2,7 @@ import { PublicModule } from './public/public.module';
 import { StaffModule } from './staff/staff.module';
 import { UploadModule } from './upload/upload.module';
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { BookingsModule } from './bookings/bookings.module';
 import { BoardingModule } from './boarding/boarding.module';
 import { LeadsModule } from './leads/leads.module';
@@ -28,6 +29,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     StaffModule,
     UploadModule,
     BookingsModule,
