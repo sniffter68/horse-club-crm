@@ -52,7 +52,7 @@ for (const width of [320, 375, 768, 1280, 1440]) {
       const card = el.parentElement!.getBoundingClientRect();
       return rects.length === 1 && rects[0].right <= card.right - 12;
     })).toBe(true);
-    await expect(page.getByRole('link', { name: 'MAX', exact: true })).toHaveAttribute('href', 'https://max.ru');
+    await expect(page.locator('#contacts').getByRole('link', { name: 'MAX', exact: true })).toHaveAttribute('href', 'https://max.ru/join/Evl2Mp0moqVwQAeBIPaY5ozOrE6rs83dO45_5SrqAvo');
     await expect(page.getByRole('link', { name: /Telegram/i })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.locator('#contacts').scrollIntoViewIfNeeded();

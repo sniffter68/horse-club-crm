@@ -43,7 +43,7 @@ test('policy links are independent of consent; preparation and FAQ have one sour
     await question.locator('summary').click();
     await expect(question).toHaveAttribute('open', '');
   }
-  await page.locator('footer').getByRole('link', { name: 'Политика обработки персональных данных' }).click();
+  await page.locator('footer').getByRole('link', { name: 'Политика конфиденциальности' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
 });
@@ -76,6 +76,6 @@ test('mobile actions meet 44px targets and certificate plus age reach the API', 
   expect(payload.notes).toBe('Возраст всадника: 7–12 лет');
   expect(payload.direction).toContain('Подарочный сертификат на 4');
   expect(payload).not.toHaveProperty('serviceId');
-  await expect(page.getByRole('link', { name: 'MAX', exact: true })).toHaveAttribute('href', 'https://max.ru');
+  await expect(page.locator('#contacts').getByRole('link', { name: 'MAX', exact: true })).toHaveAttribute('href', 'https://max.ru/join/Evl2Mp0moqVwQAeBIPaY5ozOrE6rs83dO45_5SrqAvo');
   await page.screenshot({ path: test.info().outputPath('mobile-success.png'), fullPage: true });
 });

@@ -119,6 +119,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
             <button
               type="button"
               aria-pressed={tab === 'horses'}
+              id="horses"
               onClick={() => setTab('horses')}
               className={`rounded-full px-6 py-2.5 text-sm font-medium   transition-all duration-300 ${
                 tab === 'horses'
@@ -131,6 +132,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
             <button
               type="button"
               aria-pressed={tab === 'trainers'}
+              id="trainers"
               onClick={() => setTab('trainers')}
               className={`rounded-full px-6 py-2.5 text-sm font-medium   transition-all duration-300 ${
                 tab === 'trainers'

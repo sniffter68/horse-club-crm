@@ -1,6 +1,16 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+.club-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  max-width: 100%;
+  cursor: pointer;
+  transition: color .2s;
+}
+.club-footer a:hover, .club-footer a:active { color: var(--color-club-deep); }
+
 /* A clipped viewport owns horizontal movement; the document never scrolls sideways. */
 .club-carousel { min-width: 0; }
 .club-carousel__viewport { overflow: hidden; padding: 10px 4px 36px; margin: -10px -4px -20px; }
