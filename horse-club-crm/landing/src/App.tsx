@@ -15,6 +15,7 @@ import { FaqSection } from './components/FaqSection';
 export function App(): ReactElement {
   const content = usePublicContent();
   const [selection, setSelection] = useState<BookingSelection>({});
+  const [quickBookingOpen, setQuickBookingOpen] = useState(false);
   const choose: ChooseBooking = (kind, choice) => {
     setSelection(previous => ({ ...previous, [kind]: choice }));
     scrollToBooking();
@@ -30,7 +31,10 @@ export function App(): ReactElement {
         <HeroSection onBookFirstLesson={bookFirstLesson} />
 
         {/* 2. Тёмная секция услуг с интерактивными парящими предметами */}
-        <ServicesSection services={content.services} onChoose={choose} />
+        <ServicesSection services={content.services} onChoose={(kind, choice) => {
+          setSelection(previous => ({ ...previous, [kind]: choice }));
+          setQuickBookingOpen(true);
+        }} />
 
         {/* 3. Каталог лошадей и тренеров с модальными окнами */}
         <HorsesAndTrainersSection horses={content.horses} trainers={content.trainers} onChoose={choose} />
@@ -44,6 +48,7 @@ export function App(): ReactElement {
 
         {/* 5. Премиальный блок контактов с интерактивной формой бронирования */}
         <ContactsSection services={content.services} selection={selection}
+          quickBookingOpen={quickBookingOpen} onCloseQuickBooking={() => setQuickBookingOpen(false)}
           onChoose={(kind, choice) => setSelection(previous => ({ ...previous, [kind]: choice }))}
           onRemove={kind => setSelection(previous => ({ ...previous, [kind]: undefined }))}
           onReset={() => setSelection({})} />

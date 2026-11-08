@@ -194,7 +194,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
                       <div className="mt-6 flex items-center justify-between border-t border-black/5 pt-4 text-sm">
                         <span className="font-medium text-club-ink">{horse.discipline}</span>
                         <span className="inline-flex items-center gap-1 font-semibold text-club-action group-hover:translate-x-1 transition-transform">
-                          Подробнее ↗
+                          Подробнее
                         </span>
                       </div>
                     </div>
@@ -256,7 +256,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
                           Биография наставника
                         </span>
                         <span className="inline-flex items-center gap-1 font-semibold text-club-action group-hover:translate-x-1 transition-transform">
-                          Подробнее ↗
+                          Подробнее
                         </span>
                       </div>
                     </div>
@@ -406,7 +406,6 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
                     className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-club-ink px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 hover:bg-club-secondary active:scale-95 sm:w-auto"
                   >
                     <span>Записаться</span>
-                    <span aria-hidden="true">↗</span>
                   </a>
                 </div>
               </div>

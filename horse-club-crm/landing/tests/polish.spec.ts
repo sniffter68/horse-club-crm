@@ -95,9 +95,10 @@ test('card choices survive form errors, preserve the comment and reach the lead 
   await page.getByLabel('Ваше имя').fill('Анна');
   await page.getByLabel(/^Телефон/).fill('89991234567');
   await page.getByLabel('Пожелания к занятию').fill('В субботу');
-  await page.locator('#services').getByRole('link', { name: 'Записаться на занятие', exact: true }).click();
+  await page.locator('#services').getByRole('button', { name: 'Записаться: Персональное занятие', exact: true }).click();
   await expect(page.locator('#booking-heading')).toBeFocused();
   await expect(page.locator('#booking-form')).toContainText('Выбранная услуга: Персональное занятие');
+  await page.getByRole('dialog', { name: 'Быстрая запись' }).getByRole('button', { name: 'Закрыть', exact: true }).click();
   await page.locator('#horses-trainers .club-carousel__slide > button').filter({ has: page.getByRole('heading', { name: 'Мирабель', exact: true }) }).click();
   await page.getByRole('dialog').getByRole('link', { name: 'Записаться', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);

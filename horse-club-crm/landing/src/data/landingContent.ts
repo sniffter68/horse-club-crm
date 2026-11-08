@@ -62,7 +62,7 @@ export interface ContactInfo {
   altPhone: string;
   workingHours: string;
   vkGroup: string;
-  telegram: string;
+  max: string;
   yandexMapsUrl: string;
   coordinates: [number, number];
   mapCoords: [number, number];
@@ -303,7 +303,7 @@ export const landingData: LandingData = {
     altPhone: "+7 (902) 936-47-27",
     workingHours: "Ежедневно с 09:00 до 19:00 (по предварительной записи)",
     vkGroup: "https://vk.com/soyuz68ru",
-    telegram: import.meta.env?.VITE_TELEGRAM_URL?.trim() || "https://t.me/+79156720030",
+    max: "https://max.ru",
     yandexMapsUrl: "https://yandex.ru/maps/?text=%D0%A1%D0%BE%D1%8E%D0%B7%20%D0%BB%D1%8E%D0%B1%D0%B8%D1%82%D0%B5%D0%BB%D0%B5%D0%B9%20%D0%BA%D0%BE%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE%20%D1%81%D0%BF%D0%BE%D1%80%D1%82%D0%B0%20%D0%A2%D0%B0%D0%BC%D0%B1%D0%BE%D0%B2&ll=41.369035%2C52.745154&z=16",
     coordinates: [52.745154, 41.369035],
     mapCoords: [52.745154, 41.369035],

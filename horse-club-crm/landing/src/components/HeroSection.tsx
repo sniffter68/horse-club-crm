@@ -1,15 +1,14 @@
-import { useState, type ReactElement } from 'react';
+import type { ReactElement } from 'react';
 import riderImg from '../assets/rider.png';
 import { handleCatalogImageError } from '../catalogImage';
 
 export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
-  const [motionPaused, setMotionPaused] = useState(false);
-
   return (
     <section id="hero" aria-labelledby="hero-heading" className="landing-hero bg-luxury-bg px-6 pb-10 pt-24 md:pb-16 md:pt-28 sm:px-10 lg:px-16">
       <div className="landing-hero__layout mx-auto grid w-full max-w-7xl items-center gap-6 lg:gap-8">
         <div className="min-w-0">
-          <p className="mb-4 text-sm leading-5 text-luxury-muted">Тамбов · ул. Бастионная, 22АС2</p>
+          <a href="https://yandex.ru/maps/?text=Тамбов+ул+Бастионная+22АС2" target="_blank" rel="noopener noreferrer"
+            className="mb-4 inline-block text-sm leading-5 text-luxury-muted transition-colors hover:text-luxury-dark hover:underline underline-offset-4">Тамбов · ул. Бастионная, 22АС2</a>
           <h1 id="hero-heading" className="landing-hero__heading font-serif font-normal text-luxury-dark text-3xl sm:text-4xl lg:text-5xl leading-tight">
             Искусство<br />быть в седле
           </h1>
@@ -35,14 +34,7 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
         <div className="landing-hero__visual relative min-w-0 overflow-hidden">
           <img onError={handleCatalogImageError} src={riderImg} alt="Всадник СЛКС Тамбов" loading="eager" fetchPriority="high"
             width={1122} height={1402}
-            className={`landing-hero__rider h-full w-full object-contain${motionPaused ? ' landing-hero__rider--paused' : ''}`} />
-          <button type="button" aria-pressed={motionPaused}
-            aria-label={motionPaused ? 'Продолжить анимацию' : 'Остановить анимацию'}
-            title={motionPaused ? 'Продолжить анимацию' : 'Остановить анимацию'}
-            onClick={() => setMotionPaused(paused => !paused)}
-            className="landing-hero__motion absolute bottom-0 right-0 inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-luxury-muted bg-luxury-bg text-sm text-luxury-dark transition-colors hover:bg-luxury-card active:bg-white">
-            <span aria-hidden="true">{motionPaused ? '▶' : 'Ⅱ'}</span>
-          </button>
+            className="landing-hero__rider h-full w-full object-contain" />
         </div>
       </div>
       <a href="#services" aria-label="Прокрутить к услугам"

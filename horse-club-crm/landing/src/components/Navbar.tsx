@@ -190,7 +190,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
                     onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
                     className="rounded-full bg-club-ink px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-club-action active:scale-95"
                   >
-                    Записаться ↗
+                    Записаться
                   </a>
                 </motion.nav>
               ) : (
@@ -279,7 +279,6 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
                 className="mt-10 flex min-h-14 w-full items-center justify-between rounded-2xl bg-club-sand px-6 text-sm font-semibold text-club-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <span>Записаться</span>
-                <span aria-hidden="true">↗</span>
               </motion.a>
             </motion.div>
           </motion.div>

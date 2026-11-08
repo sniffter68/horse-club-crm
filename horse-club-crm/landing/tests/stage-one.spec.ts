@@ -22,7 +22,7 @@ for (const width of [375, 390, 768, 1023, 1024, 1025, 1280, 1440, 1920]) {
   });
 }
 
-test('rider motion stays within its reserved space and can be stopped', async ({ page }) => {
+test('rider motion stays within its reserved space without player controls', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.route('**/api/public/content', route => route.fulfill({ json: {} }));
@@ -44,10 +44,8 @@ test('rider motion stays within its reserved space and can be stopped', async ({
     expect(bounds.y).toBeGreaterThanOrEqual(frame.y);
     expect(bounds.y + bounds.height).toBeLessThanOrEqual(frame.y + frame.height);
   }
-  await page.getByRole('button', { name: 'Остановить анимацию' }).click();
-  await expect(rider).toHaveCSS('animation-play-state', 'paused');
-  await page.getByRole('button', { name: 'Продолжить анимацию' }).click();
-  await expect(rider).toHaveCSS('animation-play-state', 'running');
+  await expect(page.locator('#hero button')).toHaveCount(0);
+  await expect(rider).toHaveCSS('animation-iteration-count', 'infinite');
   await expect(visual).toHaveJSProperty('offsetHeight', frame.height);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(rider).toHaveCSS('animation-name', 'none');

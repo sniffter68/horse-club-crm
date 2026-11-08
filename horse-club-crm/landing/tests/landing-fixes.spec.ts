@@ -76,6 +76,6 @@ test('mobile actions meet 44px targets and certificate plus age reach the API', 
   expect(payload.notes).toBe('Возраст всадника: 7–12 лет');
   expect(payload.direction).toContain('Подарочный сертификат на 4');
   expect(payload).not.toHaveProperty('serviceId');
-  await expect(page.getByRole('link', { name: 'Telegram', exact: true })).toHaveAttribute('href', /^https:\/\/t.me\//);
+  await expect(page.getByRole('link', { name: 'MAX', exact: true })).toHaveAttribute('href', 'https://max.ru');
   await page.screenshot({ path: test.info().outputPath('mobile-success.png'), fullPage: true });
 });

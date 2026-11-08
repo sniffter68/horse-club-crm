@@ -31,7 +31,7 @@ test('loads public records, updates service selection and opens real horse/train
   const pending = new Promise<void>(resolve => { release = resolve; });
   await page.route('**/api/public/content', async route => { await pending; await route.fulfill({ json: content }); });
   await page.goto('/');
-  await expect(page.locator('#services').getByRole('link').first()).toBeVisible();
+  await expect(page.locator('#services').getByRole('button').first()).toBeVisible();
   release();
   await expect(page.locator('#services').getByRole('heading', { name: 'Занятие из CRM' })).toBeVisible();
   await expect(page.locator('#services')).toContainText('Описание услуги из базы');
@@ -58,7 +58,7 @@ for (const scenario of ['empty', 'error', 'malformed', 'partial']) {
     }));
     await page.goto('/');
     await expect(page.locator('#horses-trainers h3').first()).toBeVisible();
-    await expect(page.locator('#services').getByRole('link').first()).toBeVisible();
+    await expect(page.locator('#services').getByRole('button').first()).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Лошадь из CRM' })).toHaveCount(0);
     if (scenario === 'partial') await expect(page.locator('#services')).toContainText('Занятие из CRM');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
