@@ -23,7 +23,7 @@ export class TelegramPersonalService {
 
   async identity(sender: string) {
     const user = await this.prisma.user.findUnique({ where: { telegramUserId: sender } });
-    return user ? (user.role === 'ADMIN' ? 'admin' : user.trainerId ? 'trainer' : 'staff') : 'client';
+    return user ? (user.role === 'ADMIN' ? 'admin' : user.role === 'TRAINER' ? 'trainer' : 'staff') : 'client';
   }
 
   async schedule(sender: string, week: boolean) {

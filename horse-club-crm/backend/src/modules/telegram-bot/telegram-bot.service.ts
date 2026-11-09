@@ -1,13 +1,16 @@
 import { HttpException, Injectable, Logger, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
-import { Bot, InlineKeyboard } from 'grammy';
+import { Bot, Context, InlineKeyboard } from 'grammy';
+import { DateTime } from 'luxon';
 import { TelegramLinkService } from './telegram-link.service';
 import { TelegramPersonalService } from './telegram-personal.service';
+import { CLUB_TIMEZONE, TelegramScheduleService } from './telegram-schedule.service';
 
 @Injectable()
 export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramBotService.name);
   private bot?: Bot;
-  constructor(private readonly links: TelegramLinkService, private readonly personal: TelegramPersonalService) {}
+  constructor(private readonly links: TelegramLinkService, private readonly personal: TelegramPersonalService,
+    private readonly schedule: TelegramScheduleService) {}
 
   onModuleInit(): void {
     const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
@@ -34,6 +37,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const role = await this.personal.identity(sender);
       const keyboard = new InlineKeyboard();
       if (role === 'client') return keyboard.webApp('Записаться на занятие', url.href).row().text('Мои записи', 'my_bookings').text('Мой абонемент', 'my_balance');
+      if (role === 'trainer' || role === 'admin') keyboard.text('📅 Расписание на сегодня', 'club_schedule:today').row().text('🗓 Расписание на завтра', 'club_schedule:tomorrow').row();
       keyboard.text('Расписание на день', 'day').row().text('Расписание на неделю', 'week');
       return keyboard;
     };
@@ -45,6 +49,31 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     bot.command('help', async ctx => { await ctx.reply('Укажите ваш Telegram username или ID в CRM. Выберите нужный раздел:', { reply_markup: await menu(String(ctx.from!.id)) }); });
     bot.command('balance', async ctx => {
       await ctx.reply(await this.personal.balance(String(ctx.from!.id)), { parse_mode: 'HTML' });
+    });
+    const showSchedule = async (ctx: Context, day: DateTime) => {
+      const user = await this.schedule.authorize(String(ctx.from!.id));
+      if (!day.isValid) {
+        await ctx.reply('Некорректная дата расписания');
+        return;
+      }
+      const chunks = await this.schedule.getDaySchedule(day.toJSDate(), user.id);
+      const keyboard = new InlineKeyboard()
+        .text('⬅️ Вчера', `club_schedule:${day.minus({ days: 1 }).toISODate()}`)
+        .text('🔄 Обновить', `club_schedule:${day.toISODate()}`)
+        .text('Завтра ➡️', `club_schedule:${day.plus({ days: 1 }).toISODate()}`);
+      for (const [index, chunk] of chunks.entries()) await ctx.reply(chunk, index === chunks.length - 1 ? { reply_markup: keyboard } : {});
+    };
+    const clubDay = (tomorrow = false) => DateTime.now().setZone(CLUB_TIMEZONE).startOf('day').plus({ days: tomorrow ? 1 : 0 });
+    bot.command('schedule', async ctx => {
+      await showSchedule(ctx, clubDay(ctx.match.trim().toLowerCase() === 'tomorrow'));
+    });
+    bot.hears(['📅 Расписание на сегодня', '🗓 Расписание на завтра'], async ctx => {
+      await showSchedule(ctx, clubDay(ctx.msg?.text === '🗓 Расписание на завтра'));
+    });
+    bot.callbackQuery(/^club_schedule:(today|tomorrow|\d{4}-\d{2}-\d{2})$/, async ctx => {
+      await ctx.answerCallbackQuery();
+      const value = ctx.match[1];
+      await showSchedule(ctx, value === 'today' || value === 'tomorrow' ? clubDay(value === 'tomorrow') : DateTime.fromISO(value, { zone: CLUB_TIMEZONE }));
     });
     bot.on('message:text', async ctx => {
       const sender = String(ctx.from!.id);
