@@ -35,7 +35,9 @@ export class TelegramAuthGuard implements CanActivate {
         name: [identity.firstName, identity.lastName].filter(Boolean).join(' ') },
       update: {}, select: { id: true, deletedAt: true },
     });
-    if (client.deletedAt) throw new ForbiddenException('Обратитесь в клуб для восстановления профиля');
+    const bookingFlow = (request.method === 'GET' && (request.path?.endsWith('/services') || slots))
+      || (request.method === 'POST' && request.path?.endsWith('/bookings'));
+    if (client.deletedAt && !bookingFlow) throw new ForbiddenException('Обратитесь в клуб для восстановления профиля');
     request.telegram = { ...identity, clientId: client.id };
     return true;
   }

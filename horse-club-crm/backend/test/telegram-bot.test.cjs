@@ -33,7 +33,7 @@ test('Telegram HMAC verifies signed identity and rejects tampering, duplicate fi
   assert.throws(() => validateTelegramInitData(sign(), 'wrong'), status(401));
 });
 
-test('guard derives client identity only from signed data, scopes schedule and denies archived profiles', async () => {
+test('guard derives signed identity and lets archived profiles access only the booking flow', async () => {
   const previous = process.env.TELEGRAM_BOT_TOKEN; process.env.TELEGRAM_BOT_TOKEN = token;
   try {
     let archived = false, disabled = false, upserts = 0;
@@ -46,6 +46,14 @@ test('guard derives client identity only from signed data, scopes schedule and d
     assert.equal(await guard.canActivate(context), true); assert.equal(request.telegram.clientId, clientId);
     disabled = true; await assert.rejects(guard.canActivate(context), status(403)); assert.equal(upserts, 1);
     disabled = false; archived = true; await assert.rejects(guard.canActivate(context), status(403));
+    for (const [method, path] of [['GET', '/api/tma/services'], ['GET', '/api/tma/slots'], ['POST', '/api/tma/bookings']]) {
+      request.method = method; request.path = path;
+      assert.equal(await guard.canActivate(context), true);
+    }
+    request.method = 'GET'; request.path = '/api/tma/my-bookings';
+    await assert.rejects(guard.canActivate(context), status(403));
+    request.method = 'POST'; request.path = '/api/tma/bookings/id/cancel-request';
+    await assert.rejects(guard.canActivate(context), status(403));
   } finally { if (previous === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = previous; }
 });
 
@@ -102,6 +110,20 @@ test('slots honor Moscow date, day off, trainer capacity conflicts and do not sw
   f.tx.clubSchedule.findUnique = async () => null;
   await assert.rejects(f.service.slots(clientId, { date, serviceId }), status(503));
 });
+test('archived profile can preview trainer slots without restoring the client', async () => {
+  const f = fixture();
+  f.tx.client.findUnique = async () => ({ id: clientId, deletedAt: new Date() });
+  let validations = 0;
+  f.rules.validate = async (_tx, input) => {
+    validations++;
+    assert.equal(input.lockResources, false);
+    assert.deepEqual(input.participants, []);
+  };
+  assert.ok((await f.service.slots(clientId, { date: f.start.toISODate(), serviceId })).slots.length > 0);
+  assert.ok(validations > 0);
+  assert.equal(f.writes.length, 0);
+});
+
 test('cancellation checks owner and effective lesson state, leaves finances and reservation untouched', async () => {
   const f = fixture();
   await assert.rejects(f.service.cancelRequest('another-client', f.saved.id), status(404));

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, HttpException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { BookingRulesService } from '../../bookings/booking-rules.service';
@@ -20,6 +20,7 @@ const bookingView = {
 
 @Injectable()
 export class TmaBookingService {
+  private readonly logger = new Logger(TmaBookingService.name);
   constructor(private readonly prisma: PrismaService, private readonly rules: BookingRulesService,
     private readonly lessons: LessonsService) {}
 
@@ -68,6 +69,7 @@ export class TmaBookingService {
   async slots(clientId: string, query: TmaSlotsQuery) {
     const day = this.date(query.date);
     return this.prisma.$transaction(async tx => {
+      const client = await tx.client.findUnique({ where: { id: clientId } });
       const service = await this.service(tx, query.serviceId);
       const trainers = await tx.trainer.findMany({ where: { isPublic: true, isActive: true },
         orderBy: [{ order: 'asc' }, { id: 'asc' }], take: 50, select: { id: true, name: true } });
@@ -82,7 +84,7 @@ export class TmaBookingService {
         const available: typeof trainers = [];
         for (const trainer of trainers) {
           try {
-            await this.rules.validate(tx, { trainerId: trainer.id, participants: [{ clientId }],
+            await this.rules.validate(tx, { trainerId: trainer.id, participants: client?.deletedAt ? [] : [{ clientId }],
               start: start.toJSDate(), end: end.toJSDate(), lockResources: false });
             available.push(trainer);
           } catch (error: unknown) {
@@ -110,7 +112,9 @@ export class TmaBookingService {
 
   async create(clientId: string, dto: TmaCreateBookingDto) {
     if (!dto.consentAccepted || dto.consentVersion !== currentLeadConsentVersion()) throw new BadRequestException('Обновите приложение и подтвердите актуальное согласие');
-    return this.serializable(async tx => {
+    let restoredClientId: string | undefined;
+    const booking = await this.serializable(async tx => {
+      restoredClientId = undefined;
       const previous = await tx.booking.findUnique({ where: { telegramRequestId: dto.requestId }, select: { ...bookingView, clientId: true } });
       if (previous) {
         if (previous.clientId !== clientId) throw new ConflictException('Повторите оформление записи');
@@ -128,13 +132,13 @@ export class TmaBookingService {
       const trainer = await tx.trainer.findFirst({ where: { id: dto.trainerId, isPublic: true, isActive: true } });
       if (!trainer) throw new ConflictException('Тренер недоступен');
       const client = await tx.client.findUnique({ where: { id: clientId } });
-      if (!client || client.deletedAt) throw new NotFoundException('Профиль недоступен');
+      if (!client) throw new NotFoundException('Профиль недоступен');
       const phone = normalizePhone(dto.phone);
       const phoneOwner = await tx.client.findUnique({ where: { phone } });
       if (phoneOwner?.telegramUserId && phoneOwner.telegramUserId !== client.telegramUserId) {
-        throw new BadRequestException('Этот номер привязан к другому Telegram-аккаунту');
+        throw new BadRequestException('Этот номер привязан к другому Telegram-аккаунту. Обратитесь в клуб');
       }
-      if (phoneOwner?.deletedAt) throw new NotFoundException('Профиль недоступен');
+      if (client.deletedAt && phoneOwner?.id !== clientId) throw new BadRequestException('Для восстановления профиля укажите его номер телефона или обратитесь в клуб');
       let bookingClientId = clientId;
       if (phoneOwner && phoneOwner.id !== clientId) {
         // The guard already created a Telegram profile. Release the unique ID first;
@@ -142,16 +146,23 @@ export class TmaBookingService {
         await tx.client.update({ where: { id: clientId }, data: { telegramUserId: null, telegramUsername: null } });
         await tx.client.update({ where: { id: phoneOwner.id }, data: {
           telegramUserId: client.telegramUserId, telegramUsername: client.telegramUsername,
+          ...(phoneOwner.deletedAt ? { deletedAt: null, name: dto.name?.trim() || phoneOwner.name } : {}),
         } });
         bookingClientId = phoneOwner.id;
       } else {
-        await tx.client.update({ where: { id: clientId }, data: { phone } });
+        await tx.client.update({ where: { id: clientId }, data: { phone,
+          ...(phoneOwner?.deletedAt ? { deletedAt: null, telegramUserId: client.telegramUserId,
+            name: dto.name?.trim() || phoneOwner.name } : {}),
+        } });
       }
+      if (phoneOwner?.deletedAt) restoredClientId = phoneOwner.id;
       const lesson = await this.lessons.createLesson({ serviceId: service.id, trainerId: trainer.id,
         startTime: start.toISO()!, participants: [{ clientId: bookingClientId }] }, tx);
       return tx.booking.update({ where: { id: lesson.bookings[0].id }, data: { telegramRequestId: dto.requestId,
         telegramConsentVersion: dto.consentVersion, telegramConsentedAt: new Date() }, select: bookingView });
     });
+    if (restoredClientId) this.logger.log(`[TMA Booking] Client ${restoredClientId} automatically restored from archive`);
+    return booking;
   }
 
   async myBookings(clientId: string, query: TmaBookingsQuery) {

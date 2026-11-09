@@ -1,0 +1,244 @@
+﻿diff --git a/horse-club-crm/backend/src/modules/telegram-bot/telegram-auth.guard.ts b/horse-club-crm/backend/src/modules/telegram-bot/telegram-auth.guard.ts
+index d226efb..4ef0fd9 100644
+--- a/horse-club-crm/backend/src/modules/telegram-bot/telegram-auth.guard.ts
++++ b/horse-club-crm/backend/src/modules/telegram-bot/telegram-auth.guard.ts
+@@ -35,7 +35,9 @@ export class TelegramAuthGuard implements CanActivate {
+         name: [identity.firstName, identity.lastName].filter(Boolean).join(' ') },
+       update: {}, select: { id: true, deletedAt: true },
+     });
+-    if (client.deletedAt) throw new ForbiddenException('Обратитесь в клуб для восстановления профиля');
++    const bookingFlow = (request.method === 'GET' && (request.path?.endsWith('/services') || slots))
++      || (request.method === 'POST' && request.path?.endsWith('/bookings'));
++    if (client.deletedAt && !bookingFlow) throw new ForbiddenException('Обратитесь в клуб для восстановления профиля');
+     request.telegram = { ...identity, clientId: client.id };
+     return true;
+   }
+diff --git a/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.dto.ts b/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.dto.ts
+index f82810e..7638d2f 100644
+--- a/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.dto.ts
++++ b/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.dto.ts
+@@ -11,6 +11,7 @@ export class TmaBookingsQuery {
+   @Type(() => Number) @IsInt() @Min(1) @Max(50) @IsOptional() limit = 20;
+ }
+ export class TmaCreateBookingDto {
++  @IsOptional() @IsString() name?: string;
+   @IsUUID() serviceId!: string;
+   @IsUUID() trainerId!: string;
+   @IsISO8601({ strict: true }) startTime!: string;
+diff --git a/horse-club-crm/backend/src/modules/telegram-bot/tma-booking.service.ts b/horse-club-crm/backend/src/modules/telegram-bot/tma-booking.service.ts
+index c99e018..a07b6a7 100644
+--- a/horse-club-crm/backend/src/modules/telegram-bot/tma-booking.service.ts
++++ b/horse-club-crm/backend/src/modules/telegram-bot/tma-booking.service.ts
+@@ -1,4 +1,4 @@
+-import { BadRequestException, ConflictException, HttpException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
++import { BadRequestException, ConflictException, HttpException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+ import { Prisma } from '@prisma/client';
+ import { DateTime } from 'luxon';
+ import { BookingRulesService } from '../../bookings/booking-rules.service';
+@@ -20,6 +20,7 @@ const bookingView = {
+ 
+ @Injectable()
+ export class TmaBookingService {
++  private readonly logger = new Logger(TmaBookingService.name);
+   constructor(private readonly prisma: PrismaService, private readonly rules: BookingRulesService,
+     private readonly lessons: LessonsService) {}
+ 
+@@ -68,6 +69,7 @@ export class TmaBookingService {
+   async slots(clientId: string, query: TmaSlotsQuery) {
+     const day = this.date(query.date);
+     return this.prisma.$transaction(async tx => {
++      const client = await tx.client.findUnique({ where: { id: clientId } });
+       const service = await this.service(tx, query.serviceId);
+       const trainers = await tx.trainer.findMany({ where: { isPublic: true, isActive: true },
+         orderBy: [{ order: 'asc' }, { id: 'asc' }], take: 50, select: { id: true, name: true } });
+@@ -82,7 +84,7 @@ export class TmaBookingService {
+         const available: typeof trainers = [];
+         for (const trainer of trainers) {
+           try {
+-            await this.rules.validate(tx, { trainerId: trainer.id, participants: [{ clientId }],
++            await this.rules.validate(tx, { trainerId: trainer.id, participants: client?.deletedAt ? [] : [{ clientId }],
+               start: start.toJSDate(), end: end.toJSDate(), lockResources: false });
+             available.push(trainer);
+           } catch (error: unknown) {
+@@ -110,7 +112,9 @@ export class TmaBookingService {
+ 
+   async create(clientId: string, dto: TmaCreateBookingDto) {
+     if (!dto.consentAccepted || dto.consentVersion !== currentLeadConsentVersion()) throw new BadRequestException('Обновите приложение и подтвердите актуальное согласие');
+-    return this.serializable(async tx => {
++    let restoredClientId: string | undefined;
++    const booking = await this.serializable(async tx => {
++      restoredClientId = undefined;
+       const previous = await tx.booking.findUnique({ where: { telegramRequestId: dto.requestId }, select: { ...bookingView, clientId: true } });
+       if (previous) {
+         if (previous.clientId !== clientId) throw new ConflictException('Повторите оформление записи');
+@@ -128,13 +132,13 @@ export class TmaBookingService {
+       const trainer = await tx.trainer.findFirst({ where: { id: dto.trainerId, isPublic: true, isActive: true } });
+       if (!trainer) throw new ConflictException('Тренер недоступен');
+       const client = await tx.client.findUnique({ where: { id: clientId } });
+-      if (!client || client.deletedAt) throw new NotFoundException('Профиль недоступен');
++      if (!client) throw new NotFoundException('Профиль недоступен');
+       const phone = normalizePhone(dto.phone);
+       const phoneOwner = await tx.client.findUnique({ where: { phone } });
+       if (phoneOwner?.telegramUserId && phoneOwner.telegramUserId !== client.telegramUserId) {
+-        throw new BadRequestException('Этот номер привязан к другому Telegram-аккаунту');
++        throw new BadRequestException('Этот номер привязан к другому Telegram-аккаунту. Обратитесь в клуб');
+       }
+-      if (phoneOwner?.deletedAt) throw new NotFoundException('Профиль недоступен');
++      if (client.deletedAt && phoneOwner?.id !== clientId) throw new BadRequestException('Для восстановления профиля укажите его номер телефона или обратитесь в клуб');
+       let bookingClientId = clientId;
+       if (phoneOwner && phoneOwner.id !== clientId) {
+         // The guard already created a Telegram profile. Release the unique ID first;
+@@ -142,16 +146,23 @@ export class TmaBookingService {
+         await tx.client.update({ where: { id: clientId }, data: { telegramUserId: null, telegramUsername: null } });
+         await tx.client.update({ where: { id: phoneOwner.id }, data: {
+           telegramUserId: client.telegramUserId, telegramUsername: client.telegramUsername,
++          ...(phoneOwner.deletedAt ? { deletedAt: null, name: dto.name?.trim() || phoneOwner.name } : {}),
+         } });
+         bookingClientId = phoneOwner.id;
+       } else {
+-        await tx.client.update({ where: { id: clientId }, data: { phone } });
++        await tx.client.update({ where: { id: clientId }, data: { phone,
++          ...(phoneOwner?.deletedAt ? { deletedAt: null, telegramUserId: client.telegramUserId,
++            name: dto.name?.trim() || phoneOwner.name } : {}),
++        } });
+       }
++      if (phoneOwner?.deletedAt) restoredClientId = phoneOwner.id;
+       const lesson = await this.lessons.createLesson({ serviceId: service.id, trainerId: trainer.id,
+         startTime: start.toISO()!, participants: [{ clientId: bookingClientId }] }, tx);
+       return tx.booking.update({ where: { id: lesson.bookings[0].id }, data: { telegramRequestId: dto.requestId,
+         telegramConsentVersion: dto.consentVersion, telegramConsentedAt: new Date() }, select: bookingView });
+     });
++    if (restoredClientId) this.logger.log(`[TMA Booking] Client ${restoredClientId} automatically restored from archive`);
++    return booking;
+   }
+ 
+   async myBookings(clientId: string, query: TmaBookingsQuery) {
+diff --git a/horse-club-crm/backend/test/telegram-bot.test.cjs b/horse-club-crm/backend/test/telegram-bot.test.cjs
+index 2eec298..8543272 100644
+--- a/horse-club-crm/backend/test/telegram-bot.test.cjs
++++ b/horse-club-crm/backend/test/telegram-bot.test.cjs
+@@ -33,7 +33,7 @@ test('Telegram HMAC verifies signed identity and rejects tampering, duplicate fi
+   assert.throws(() => validateTelegramInitData(sign(), 'wrong'), status(401));
+ });
+ 
+-test('guard derives client identity only from signed data, scopes schedule and denies archived profiles', async () => {
++test('guard derives signed identity and lets archived profiles access only the booking flow', async () => {
+   const previous = process.env.TELEGRAM_BOT_TOKEN; process.env.TELEGRAM_BOT_TOKEN = token;
+   try {
+     let archived = false, disabled = false, upserts = 0;
+@@ -46,6 +46,14 @@ test('guard derives client identity only from signed data, scopes schedule and d
+     assert.equal(await guard.canActivate(context), true); assert.equal(request.telegram.clientId, clientId);
+     disabled = true; await assert.rejects(guard.canActivate(context), status(403)); assert.equal(upserts, 1);
+     disabled = false; archived = true; await assert.rejects(guard.canActivate(context), status(403));
++    for (const [method, path] of [['GET', '/api/tma/services'], ['GET', '/api/tma/slots'], ['POST', '/api/tma/bookings']]) {
++      request.method = method; request.path = path;
++      assert.equal(await guard.canActivate(context), true);
++    }
++    request.method = 'GET'; request.path = '/api/tma/my-bookings';
++    await assert.rejects(guard.canActivate(context), status(403));
++    request.method = 'POST'; request.path = '/api/tma/bookings/id/cancel-request';
++    await assert.rejects(guard.canActivate(context), status(403));
+   } finally { if (previous === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = previous; }
+ });
+ 
+@@ -102,6 +110,20 @@ test('slots honor Moscow date, day off, trainer capacity conflicts and do not sw
+   f.tx.clubSchedule.findUnique = async () => null;
+   await assert.rejects(f.service.slots(clientId, { date, serviceId }), status(503));
+ });
++test('archived profile can preview trainer slots without restoring the client', async () => {
++  const f = fixture();
++  f.tx.client.findUnique = async () => ({ id: clientId, deletedAt: new Date() });
++  let validations = 0;
++  f.rules.validate = async (_tx, input) => {
++    validations++;
++    assert.equal(input.lockResources, false);
++    assert.deepEqual(input.participants, []);
++  };
++  assert.ok((await f.service.slots(clientId, { date: f.start.toISODate(), serviceId })).slots.length > 0);
++  assert.ok(validations > 0);
++  assert.equal(f.writes.length, 0);
++});
++
+ test('cancellation checks owner and effective lesson state, leaves finances and reservation untouched', async () => {
+   const f = fixture();
+   await assert.rejects(f.service.cancelRequest('another-client', f.saved.id), status(404));
+diff --git a/horse-club-crm/backend/test/tma-phone-link.test.cjs b/horse-club-crm/backend/test/tma-phone-link.test.cjs
+index dc41ea7..ba5bd2e 100644
+--- a/horse-club-crm/backend/test/tma-phone-link.test.cjs
++++ b/horse-club-crm/backend/test/tma-phone-link.test.cjs
+@@ -9,7 +9,10 @@ function fixture(owner) {
+   const client = { id: 'telegram-profile', telegramUserId: '123', telegramUsername: 'anna', deletedAt: null };
+   const start = DateTime.now().setZone('Europe/Moscow').plus({ days: 2 }).set({ hour: 12, minute: 0, second: 0, millisecond: 0 });
+   const tx = {
+-    client: { findUnique: async ({ where }) => where.phone ? owner : client,
++    client: { findUnique: async ({ where }) => {
++      if (where.phone) { assert.equal(where.phone, '+79991234567'); return owner; }
++      return client;
++    },
+       update: async input => { writes.push(input); return input.data; } },
+     service: { findFirst: async () => ({ id: 'service', durationMinutes: 60 }) },
+     trainer: { findFirst: async () => ({ id: 'trainer' }) },
+@@ -23,7 +26,7 @@ function fixture(owner) {
+   });
+   const dto = { phone: '8 (999) 123-45-67', startTime: start.toISO(), serviceId: 'service', trainerId: 'trainer',
+     requestId: 'request', consentAccepted: true, consentVersion: DEFAULT_LEAD_CONSENT_VERSION };
+-  return { service, client, dto, writes };
++  return { service, client, dto, writes, tx };
+ }
+ 
+ test('TMA normalizes phone, releases unique Telegram ID and books with existing unlinked CRM card', async () => {
+@@ -42,11 +45,50 @@ test('TMA accepts own phone and fills the Telegram profile when phone has no own
+   }
+ });
+ 
+-test('TMA rejects another Telegram account and archived CRM cards without mutations', async () => {
+-  for (const [owner, status] of [[{ id: 'crm-client', telegramUserId: '456' }, 400],
+-    [{ id: 'crm-client', telegramUserId: null, deletedAt: new Date() }, 404]]) {
++test('TMA rejects another Telegram account on active and archived CRM cards without mutations', async () => {
++  for (const deletedAt of [null, new Date()]) {
++    const owner = { id: 'crm-client', telegramUserId: '456', deletedAt };
+     const f = fixture(owner);
+-    await assert.rejects(f.service.create(f.client.id, f.dto), error => error.getStatus() === status);
++    await assert.rejects(f.service.create(f.client.id, f.dto), error => error.getStatus() === 400 && /Обратитесь в клуб/.test(error.message));
+     assert.equal(f.writes.length, 0);
+   }
+ });
++
++test('TMA restores an unlinked archived phone owner and creates a booking in the same transaction', async () => {
++  for (const name of [undefined, '   ', '  Новое имя  ']) {
++    const f = fixture({ id: 'crm-client', telegramUserId: null, deletedAt: new Date(), name: 'Прежнее имя' });
++    const result = await f.service.create(f.client.id, { ...f.dto, name });
++    assert.deepEqual(f.writes[0], { where: { id: f.client.id }, data: { telegramUserId: null, telegramUsername: null } });
++    assert.deepEqual(f.writes[1], { where: { id: 'crm-client' }, data: {
++      telegramUserId: '123', telegramUsername: 'anna', deletedAt: null, name: name?.trim() || 'Прежнее имя',
++    } });
++    assert.deepEqual(f.writes[2].participants, [{ clientId: 'crm-client' }]);
++    assert.equal(result.where.id, 'booking');
++    assert.equal(result.data.telegramRequestId, f.dto.requestId);
++  }
++});
++
++test('TMA restores its own archived Telegram profile only when the normalized phone matches', async () => {
++  const f = fixture({ id: 'telegram-profile', telegramUserId: '123', deletedAt: new Date(), name: 'Анна' });
++  f.client.deletedAt = new Date();
++  await f.service.create(f.client.id, f.dto);
++  assert.deepEqual(f.writes[0], { where: { id: f.client.id }, data: {
++    phone: '+79991234567', deletedAt: null, telegramUserId: '123', name: 'Анна',
++  } });
++  assert.deepEqual(f.writes[1].participants, [{ clientId: f.client.id }]);
++  const mismatch = fixture(null); mismatch.client.deletedAt = new Date();
++  await assert.rejects(mismatch.service.create(mismatch.client.id, mismatch.dto), error => error.getStatus() === 400);
++  assert.equal(mismatch.writes.length, 0);
++});
++
++test('TMA logs restoration only after the booking transaction succeeds', async t => {
++  const f = fixture({ id: 'crm-client', telegramUserId: null, deletedAt: new Date(), name: 'Анна' });
++  const log = t.mock.method(f.service.logger, 'log', () => {});
++  f.tx.booking.update = async () => { throw new Error('booking write failed'); };
++  await assert.rejects(f.service.create(f.client.id, f.dto), /booking write failed/);
++  assert.equal(log.mock.calls.length, 0);
++  f.tx.booking.update = async input => input;
++  await f.service.create(f.client.id, f.dto);
++  assert.equal(log.mock.calls.length, 1);
++  assert.equal(log.mock.calls[0].arguments[0], '[TMA Booking] Client crm-client automatically restored from archive');
++});

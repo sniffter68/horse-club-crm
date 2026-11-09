@@ -11,6 +11,7 @@ export class TmaBookingsQuery {
   @Type(() => Number) @IsInt() @Min(1) @Max(50) @IsOptional() limit = 20;
 }
 export class TmaCreateBookingDto {
+  @IsOptional() @IsString() name?: string;
   @IsUUID() serviceId!: string;
   @IsUUID() trainerId!: string;
   @IsISO8601({ strict: true }) startTime!: string;
