@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { api, dateTime, money, moscowDate, requireUuid, time, upcoming, type Booking, type Service, type Slot } from './api';
 import { applyTheme, haptic, telegram } from './telegram';
 import { useTelegramNavigation } from './useTelegramNavigation';
+
+const _h = React.createElement;
 
 const ADDRESS = 'Тамбов, ул. Бастионная, 22АС2';
 const FORMATS = [
@@ -26,6 +28,9 @@ export function App() {
   const [slot, setSlot] = useState<Slot>();
   const [trainerId, setTrainerId] = useState('');
   const [phone, setPhone] = useState('');
+  const [contactPending, setContactPending] = useState(false);
+  const [contactNotice, setContactNotice] = useState('');
+  const contactRequest = useRef(false);
   const [consent, setConsent] = useState(false);
   const [booking, setBooking] = useState<Booking>();
   const [loading, setLoading] = useState(false);
@@ -82,11 +87,30 @@ export function App() {
     else if (screen === 'checkout') void submit();
   };
   const text = screen === 'catalog' || screen === 'slots' ? 'Далее' : screen === 'checkout' ? 'Подтвердить запись' : undefined;
-  const enabled = !loading && !busy && (screen === 'catalog' ? Boolean(service) : screen === 'slots' ? Boolean(slot) : validPhone && consent);
+  const enabled = !loading && !busy && !contactPending && (screen === 'catalog' ? Boolean(service) : screen === 'slots' ? Boolean(slot) : validPhone && consent);
   useTelegramNavigation(text, enabled, busy, next, back);
 
+  function requestPhone(): void {
+    if (contactRequest.current || busy || !tg?.requestContact) return;
+    contactRequest.current = true; setContactPending(true); setContactNotice('');
+    const fallback = 'Введите номер вручную.';
+    try {
+      tg.requestContact((ok, response) => {
+        contactRequest.current = false; setContactPending(false);
+        const value = response?.responseUnsafe?.contact?.phone_number;
+        if (ok && typeof value === 'string' && value.trim()) {
+          setPhone(value.startsWith('+') ? value : `+${value}`);
+          setContactNotice('Номер получен из Telegram.');
+        } else { setContactNotice(fallback); phoneInput.current?.focus(); }
+      });
+    } catch {
+      contactRequest.current = false; setContactPending(false);
+      setContactNotice(fallback); phoneInput.current?.focus();
+    }
+  }
+
   async function submit() {
-    if (submitting.current || !service || !slot) return;
+    if (submitting.current || contactRequest.current || !service || !slot) return;
     if (!validPhone || !consent) { setError('Укажите телефон +79991234567 и подтвердите согласие'); phoneInput.current?.focus(); return; }
     submitting.current = true; setBusy(true); setError('');
     try {
@@ -145,7 +169,10 @@ export function App() {
         <label className="field">Ваше имя<input readOnly value={[user?.first_name, user?.last_name].filter(Boolean).join(' ')} /></label>
         {user?.username && <p className="hint mt-2">@{user.username}</p>}
         <label className="field mt-4">Телефон<input ref={phoneInput} type="tel" inputMode="tel" autoComplete="tel" placeholder="+79991234567"
-          disabled={busy} value={phone} onChange={event => setPhone(event.target.value)} aria-describedby="phone-help" aria-invalid={phone.length > 0 && !validPhone} /></label>
+          disabled={busy || contactPending} value={phone} onChange={event => { setPhone(event.target.value); setContactNotice(''); }} aria-describedby="phone-help" aria-invalid={phone.length > 0 && !validPhone} /></label>
+        {native && tg?.requestContact && (!tg.isVersionAtLeast || tg.isVersionAtLeast('6.9')) && <button type="button" className="quiet mt-2" disabled={busy || contactPending}
+          onClick={requestPhone}>{contactPending ? 'Ожидаем Telegram…' : '📱 Заполнить из Telegram'}</button>}
+        <p className="hint" role="status">{contactNotice}</p>
         <p className="hint mt-2" id="phone-help">Для связи: +79991234567.</p>
         <label className="consent mt-4"><input type="checkbox" checked={consent} disabled={busy} onChange={event => { setConsent(event.target.checked); haptic(); }} />
           <span>Даю <a href="https://club.horseclub68.ru/#consent" target="_blank" rel="noreferrer">согласие на обработку персональных данных</a> для записи в клуб (152-ФЗ). <a href="https://club.horseclub68.ru/#privacy" target="_blank" rel="noreferrer">Политика обработки данных</a>.</span></label>

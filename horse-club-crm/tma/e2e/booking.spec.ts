@@ -47,6 +47,39 @@ async function checkout(page: Page) {
   await page.getByLabel('Тренер').selectOption(trainerId); await advance(page);
   await expect(page.getByLabel('Ваше имя')).toHaveValue('Елена');
 }
+
+test('contact request fills phone, prevents duplicates and retains manual fallback', async ({ page }) => {
+  await setup(page);
+  await page.addInitScript(() => {
+    const app = window.Telegram?.WebApp;
+    if (app) app.requestContact = callback => { setTimeout(() => callback(true, { responseUnsafe: { contact: { phone_number: '79991234567', first_name: 'Елена' } } }), 100); };
+  });
+  await checkout(page);
+  const button = page.getByRole('button', { name: '📱 Заполнить из Telegram' });
+  await button.focus(); await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Ожидаем Telegram…' })).toBeDisabled();
+  await expect(page.getByLabel('Телефон', { exact: true })).toHaveValue('+79991234567');
+  await expect(page.getByRole('status')).toContainText('Номер получен из Telegram');
+  await page.getByLabel('Телефон', { exact: true }).fill('+79997654321');
+  await expect(page.getByText('Номер получен из Telegram.')).toHaveCount(0);
+  await page.evaluate(() => { const app = window.Telegram?.WebApp; if (app) app.requestContact = callback => callback(false); });
+  await button.click();
+  await expect(page.getByRole('status')).toContainText('Введите номер вручную');
+  await expect(page.getByLabel('Телефон', { exact: true })).toHaveValue('+79997654321');
+  await expect(page.getByLabel('Телефон', { exact: true })).toBeFocused();
+  await page.evaluate(() => { const app = window.Telegram?.WebApp; if (app) app.requestContact = () => { throw new Error('unsupported'); }; });
+  await button.click(); await expect(button).toBeEnabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/tma-phone-contact.png', fullPage: true });
+});
+
+test('SDK without requestContact leaves manual phone entry available', async ({ page }) => {
+  await setup(page); await checkout(page);
+  await expect(page.getByRole('button', { name: '📱 Заполнить из Telegram' })).toHaveCount(0);
+  await page.getByLabel('Телефон', { exact: true }).fill('+79991234567');
+  await page.getByRole('checkbox').check();
+  await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(true);
+});
 test('native Telegram flow creates once, shows success and requests cancellation at narrow width', async ({ page }) => {
   await setup(page); let writes = 0, cancellations = 0;
   await page.route('**/api/tma/bookings', async route => {

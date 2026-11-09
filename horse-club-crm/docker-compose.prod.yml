@@ -48,6 +48,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set a random JWT_SECRET of at least 32 bytes}
       CLUB_TIME_ZONE: ${CLUB_TIME_ZONE:-Europe/Moscow}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_API_ROOT: ${TELEGRAM_API_ROOT:-}
       TELEGRAM_WEBAPP_URL: ${TELEGRAM_WEBAPP_URL:-https://crm.horseclub68.ru/tma}
       VK_COMMUNITY_ID: ${VK_COMMUNITY_ID:-}
       VK_ACCESS_TOKEN: ${VK_ACCESS_TOKEN:-}

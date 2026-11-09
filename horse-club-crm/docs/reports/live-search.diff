@@ -1,0 +1,812 @@
+commit 71e7dc9983327b8ea8654572c67a4336910c59b8
+Author:     sniffter68 <sniffter57@gmail.com>
+AuthorDate: Fri Nov 6 01:19:05 2026 +0300
+Commit:     sniffter68 <sniffter57@gmail.com>
+CommitDate: Fri Nov 6 01:19:05 2026 +0300
+
+    feat(frontend): implement instant search-as-you-type with autocomplete suggestions
+
+diff --git a/horse-club-crm/DESIGN.md b/horse-club-crm/DESIGN.md
+index 6b243f9..3117439 100644
+--- a/horse-club-crm/DESIGN.md
++++ b/horse-club-crm/DESIGN.md
+@@ -41,6 +41,8 @@ components:
+ 
+ # Horse Club OS Design System
+ 
++Живой поиск использует общий `LiveSearch` на базе Ant Design AutoComplete/Input: иконка слева, очистка, до восьми подсказок с подсветкой совпадения. Задержка ввода — 300 мс; очистка и Enter применяют фильтр сразу. Поле сохраняет фокус при загрузке. В формах записи `ClientSelectWithCreate` и `SearchSelect` сохраняют штатную клавиатурную навигацию Ant Design и ограничения доступности лошадей. Новые визуальные токены не вводятся. Контракт: `docs/live-search.md`.
++
+ Привязка VK тренера переиспользует `VkProfileField`, `VkProfileLink` и существующую шторку CatalogForm. Единственное поле «VK ID» принимает ID или ссылку; ошибка сохраняет ввод и позволяет повторить сохранение. Цвета и токены не меняются. Контракт: `docs/trainer-vk-binding.md`.
+ 
+ Двухшаговое закрытие месяца использует существующий Ant Design Modal, Collapse и ResponsiveTable: на телефоне ведомость переходит в карточки, длинные подписи сверки располагаются над неразрывными суммами. Тело диалога прокручивается, кнопка переноса остается доступной. Входящее сальдо отображается Ant Design Alert; новые токены не добавлены. Контракт: `docs/membership-accrual.md`.
+diff --git a/horse-club-crm/UX-CONTRACT.md b/horse-club-crm/UX-CONTRACT.md
+index a61afa1..aec4db0 100644
+--- a/horse-club-crm/UX-CONTRACT.md
++++ b/horse-club-crm/UX-CONTRACT.md
+@@ -95,7 +95,7 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
+ |---|---|---|---|---|---|---|---|
+ | Button | semantic emphasis | saddle/border emphasis | visible ring | 1px press | muted, inert | stable spinner | intent preserved |
+ | Input | warm border | stronger border | saddle ring | n/a | muted | stable suffix | inline Ant error |
+-| Search | clear + submit | shared input | shared input | submit | inert | table loader | page alert |
++| Search | clear + 300 ms debounce | LiveSearch | autocomplete, up to 8 | Enter / select immediately | editable | table loader | page alert |
+ | Textarea | resize none | shared input | shared input | n/a | muted | form pending | inline Ant error |
+ | Table/list | hairline rows | warm row | native controls | n/a | n/a | stable loader | persistent alert |
+ 
+@@ -126,7 +126,7 @@ Publication fields for horses, trainers and services reuse `frontend/src/pages/c
+ | Create | Создать | stable busy button | owning list | shared toast | form preserved | list context | shared catalog form |
+ | Edit | Сохранить | stable busy button | owning list | shared toast | form preserved | list context | shared catalog form |
+ | Delete | Удалить | dialog action busy | owning list | shared toast | dialog remains/retry | list context | Refine DeleteButton |
+-| Search | Найти / search input | stable table loading | same route | result table | alert + retry input | search/list | shared catalog list |
++| Search | LiveSearch / optional Найти | stable table loading | same route + Refine query | table / entity card | alert + retry input | search/list | LiveSearch + shared catalog list |
+ | Cancel/back | Отмена / Back | none | origin | none | unsaved behavior unchanged | origin | existing routes |
+ 
+ ## Navigation and responsive behavior
+diff --git a/horse-club-crm/backend/src/clients/clients.service.ts b/horse-club-crm/backend/src/clients/clients.service.ts
+index 7807173..085181b 100644
+--- a/horse-club-crm/backend/src/clients/clients.service.ts
++++ b/horse-club-crm/backend/src/clients/clients.service.ts
+@@ -1,3 +1,4 @@
++import { phoneSearchIds } from '../common/phone-search';
+ import { VkIdentityService } from '../vk-bot/vk-identity.service';
+ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+ import { Prisma } from '@prisma/client';
+@@ -115,10 +116,14 @@ export class ClientsService {
+   async findAll(query: ClientQueryDto): Promise<PaginatedResult<ClientListResponse>> {
+     const now = new Date();
+     const options = parseRefineQuery(query, ['id', 'name', 'phone', 'email', 'firstName', 'lastName', 'createdAt'], 'name');
++    const phoneIds = await phoneSearchIds(this.prisma, 'Client', options.search);
+     const where: Prisma.ClientWhereInput = options.search
+       ? {
+           OR: [
+             { name: { contains: options.search, mode: 'insensitive' } },
++            { firstName: { contains: options.search, mode: 'insensitive' } },
++            { lastName: { contains: options.search, mode: 'insensitive' } },
++            ...(phoneIds.length ? [{ id: { in: phoneIds } }] : []),
+             { phone: { contains: options.search, mode: 'insensitive' } },
+             { email: { contains: options.search, mode: 'insensitive' } },
+           ],
+diff --git a/horse-club-crm/backend/src/common/phone-search.ts b/horse-club-crm/backend/src/common/phone-search.ts
+new file mode 100644
+index 0000000..040392c
+--- /dev/null
++++ b/horse-club-crm/backend/src/common/phone-search.ts
+@@ -0,0 +1,16 @@
++import { Prisma } from '@prisma/client';
++import type { PrismaService } from '../prisma/prisma.service';
++
++/** Match legacy masked numbers as well as canonical Russian 7/8 numbers. */
++export async function phoneSearchIds(prisma: PrismaService, model: 'Client' | 'Trainer', query?: string): Promise<string[]> {
++  if (!query || !/^[+\d\s()-]+$/.test(query)) return [];
++  let digits = query.replace(/\D/g, '');
++  if (!digits) return [];
++  if (digits.length === 11 && /^[78]/.test(digits)) digits = digits.slice(1);
++  const table = model === 'Client' ? Prisma.sql`"Client"` : Prisma.sql`"Trainer"`;
++  const rows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
++    SELECT id FROM ${table}
++    WHERE strpos(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), ${digits}) > 0
++  `);
++  return rows.map(row => row.id);
++}
+diff --git a/horse-club-crm/backend/src/horses/horses.service.ts b/horse-club-crm/backend/src/horses/horses.service.ts
+index 3b87e09..65ce98f 100644
+--- a/horse-club-crm/backend/src/horses/horses.service.ts
++++ b/horse-club-crm/backend/src/horses/horses.service.ts
+@@ -60,7 +60,15 @@ export class HorsesService {
+       'name',
+     );
+     const where: Prisma.HorseWhereInput = options.search
+-      ? { name: { contains: options.search, mode: 'insensitive' } }
++      ? { OR: [
++          { name: { contains: options.search, mode: 'insensitive' } },
++          { breed: { contains: options.search, mode: 'insensitive' } },
++          { owner: { is: { OR: [
++            { name: { contains: options.search, mode: 'insensitive' } },
++            { firstName: { contains: options.search, mode: 'insensitive' } },
++            { lastName: { contains: options.search, mode: 'insensitive' } },
++          ] } } },
++        ] }
+       : {};
+     const orderBy = { [options.sort]: options.order } as Prisma.HorseOrderByWithRelationInput;
+     const [total, data] = await this.prisma.$transaction([
+@@ -70,6 +78,7 @@ export class HorsesService {
+         orderBy: [orderBy, { id: 'asc' }],
+         skip: options.skip,
+         take: options.take,
++        include: { owner: { select: { name: true } } },
+       }),
+     ]);
+     return { data, total };
+diff --git a/horse-club-crm/backend/src/trainers/trainers.service.ts b/horse-club-crm/backend/src/trainers/trainers.service.ts
+index 3518064..1ede02b 100644
+--- a/horse-club-crm/backend/src/trainers/trainers.service.ts
++++ b/horse-club-crm/backend/src/trainers/trainers.service.ts
+@@ -1,3 +1,4 @@
++import { phoneSearchIds } from '../common/phone-search';
+ import { Injectable, NotFoundException } from '@nestjs/common';
+ import { Prisma } from '@prisma/client';
+ import type { Trainer } from '@prisma/client';
+@@ -16,10 +17,12 @@ export class TrainersService {
+ 
+   async findAll(query: RefineQueryDto): Promise<PaginatedResult<Trainer>> {
+     const options = parseRefineQuery(query, ['id', 'name', 'phone', 'baseRate', 'maxDailyLoad'], 'name');
++    const phoneIds = await phoneSearchIds(this.prisma, 'Trainer', options.search);
+     const where: Prisma.TrainerWhereInput = options.search
+       ? {
+           OR: [
+             { name: { contains: options.search, mode: 'insensitive' } },
++            ...(phoneIds.length ? [{ id: { in: phoneIds } }] : []),
+             { phone: { contains: options.search, mode: 'insensitive' } },
+           ],
+         }
+diff --git a/horse-club-crm/backend/test/live-search.test.cjs b/horse-club-crm/backend/test/live-search.test.cjs
+new file mode 100644
+index 0000000..c4775ba
+--- /dev/null
++++ b/horse-club-crm/backend/test/live-search.test.cjs
+@@ -0,0 +1,38 @@
++require('reflect-metadata');
++const { test } = require('node:test');
++const assert = require('node:assert/strict');
++const { phoneSearchIds } = require('../dist/common/phone-search');
++const { ClientsService } = require('../dist/clients/clients.service');
++const { TrainersService } = require('../dist/trainers/trainers.service');
++const { HorsesService } = require('../dist/horses/horses.service');
++
++test('phone search binds unmasked digits and skips non-phone queries', async () => {
++  const queries = [];
++  const prisma = { $queryRaw: async query => { queries.push(query); return [{ id: 'match' }]; } };
++  for (const q of ['+7 (900) 123-45-67', '8-900-123-45-67', '9001234567']) {
++    assert.deepEqual(await phoneSearchIds(prisma, 'Client', q), ['match']);
++    assert.deepEqual(queries.at(-1).values, ['9001234567']);
++    assert.match(queries.at(-1).sql, /regexp_replace/);
++  }
++  for (const q of ['', 'Анна', '---', "1' OR true"]) assert.deepEqual(await phoneSearchIds(prisma, 'Trainer', q), []);
++  assert.equal(queries.length, 3);
++});
++
++test('catalog search preserves pagination, archive filters and uses identical count/data filters', async () => {
++  for (const [Service, model, q] of [[ClientsService, 'client', '8 (900) 123-45-67'], [TrainersService, 'trainer', '900'], [HorsesService, 'horse', 'Анна']]) {
++    let countWhere, list;
++    const prisma = {
++      $queryRaw: async () => [{ id: 'match' }], $transaction: promises => Promise.all(promises),
++      [model]: { count: async ({ where }) => { countWhere = where; return 1; }, findMany: async args => { list = args; return []; } },
++    };
++    await new Service(prisma).findAll({ q, _start: 10, _end: 20, archivedOnly: true });
++    assert.deepEqual(countWhere, list.where);
++    assert.equal(list.skip, 10); assert.equal(list.take, 10);
++    if (model === 'client') assert.deepEqual(list.where.deletedAt, { not: null });
++    if (model !== 'horse') assert.ok(list.where.OR.some(filter => filter.id?.in.includes('match')));
++    else {
++      assert.ok(list.where.OR.some(filter => filter.breed?.contains === q));
++      assert.ok(list.where.OR.some(filter => filter.owner?.is.OR.some(person => person.name?.contains === q)));
++    }
++  }
++});
+diff --git a/horse-club-crm/docs/live-search.md b/horse-club-crm/docs/live-search.md
+new file mode 100644
+index 0000000..a2fac05
+--- /dev/null
++++ b/horse-club-crm/docs/live-search.md
+@@ -0,0 +1,15 @@
++# Живой поиск CRM
++
++Источник: задача владельца от 06.11.2026.
++
++- `LiveSearch` — общий контролируемый компонент Ant Design AutoComplete/Input, совместимый с Form.Item. Поиск применяется через существующий submit формы и прежний фильтр `q` Refine; сортировка, пагинация, тип клиента и архив сохраняют своих владельцев. Смена поискового запроса возвращает Refine на первую страницу.
++- Ввод от одного символа, debounce 300 мс; очистка и Enter без задержки, IME не отправляет промежуточный текст. Таймер отменяется при смене значения и размонтировании. Данные разных запросов изолированы ключами кэша Refine; журнал и поиск клиента отменяют HTTP-запросы через AbortController.
++- Подсказки каталогов берутся из текущей серверной страницы результата, до восьми строк. Это не отдельный поиск по уже загруженной странице: сервер фильтрует весь каталог. Во время debounce/загрузки старые предложения скрыты. В журнале предложения отбираются из загруженных справочников. Выбор клиента, лошади или тренера открывает существующую карточку с проверкой UUID; прочие списки применяют выбранный текст к фильтру.
++- `SearchHighlight` выделяет буквальное совпадение без HTML-вставок и регулярных выражений из пользовательского ввода. Телефон сопоставляется по цифрам с учетом маски и российских префиксов 7/8.
++- Сервер клиентов ищет имя, фамилию, отображаемое имя, телефон и email. Сервер тренеров — ФИО и телефон. Сервер лошадей — кличку, породу, ФИО владельца. Телефонный поиск использует параметризованный SQL только для получения совпадающих ID; основной Prisma-фильтр сохраняет архив и прочие ограничения.
++- Выбор клиента при записи сохраняет создание постоянного/разового клиента, отмену запросов, ошибки и повторы. Выбор лошади переиспользует Ant Design Select, поддерживает подсветку и сохраняет disabled-опции, проверки нагрузки и веса.
++- При ошибке доступны прежние Alert и повторный ввод. Во время поиска поле остается доступным. READ_ONLY не добавляет разрешений на мутации.
++
++Схема БД не меняется, миграция и генерация Prisma Client не нужны.
++
++Проверки: `searchText.test.ts`, `backend/test/live-search.test.cjs`, `frontend/e2e/live-search.spec.ts`, существующие сценарии записи и клиентских форм. Проверка UI использует штатный JSX-адаптер проекта `scripts/audit-ui.py`: исходный HTML-парсер навыка ошибочно распознает Ant Select и Form.Item как HTML-теги.
+diff --git a/horse-club-crm/docs/reports/live-search-verification.md b/horse-club-crm/docs/reports/live-search-verification.md
+new file mode 100644
+index 0000000..14b6858
+--- /dev/null
++++ b/horse-club-crm/docs/reports/live-search-verification.md
+@@ -0,0 +1,17 @@
++# Проверка живого поиска — 06.11.2026
++
++Реализованы общий `LiveSearch`, подсветка совпадений, поиск без Enter во всех отдельных строках поиска списков CRM, поиск клиентов и лошадей в текущей шторке записи. Основные каталоги открывают карточку по выбору подсказки. Сервер учитывает породу и владельца лошади, а также телефон без маски и префиксы 7/8.
++
++Проверки:
++
++- Backend: `npm run typecheck`, `npm run lint`, `npm run build`, `npm test` — успешно. 659 тестов прошли, 20 пропущены штатными условиями окружения. Линтер сообщает три прежних предупреждения в `vet-records.test.cjs`, `dashboard.test.cjs`, `audit-http-20261019.cjs`; ошибок нет.
++- Frontend: `npm run typecheck`, `npm run lint`, `npm run build`, `npm test` — успешно. 19 файлов, 162 теста.
++- `npx playwright test --project=mock live-search.spec.ts` — 8 сценариев прошли в Microsoft Edge. Клиенты/лошади/тренеры на 1280 и 390 px: debounce, отсутствие лишнего запроса при очистке, сохранение фокуса, клавиатурный крестик, медленный устаревший ответ, пустой результат, ошибка и восстановление, IME, подсветка, переход в карточку мышью и клавиатурой. Еще два сценария проверяют выбор клиента/лошади в актуальной шторке записи и disabled-состояние лошади на лечении.
++- `python scripts/audit-ui.py . --mode strict` — 0 замечаний. Исходный аудит навыка без штатного JSX-адаптера ошибочно распознает Ant Design Select/Form.Item как HTML select/form; адаптер проекта сохраняет все правила и корректно обрабатывает JSX.
++- `git diff --check` — успешно.
++
++Ограничения: дополнительный запуск прежних сценариев `client-preferences.spec.ts` остановлен после ошибок ожидания старых диалогов «Бронирование тройного ресурса» / «Быстрое бронирование». В HEAD эти формы уже заменены общей шторкой «Записать на тренировку». Новые сценарии тестируют актуальную шторку. Весь набор legacy E2E не считается пройденным.
++
++Телефонный SQL проверен mock-тестами, PostgreSQL локально не использовался. Схема БД не менялась; миграция и генерация Prisma Client не требуются.
++
++В коммит входят только изменения задачи; существовавшие до начала работы `trainer-concurrency.diff` и `trainer-vk-binding.diff` сохранены отдельно.
+diff --git a/horse-club-crm/frontend/e2e/live-search.spec.ts b/horse-club-crm/frontend/e2e/live-search.spec.ts
+new file mode 100644
+index 0000000..24169f8
+--- /dev/null
++++ b/horse-club-crm/frontend/e2e/live-search.spec.ts
+@@ -0,0 +1,114 @@
++import { test, expect } from './fixtures'
++
++for (const resource of ['clients', 'horses', 'trainers']) {
++  for (const width of [1280, 390]) test(`live ${resource} search at ${width}px`, async ({ page }) => {
++    await page.setViewportSize({ width, height: 900 })
++    await page.addInitScript(() => {
++      localStorage.setItem('horsecrm.access_token', 'cookie-session')
++      localStorage.setItem('horsecrm.email', 'qa@example.com')
++      localStorage.setItem('horsecrm.role', 'ADMIN')
++    })
++    const rows = ['Анна', 'Борис'].map((name, i) => ({
++      id: `00000000-0000-4000-8000-00000000000${i + 1}`, name, firstName: name, lastName: '', phone: '+7 (900) 123-45-67',
++      breed: 'Орловская', createdAt: '2026-10-01', clientType: 'REGULAR', isRider: true, isPayer: true,
++      isUnavailable: false, maxDailyMinutes: 180, minRestMinutes: 30, maxDailyLoad: 180,
++    }))
++    const queries: string[] = []
++    await page.route(`**/api/${resource}?*`, async route => {
++      const q = new URL(route.request().url()).searchParams.get('q') || ''
++      queries.push(q)
++      if (q === 'ошибка') return route.fulfill({ status: 400, json: { message: 'Ошибка поиска' } })
++      if (q === 'Бор') await new Promise(resolve => setTimeout(resolve, 700))
++      const data = rows.filter(row => row.name.toLowerCase().includes(q.toLowerCase()))
++      await route.fulfill({ json: data, headers: { 'x-total-count': String(data.length) } })
++    })
++    await page.goto(`/${resource}`)
++    const input = page.getByRole('combobox', { name: 'Поиск', exact: true })
++    await expect(input).toBeVisible()
++    await expect(page.getByRole('button', { name: 'Борис', exact: true })).toBeVisible()
++    const before = queries.length
++    await input.pressSequentially('Ан', { delay: 40 })
++    await expect(input).toBeFocused()
++    await expect(page.getByRole('button', { name: 'Борис', exact: true })).toHaveCount(0)
++    expect(queries.slice(before)).toEqual(['Ан'])
++    await expect(page.locator('.ant-select-item-option-content mark')).toHaveText('Ан')
++    await input.press('Escape')
++    await input.fill('Аннаx')
++    await input.press('Tab')
++    const clear = page.getByRole('button', { name: 'Очистить поиск', exact: true })
++    await expect(clear).toBeFocused()
++    await clear.press('Enter')
++    await expect(page.getByRole('button', { name: 'Борис', exact: true })).toBeVisible()
++    await page.waitForTimeout(400)
++    expect(queries).not.toContain('Аннаx')
++    await input.fill('Бор')
++    await expect.poll(() => queries.includes('Бор')).toBe(true)
++    await input.fill('Ан')
++    await expect(page.getByRole('button', { name: 'Анна', exact: true })).toBeVisible()
++    await page.waitForTimeout(850)
++    await expect(input).toHaveValue('Ан')
++    await expect(page.getByRole('button', { name: 'Борис', exact: true })).toHaveCount(0)
++    await input.fill('нет совпадений')
++    await expect(page.getByText(/^(No data|Нет данных)$/).last()).toBeVisible()
++    await input.fill('ошибка')
++    await expect(page.locator('.ant-alert-description').getByText('Ошибка поиска', { exact: true })).toBeVisible()
++    await input.fill('')
++    await expect(page.getByRole('button', { name: 'Борис', exact: true })).toBeVisible()
++    await expect(input).toBeFocused()
++    // IME composition must not trigger searches or submit prematurely.
++    const compositionStart = queries.length
++    await input.dispatchEvent('compositionstart')
++    await input.fill('Ан')
++    await page.waitForTimeout(400)
++    expect(queries.length).toBe(compositionStart)
++    await input.dispatchEvent('compositionend', { data: 'Ан' })
++    await expect(page.locator('.ant-select-item-option-content mark')).toHaveText('Ан')
++    if (resource === 'clients' && width === 390) await page.screenshot({ path: 'test-results/live-search-mobile.png', fullPage: true })
++    await page.route(`**/api/${resource}/${rows[0].id}`, route => route.fulfill({ json: {
++      ...rows[0], memberships: [], bookings: [], payments: [], boardingContracts: [], healthLogs: [],
++    } }))
++    if (resource === 'trainers') {
++      await input.press('ArrowDown')
++      await input.press('Enter')
++    } else await page.locator('.ant-select-item-option:visible').filter({ hasText: 'Анна' }).click()
++    const title = resource === 'clients' ? 'Карточка клиента' : resource === 'horses' ? 'Карточка лошади' : 'Карточка тренера'
++    await expect(page.getByRole('dialog', { name: title })).toBeVisible()
++    await expect(input).toHaveValue('Анна')
++  })
++}
++
++for (const width of [1280, 390]) test(`booking search preserves client and horse selection at ${width}px`, async ({ page }) => {
++  await page.setViewportSize({ width, height: 900 })
++  await page.addInitScript(() => {
++    localStorage.setItem('horsecrm.access_token', 'cookie-session')
++    localStorage.setItem('horsecrm.role', 'ADMIN')
++    localStorage.setItem('horsecrm.email', 'qa@example.com')
++  })
++  const id = (n: number) => `00000000-0000-4000-8000-00000000000${n}`
++  const client = { id: id(1), name: 'Анна', phone: '+7 (900) 123-45-67', memberships: [] }
++  const horses = [{ id: id(2), name: 'Буран', status: 'active', healthStatus: 'HEALTHY' }, { id: id(3), name: 'Буревестник', status: 'active', healthStatus: 'TREATMENT' }]
++  const catalogs = { clients: [client], horses, trainers: [{ id: id(4), name: 'Мария', isActive: true }], arenas: [], services: [], lessons: [], bookings: [] }
++  for (const [resource, rows] of Object.entries(catalogs)) await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } }))
++  await page.route(`**/api/clients/${id(1)}`, route => route.fulfill({ json: client }))
++  await page.route('**/api/settings/club-schedule*', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } }))
++  await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { horseWorkloads: horses.map(horse => ({ horseId: horse.id, currentWorkloadMinutes: 0, maxDailyWorkloadMinutes: 240, status: 'AVAILABLE' })), arenaOccupancy: [] } }))
++  await page.goto('/schedule')
++  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
++  const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
++  const clientInput = drawer.getByRole('combobox', { name: 'Клиент', exact: true })
++  await clientInput.fill('Ан')
++  const clientOption = page.locator('.ant-select-item-option:visible').filter({ hasText: 'Анна' })
++  await expect(clientOption.locator('mark')).toHaveText('Ан')
++  await clientOption.click()
++  const horseInput = drawer.getByRole('combobox', { name: 'Лошадь', exact: true })
++  await horseInput.fill('Бур')
++  const available = page.locator('.ant-select-item-option:visible').filter({ hasText: 'Буран' })
++  const blocked = page.locator('.ant-select-item-option:visible').filter({ hasText: 'Буревестник' })
++  await expect(available).not.toHaveClass(/disabled/)
++  await expect(blocked).toHaveClass(/disabled/)
++  await expect(available.locator('mark')).toHaveText('Бур')
++  await horseInput.press('ArrowDown')
++  await horseInput.press('Enter')
++  await expect(drawer.locator('.ant-select-selection-item').filter({ hasText: 'Буран' })).toBeVisible()
++  await expect(drawer.locator('.ant-select-selection-item').filter({ hasText: 'Анна' })).toBeVisible()
++})
+diff --git a/horse-club-crm/frontend/playwright.config.ts b/horse-club-crm/frontend/playwright.config.ts
+index 149a542..d4ae37b 100644
+--- a/horse-club-crm/frontend/playwright.config.ts
++++ b/horse-club-crm/frontend/playwright.config.ts
+@@ -3,7 +3,7 @@ export default defineConfig({
+   projects: [
+     { name: 'live', testMatch: '**/*.live.spec.ts' },
+     { name: 'operational-reset', testMatch: '**/operational-reset.spec.ts' },
+-    { name: 'mock', testMatch: ['**/table-columns.spec.ts', '**/staff-payroll-lock.spec.ts', '**/staff-lifecycle.spec.ts', '**/client-preferences.spec.ts', '**/entity-edit.spec.ts', '**/client-archive.spec.ts', '**/lead-notifications.spec.ts', '**/lesson-payments.spec.ts', '**/dashboard.spec.ts', '**/module-access.spec.ts', '**/stall-map.spec.ts', '**/s3-01.spec.ts', '**/clients-memberships.spec.ts', '**/horse-workload.spec.ts', '**/horse-replacement.spec.ts', '**/vet-log.spec.ts', '**/vet-records.spec.ts', '**/role-access.spec.ts', '**/vk-link.spec.ts', '**/vk-settings.spec.ts', '**/quick-boarding.spec.ts', '**/triad-booking.spec.ts', '**/cash-desk.spec.ts', '**/lead-conversion.spec.ts', '**/public-content.spec.ts'] },
++    { name: 'mock', testMatch: ['**/live-search.spec.ts', '**/table-columns.spec.ts', '**/staff-payroll-lock.spec.ts', '**/staff-lifecycle.spec.ts', '**/client-preferences.spec.ts', '**/entity-edit.spec.ts', '**/client-archive.spec.ts', '**/lead-notifications.spec.ts', '**/lesson-payments.spec.ts', '**/dashboard.spec.ts', '**/module-access.spec.ts', '**/stall-map.spec.ts', '**/s3-01.spec.ts', '**/clients-memberships.spec.ts', '**/horse-workload.spec.ts', '**/horse-replacement.spec.ts', '**/vet-log.spec.ts', '**/vet-records.spec.ts', '**/role-access.spec.ts', '**/vk-link.spec.ts', '**/vk-settings.spec.ts', '**/quick-boarding.spec.ts', '**/triad-booking.spec.ts', '**/cash-desk.spec.ts', '**/lead-conversion.spec.ts', '**/public-content.spec.ts'] },
+   ],
+   testDir: './e2e', workers: 1, timeout: 20000,
+   reporter: [['list'], ['html', { open: 'never' }]],
+diff --git a/horse-club-crm/frontend/src/components/ClientSelectWithCreate.tsx b/horse-club-crm/frontend/src/components/ClientSelectWithCreate.tsx
+index 41185c1..5923d5f 100644
+--- a/horse-club-crm/frontend/src/components/ClientSelectWithCreate.tsx
++++ b/horse-club-crm/frontend/src/components/ClientSelectWithCreate.tsx
+@@ -1,3 +1,4 @@
++import { SearchHighlight } from './LiveSearch'
+ import { useEffect, useRef, useState } from 'react'
+ import { useInvalidate } from '@refinedev/core'
+ import { Alert, Button, Select, Space, Tag, type SelectProps } from 'antd'
+@@ -32,7 +33,7 @@ export function ClientSelectWithCreate({ value, onChange, onCreated, excludedIds
+     const controller = new AbortController()
+     const timer = setTimeout(() => {
+       setLoading(true); setError(undefined)
+-      void httpClient.get<CreatedClient[]>(`${API_URL}/clients`, { params: { q: search, _start: 0, _end: 50 }, signal: controller.signal })
++      void httpClient.get<CreatedClient[]>(`${API_URL}/clients`, { params: { q: search, _start: 0, _end: 8 }, signal: controller.signal })
+         .then(({ data }) => {
+           if (controller.signal.aborted) return
+           setCache(current => new Map([...current, ...data.map(row => [row.id, row] as const)])); setRows(data); setResultSearch(search)
+@@ -58,8 +59,8 @@ export function ClientSelectWithCreate({ value, onChange, onCreated, excludedIds
+       open={!creating && open} onOpenChange={setOpen} searchValue={search} onSearch={query => { setLoading(true); setSearch(query) }} onClear={() => setSearch('')}
+       onInputKeyDown={event => { if (event.key === 'Escape') event.stopPropagation() }}
+       loading={loading} onChange={id => { setSearch(''); onChange?.(id) }}
+-      options={[...choices.values()].map(row => ({ value: row.id, disabled: row.id !== value && excludedIds.includes(row.id),
+-        label: <Space wrap>{row.name} · {row.phone || 'без телефона'}{row.clientType === 'ONE_TIME' && <OneTimeBadge />}</Space> }))}
++      options={[...choices.values()].slice(0, 8).map(row => ({ value: row.id, disabled: row.id !== value && excludedIds.includes(row.id),
++        label: <Space wrap><SearchHighlight text={row.name} query={search} /> · <SearchHighlight text={row.phone || 'без телефона'} query={search} />{row.clientType === 'ONE_TIME' && <OneTimeBadge />}</Space> }))}
+       notFoundContent={loading ? 'Загрузка…' : 'Клиенты не найдены'}
+       popupRender={menu => <>{menu}{error && <Alert role="alert" type="error" message={error} action={<Button onClick={() => retry(n => n + 1)}>Повторить</Button>} />}
+         {search && <Button type="link" onClick={() => { setSearch(''); select.current?.focus() }}>Очистить поиск</Button>}
+diff --git a/horse-club-crm/frontend/src/components/LiveSearch.tsx b/horse-club-crm/frontend/src/components/LiveSearch.tsx
+new file mode 100644
+index 0000000..a77cd8c
+--- /dev/null
++++ b/horse-club-crm/frontend/src/components/LiveSearch.tsx
+@@ -0,0 +1,78 @@
++import { useEffect, useRef, useState, type CSSProperties } from 'react'
++import { AutoComplete, Button, Input, Typography, type InputRef } from 'antd'
++import { SearchOutlined } from '@ant-design/icons'
++import { matchRange, type SearchSuggestion } from './searchText'
++
++export function SearchHighlight({ text, query }: { text: string; query: string }) {
++  const range = matchRange(text, query)
++  return range ? <>{text.slice(0, range[0])}<mark>{text.slice(...range)}</mark>{text.slice(range[1])}</> : <>{text}</>
++}
++
++interface Props {
++  value?: string
++  onChange?: (value: string) => void
++  onSearch: (value: string) => void
++  suggestions?: readonly SearchSuggestion[]
++  onSelectSuggestion?: (id: string) => void
++  loading?: boolean
++  placeholder?: string
++  id?: string
++  style?: CSSProperties
++  'aria-label'?: string
++}
++
++export function LiveSearch({ value = '', onChange, onSearch, suggestions = [], onSelectSuggestion, loading, placeholder = 'Поиск', style, id, 'aria-label': ariaLabel = 'Поиск' }: Props) {
++  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
++  const composing = useRef(false)
++  const input = useRef<InputRef>(null)
++  const clearButton = useRef<HTMLButtonElement>(null)
++  const [pending, setPending] = useState(false)
++  const cancel = () => { clearTimeout(timer.current); timer.current = undefined }
++  useEffect(() => () => clearTimeout(timer.current), [])
++  const commit = (query: string) => { cancel(); setPending(false); onSearch(query) }
++  const schedule = (query: string) => {
++    cancel()
++    setPending(Boolean(query))
++    if (!query) commit('')
++    else if (!composing.current) timer.current = setTimeout(() => commit(query), 300)
++  }
++  // Schedule after controlled Form value propagation, preserving typing focus.
++  const latestValue = useRef(value)
++  const search = useRef(onSearch)
++  useEffect(() => { search.current = onSearch }, [onSearch])
++  useEffect(() => {
++    cancel()
++    if (latestValue.current === value) return
++    latestValue.current = value
++    if (composing.current) return
++    if (!value) { search.current(''); return }
++    timer.current = setTimeout(() => { setPending(false); search.current(value) }, 300)
++    return cancel
++  }, [value])
++  const options = pending || loading || !value.trim() ? [] : suggestions.slice(0, 8).map(item => ({
++    value: item.id,
++    label: <div><SearchHighlight text={item.text} query={value} />{item.detail && <><br /><Typography.Text type="secondary"><SearchHighlight text={item.detail} query={value} /></Typography.Text></>}</div>,
++  }))
++  return <AutoComplete style={{ width: '100%', ...style }} value={value} options={options} filterOption={false}
++    onInputKeyDown={event => {
++      if (event.key === 'Tab' && !event.shiftKey && value) {
++        event.preventDefault(); event.stopPropagation(); requestAnimationFrame(() => clearButton.current?.focus())
++      }
++    }}
++    onChange={(query, option) => {
++      if (!option || !('label' in option)) { cancel(); setPending(Boolean(query)); onChange?.(query) }
++    }}
++    onSelect={id => {
++      const item = suggestions.find(row => row.id === id)
++      if (!item) return
++      cancel(); latestValue.current = item.text; onChange?.(item.text); commit(item.text); onSelectSuggestion?.(id)
++    }} notFoundContent={pending || loading ? 'Поиск…' : 'Совпадений нет'}>
++    <Input ref={input} id={id} aria-label={ariaLabel} placeholder={placeholder} prefix={<SearchOutlined />}
++      suffix={value ? <Button ref={clearButton} type="text" size="small" aria-label="Очистить поиск" onKeyDown={event => event.stopPropagation()} onClick={() => {
++        composing.current = false; latestValue.current = ''; onChange?.(''); commit(''); input.current?.focus()
++      }}>×</Button> : <span />}
++      onCompositionStart={() => { composing.current = true; cancel() }}
++      onCompositionEnd={event => { composing.current = false; schedule(event.currentTarget.value) }}
++      onPressEnter={event => { event.preventDefault(); if (!composing.current && !event.nativeEvent.isComposing) commit(value) }} />
++  </AutoComplete>
++}
+diff --git a/horse-club-crm/frontend/src/components/SearchSelect.tsx b/horse-club-crm/frontend/src/components/SearchSelect.tsx
+new file mode 100644
+index 0000000..0b05a2c
+--- /dev/null
++++ b/horse-club-crm/frontend/src/components/SearchSelect.tsx
+@@ -0,0 +1,14 @@
++import { useState } from 'react'
++import { Select, type SelectProps } from 'antd'
++import { SearchHighlight } from './LiveSearch'
++import { matchRange } from './searchText'
++
++/** Local catalog selection keeps Ant Design's keyboard and disabled-option behavior. */
++export function SearchSelect({ onSearch, ...props }: SelectProps<string>) {
++  const [query, setQuery] = useState('')
++  return <Select<string> {...props} showSearch allowClear
++    onSearch={value => { setQuery(value); onSearch?.(value) }}
++    onOpenChange={open => { if (!open) setQuery(''); props.onOpenChange?.(open) }}
++    filterOption={(value, option) => !value || (typeof option?.label === 'string' && Boolean(matchRange(option.label, value)))}
++    optionRender={option => typeof option.label === 'string' ? <SearchHighlight text={option.label} query={query} /> : option.label} />
++}
+diff --git a/horse-club-crm/frontend/src/components/searchText.test.ts b/horse-club-crm/frontend/src/components/searchText.test.ts
+new file mode 100644
+index 0000000..83b66d6
+--- /dev/null
++++ b/horse-club-crm/frontend/src/components/searchText.test.ts
+@@ -0,0 +1,22 @@
++import { describe, expect, it } from 'vitest'
++import { matchRange, phoneDigits, recordSuggestion } from './searchText'
++
++describe('search matching', () => {
++  it('matches Cyrillic without case sensitivity and treats punctuation literally', () => {
++    expect(matchRange('Анна (клиент)', 'анН')).toEqual([0, 3])
++    expect(matchRange('Анна (клиент)', '(')).toEqual([5, 6])
++    expect(matchRange('Анна', '')).toBeUndefined()
++  })
++  it('highlights masked phone ranges for either Russian prefix', () => {
++    expect(phoneDigits('8 (900) 123-45-67')).toBe('9001234567')
++    expect(matchRange('+7 (900) 123-45-67', '8 900 123 45 67')).toEqual([4, 18])
++    expect(matchRange('+7 (900) 123-45-67', '12345')).toEqual([9, 15])
++    expect(matchRange('Анна', '999')).toBeUndefined()
++  })
++  it('extracts list suggestions and related clients without exposing unknown fields', () => {
++    expect(recordSuggestion({ id: '1', name: 'Анна', phone: '123' })).toEqual({ id: '1', text: 'Анна', detail: '123' })
++    expect(recordSuggestion({ id: '2', client: { id: '1', name: 'Анна' } })?.text).toBe('Анна')
++    expect(recordSuggestion(null)).toBeUndefined()
++    expect(recordSuggestion({ id: '3', name: 'Буран', owner: { name: 'Анна' } })?.detail).toBe('Анна')
++  })
++})
+diff --git a/horse-club-crm/frontend/src/components/searchText.ts b/horse-club-crm/frontend/src/components/searchText.ts
+new file mode 100644
+index 0000000..a7fb1f2
+--- /dev/null
++++ b/horse-club-crm/frontend/src/components/searchText.ts
+@@ -0,0 +1,32 @@
++export function phoneDigits(value: string): string {
++  const digits = value.replace(/\D/g, '')
++  return digits.length === 11 && /^[78]/.test(digits) ? digits.slice(1) : digits
++}
++
++export function matchRange(text: string, query: string): [number, number] | undefined {
++  const needle = query.trim().toLocaleLowerCase('ru')
++  if (!needle) return undefined
++  const start = text.toLocaleLowerCase('ru').indexOf(needle)
++  if (start >= 0) return [start, start + needle.length]
++  if (!/^[+\d\s()-]+$/.test(needle)) return undefined
++  const digits = phoneDigits(needle)
++  const positions = [...text.matchAll(/\d/g)].map(match => match.index)
++  const raw = positions.map(index => text[index]).join('')
++  const offset = raw.indexOf(digits)
++  return digits && offset >= 0 ? [positions[offset], positions[offset + digits.length - 1] + 1] : undefined
++}
++
++export interface SearchSuggestion { id: string; text: string; detail?: string }
++
++/** Accept API records without relying on Refine's permissive BaseRecord index signature. */
++export function recordSuggestion(row: unknown): SearchSuggestion | undefined {
++  if (!row || typeof row !== 'object') return undefined
++  const field = (key: string): string => key in row && typeof Reflect.get(row, key) === 'string' ? String(Reflect.get(row, key)) : ''
++  const id = field('id')
++  const related = 'client' in row ? recordSuggestion(Reflect.get(row, 'client')) : undefined
++  const text = field('name') || [field('firstName'), field('lastName')].filter(Boolean).join(' ') || field('title') || field('email') || related?.text || field('description')
++  const owner: unknown = 'owner' in row ? Reflect.get(row, 'owner') : undefined
++  const ownerName = owner && typeof owner === 'object' && 'name' in owner && typeof owner.name === 'string' ? owner.name : ''
++  const detail = [field('phone'), field('breed'), ownerName].filter(Boolean).join(' · ')
++  return id && text ? { id, text, detail } : undefined
++}
+diff --git a/horse-club-crm/frontend/src/pages/catalogs/shared.tsx b/horse-club-crm/frontend/src/pages/catalogs/shared.tsx
+index fc68375..b707c33 100644
+--- a/horse-club-crm/frontend/src/pages/catalogs/shared.tsx
++++ b/horse-club-crm/frontend/src/pages/catalogs/shared.tsx
+@@ -1,3 +1,6 @@
++import { LiveSearch } from '../../components/LiveSearch'
++import { recordSuggestion } from '../../components/searchText'
++import { isUuid } from '../../uuid'
+ import { ServiceCancellationAction } from '../../components/ServiceCancellationAction'
+ import type { ReactNode } from 'react'
+ import { useContext, useEffect, useState } from 'react'
+@@ -11,9 +14,9 @@ import { useCatalogPermissions } from './permissions'
+ import { ResponsiveTable } from '../../components/ResponsiveTable'
+ import { ConfigurableTable } from '../../components/ConfigurableTable'
+ 
+-export function CatalogList<T extends BaseRecord>({ resource, title, columns, extraActions, layout, toolbar, storageKey, defaultHiddenColumns }: {
++export function CatalogList<T extends BaseRecord>({ resource, title, columns, extraActions, layout, toolbar, storageKey, defaultHiddenColumns, onSearchSelect }: {
+   resource: string; title: string; columns: TableColumnsType<T>; extraActions?: (record: T) => ReactNode; layout?: 'clients'; toolbar?: ReactNode
+-  storageKey?: string; defaultHiddenColumns?: readonly string[]
++  storageKey?: string; defaultHiddenColumns?: readonly string[]; onSearchSelect?: (id: string) => void
+ }) {
+   const { canManage, role } = useCatalogPermissions(resource)
+   const { tableProps, searchFormProps, tableQuery, sorters, filters, currentPage, pageSize, setCurrentPage } = useTable<T, HttpError, { q?: string; clientType?: string; archive?: string }>({
+@@ -47,7 +50,9 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
+   return <List title={title} canCreate={canManage} createButtonProps={{ children: 'Создать' }}>
+     <Form noValidate {...searchFormProps} initialValues={{ ...searchFormProps.initialValues, clientType: filters.find(filter => 'field' in filter && filter.field === 'clientType')?.value }} layout="inline" style={{ marginBottom: 20 }}>
+       <Form.Item name="q" style={{ width: 320, maxWidth: '100%' }}>
+-        <Input.Search aria-label="Поиск" placeholder="Поиск" allowClear onSearch={() => searchFormProps.form?.submit()} />
++        <LiveSearch onSearch={() => searchFormProps.form?.submit()} loading={tableQuery.isFetching}
++          suggestions={(tableQuery.data?.data ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })}
++          onSelectSuggestion={id => { if (isUuid(id)) onSearchSelect?.(id) }} />
+       </Form.Item>
+       {resource === 'clients' && <Form.Item name="clientType"><Select aria-label="Тип клиента" allowClear placeholder="Все клиенты" style={{ width: 200 }}
+         onChange={() => searchFormProps.form?.submit()} options={[{ value: 'REGULAR', label: 'Постоянные' }, { value: 'ONE_TIME', label: 'Разовые' }]} /></Form.Item>}
+diff --git a/horse-club-crm/frontend/src/pages/clients/list.tsx b/horse-club-crm/frontend/src/pages/clients/list.tsx
+index e80047e..3bf896f 100644
+--- a/horse-club-crm/frontend/src/pages/clients/list.tsx
++++ b/horse-club-crm/frontend/src/pages/clients/list.tsx
+@@ -112,7 +112,7 @@ export function ClientList() {
+   ]
+ 
+   return <>
+-    <CatalogList<ClientRow> resource="clients" title="Клиенты" layout="clients"
++    <CatalogList<ClientRow> resource="clients" onSearchSelect={setSelectedClientId} title="Клиенты" layout="clients"
+       extraActions={row => <><ArchiveAction resource="clients" id={row.id} archived={Boolean(row.deletedAt)} /><Button size="small" onClick={() => setLedgerClient(row)}>История баланса</Button>{!row.deletedAt && row.clientType === 'ONE_TIME' && <ConvertClient client={row} />}</>} columns={visibleColumns} toolbar={<ClientColumnSettings settings={columnSettings} canManage={canManage} />} />
+     <Modal title={client && !query.isLoading ? <ProfileHeader title="Карточка клиента"
+       name={[client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || 'Без имени'}
+diff --git a/horse-club-crm/frontend/src/pages/horses/list.tsx b/horse-club-crm/frontend/src/pages/horses/list.tsx
+index 996c18f..5c9b084 100644
+--- a/horse-club-crm/frontend/src/pages/horses/list.tsx
++++ b/horse-club-crm/frontend/src/pages/horses/list.tsx
+@@ -26,7 +26,7 @@ export function HorseList() {
+   const { permissions } = useRoleAccess()
+   const [selectedId, setSelectedId] = useState<string>()
+   return <>
+-    <CatalogList<Horse> resource="horses" storageKey="horse_crm_horses_columns_v1" defaultHiddenColumns={['riderLevel', 'minRestMinutes', 'description']} title="Лошади" columns={[
++    <CatalogList<Horse> resource="horses" onSearchSelect={setSelectedId} storageKey="horse_crm_horses_columns_v1" defaultHiddenColumns={['riderLevel', 'minRestMinutes', 'description']} title="Лошади" columns={[
+       { key: 'name', fixed: 'left', width: 180, title: 'Кличка / Фото', sorter: true, render: (_: unknown, row) => <Space size={8}><Avatar shape="square" size={32} src={row.imageUrl ? <img src={row.imageUrl} alt={row.name} /> : undefined}>{row.name.slice(0, 1)}</Avatar><CardLink onClick={() => setSelectedId(row.id)}>{row.name}</CardLink></Space> },
+       { key: 'breed', align: 'center', width: 130, dataIndex: 'breed', title: 'Порода', sorter: true },
+       { key: 'coat', align: 'center', width: 110, dataIndex: 'coat', title: 'Масть' },
+diff --git a/horse-club-crm/frontend/src/pages/lesson-history/index.tsx b/horse-club-crm/frontend/src/pages/lesson-history/index.tsx
+index 7b1e3b9..cf94c6a 100644
+--- a/horse-club-crm/frontend/src/pages/lesson-history/index.tsx
++++ b/horse-club-crm/frontend/src/pages/lesson-history/index.tsx
+@@ -1,6 +1,8 @@
++import { LiveSearch } from '../../components/LiveSearch'
++import { matchRange, recordSuggestion } from '../../components/searchText'
+ import { useCallback, useEffect, useState } from 'react'
+ import { List as RefineList } from '@refinedev/antd'
+-import { Alert, Button, DatePicker, Descriptions, Form, Input, List, Modal, Select, Space, Tag, Typography } from 'antd'
++import { Alert, Button, DatePicker, Descriptions, Form, List, Modal, Select, Space, Tag, Typography } from 'antd'
+ import type { Dayjs } from 'dayjs'
+ import { ResponsiveTable } from '../../components/ResponsiveTable'
+ import { API_URL, httpClient, toHttpError } from '../../httpClient'
+@@ -77,6 +79,7 @@ const attendanceLabels: Record<JournalBooking['attendanceStatus'], string> = {
+ 
+ export function LessonHistoryPage() {
+   const [form] = Form.useForm<FilterValues>()
++  const searchQuery = Form.useWatch<string>('q', form) ?? ''
+   const [catalogs, setCatalogs] = useState<Catalogs>({ clients: [], horses: [], trainers: [], services: [], arenas: [] })
+   const [filters, setFilters] = useState<FilterValues>({})
+   const [lessons, setLessons] = useState<JournalLesson[]>([])
+@@ -149,7 +152,7 @@ export function LessonHistoryPage() {
+     <RefineList title="Журнал занятий" canCreate={false}>
+       <Form<FilterValues> noValidate form={form} layout="vertical" onFinish={applyFilters}>
+         <Space align="end" wrap size="middle">
+-          <Form.Item name="q" label="Поиск"><Input.Search placeholder="Клиент, телефон, услуга, тренер, лошадь" allowClear onSearch={() => form.submit()} style={{ width: 300 }} /></Form.Item>
++          <Form.Item name="q" label="Поиск"><LiveSearch loading={loading} suggestions={[...catalogs.clients, ...catalogs.horses, ...catalogs.trainers, ...catalogs.services].flatMap(row => { const item = recordSuggestion(row); return item && (matchRange(item.text, searchQuery) || matchRange(item.detail ?? '', searchQuery)) ? [item] : [] })} placeholder="Клиент, телефон, услуга, тренер, лошадь" onSearch={() => form.submit()} style={{ width: 300 }} /></Form.Item>
+           <Form.Item name="period" label="Период"><DatePicker.RangePicker format="DD.MM.YYYY" /></Form.Item>
+           <Form.Item name="status" label="Статус"><Select allowClear placeholder="Все" style={{ width: 180 }} options={Object.entries(statuses).map(([value, item]) => ({ value, label: item.label }))} /></Form.Item>
+           <Form.Item name="clientId" label="Клиент"><Select showSearch allowClear optionFilterProp="label" style={{ width: 220 }} options={catalogs.clients.map(row => option(row.id, personName(row)))} /></Form.Item>
+diff --git a/horse-club-crm/frontend/src/pages/memberships/list.tsx b/horse-club-crm/frontend/src/pages/memberships/list.tsx
+index f794f68..a77df13 100644
+--- a/horse-club-crm/frontend/src/pages/memberships/list.tsx
++++ b/horse-club-crm/frontend/src/pages/memberships/list.tsx
+@@ -1,10 +1,12 @@
++import { LiveSearch } from '../../components/LiveSearch'
++import { recordSuggestion } from '../../components/searchText'
+ import { SharedMembershipAccess, type SharedMember } from './SharedMembershipAccess'
+ import { deferredBalance } from './deferredBalance'
+ import { ArchiveAction } from '../clients/ArchiveAction'
+ import { useState } from 'react'
+ import { CreateButton, List as RefineList, useTable } from '@refinedev/antd'
+ import type { HttpError } from '@refinedev/core'
+-import { Descriptions, Empty, Form, Input, List, Progress, Space, Tag, Typography } from 'antd'
++import { Descriptions, Empty, Form, List, Progress, Space, Tag, Typography } from 'antd'
+ import { money } from '../catalogs/format'
+ import type { RelationLesson, RelationPayment } from '../catalogs/types'
+ import { dateOnly, dateTime, personName } from '../cards/format'
+@@ -33,7 +35,7 @@ export function MembershipList() {
+   const { canManage } = useCatalogPermissions()
+   const canSell = canManage && !access.loading && !access.error && (!access.isEnabled('CASHBOX') || access.canWrite('CASHBOX'))
+   const [selectedId, setSelectedId] = useState<string>()
+-  const { tableProps, searchFormProps } = useTable<Membership, HttpError, { q?: string }>({
++  const { tableProps, searchFormProps, tableQuery } = useTable<Membership, HttpError, { q?: string }>({
+     resource: 'memberships', pagination: { pageSize: 10 },
+     onSearch: ({ q }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' }],
+   })
+@@ -41,7 +43,7 @@ export function MembershipList() {
+   return <>
+     <RefineList title="Абонементы" headerButtons={<CreateButton disabled={!canSell}>Продать абонемент</CreateButton>}>
+       <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q">
+-        <Input.Search placeholder="Поиск клиента" allowClear onSearch={() => searchFormProps.form?.submit()} />
++        <LiveSearch loading={tableQuery.isFetching} suggestions={(tableProps.dataSource ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })} placeholder="Поиск клиента" onSearch={() => searchFormProps.form?.submit()} />
+       </Form.Item></Form>
+       <ConfigurableTable<Membership> storageKey="horse_crm_memberships_columns_v1" {...tableProps} rowKey="id" columns={[
+         { key: 'client', fixed: 'left', width: 180, title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : '—'}</CardLink> },
+diff --git a/horse-club-crm/frontend/src/pages/payments/list.tsx b/horse-club-crm/frontend/src/pages/payments/list.tsx
+index 434e0aa..84fb532 100644
+--- a/horse-club-crm/frontend/src/pages/payments/list.tsx
++++ b/horse-club-crm/frontend/src/pages/payments/list.tsx
+@@ -1,8 +1,10 @@
++import { LiveSearch } from '../../components/LiveSearch'
++import { recordSuggestion } from '../../components/searchText'
+ import { usePermissions } from '../../modulePermissions'
+ import { useState } from 'react'
+ import { useUpdate, type HttpError } from '@refinedev/core'
+ import { List, useTable } from '@refinedev/antd'
+-import { Alert, Button, Descriptions, Form, Input, Space, Tag } from 'antd'
++import { Alert, Button, Descriptions, Form, Space, Tag } from 'antd'
+ import { money } from '../catalogs/format'
+ import { dateTime, personName } from '../cards/format'
+ import { CardLink, DetailsModal } from '../cards/shared'
+@@ -45,7 +47,7 @@ export function PaymentList() {
+         description="Начисления создаются автоматически. Нажмите «Оплачено», когда деньги получены. Кассовые чеки и бухгалтерия ведутся отдельно."
+         style={{ marginBottom: 20 }} />
+       <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}>
+-        <Form.Item name="q" style={{ width: 320, maxWidth: '100%' }}><Input.Search placeholder="Клиент, лошадь или комментарий" allowClear onSearch={() => searchFormProps.form?.submit()} /></Form.Item>
++        <Form.Item name="q" style={{ width: 320, maxWidth: '100%' }}><LiveSearch loading={tableQuery.isFetching} suggestions={(tableProps.dataSource ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })} placeholder="Клиент, лошадь или комментарий" onSearch={() => searchFormProps.form?.submit()} /></Form.Item>
+         <Button htmlType="submit">Найти</Button>
+       </Form>
+       {tableQuery.error && <Alert type="error" showIcon message="Не удалось загрузить оплаты" description={tableQuery.error.message} />}
+diff --git a/horse-club-crm/frontend/src/pages/schedule/LessonDrawer.tsx b/horse-club-crm/frontend/src/pages/schedule/LessonDrawer.tsx
+index 397656f..9cf7824 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/LessonDrawer.tsx
++++ b/horse-club-crm/frontend/src/pages/schedule/LessonDrawer.tsx
+@@ -1,3 +1,4 @@
++import { SearchSelect } from '../../components/SearchSelect'
+ import { useCallback, useEffect, useState } from 'react'
+ import { Alert, Button, Form, InputNumber, Select, Typography } from 'antd'
+ import dayjs, { type Dayjs } from 'dayjs'
+@@ -131,7 +132,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
+     {trainerFull && <Alert type="error" showIcon message={`У тренера достигнут максимум одновременных всадников (${trainerLimit})`} />}
+     {conflicts.error && <Alert type="warning" showIcon message="Не удалось проверить свободные места тренера" description="При сохранении сервер повторно проверит вместимость."
+       action={<Button onClick={() => retry(n => n + 1)}>Повторить</Button>} />}
+-    <Form.Item name="horseId" label="Лошадь" extra={perPerson ? 'Для экскурсий выбор лошади необязателен' : 'Можно назначить лошадь позже в карточке занятия'}><Select allowClear placeholder="Назначить позже / Не выбрана" onChange={preferences.horseChanged} onInputKeyDown={stopPopupEscape} aria-label="Лошадь" loading={catalogs.loading || availability.loading} showSearch optionFilterProp="label"
++    <Form.Item name="horseId" label="Лошадь" extra={perPerson ? 'Для экскурсий выбор лошади необязателен' : 'Можно назначить лошадь позже в карточке занятия'}><SearchSelect allowClear placeholder="Назначить позже / Не выбрана" onChange={preferences.horseChanged} onInputKeyDown={stopPopupEscape} aria-label="Лошадь" loading={catalogs.loading || availability.loading} showSearch optionFilterProp="label"
+       options={[{ value: '', label: 'Назначить позже / Не выбрана' }, ...catalogs.horses.map(row => ({ value: row.id, label: row.name, disabled: !from || availability.loading || blockedHorse(row.id) }))]} /></Form.Item>
+     {horseId && !availability.loading && blockedHorse(horseId) && <Alert type="warning" showIcon message="Лошадь недоступна или превышен дневной лимит. Выберите другую лошадь или время." />}
+     <Form.Item name="arenaId" label="Манеж / локация"><Select onInputKeyDown={stopPopupEscape} allowClear showSearch optionFilterProp="label" loading={catalogs.loading}
+diff --git a/horse-club-crm/frontend/src/pages/schedule/ReplaceHorseAction.tsx b/horse-club-crm/frontend/src/pages/schedule/ReplaceHorseAction.tsx
+index 672719c..4e419aa 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/ReplaceHorseAction.tsx
++++ b/horse-club-crm/frontend/src/pages/schedule/ReplaceHorseAction.tsx
+@@ -1,5 +1,6 @@
+ import { useEffect, useRef, useState } from 'react'
+-import { Alert, App, Button, Form, Input, Modal, Select, Space, Typography } from 'antd'
++import { Alert, App, Button, Form, Input, Modal, Space, Typography } from 'antd'
++import { SearchSelect } from '../../components/SearchSelect'
+ import { API_URL, httpClient, toHttpError } from '../../httpClient'
+ import type { Horse } from '../catalogs/types'
+ import { useRoleAccess } from '../../access'
+@@ -60,7 +61,7 @@ export function ReplaceHorseAction({ bookingId, trainerId, disabled, report, onS
+       {loadError && <Alert type="error" role="alert" showIcon message={loadError} action={<Button onClick={reload}>Повторить</Button>} />}
+       <Form form={form} noValidate layout="vertical" onFinish={save} disabled={busy} scrollToFirstError>
+         <Form.Item name="horseId" label="Новая лошадь" rules={[{ required: true, message: 'Выберите лошадь' }]}>
+-          <Select aria-label="Новая лошадь" showSearch optionFilterProp="label" loading={loading} disabled={busy || loading || Boolean(loadError)} notFoundContent="На это время нет доступных лошадей"
++          <SearchSelect aria-label="Новая лошадь" showSearch optionFilterProp="label" loading={loading} disabled={busy || loading || Boolean(loadError)} notFoundContent="На это время нет доступных лошадей"
+             options={options.map(horse => ({ value: horse.id, label: `${horse.name} · до ${horse.maxRiderWeight} кг` }))} />
+         </Form.Item>
+         <Form.Item name="reason" label="Причина замены"><Input aria-label="Причина замены" maxLength={500} /></Form.Item>
+diff --git a/horse-club-crm/frontend/src/pages/schedule/TriadBookingModal.tsx b/horse-club-crm/frontend/src/pages/schedule/TriadBookingModal.tsx
+index f74a09b..f2324b4 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/TriadBookingModal.tsx
++++ b/horse-club-crm/frontend/src/pages/schedule/TriadBookingModal.tsx
+@@ -1,3 +1,4 @@
++import { SearchSelect } from '../../components/SearchSelect'
+ import { ScheduleConflictNotice } from './ScheduleConflictNotice'
+ import { scheduleConflicts } from './triad'
+ import { useScheduleConflicts } from './useScheduleConflicts'
+@@ -135,7 +136,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
+         } }]}><BookingDateTimeInput placeholder="Дата и время окончания" /></Form.Item>
+       </div>
+       <Form.Item name="horseId" label="Лошадь" rules={[required]} extra={horse ? `Допустимый вес: до ${horse.maxRiderWeight ?? 85} кг. Отдых между тренировками: ${horse.requiredRestMinutes ?? horse.minRestMinutes ?? 45} мин.` : undefined}>
+-        <Select onInputKeyDown={stopPopupEscape} onChange={preferences.horseChanged} id="triad_horseId" aria-label="Лошадь" showSearch allowClear optionFilterProp="label" placeholder="Выберите активную лошадь" loading={availability.loading} options={horses.filter(activePreferredHorse).map(h => {
++        <SearchSelect onInputKeyDown={stopPopupEscape} onChange={preferences.horseChanged} id="triad_horseId" aria-label="Лошадь" showSearch allowClear optionFilterProp="label" placeholder="Выберите активную лошадь" loading={availability.loading} options={horses.filter(activePreferredHorse).map(h => {
+           const load = availability.data?.horseWorkloads.find(w => w.horseId === h.id)
+           const unsuitable = weight !== undefined && weight > (h.maxRiderWeight ?? 85)
+           return { value: h.id, disabled: unsuitable, label: `${h.name} — ${load ? `${formatMinutes(load.currentWorkloadMinutes)} / ${load.maxDailyWorkloadMinutes} мин` : 'нагрузка уточняется'}${unsuitable ? ` · вес до ${h.maxRiderWeight ?? 85} кг` : ''}` }
+diff --git a/horse-club-crm/frontend/src/pages/trainers/list.tsx b/horse-club-crm/frontend/src/pages/trainers/list.tsx
+index 02219d8..67ac25b 100644
+--- a/horse-club-crm/frontend/src/pages/trainers/list.tsx
++++ b/horse-club-crm/frontend/src/pages/trainers/list.tsx
+@@ -23,7 +23,7 @@ export function TrainerList() {
+     { key: 'maxDailyLoad', align: 'right', width: 115, dataIndex: 'maxDailyLoad', title: 'Дневная нагрузка, мин', sorter: true },
+   ]
+   if (canManage && canRead('STAFF_PAYROLL')) columns.push({ key: 'baseRate', align: 'right', width: 120, dataIndex: 'baseRate', title: 'Базовая ставка', sorter: true, render: money })
+-  return <><CatalogList<Trainer> resource="trainers" storageKey="horse_crm_trainers_columns_v1" defaultHiddenColumns={['vk', 'qualification']} title="Тренеры" columns={columns} />
++  return <><CatalogList<Trainer> resource="trainers" onSearchSelect={setSelectedId} storageKey="horse_crm_trainers_columns_v1" defaultHiddenColumns={['vk', 'qualification']} title="Тренеры" columns={columns} />
+     <DetailsModal<Trainer> resource="trainers" id={selectedId} title="Карточка тренера" onClose={() => setSelectedId(undefined)}>
+       {trainer => <><CatalogEditAction resource="trainers" id={trainer.id}><TrainerForm action="edit" /></CatalogEditAction>
+         {canManage && <VkProfileLink id={trainer.id} name={trainer.name} kind="TRAINER" vkId={trainer.vkId} />}
+diff --git a/horse-club-crm/frontend/src/pages/users/list.tsx b/horse-club-crm/frontend/src/pages/users/list.tsx
+index 8e2cb5c..33fcb3f 100644
+--- a/horse-club-crm/frontend/src/pages/users/list.tsx
++++ b/horse-club-crm/frontend/src/pages/users/list.tsx
+@@ -1,6 +1,8 @@
++import { LiveSearch } from '../../components/LiveSearch'
++import { recordSuggestion } from '../../components/searchText'
+ import { List, useTable } from '@refinedev/antd'
+ import { usePermissions, type HttpError } from '@refinedev/core'
+-import { Button, Form, Input, Tag } from 'antd'
++import { Button, Form, Tag } from 'antd'
+ import { Link } from 'react-router-dom'
+ import type { Role } from '../../authStorage'
+ import { ConfigurableTable } from '../../components/ConfigurableTable'
+@@ -11,13 +13,13 @@ const roleColor: Record<Role, string> = { ADMIN: 'red', MANAGER: 'blue', TRAINER
+ 
+ export function UserList() {
+   const { data: role } = usePermissions<Role>({})
+-  const { tableProps, searchFormProps } = useTable<User, HttpError, { q?: string }>({
++  const { tableProps, searchFormProps, tableQuery } = useTable<User, HttpError, { q?: string }>({
+     resource: 'users', pagination: { pageSize: 10 }, sorters: { mode: 'server' },
+     onSearch: ({ q }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' }],
+   })
+   return <List title="Пользователи" canCreate={false}
+     headerButtons={role === 'ADMIN' ? <Link to="/users/new"><Button type="primary">Создать</Button></Link> : undefined}>
+-    <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q"><Input.Search placeholder="Поиск по email" allowClear onSearch={() => searchFormProps.form?.submit()} /></Form.Item><Button htmlType="submit">Найти</Button></Form>
++    <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q"><LiveSearch loading={tableQuery.isFetching} suggestions={(tableProps.dataSource ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })} placeholder="Поиск по email" onSearch={() => searchFormProps.form?.submit()} /></Form.Item><Button htmlType="submit">Найти</Button></Form>
+     <ConfigurableTable<User> storageKey="horse_crm_users_columns_v1" {...tableProps} rowKey="id" columns={[
+       { key: 'email', fixed: 'left', width: 230, dataIndex: 'email', title: 'Email', sorter: true },
+       { key: 'role', align: 'center', width: 130, dataIndex: 'role', title: 'Роль', sorter: true, render: (value: Role) => <Tag color={roleColor[value]}>{value}</Tag> },

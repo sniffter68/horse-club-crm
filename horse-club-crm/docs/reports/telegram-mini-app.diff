@@ -1,0 +1,3215 @@
+diff --git a/horse-club-crm/backend/.env.example b/horse-club-crm/backend/.env.example
+index 23e9f78..799409e 100644
+--- a/horse-club-crm/backend/.env.example
++++ b/horse-club-crm/backend/.env.example
+@@ -3,6 +3,8 @@ DATABASE_URL=postgresql://postgres:password@localhost:5432/horse_club_crm?schema
+ CLUB_TIME_ZONE=Europe/Moscow
+ JWT_SECRET=
+ PORT=3000
++TELEGRAM_BOT_TOKEN=
++TELEGRAM_WEBAPP_URL=https://crm.horseclub68.ru/tma
+ # Preferred name for the VK community messages token.
+ VK_GROUP_TOKEN=
+ # Backward-compatible token names remain supported.
+diff --git a/horse-club-crm/backend/package-lock.json b/horse-club-crm/backend/package-lock.json
+index 4b0c8ee..6d33434 100644
+--- a/horse-club-crm/backend/package-lock.json
++++ b/horse-club-crm/backend/package-lock.json
+@@ -17,6 +17,7 @@
+         "bcrypt": "^6.0.0",
+         "class-transformer": "^0.5.1",
+         "class-validator": "^0.15.1",
++        "grammy": "^1.46.0",
+         "libphonenumber-js": "^1.13.12",
+         "luxon": "^3.7.2",
+         "passport": "^0.7.0",
+@@ -48,6 +49,12 @@
+         "url": "https://github.com/sponsors/Borewit"
+       }
+     },
++    "node_modules/@grammyjs/types": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/@grammyjs/types/-/types-5.0.0.tgz",
++      "integrity": "sha512-iq1Qrq1iPKkB8yAa0qSuIURMZOCuqTY5pWy5gHpCeL1oQ+GPadGhw/cDTVE8waJwuCzacUzuIjRv1sESvk7u7A==",
++      "license": "MIT"
++    },
+     "node_modules/@lukeed/csprng": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/@lukeed/csprng/-/csprng-1.1.0.tgz",
+@@ -1977,6 +1984,41 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/grammy": {
++      "version": "1.46.0",
++      "resolved": "https://registry.npmjs.org/grammy/-/grammy-1.46.0.tgz",
++      "integrity": "sha512-/8Qw+iisrUdOMk+p2mjEHouMm/BBdBEN1DHh16wiTpRUZkxDG3PxexdjCvR+wvK3LWPdrEvnQbdrwpU954sPhg==",
++      "license": "MIT",
++      "dependencies": {
++        "@grammyjs/types": "5.0.0",
++        "abort-controller": "^3.0.0",
++        "debug": "^4.4.3",
++        "node-fetch": "^2.7.0"
++      },
++      "engines": {
++        "node": "^12.20.0 || >=14.13.1"
++      }
++    },
++    "node_modules/grammy/node_modules/node-fetch": {
++      "version": "2.7.0",
++      "resolved": "https://registry.npmjs.org/node-fetch/-/node-fetch-2.7.0.tgz",
++      "integrity": "sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==",
++      "license": "MIT",
++      "dependencies": {
++        "whatwg-url": "^5.0.0"
++      },
++      "engines": {
++        "node": "4.x || >=6.0.0"
++      },
++      "peerDependencies": {
++        "encoding": "^0.1.0"
++      },
++      "peerDependenciesMeta": {
++        "encoding": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/has-symbols": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/has-symbols/-/has-symbols-1.1.0.tgz",
+@@ -3155,6 +3197,12 @@
+         "url": "https://github.com/sponsors/Borewit"
+       }
+     },
++    "node_modules/tr46": {
++      "version": "0.0.3",
++      "resolved": "https://registry.npmjs.org/tr46/-/tr46-0.0.3.tgz",
++      "integrity": "sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==",
++      "license": "MIT"
++    },
+     "node_modules/tree-kill": {
+       "version": "1.2.2",
+       "resolved": "https://registry.npmjs.org/tree-kill/-/tree-kill-1.2.2.tgz",
+@@ -3347,6 +3395,22 @@
+         "node": ">= 14"
+       }
+     },
++    "node_modules/webidl-conversions": {
++      "version": "3.0.1",
++      "resolved": "https://registry.npmjs.org/webidl-conversions/-/webidl-conversions-3.0.1.tgz",
++      "integrity": "sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==",
++      "license": "BSD-2-Clause"
++    },
++    "node_modules/whatwg-url": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/whatwg-url/-/whatwg-url-5.0.0.tgz",
++      "integrity": "sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==",
++      "license": "MIT",
++      "dependencies": {
++        "tr46": "~0.0.3",
++        "webidl-conversions": "^3.0.0"
++      }
++    },
+     "node_modules/wrap-ansi": {
+       "version": "9.0.2",
+       "resolved": "https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-9.0.2.tgz",
+diff --git a/horse-club-crm/backend/package.json b/horse-club-crm/backend/package.json
+index 07318ab..71fc5d5 100644
+--- a/horse-club-crm/backend/package.json
++++ b/horse-club-crm/backend/package.json
+@@ -32,6 +32,7 @@
+     "bcrypt": "^6.0.0",
+     "class-transformer": "^0.5.1",
+     "class-validator": "^0.15.1",
++    "grammy": "^1.46.0",
+     "libphonenumber-js": "^1.13.12",
+     "luxon": "^3.7.2",
+     "passport": "^0.7.0",
+diff --git a/horse-club-crm/backend/prisma/migrations/20261108000000_telegram_mini_app/migration.sql b/horse-club-crm/backend/prisma/migrations/20261108000000_telegram_mini_app/migration.sql
+new file mode 100644
+index 0000000..47dfe5a
+--- /dev/null
++++ b/horse-club-crm/backend/prisma/migrations/20261108000000_telegram_mini_app/migration.sql
+@@ -0,0 +1,6 @@
++ALTER TABLE "Client" ADD COLUMN "telegramUserId" TEXT, ADD COLUMN "telegramUsername" TEXT;
++CREATE UNIQUE INDEX "Client_telegramUserId_key" ON "Client"("telegramUserId");
++ALTER TABLE "Booking" ADD COLUMN "telegramRequestId" UUID,
++  ADD COLUMN "telegramConsentVersion" TEXT,
++  ADD COLUMN "telegramConsentedAt" TIMESTAMPTZ(6);
++CREATE UNIQUE INDEX "Booking_telegramRequestId_key" ON "Booking"("telegramRequestId");
+diff --git a/horse-club-crm/backend/prisma/schema.prisma b/horse-club-crm/backend/prisma/schema.prisma
+index 7dd6386..d40b133 100644
+--- a/horse-club-crm/backend/prisma/schema.prisma
++++ b/horse-club-crm/backend/prisma/schema.prisma
+@@ -328,6 +328,8 @@ enum ClientType {
+ }
+ 
+ model Client {
++  telegramUserId String? @unique
++  telegramUsername String?
+   preferredTrainerId String? @db.Uuid
+   preferredHorseId String? @db.Uuid
+   preferredTrainer Trainer? @relation("ClientPreferredTrainer", fields: [preferredTrainerId], references: [id], onDelete: SetNull)
+@@ -487,6 +489,9 @@ model PricingPlan {
+ }
+ 
+ model Booking {
++  telegramRequestId String? @unique @db.Uuid
++  telegramConsentVersion String?
++  telegramConsentedAt DateTime? @db.Timestamptz(6)
+   financialActorId String? @db.Uuid
+   prepaymentAmount Decimal @default(0) @db.Decimal(12, 2)
+   prepaymentMethod PaymentMethod?
+diff --git a/horse-club-crm/backend/src/app.module.ts b/horse-club-crm/backend/src/app.module.ts
+index cdded7c..c03c31c 100644
+--- a/horse-club-crm/backend/src/app.module.ts
++++ b/horse-club-crm/backend/src/app.module.ts
+@@ -1,4 +1,5 @@
+ import { PublicModule } from './public/public.module';
++import { TelegramBotModule } from './modules/telegram-bot/telegram-bot.module';
+ import { StaffModule } from './staff/staff.module';
+ import { UploadModule } from './upload/upload.module';
+ import { Module } from '@nestjs/common';
+@@ -36,6 +37,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
+     BoardingModule,
+     LeadsModule,
+     PublicModule,
++    TelegramBotModule,
+     VkBotModule,
+     PrismaModule,
+     CommonModule,
+diff --git a/horse-club-crm/backend/src/modules/telegram-bot/telegram-auth.guard.ts b/horse-club-crm/backend/src/modules/telegram-bot/telegram-auth.guard.ts
+new file mode 100644
+index 0000000..d226efb
+--- /dev/null
++++ b/horse-club-crm/backend/src/modules/telegram-bot/telegram-auth.guard.ts
+@@ -0,0 +1,42 @@
++import { ForbiddenException, HttpException, Injectable, ServiceUnavailableException, type CanActivate, type ExecutionContext } from '@nestjs/common';
++import type { Request } from 'express';
++import { PrismaService } from '../../prisma/prisma.service';
++import { validateTelegramInitData, type TelegramIdentity } from './telegram-init-data';
++
++export interface TelegramRequest extends Request {
++  telegram: TelegramIdentity & { clientId: string };
++}
++
++@Injectable()
++export class TelegramAuthGuard implements CanActivate {
++  private readonly buckets = new Map<string, { count: number; until: number }>();
++  constructor(private readonly prisma: PrismaService) {}
++
++  async canActivate(context: ExecutionContext): Promise<boolean> {
++    const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
++    if (!token) throw new ServiceUnavailableException('Онлайн-запись через Telegram пока недоступна');
++    const request = context.switchToHttp().getRequest<TelegramRequest>();
++    const identity = validateTelegramInitData(request.get('X-Telegram-Init-Data') ?? '', token);
++    const now = Date.now();
++    for (const [key, bucket] of this.buckets) if (bucket.until <= now) this.buckets.delete(key);
++    const slots = request.path?.endsWith('/slots');
++    const key = `${identity.telegramUserId}:${slots ? 'slots' : 'general'}`;
++    const bucket = this.buckets.get(key);
++    if ((!bucket && this.buckets.size >= 10_000) || (bucket && bucket.count >= (slots ? 10 : 60))) throw new HttpException('Слишком много запросов. Повторите через минуту', 429);
++    this.buckets.set(key, { count: (bucket?.count ?? 0) + 1, until: bucket?.until ?? now + 60_000 });
++    // Personal TMA routes have no staff role: enforce enabled SCHEDULE and ownership,
++    // never manufacture an ADMIN/JWT identity or grant access to CRM endpoints.
++    const settings = await this.prisma.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
++    if (settings && !settings.isEnabled) throw new ForbiddenException('Онлайн-запись временно отключена');
++    const client = await this.prisma.client.upsert({
++      where: { telegramUserId: identity.telegramUserId },
++      create: { telegramUserId: identity.telegramUserId, telegramUsername: identity.username,
++        firstName: identity.firstName, lastName: identity.lastName,
++        name: [identity.firstName, identity.lastName].filter(Boolean).join(' ') },
++      update: {}, select: { id: true, deletedAt: true },
++    });
++    if (client.deletedAt) throw new ForbiddenException('Обратитесь в клуб для восстановления профиля');
++    request.telegram = { ...identity, clientId: client.id };
++    return true;
++  }
++}
+diff --git a/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.controller.ts b/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.controller.ts
+new file mode 100644
+index 0000000..399076a
+--- /dev/null
++++ b/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.controller.ts
+@@ -0,0 +1,22 @@
++import { Body, Controller, Get, Header, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
++import { RequireModule } from '../../auth/module-access.guard';
++import { TelegramAuthGuard, type TelegramRequest } from './telegram-auth.guard';
++import { TmaBookingsQuery, TmaCreateBookingDto, TmaSlotsQuery } from './telegram-bot.dto';
++import { TmaBookingService } from './tma-booking.service';
++
++@Controller('tma')
++@RequireModule('SCHEDULE')
++@UseGuards(TelegramAuthGuard)
++export class TelegramBotController {
++  constructor(private readonly service: TmaBookingService) {}
++  @Get('services') @Header('Cache-Control', 'no-store')
++  services() { return this.service.services(); }
++  @Get('slots')
++  slots(@Req() req: TelegramRequest, @Query() query: TmaSlotsQuery) { return this.service.slots(req.telegram.clientId, query); }
++  @Post('bookings')
++  create(@Req() req: TelegramRequest, @Body() dto: TmaCreateBookingDto) { return this.service.create(req.telegram.clientId, dto); }
++  @Get('my-bookings')
++  bookings(@Req() req: TelegramRequest, @Query() query: TmaBookingsQuery) { return this.service.myBookings(req.telegram.clientId, query); }
++  @Post('bookings/:id/cancel-request')
++  cancel(@Req() req: TelegramRequest, @Param('id', new ParseUUIDPipe()) id: string) { return this.service.cancelRequest(req.telegram.clientId, id); }
++}
+diff --git a/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.dto.ts b/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.dto.ts
+new file mode 100644
+index 0000000..f82810e
+--- /dev/null
++++ b/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.dto.ts
+@@ -0,0 +1,23 @@
++import { Transform, Type } from 'class-transformer';
++import { Equals, IsBoolean, IsInt, IsISO8601, IsOptional, IsPhoneNumber, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
++
++export class TmaSlotsQuery {
++  @Matches(/^\d{4}-\d{2}-\d{2}$/) date!: string;
++  @Transform(({ value }: { value: unknown }) => value === '' ? undefined : value)
++  @IsOptional() @IsUUID() serviceId?: string;
++}
++export class TmaBookingsQuery {
++  @Type(() => Number) @IsInt() @Min(0) @IsOptional() offset = 0;
++  @Type(() => Number) @IsInt() @Min(1) @Max(50) @IsOptional() limit = 20;
++}
++export class TmaCreateBookingDto {
++  @IsUUID() serviceId!: string;
++  @IsUUID() trainerId!: string;
++  @IsISO8601({ strict: true }) startTime!: string;
++  @IsUUID() requestId!: string;
++  @Transform(({ value }: { value: unknown }) => typeof value === 'string' ? value.replace(/[\s()-]/g, '') : value)
++  @IsPhoneNumber('RU') phone!: string;
++  @Transform(({ obj }: { obj: Record<string, unknown> }) => obj.consentAccepted)
++  @IsBoolean() @Equals(true) consentAccepted!: boolean;
++  @IsString() @Matches(/^[a-zA-Z0-9._-]{1,64}$/) consentVersion!: string;
++}
+diff --git a/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.module.ts b/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.module.ts
+new file mode 100644
+index 0000000..f0f7657
+--- /dev/null
++++ b/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.module.ts
+@@ -0,0 +1,12 @@
++import { Module } from '@nestjs/common';
++import { BookingsModule } from '../../bookings/bookings.module';
++import { LessonsModule } from '../../lessons/lessons.module';
++import { PrismaModule } from '../../prisma/prisma.module';
++import { TelegramAuthGuard } from './telegram-auth.guard';
++import { TelegramBotController } from './telegram-bot.controller';
++import { TelegramBotService } from './telegram-bot.service';
++import { TmaBookingService } from './tma-booking.service';
++
++@Module({ imports: [PrismaModule, BookingsModule, LessonsModule], controllers: [TelegramBotController],
++  providers: [TelegramBotService, TelegramAuthGuard, TmaBookingService] })
++export class TelegramBotModule {}
+diff --git a/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.service.ts b/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.service.ts
+new file mode 100644
+index 0000000..8e46298
+--- /dev/null
++++ b/horse-club-crm/backend/src/modules/telegram-bot/telegram-bot.service.ts
+@@ -0,0 +1,30 @@
++import { Injectable, Logger, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
++import { Bot, InlineKeyboard } from 'grammy';
++
++@Injectable()
++export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
++  private readonly logger = new Logger(TelegramBotService.name);
++  private bot?: Bot;
++
++  onModuleInit(): void {
++    const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
++    if (!token) return;
++    const url = new URL(process.env.TELEGRAM_WEBAPP_URL?.trim() || 'https://crm.horseclub68.ru/tma');
++    if (url.protocol !== 'https:' || url.username || url.password) throw new Error('TELEGRAM_WEBAPP_URL must be an HTTPS URL');
++    const bot = new Bot(token);
++    this.bot = bot;
++    bot.command('start', async ctx => {
++      if (ctx.chat.type !== 'private') return;
++      await ctx.reply('Добро пожаловать в КСК «СЛКС», Тамбов! 🐎\nВыберите занятие и удобное время. Ждём вас: ул. Бастионная, 22АС2.',
++        { reply_markup: new InlineKeyboard().webApp('Записаться на занятие', url.href) });
++    });
++    bot.catch(() => this.logger.warn('Telegram update failed; token and user data omitted'));
++    // Start polling without blocking CRM startup. Exactly one backend replica should poll.
++    void bot.start({ onStart: () => this.logger.log('Telegram bot polling started') })
++      .catch(() => this.logger.error('Telegram polling stopped; check bot configuration and network'));
++  }
++
++  async onModuleDestroy(): Promise<void> {
++    if (this.bot?.isRunning()) await this.bot.stop();
++  }
++}
+diff --git a/horse-club-crm/backend/src/modules/telegram-bot/telegram-init-data.ts b/horse-club-crm/backend/src/modules/telegram-bot/telegram-init-data.ts
+new file mode 100644
+index 0000000..293ae35
+--- /dev/null
++++ b/horse-club-crm/backend/src/modules/telegram-bot/telegram-init-data.ts
+@@ -0,0 +1,37 @@
++import { createHmac, timingSafeEqual } from 'node:crypto';
++import { UnauthorizedException } from '@nestjs/common';
++
++export interface TelegramIdentity {
++  telegramUserId: string;
++  firstName: string;
++  lastName: string;
++  username?: string;
++}
++
++/** Only signed initData is trusted. Never accept initDataUnsafe as identity. */
++export function validateTelegramInitData(raw: string, token: string, now = Date.now()): TelegramIdentity {
++  const invalid = () => new UnauthorizedException('Откройте приложение заново через Telegram');
++  if (!raw || raw.length > 16_384 || !token) throw invalid();
++  const params = new URLSearchParams(raw);
++  const keys = [...params.keys()];
++  if (new Set(keys).size !== keys.length) throw invalid();
++  const hash = params.get('hash') ?? '';
++  if (!/^[a-fA-F0-9]{64}$/.test(hash)) throw invalid();
++  params.delete('hash');
++  const check = [...params.entries()].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
++    .map(([key, value]) => `${key}=${value}`).join('\n');
++  const secret = createHmac('sha256', 'WebAppData').update(token).digest();
++  const expected = createHmac('sha256', secret).update(check).digest();
++  if (!timingSafeEqual(expected, Buffer.from(hash, 'hex'))) throw invalid();
++  const authDate = Number(params.get('auth_date'));
++  if (!Number.isSafeInteger(authDate) || authDate <= 0 || authDate * 1000 > now + 30_000 || now - authDate * 1000 > 3_600_000) throw invalid();
++  let user: unknown;
++  try { user = JSON.parse(params.get('user') ?? ''); } catch { throw invalid(); }
++  if (!user || typeof user !== 'object' || !('id' in user) || !('first_name' in user)
++    || typeof user.id !== 'number' || !Number.isSafeInteger(user.id) || user.id <= 0
++    || typeof user.first_name !== 'string' || !user.first_name.trim() || user.first_name.length > 128) throw invalid();
++  const lastName = 'last_name' in user ? user.last_name : '';
++  const username = 'username' in user ? user.username : undefined;
++  if (typeof lastName !== 'string' || lastName.length > 128 || (username !== undefined && (typeof username !== 'string' || username.length > 64))) throw invalid();
++  return { telegramUserId: String(user.id), firstName: user.first_name, lastName, username };
++}
+diff --git a/horse-club-crm/backend/src/modules/telegram-bot/tma-booking.service.ts b/horse-club-crm/backend/src/modules/telegram-bot/tma-booking.service.ts
+new file mode 100644
+index 0000000..993dcc2
+--- /dev/null
++++ b/horse-club-crm/backend/src/modules/telegram-bot/tma-booking.service.ts
+@@ -0,0 +1,158 @@
++import { BadRequestException, ConflictException, HttpException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
++import { Prisma } from '@prisma/client';
++import { DateTime } from 'luxon';
++import { BookingRulesService } from '../../bookings/booking-rules.service';
++import { currentLeadConsentVersion } from '../../common/lead-consent';
++import { isSerializationFailure } from '../../common/serialization-failure';
++import { LessonsService } from '../../lessons/lessons.service';
++import { PrismaService } from '../../prisma/prisma.service';
++import type { TmaBookingsQuery, TmaCreateBookingDto, TmaSlotsQuery } from './telegram-bot.dto';
++
++const ZONE = 'Europe/Moscow';
++const bookingView = {
++  id: true, startTime: true, endTime: true, status: true, clientConfirmed: true,
++  clientCancellationRequested: true, costAmount: true,
++  trainer: { select: { name: true } },
++  lesson: { select: { status: true, deletedAt: true, startTime: true, endTime: true,
++    service: { select: { title: true, name: true } } } },
++} satisfies Prisma.BookingSelect;
++
++@Injectable()
++export class TmaBookingService {
++  constructor(private readonly prisma: PrismaService, private readonly rules: BookingRulesService,
++    private readonly lessons: LessonsService) {}
++
++  async services() {
++    const services = await this.prisma.service.findMany({ where: { isPublic: true, durationMinutes: { gt: 0 } },
++      orderBy: [{ order: 'asc' }, { id: 'asc' }], take: 100,
++      select: { id: true, title: true, name: true, description: true, price: true, durationMinutes: true } });
++    return { services, consentVersion: currentLeadConsentVersion() };
++  }
++
++  private date(value: string) {
++    const day = DateTime.fromISO(value, { zone: ZONE });
++    const today = DateTime.now().setZone(ZONE).startOf('day');
++    if (!day.isValid || day.toISODate() !== value || day < today || day > today.plus({ days: 30 })) {
++      throw new BadRequestException('Выберите дату в ближайшие 30 дней');
++    }
++    return day;
++  }
++
++  private async service(tx: Prisma.TransactionClient, id?: string) {
++    const service = await tx.service.findFirst({ where: { ...(id ? { id } : {}), isPublic: true, durationMinutes: { gt: 0 } },
++      orderBy: [{ order: 'asc' }, { id: 'asc' }] });
++    if (!service) throw new NotFoundException('Услуга недоступна для онлайн-записи');
++    return service;
++  }
++
++  private async withinHours(tx: Prisma.TransactionClient, start: DateTime, minutes: number): Promise<boolean> {
++    const schedule = await this.schedule(tx);
++    const open = schedule.openTime, close = schedule.closeTime;
++    const off = schedule.daysOfWeekOff;
++    const end = start.plus({ minutes });
++    return !off.includes(start.weekday % 7) && start.toISODate() === end.toISODate()
++      && start.toFormat('HH:mm') >= open && end.toFormat('HH:mm') <= close && start.toMillis() > Date.now();
++  }
++
++  private async schedule(tx: Prisma.TransactionClient) {
++    const schedule = await tx.clubSchedule.findUnique({ where: { id: 1 } });
++    const clock = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
++    if (!schedule || !clock.test(schedule.openTime) || !clock.test(schedule.closeTime) || schedule.closeTime <= schedule.openTime
++      || schedule.daysOfWeekOff.some(day => !Number.isInteger(day) || day < 0 || day > 6)) {
++      throw new ServiceUnavailableException('Расписание клуба не настроено. Позвоните в клуб');
++    }
++    return schedule;
++  }
++
++  async slots(clientId: string, query: TmaSlotsQuery) {
++    const day = this.date(query.date);
++    return this.prisma.$transaction(async tx => {
++      const service = await this.service(tx, query.serviceId);
++      const trainers = await tx.trainer.findMany({ where: { isPublic: true, isActive: true },
++        orderBy: [{ order: 'asc' }, { id: 'asc' }], take: 50, select: { id: true, name: true } });
++      const schedule = await this.schedule(tx);
++      if (schedule.daysOfWeekOff.includes(day.weekday % 7)) return { slots: [] };
++      const slots: { startTime: string; endTime: string; trainers: { id: string; name: string }[] }[] = [];
++      const open = DateTime.fromISO(`${query.date}T${schedule.openTime}`, { zone: ZONE });
++      const close = DateTime.fromISO(`${query.date}T${schedule.closeTime}`, { zone: ZONE });
++      for (let start = open; start.plus({ minutes: service.durationMinutes }) <= close; start = start.plus({ minutes: 30 })) {
++        if (start.toMillis() <= Date.now()) continue;
++        const end = start.plus({ minutes: service.durationMinutes });
++        const available: typeof trainers = [];
++        for (const trainer of trainers) {
++          try {
++            await this.rules.validate(tx, { trainerId: trainer.id, participants: [{ clientId }],
++              start: start.toJSDate(), end: end.toJSDate(), lockResources: false });
++            available.push(trainer);
++          } catch (error: unknown) {
++            if (!(error instanceof HttpException) || ![400, 409].includes(error.getStatus())) throw error;
++          }
++        }
++        if (available.length) slots.push({ startTime: start.toISO()!, endTime: end.toISO()!, trainers: available });
++      }
++      return { slots };
++    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30_000 });
++  }
++
++  private async serializable<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
++    for (let attempt = 0; attempt < 3; attempt++) {
++      try { return await this.prisma.$transaction(operation, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15_000 }); }
++      catch (error: unknown) {
++        if (!isSerializationFailure(error)) {
++          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException('Данные изменились. Проверьте «Мои записи» и повторите');
++          throw error;
++        }
++      }
++    }
++    throw new ConflictException('Слот изменился. Обновите доступное время');
++  }
++
++  async create(clientId: string, dto: TmaCreateBookingDto) {
++    if (!dto.consentAccepted || dto.consentVersion !== currentLeadConsentVersion()) throw new BadRequestException('Обновите приложение и подтвердите актуальное согласие');
++    return this.serializable(async tx => {
++      const previous = await tx.booking.findUnique({ where: { telegramRequestId: dto.requestId }, select: { ...bookingView, clientId: true } });
++      if (previous) {
++        if (previous.clientId !== clientId) throw new ConflictException('Повторите оформление записи');
++        // A retry may only return the original result to its owner, with no private fields.
++        return tx.booking.findUniqueOrThrow({ where: { id: previous.id }, select: bookingView });
++      }
++      const start = DateTime.fromISO(dto.startTime, { zone: ZONE });
++      if (!start.isValid) throw new BadRequestException('Некорректное время');
++      this.date(start.toISODate()!);
++      const service = await this.service(tx, dto.serviceId);
++      const schedule = await this.schedule(tx);
++      const open = DateTime.fromISO(`${start.toISODate()}T${schedule.openTime}`, { zone: ZONE });
++      if (start.second !== 0 || start.millisecond !== 0 || start.diff(open, 'minutes').minutes % 30 !== 0
++        || !await this.withinHours(tx, start, service.durationMinutes)) throw new ConflictException('Время недоступно. Выберите другой слот');
++      const trainer = await tx.trainer.findFirst({ where: { id: dto.trainerId, isPublic: true, isActive: true } });
++      if (!trainer) throw new ConflictException('Тренер недоступен');
++      const client = await tx.client.findUnique({ where: { id: clientId } });
++      if (!client || client.deletedAt) throw new NotFoundException('Профиль недоступен');
++      // A typed phone number is NOT proof of ownership of an existing CRM account.
++      const phoneOwner = await tx.client.findUnique({ where: { phone: dto.phone }, select: { id: true } });
++      if (phoneOwner && phoneOwner.id !== clientId) throw new ConflictException('Этот телефон уже есть в клубе. Позвоните +7 (915) 672-00-30 для привязки Telegram');
++      await tx.client.update({ where: { id: clientId }, data: { phone: dto.phone } });
++      const lesson = await this.lessons.createLesson({ serviceId: service.id, trainerId: trainer.id,
++        startTime: start.toISO()!, participants: [{ clientId }] }, tx);
++      return tx.booking.update({ where: { id: lesson.bookings[0].id }, data: { telegramRequestId: dto.requestId,
++        telegramConsentVersion: dto.consentVersion, telegramConsentedAt: new Date() }, select: bookingView });
++    });
++  }
++
++  async myBookings(clientId: string, query: TmaBookingsQuery) {
++    const rows = await this.prisma.booking.findMany({ where: { clientId }, select: bookingView,
++      orderBy: [{ startTime: 'desc' }, { id: 'desc' }], skip: query.offset, take: query.limit + 1 });
++    return { bookings: rows.slice(0, query.limit), hasMore: rows.length > query.limit };
++  }
++
++  async cancelRequest(clientId: string, id: string) {
++    return this.serializable(async tx => {
++      const booking = await tx.booking.findFirst({ where: { id, clientId }, select: bookingView });
++      if (!booking) throw new NotFoundException('Запись не найдена');
++      const start = booking.lesson?.startTime ?? booking.startTime;
++      if (booking.status !== 'scheduled' || (booking.lesson && (booking.lesson.deletedAt || booking.lesson.status !== 'SCHEDULED')) || start <= new Date()) throw new ConflictException('Запросить отмену можно только для предстоящего занятия');
++      // Preserve the reservation and finances until an administrator handles it in CRM.
++      return tx.booking.update({ where: { id }, data: { clientCancellationRequested: true, clientConfirmed: false }, select: bookingView });
++    });
++  }
++}
+diff --git a/horse-club-crm/backend/test/telegram-bot.test.cjs b/horse-club-crm/backend/test/telegram-bot.test.cjs
+new file mode 100644
+index 0000000..e081334
+--- /dev/null
++++ b/horse-club-crm/backend/test/telegram-bot.test.cjs
+@@ -0,0 +1,152 @@
++const { test } = require('node:test');
++const assert = require('node:assert/strict');
++const { createHmac } = require('node:crypto');
++require('reflect-metadata');
++const { validateTelegramInitData } = require('../dist/modules/telegram-bot/telegram-init-data');
++const { TelegramAuthGuard } = require('../dist/modules/telegram-bot/telegram-auth.guard');
++const { TmaBookingService } = require('../dist/modules/telegram-bot/tma-booking.service');
++const { TelegramBotService } = require('../dist/modules/telegram-bot/telegram-bot.service');
++const { DEFAULT_LEAD_CONSENT_VERSION } = require('../dist/common/lead-consent');
++const { DateTime } = require('luxon');
++const token = '123:test-token-only';
++const clientId = '11111111-1111-4111-8111-111111111111';
++const trainerId = '22222222-2222-4222-8222-222222222222';
++const serviceId = '33333333-3333-4333-8333-333333333333';
++const requestId = '44444444-4444-4444-8444-444444444444';
++function sign(fields = {}) {
++  const params = new URLSearchParams({ auth_date: String(Math.floor(Date.now() / 1000)),
++    user: JSON.stringify({ id: 123456789012, first_name: 'Анна', last_name: 'Тест', username: 'anna' }), ...fields });
++  const check = [...params.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key}=${value}`).join('\n');
++  const secret = createHmac('sha256', 'WebAppData').update(token).digest();
++  params.set('hash', createHmac('sha256', secret).update(check).digest('hex'));
++  return params.toString();
++}
++const status = code => error => error.getStatus() === code;
++test('Telegram HMAC verifies signed identity and rejects tampering, duplicate fields, wrong token, stale/future data and invalid users', () => {
++  assert.deepEqual(validateTelegramInitData(sign(), token), { telegramUserId: '123456789012', firstName: 'Анна', lastName: 'Тест', username: 'anna' });
++  const now = Math.floor(Date.now() / 1000);
++  for (const raw of ['', sign() + '&user=forged', sign().replace('anna', 'evil'), sign({ auth_date: String(now - 3601) }),
++    sign({ auth_date: String(now + 100) }), sign({ auth_date: 'NaN' }), sign({ user: 'invalid' }),
++    sign({ user: JSON.stringify({ id: -1, first_name: 'A' }) }), sign({ user: JSON.stringify({ id: 1.5, first_name: 'A' }) })]) {
++    assert.throws(() => validateTelegramInitData(raw, token), status(401));
++  }
++  assert.throws(() => validateTelegramInitData(sign(), 'wrong'), status(401));
++});
++
++test('guard derives client identity only from signed data, scopes schedule and denies archived profiles', async () => {
++  const previous = process.env.TELEGRAM_BOT_TOKEN; process.env.TELEGRAM_BOT_TOKEN = token;
++  try {
++    let archived = false, disabled = false, upserts = 0;
++    const guard = new TelegramAuthGuard({
++      clubModuleSettings: { findUnique: async () => ({ isEnabled: !disabled }) },
++      client: { upsert: async input => { upserts++; assert.equal(input.where.telegramUserId, '123456789012'); return { id: clientId, deletedAt: archived ? new Date() : null }; } },
++    });
++    const request = { get: () => sign() };
++    const context = { switchToHttp: () => ({ getRequest: () => request }) };
++    assert.equal(await guard.canActivate(context), true); assert.equal(request.telegram.clientId, clientId);
++    disabled = true; await assert.rejects(guard.canActivate(context), status(403)); assert.equal(upserts, 1);
++    disabled = false; archived = true; await assert.rejects(guard.canActivate(context), status(403));
++  } finally { if (previous === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = previous; }
++});
++
++function fixture() {
++  const start = DateTime.now().setZone('Europe/Moscow').plus({ days: 2 }).set({ hour: 12, minute: 0, second: 0, millisecond: 0 });
++  const saved = { id: '55555555-5555-4555-8555-555555555555', clientId, status: 'scheduled', startTime: start.toJSDate(), endTime: start.plus({ hours: 1 }).toJSDate(),
++    clientCancellationRequested: false, lesson: null };
++  const writes = [], options = [];
++  const tx = {
++    service: { findFirst: async () => ({ id: serviceId, isPublic: true, durationMinutes: 60 }) },
++    clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] }) },
++    trainer: { findFirst: async () => ({ id: trainerId }), findMany: async () => [{ id: trainerId, name: 'Тренер' }] },
++    client: { findUnique: async ({ where }) => where.phone ? null : { id: clientId, deletedAt: null }, update: async input => { writes.push(input); } },
++    booking: { findUnique: async () => null, findFirst: async ({ where }) => where.clientId === clientId ? saved : null,
++      findUniqueOrThrow: async () => saved, update: async input => { writes.push(input); return { ...saved, ...input.data }; } },
++  };
++  const prisma = { ...tx, $transaction: async (operation, config) => { options.push(config); return operation(tx); } };
++  const lessons = { createLesson: async (input, transaction) => { assert.equal(transaction, tx); assert.deepEqual(input.participants, [{ clientId }]); writes.push(input); return { bookings: [saved] }; } };
++  const rules = { validate: async () => {} };
++  const service = new TmaBookingService(prisma, rules, lessons);
++  const dto = { serviceId, trainerId, requestId, startTime: start.toISO(), phone: '+79991234567', consentAccepted: true, consentVersion: DEFAULT_LEAD_CONSENT_VERSION };
++  return { service, dto, tx, saved, writes, options, rules, start };
++}
++test('create uses serializable existing lesson rules, server-owned client and audited consent; retry returns original', async () => {
++  const f = fixture();
++  const result = await f.service.create(clientId, f.dto);
++  assert.equal(result.telegramRequestId, requestId); assert.ok(result.telegramConsentedAt instanceof Date);
++  assert.equal(f.options[0].isolationLevel, 'Serializable');
++  f.tx.booking.findUnique = async () => f.saved;
++  f.writes.length = 0;
++  assert.equal((await f.service.create(clientId, f.dto)).id, f.saved.id); assert.equal(f.writes.length, 0);
++  await assert.rejects(f.service.create('other-client', f.dto), status(409));
++});
++test('rejects stale consent, phone takeover, unpublished services and unoffered start times', async () => {
++  let f = fixture(); await assert.rejects(f.service.create(clientId, { ...f.dto, consentVersion: 'old' }), status(400));
++  f = fixture(); f.tx.client.findUnique = async ({ where }) => where.phone ? { id: 'another' } : { id: clientId };
++  await assert.rejects(f.service.create(clientId, f.dto), status(409)); assert.equal(f.writes.length, 0);
++  f = fixture(); f.tx.service.findFirst = async () => null; await assert.rejects(f.service.create(clientId, f.dto), status(404));
++  f = fixture(); await assert.rejects(f.service.create(clientId, { ...f.dto, startTime: f.start.plus({ minutes: 1 }).toISO() }), status(409));
++});
++test('slots honor Moscow date, day off, trainer capacity conflicts and do not swallow infrastructure failures', async () => {
++  const f = fixture(); const date = f.start.toISODate();
++  assert.ok((await f.service.slots(clientId, { date, serviceId })).slots.length > 0);
++  f.rules.validate = async () => { const { ConflictException } = require('@nestjs/common'); throw new ConflictException(); };
++  assert.deepEqual(await f.service.slots(clientId, { date, serviceId }), { slots: [] });
++  f.rules.validate = async () => { throw new Error('database unavailable'); };
++  await assert.rejects(f.service.slots(clientId, { date, serviceId }), /database unavailable/);
++  f.tx.clubSchedule.findUnique = async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [f.start.weekday % 7] });
++  assert.deepEqual(await f.service.slots(clientId, { date, serviceId }), { slots: [] });
++  await assert.rejects(f.service.slots(clientId, { date: '2026-02-30' }), status(400));
++  f.tx.clubSchedule.findUnique = async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [0] });
++  const sunday = DateTime.now().setZone('Europe/Moscow').plus({ days: 7 }).set({ weekday: 7 }).toISODate();
++  assert.deepEqual(await f.service.slots(clientId, { date: sunday, serviceId }), { slots: [] });
++  f.tx.clubSchedule.findUnique = async () => null;
++  await assert.rejects(f.service.slots(clientId, { date, serviceId }), status(503));
++});
++test('cancellation checks owner and effective lesson state, leaves finances and reservation untouched', async () => {
++  const f = fixture();
++  await assert.rejects(f.service.cancelRequest('another-client', f.saved.id), status(404));
++  const result = await f.service.cancelRequest(clientId, f.saved.id);
++  assert.equal(result.clientCancellationRequested, true);
++  assert.deepEqual(f.writes[0].data, { clientCancellationRequested: true, clientConfirmed: false });
++  f.saved.lesson = { startTime: f.start.toJSDate(), status: 'CANCELLED' };
++  await assert.rejects(f.service.cancelRequest(clientId, f.saved.id), status(409));
++});
++test('bot is disabled without a token and rejects non-HTTPS WebApp URLs before polling', () => {
++  const previous = { token: process.env.TELEGRAM_BOT_TOKEN, url: process.env.TELEGRAM_WEBAPP_URL };
++  try {
++    delete process.env.TELEGRAM_BOT_TOKEN; assert.doesNotThrow(() => new TelegramBotService().onModuleInit());
++    process.env.TELEGRAM_BOT_TOKEN = token; process.env.TELEGRAM_WEBAPP_URL = 'http://example.test/tma';
++    assert.throws(() => new TelegramBotService().onModuleInit(), /HTTPS/);
++  } finally {
++    for (const [name, value] of [['TELEGRAM_BOT_TOKEN', previous.token], ['TELEGRAM_WEBAPP_URL', previous.url]]) {
++      if (value === undefined) delete process.env[name]; else process.env[name] = value;
++    }
++  }
++});
++
++test('HTTP routes require signed Telegram auth, reject invalid UUIDs, staff fields and consent coercion', async () => {
++  const { Test } = require('@nestjs/testing');
++  const { ValidationPipe } = require('@nestjs/common');
++  const request = require('supertest');
++  const { TelegramBotController } = require('../dist/modules/telegram-bot/telegram-bot.controller');
++  const { PrismaService } = require('../dist/prisma/prisma.service');
++  const previous = process.env.TELEGRAM_BOT_TOKEN; process.env.TELEGRAM_BOT_TOKEN = token;
++  const f = fixture();
++  const service = { services: async () => ({ services: [] }), create: async (owner, dto) => ({ owner, requestId: dto.requestId }), cancelRequest: async () => ({}) };
++  const module = await Test.createTestingModule({ controllers: [TelegramBotController], providers: [TelegramAuthGuard,
++    { provide: TmaBookingService, useValue: service }, { provide: PrismaService, useValue: {
++      clubModuleSettings: { findUnique: async () => null }, client: { upsert: async () => ({ id: clientId }) },
++    } }] }).compile();
++  const app = module.createNestApplication(); app.setGlobalPrefix('api');
++  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true } }));
++  await app.init();
++  try {
++    await request(app.getHttpServer()).get('/api/tma/services').expect(401);
++    await request(app.getHttpServer()).get('/api/tma/services').set('X-Telegram-Init-Data', sign()).expect(200);
++    await request(app.getHttpServer()).post('/api/tma/bookings/bad/cancel-request').set('X-Telegram-Init-Data', sign()).expect(400);
++    await request(app.getHttpServer()).post('/api/tma/bookings').set('X-Telegram-Init-Data', sign()).send({ ...f.dto, clientId: 'victim', costAmount: 0 }).expect(400);
++    const result = await request(app.getHttpServer()).post('/api/tma/bookings').set('X-Telegram-Init-Data', sign()).send(f.dto).expect(201);
++    assert.equal(result.body.owner, clientId);
++    await request(app.getHttpServer()).post('/api/tma/bookings').set('X-Telegram-Init-Data', sign()).send({ ...f.dto, consentAccepted: 'false' }).expect(400);
++  } finally { await app.close(); if (previous === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = previous; }
++});
+diff --git a/horse-club-crm/deploy.sh b/horse-club-crm/deploy.sh
+index a055a03..a8ef6c2 100755
+--- a/horse-club-crm/deploy.sh
++++ b/horse-club-crm/deploy.sh
+@@ -35,6 +35,8 @@ fi
+ echo "===> 2. Building frontend dist..."
+ npm --prefix frontend ci
+ npm --prefix frontend run build
++npm --prefix tma ci
++npm --prefix tma run build
+ 
+ echo "===> 2.1. Building landing dist..."
+ npm --prefix landing ci
+diff --git a/horse-club-crm/docker-compose.prod.yml b/horse-club-crm/docker-compose.prod.yml
+index 308d362..bf0517e 100644
+--- a/horse-club-crm/docker-compose.prod.yml
++++ b/horse-club-crm/docker-compose.prod.yml
+@@ -47,6 +47,8 @@ services:
+       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+       JWT_SECRET: ${JWT_SECRET:?Set a random JWT_SECRET of at least 32 bytes}
+       CLUB_TIME_ZONE: ${CLUB_TIME_ZONE:-Europe/Moscow}
++      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
++      TELEGRAM_WEBAPP_URL: ${TELEGRAM_WEBAPP_URL:-https://crm.horseclub68.ru/tma}
+       VK_COMMUNITY_ID: ${VK_COMMUNITY_ID:-}
+       VK_ACCESS_TOKEN: ${VK_ACCESS_TOKEN:-}
+       VK_CONFIRMATION_TOKEN: ${VK_CONFIRMATION_TOKEN:-}
+diff --git a/horse-club-crm/docker/Caddyfile b/horse-club-crm/docker/Caddyfile
+index 55e5a88..3715f2b 100644
+--- a/horse-club-crm/docker/Caddyfile
++++ b/horse-club-crm/docker/Caddyfile
+@@ -46,6 +46,16 @@
+ 
+ {$CRM_SITE} {
+ 	import common
++	@tma path /tma /tma/*
++	handle @tma {
++		# Telegram Web/Desktop embeds the Mini App. Relax framing only here.
++		header -X-Frame-Options
++		header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors https://web.telegram.org https://*.telegram.org; form-action 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'"
++		root * /var/www/crm-dist
++		try_files {path} /tma/index.html
++		header Cache-Control "no-cache"
++		file_server
++	}
+ 	handle {
+ 		root * /var/www/crm-dist
+ 		try_files {path} /index.html
+diff --git a/horse-club-crm/docs/reports/telegram-ui-audit.json b/horse-club-crm/docs/reports/telegram-ui-audit.json
+new file mode 100644
+index 0000000..c397310
+--- /dev/null
++++ b/horse-club-crm/docs/reports/telegram-ui-audit.json
+@@ -0,0 +1,13 @@
++{
++  "findings": [],
++  "mode": "strict",
++  "projectRoot": "C:\\Users\\Валерий\\Desktop\\HorseCRM2026\\horse-club-crm\\tma",
++  "schemaVersion": 1,
++  "summary": {
++    "errors": 0,
++    "total": 0,
++    "unresolved": 0,
++    "violations": 0,
++    "warnings": 0
++  }
++}
+diff --git a/horse-club-crm/docs/telegram-mini-app.md b/horse-club-crm/docs/telegram-mini-app.md
+new file mode 100644
+index 0000000..945afde
+--- /dev/null
++++ b/horse-club-crm/docs/telegram-mini-app.md
+@@ -0,0 +1,57 @@
++# Telegram Mini App и бот
++
++## Состав
++
++- `backend/src/modules/telegram-bot/`: grammY polling, `/start`, TelegramAuthGuard, клиентские API.
++- `tma/`: отдельный React + TypeScript + Tailwind SPA, без Refine/Ant Design и без изменения зависимостей/маршрутов CRM и лендинга.
++- Production-артефакты: `frontend/dist/tma/`; сборка TMA выполняется **после** сборки CRM. Оба deploy-скрипта обновлены.
++- `docker/Caddyfile`: отдельный `/tma` SPA fallback, Telegram SDK разрешён в CSP; разрешение встраивания ограничено Telegram и только TMA.
++
++## Конфигурация и выпуск
++
++1. На сервере применить `npx prisma migrate deploy` из backend: миграция `20261108000000_telegram_mini_app` добавляет Telegram ID/username клиента, ключ повторной отправки и аудит согласия на Booking. Prisma Client сгенерирован локально.
++2. Указать `TELEGRAM_BOT_TOKEN` и `TELEGRAM_WEBAPP_URL=https://crm.horseclub68.ru/tma` в production `.env`. Compose передаёт обе переменные backend. При пустом токене бот отключён, TMA API отвечает 503.
++3. У бота в BotFather настроить домен/кнопку Mini App на этот HTTPS URL. `/start` уже отправляет inline web_app кнопку в личном чате.
++4. Выполнить `npm --prefix tma ci` и `npm --prefix tma run build` после `npm --prefix frontend run build`. Обычный deploy делает это автоматически.
++5. Запускать только одну polling-реплику backend. Для нескольких реплик нужен отдельный polling worker или webhook-режим.
++6. Проверить `/start` и WebApp на реальном Telegram, включая системный выбор даты/тренера и нативную нижнюю кнопку.
++
++## API
++
++Все маршруты требуют заголовок `X-Telegram-Init-Data` с исходной строкой `Telegram.WebApp.initData`.
++
++| Метод и путь | Поведение |
++| --- | --- |
++| `GET /api/tma/services` | Опубликованные услуги с фактическими ценами, consentVersion |
++| `GET /api/tma/slots?date=YYYY-MM-DD&serviceId=UUID` | Слоты через 30 минут и доступные публичные активные тренеры; без serviceId выбирается первая опубликованная услуга |
++| `POST /api/tma/bookings` | `{serviceId, trainerId, startTime, phone, requestId, consentAccepted:true, consentVersion}` |
++| `GET /api/tma/my-bookings?offset=0&limit=20` | Только записи своего клиента, bounded pagination и hasMore |
++| `POST /api/tma/bookings/:id/cancel-request` | Только своя предстоящая запись; флаг запроса отмены, без отмены занятия/финансов |
++
++Каталог предлагает четыре фильтра формата из задачи, а услуги и цены берёт из CRM. Фильтры сопоставляют публичные названия услуг; если подходящей услуги нет, запись в этом формате недоступна. Для названий вне этих форматов есть «Все занятия».
++
++## Идентичность и целостность
++
++Подпись проверяется HMAC-SHA256: секрет `HMAC(key="WebAppData", data=token)`, затем подпись отсортированных декодированных пар без `hash`. Сравнение constant-time. Дубликаты полей, неправильные user/auth_date, подпись и данные старше часа отклоняются. Будущая auth_date допускает лишь 30 секунд рассинхронизации часов. Токен и initData не логируются и не сохраняются в браузере.
++
++Client upsert выполняется по уникальному подписанному Telegram ID; административная JWT-сессия не создаётся. Применяется включённость SCHEDULE и владение clientId; клиентские операции не дают доступ к CRM и её staff RBAC. Архивный профиль не восстанавливается автоматически. Дополнительно ограничены запросы на Telegram ID: 10 запросов слотов и 60 остальных в минуту в единственной backend-реплике.
++
++Введённый телефон **не является** доказательством владения существующим CRM-профилем. При конфликте номера показан телефон клуба для ручной привязки; автоматического слияния нет. Имя и username берутся из подписи при создании клиента, последующие запросы не перезаписывают администраторские изменения.
++
++Создание идёт через существующий LessonsService внутри Serializable-транзакции с повтором при конфликте сериализации. Сервис повторно проверяет опубликованность услуги/тренера, московское расписание, ёмкость тренера и занятость клиента. Сохраняются существующие начисления и финансовые правила. Лошадь и манеж назначает администратор после согласования — TMA не обещает конкретную лошадь или площадку; при назначении действуют существующие ограничения здоровья/нагрузки.
++
++requestId имеет уникальный индекс; повтор после сетевого сбоя возвращает первоначальную запись только её владельцу. Новый слот начинает новое оформление. Согласие хранится с версией и timestamp на записи. Юридические ссылки переиспользуют действующие документы лендинга. Запрос отмены сохраняет резервацию и деньги до обработки администратором существующим процессом CRM.
++
++## Размер и совместимость
++
++Порог проверяется скриптом `tma/scripts/check-size.cjs`: **сумма всех несжатых JS + CSS строго меньше 150 000 байт**. Текущий результат: 149 988 байт; gzip — 49 702 байта. HTML и отдельно загружаемый официальный Telegram SDK не входят в JS/CSS-бандл. React 17.0.2 закреплён только внутри TMA ради этого строгого бюджета; CRM продолжает использовать свой React 19. Дизайн/поведение описаны в `tma/DESIGN.md` и `tma/UX-CONTRACT.md`.
++
++## Проверка
++
++- backend: typecheck, lint без ошибок (3 существующих предупреждения вне Telegram), build; 707 passed, 20 PostgreSQL-тестов skipped.
++- frontend: typecheck, lint, build; 20 файлов, 165 passed.
++- TMA: typecheck, lint, build с проверкой размера; unit isolation test passed.
++- Playwright по production-бандлу: 4 passed. Запись/двойное нажатие, повтор с тем же requestId после 503, отмена, пустые слоты, загрузка/ошибка/повтор, клавиатура, BackButton, тема Telegram и узкий viewport.
++- Строгий UI-аудит: `docs/reports/telegram-ui-audit.json`, 0 ошибок. DESIGN.md lint: 0 ошибок; токены текстовых цветов имеют диагностические предупреждения о ссылках из components.
++- Prisma Client generated; миграция не применялась к production из локальной среды.
++- Caddy/Docker не установлены локально: runtime-валидация Caddy и живой bot token не проверены. Нужен smoke test после серверного выпуска.
+diff --git a/horse-club-crm/scripts/deploy-native.cjs b/horse-club-crm/scripts/deploy-native.cjs
+index ab029b6..80a881b 100644
+--- a/horse-club-crm/scripts/deploy-native.cjs
++++ b/horse-club-crm/scripts/deploy-native.cjs
+@@ -74,6 +74,8 @@ async function main() {
+   if (!ready) throw new Error('PostgreSQL is not ready');
+   run('npm', ['--prefix', 'frontend', 'ci']);
+   run('npm', ['--prefix', 'frontend', 'run', 'build']);
++  run('npm', ['--prefix', 'tma', 'ci']);
++  run('npm', ['--prefix', 'tma', 'run', 'build']);
+   run('npm', ['--prefix', 'landing', 'ci']);
+   const landingEnv = landingBuildEnv({ services: { backend: { environment: process.env } } });
+   run('npm', ['--prefix', 'landing', 'run', 'build'], { env: landingEnv });
+diff --git a/horse-club-crm/tma/.gitignore b/horse-club-crm/tma/.gitignore
+new file mode 100644
+index 0000000..945fcd0
+--- /dev/null
++++ b/horse-club-crm/tma/.gitignore
+@@ -0,0 +1,3 @@
++node_modules/
++playwright-report/
++test-results/
+diff --git a/horse-club-crm/tma/DESIGN.md b/horse-club-crm/tma/DESIGN.md
+new file mode 100644
+index 0000000..bdf4209
+--- /dev/null
++++ b/horse-club-crm/tma/DESIGN.md
+@@ -0,0 +1,57 @@
++---
++version: alpha
++name: "СЛКС · Запись в Telegram"
++colors:
++  background: "#F7F4F0"
++  surface: "#FFFFFF"
++  text: "#3A2F2B"
++  primary: "#234D3C"
++  hint: "#6C655F"
++  success: "#3E5F48"
++typography:
++  sans:
++    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
++  display:
++    fontFamily: "Georgia, serif"
++rounded:
++  DEFAULT: "0.75rem"
++  card: "1rem"
++spacing:
++  page: "1.25rem"
++  control: "3rem"
++components:
++  choice:
++    rounded: "1rem"
++---
++
++## Overview
++
++Посетители КСК «СЛКС» выбирают занятие с телефона внутри Telegram. Спокойная клубная приёмная, узнаваемый наборный знак СЛКС, зелёный цвет конного поля. Выразительность сосредоточена в заголовке и знаке, расписание остаётся простым. Общие с CRM бумажный фон, цвет текста и Georgia; без загрузки Ant Design/Refine. Без внешних шрифтов, фотографий и декоративной анимации.
++
++## Colors
++
++Runtime-владелец — `src/styles.css`, токены `--tma-*`. Цвета Telegram `bg_color`, `text_color`, `button_color`, `button_text_color`, `hint_color`, `secondary_bg_color` имеют приоритет через `applyTheme` в `src/telegram.ts`. Светлая и тёмная темы имеют локальные fallback. Статусы — мягкие бейджи с текстом. Выбор отмечается рамкой и `aria-pressed`.
++
++## Typography
++
++Georgia только в заголовке и знаке клуба; системный sans для чтения и форм. Русская локаль, рубли, григорианский календарь и Europe/Moscow.
++
++## Layout
++
++Одна колонка до 576px, отступ 20px, нативные Telegram MainButton/BackButton. Календарь и выбор тренера используют системные date/select — системный popup допустим в мобильном WebView. Документ прокручивается естественно; нижний safe area учитывается.
++
++## Elevation & Depth
++
++Без теней на поверхностях; рамка выделяет выбор. Нет маркетинговых градиентов и тяжёлых изображений.
++
++## Shapes
++
++Контролы 12px, карточки 16px. Минимум 44px для кнопок.
++
++## Components
++
++Общие владельцы TMA: `App.tsx` — выбор/оформление, `MyBookings` — история/отмена, `useTelegramNavigation` — нижняя кнопка и назад, `api.ts` — транспорт/ошибки/форматирование. Различие с CRM намеренное: отдельный пользовательский SPA без административных зависимостей. Семантические HTML-контролы вместо импорта CRM-примитивов.
++
++## Do's and Don'ts
++
++Сохранять ввод при ошибке, блокировать повторную отправку, обновлять слоты при смене даты с отменой старого запроса. Не выдавать отсутствие ошибки за подтверждение администратором. Не назначать лошадь автоматически. Не хранить initData в URL или storage.
+diff --git a/horse-club-crm/tma/UX-CONTRACT.md b/horse-club-crm/tma/UX-CONTRACT.md
+new file mode 100644
+index 0000000..e65b46c
+--- /dev/null
++++ b/horse-club-crm/tma/UX-CONTRACT.md
+@@ -0,0 +1,26 @@
++# Telegram Mini App: контракт поведения
++
++Визуальный источник: [DESIGN.md](DESIGN.md). Основание: задача владельца от 08.11.2026, общие правила репозитория и существующий LessonsService.
++
++## Canonical UI Map
++
++| Capability | Canonical owner | Source of truth | Allowed variants | Verification |
++| --- | --- | --- | --- | --- |
++| Select/Listbox | `App.tsx` | Нативный select | Системный popup | `e2e/booking.spec.ts` |
++| Date | `App.tsx` | Нативный date | Ближайшие 30 дней | `e2e/booking.spec.ts` |
++| Form | `App.tsx` | noValidate, inline ошибки | Телефон +7 и согласие | `e2e/booking.spec.ts` |
++| Scrollbar | `styles.css` | Общий системный scrollbar | Нет | `e2e/booking.spec.ts` |
++| Toast | `App.tsx`, `MyBookings` | role=status/alert | Постоянный текст | `e2e/booking.spec.ts` |
++| CRUD | `api.ts`, `MyBookings` | Клиентские маршруты | Создание, история, запрос отмены | `e2e/booking.spec.ts` |
++
++Каталог → дата/время → оформление → успех → мои записи. BackButton возвращает на предыдущий шаг, из истории/успеха — в каталог. В оформлении Telegram предупреждает перед закрытием WebView. Имя и username — из Telegram, доверенной идентичностью является только серверная проверка initData.
++
++Отправка блокируется ref и состоянием busy. После сетевой ошибки повтор использует тот же requestId, сервер возвращает существующую запись. Смена слота начинает новое оформление. При 401 пользователь повторно открывает WebApp через бота. Данные не сохраняются в браузерном storage. История — по 20 строк с «Загрузить ещё».
++
++Ошибка загрузки имеет повтор; ошибка отправки сохраняет телефон и согласие. Старые запросы слотов отменяются. Пустое расписание предлагает другую дату. Успех содержит время, тренера и адрес. Запрос отмены требует inline подтверждения; сохраняет резервацию и финансы до решения администратора.
++
++Права: TMA имеет только клиентские маршруты с TelegramAuthGuard и проверкой включённого SCHEDULE. Staff FULL/READ_ONLY/HIDDEN не выдаются посетителям и продолжают действовать на CRM. Все операции с записями ограничены clientId из подписи.
++
++Телефон существующего клиента не доказывает владение его профилем. Автопривязка по введённому номеру запрещена, конфликт предлагает позвонить в клуб. Согласие хранится с версией и timestamp на Booking; юридические документы переиспользуются с действующего лендинга.
++
++Проверки: backend mock/HTTP security tests, browser suite `e2e/booking.spec.ts`, узкая ширина, тема Telegram, native MainButton/BackButton, retry/double click/empty/error. Нативные системные date/select остаются ответственностью ОС; проверка реального Telegram на устройстве нужна при выпуске.
+diff --git a/horse-club-crm/tma/e2e/booking.spec.ts b/horse-club-crm/tma/e2e/booking.spec.ts
+new file mode 100644
+index 0000000..9d7a5a7
+--- /dev/null
++++ b/horse-club-crm/tma/e2e/booking.spec.ts
+@@ -0,0 +1,105 @@
++import { expect, test, type Page } from '@playwright/test';
++import type { TelegramWebApp } from '../src/telegram';
++
++declare global {
++  interface Window {
++    __tmaTest: { main(): void; back(): void; active(): boolean; haptics(): number; theme(): void };
++  }
++}
++const serviceId = '11111111-1111-4111-8111-111111111111';
++const trainerId = '22222222-2222-4222-8222-222222222222';
++const bookingId = '33333333-3333-4333-8333-333333333333';
++const start = new Date(Date.now() + 2 * 86400_000).toISOString().slice(0, 10) + 'T12:00:00+03:00';
++const service = { id: serviceId, title: 'Первое знакомство', name: 'Знакомство', description: 'Спокойное занятие для начинающих', price: '1500', durationMinutes: 30 };
++const booking = { id: bookingId, status: 'scheduled', startTime: start, endTime: start, clientConfirmed: false,
++  clientCancellationRequested: false, costAmount: '1500', trainer: { name: 'Анна' },
++  lesson: { status: 'SCHEDULED', deletedAt: null, startTime: start, endTime: start, service } };
++async function setup(page: Page) {
++  await page.route('https://telegram.org/js/telegram-web-app.js', route => route.fulfill({ body: '', contentType: 'text/javascript' }));
++  await page.addInitScript(() => {
++    let main = () => {}, back = () => {}, theme = () => {}, enabled = false, haptics = 0;
++    const app: TelegramWebApp = {
++      initData: 'signed-data-test', initDataUnsafe: { user: { id: 123, first_name: 'Елена', username: 'elena' } },
++      themeParams: { bg_color: '#17241c', text_color: '#f0f4f1', button_color: '#a4d5b8', button_text_color: '#163326', hint_color: '#b3bdb6', secondary_bg_color: '#28332c' },
++      MainButton: { show() {}, hide() {}, showProgress() {}, hideProgress() {},
++        setParams(params) { enabled = params.is_active && params.is_visible; },
++        onClick(callback) { main = callback; }, offClick(callback) { if (main === callback) main = () => {}; } },
++      BackButton: { show() {}, hide() {}, onClick(callback) { back = callback; }, offClick(callback) { if (back === callback) back = () => {}; } },
++      HapticFeedback: { impactOccurred() { haptics++; } }, ready() {}, expand() {}, enableClosingConfirmation() {}, disableClosingConfirmation() {},
++      onEvent(_event, callback) { theme = callback; }, offEvent() {},
++    };
++    window.Telegram = { WebApp: app };
++    window.__tmaTest = { main() { if (enabled) main(); }, back() { back(); }, active: () => enabled, haptics: () => haptics, theme() { app.themeParams.bg_color = '#f7f4f0'; theme(); } };
++  });
++  await page.route('**/api/tma/services', route => route.fulfill({ json: { services: [service], consentVersion: '2026-09-19' } }));
++  await page.route('**/api/tma/slots?**', route => route.fulfill({ json: { slots: [{ startTime: start, endTime: start, trainers: [{ id: trainerId, name: 'Анна' }] }] } }));
++  await page.route('**/api/tma/my-bookings?**', route => route.fulfill({ json: { bookings: [booking], hasMore: false } }));
++}
++async function advance(page: Page) {
++  await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(true);
++  await page.evaluate(() => window.__tmaTest.main());
++}
++async function checkout(page: Page) {
++  await page.goto('');
++  await page.getByRole('button', { name: /Первое знакомство 30/ }).click(); await advance(page);
++  await expect(page.getByRole('heading', { name: 'Когда приедете?' })).toBeVisible();
++  await page.getByRole('button', { name: '12:00' }).click();
++  await page.getByLabel('Тренер').selectOption(trainerId); await advance(page);
++  await expect(page.getByLabel('Ваше имя')).toHaveValue('Елена');
++}
++test('native Telegram flow creates once, shows success and requests cancellation at narrow width', async ({ page }) => {
++  await setup(page); let writes = 0, cancellations = 0;
++  await page.route('**/api/tma/bookings', async route => {
++    writes++; const body: unknown = route.request().postDataJSON();
++    expect(body).toMatchObject({ serviceId, trainerId, consentAccepted: true });
++    expect(route.request().headers()['x-telegram-init-data']).toBe('signed-data-test');
++    await new Promise(resolve => setTimeout(resolve, 100)); await route.fulfill({ json: booking, status: 201 });
++  });
++  await page.route(`**/bookings/${bookingId}/cancel-request`, route => { cancellations++; return route.fulfill({ json: { ...booking, clientCancellationRequested: true } }); });
++  await checkout(page);
++  await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(false);
++  await page.getByLabel('Телефон', { exact: true }).fill('+79991234567'); await page.getByRole('checkbox').check();
++  await advance(page); await page.evaluate(() => window.__tmaTest.main());
++  await expect(page.getByRole('heading', { name: 'Ждём вас в клубе' })).toBeVisible(); expect(writes).toBe(1);
++  await page.getByRole('button', { name: 'Перейти в мои записи' }).click();
++  await expect(page.getByText('Ожидает', { exact: true })).toBeVisible();
++  await page.getByRole('button', { name: 'Отменить занятие' }).click();
++  await page.getByRole('button', { name: 'Запросить отмену' }).click();
++  await expect(page.getByText('Запрошена отмена', { exact: true })).toBeVisible(); expect(cancellations).toBe(1);
++  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
++  await page.screenshot({ path: 'test-results/tma-my-bookings.png', fullPage: true });
++});
++test('server error retains phone and consent, retry uses the same idempotency key', async ({ page }) => {
++  await setup(page); const ids: unknown[] = [];
++  await page.route('**/api/tma/bookings', route => {
++    const body: { requestId: string } = route.request().postDataJSON(); ids.push(body.requestId);
++    return route.fulfill(ids.length === 1 ? { status: 503, json: { message: 'Соединение прервано. Повторите запись' } } : { status: 201, json: booking });
++  });
++  await checkout(page); await page.getByLabel('Телефон', { exact: true }).fill('+79991234567'); await page.getByRole('checkbox').check();
++  await advance(page); await expect(page.getByRole('alert')).toContainText('Соединение прервано');
++  await expect(page.getByLabel('Телефон', { exact: true })).toHaveValue('+79991234567'); await expect(page.getByRole('checkbox')).toBeChecked();
++  await advance(page); await expect(page.getByRole('heading', { name: 'Ждём вас в клубе' })).toBeVisible();
++  expect(ids).toHaveLength(2); expect(ids[0]).toBe(ids[1]);
++});
++test('empty slots, loading, error retry, native back and dynamic theme', async ({ page }) => {
++  await setup(page); let calls = 0;
++  await page.route('**/api/tma/slots?**', async route => {
++    calls++; await new Promise(resolve => setTimeout(resolve, 100));
++    await route.fulfill(calls === 1 ? { status: 503, json: { message: 'Нет соединения' } } : { json: { slots: [] } });
++  });
++  await page.goto(''); await page.getByRole('button', { name: /Первое знакомство 30/ }).focus(); await page.keyboard.press('Enter'); await advance(page);
++  await expect(page.getByRole('status')).toContainText('Проверяем');
++  await expect(page.getByRole('alert')).toContainText('Нет соединения');
++  await page.getByRole('button', { name: 'Повторить загрузку' }).click(); await expect(page.getByText('Свободного времени нет.', { exact: false })).toBeVisible();
++  await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(false);
++  await page.evaluate(() => window.__tmaTest.back()); await expect(page.getByRole('heading', { name: 'Время для лошадей' })).toBeVisible();
++  await page.evaluate(() => window.__tmaTest.theme());
++  expect(await page.evaluate(() => document.documentElement.style.getPropertyValue('--tma-bg'))).toBe('#f7f4f0');
++  expect(await page.evaluate(() => window.__tmaTest.haptics())).toBeGreaterThan(0);
++});
++test('outside Telegram shows clear entry guidance and makes no unauthenticated API calls', async ({ page }) => {
++  let calls = 0;
++  await page.route('https://telegram.org/**', route => route.fulfill({ body: '', contentType: 'text/javascript' }));
++  await page.route('**/api/tma/**', route => { calls++; return route.abort(); });
++  await page.goto(''); await expect(page.getByRole('alert')).toContainText('Откройте запись'); expect(calls).toBe(0);
++});
+diff --git a/horse-club-crm/tma/index.html b/horse-club-crm/tma/index.html
+new file mode 100644
+index 0000000..16b0b63
+--- /dev/null
++++ b/horse-club-crm/tma/index.html
+@@ -0,0 +1,11 @@
++<!doctype html>
++<html lang="ru">
++  <head>
++    <meta charset="UTF-8" />
++    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
++    <meta name="color-scheme" content="light dark" />
++    <title>Запись в КСК «СЛКС»</title>
++    <script src="https://telegram.org/js/telegram-web-app.js"></script>
++  </head>
++  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
++</html>
+diff --git a/horse-club-crm/tma/package-lock.json b/horse-club-crm/tma/package-lock.json
+new file mode 100644
+index 0000000..01c42dd
+--- /dev/null
++++ b/horse-club-crm/tma/package-lock.json
+@@ -0,0 +1,1561 @@
++{
++  "name": "horse-club-telegram-mini-app",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "horse-club-telegram-mini-app",
++      "dependencies": {
++        "react": "17.0.2",
++        "react-dom": "17.0.2"
++      },
++      "devDependencies": {
++        "@playwright/test": "^1.65.0",
++        "@tailwindcss/vite": "^4.1.0",
++        "@types/node": "^24.13.3",
++        "@types/react": "^17.0.93",
++        "@types/react-dom": "^17.0.26",
++        "tailwindcss": "^4.1.0",
++        "terser": "^5.51.2",
++        "typescript": "~6.0.2",
++        "vite": "^8.2.2"
++      }
++    },
++    "node_modules/@jridgewell/gen-mapping": {
++      "version": "0.3.13",
++      "resolved": "https://registry.npmjs.org/@jridgewell/gen-mapping/-/gen-mapping-0.3.13.tgz",
++      "integrity": "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@jridgewell/sourcemap-codec": "^1.5.0",
++        "@jridgewell/trace-mapping": "^0.3.24"
++      }
++    },
++    "node_modules/@jridgewell/remapping": {
++      "version": "2.3.5",
++      "resolved": "https://registry.npmjs.org/@jridgewell/remapping/-/remapping-2.3.5.tgz",
++      "integrity": "sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@jridgewell/gen-mapping": "^0.3.5",
++        "@jridgewell/trace-mapping": "^0.3.24"
++      }
++    },
++    "node_modules/@jridgewell/resolve-uri": {
++      "version": "3.1.2",
++      "resolved": "https://registry.npmjs.org/@jridgewell/resolve-uri/-/resolve-uri-3.1.2.tgz",
++      "integrity": "sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=6.0.0"
++      }
++    },
++    "node_modules/@jridgewell/source-map": {
++      "version": "0.3.11",
++      "resolved": "https://registry.npmjs.org/@jridgewell/source-map/-/source-map-0.3.11.tgz",
++      "integrity": "sha512-ZMp1V8ZFcPG5dIWnQLr3NSI1MiCU7UETdS/A0G8V/XWHvJv3ZsFqutJn1Y5RPmAPX6F3BiE397OqveU/9NCuIA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@jridgewell/gen-mapping": "^0.3.5",
++        "@jridgewell/trace-mapping": "^0.3.25"
++      }
++    },
++    "node_modules/@jridgewell/sourcemap-codec": {
++      "version": "1.6.0",
++      "resolved": "https://registry.npmjs.org/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.6.0.tgz",
++      "integrity": "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@jridgewell/trace-mapping": {
++      "version": "0.3.31",
++      "resolved": "https://registry.npmjs.org/@jridgewell/trace-mapping/-/trace-mapping-0.3.31.tgz",
++      "integrity": "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@jridgewell/resolve-uri": "^3.1.0",
++        "@jridgewell/sourcemap-codec": "^1.4.14"
++      }
++    },
++    "node_modules/@oxc-project/types": {
++      "version": "0.156.0",
++      "resolved": "https://registry.npmjs.org/@oxc-project/types/-/types-0.156.0.tgz",
++      "integrity": "sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/oxc-project"
++      }
++    },
++    "node_modules/@playwright/test": {
++      "version": "1.65.0",
++      "resolved": "https://registry.npmjs.org/@playwright/test/-/test-1.65.0.tgz",
++      "integrity": "sha512-iGURLGuKDLakSEl7Pgfv8h7f+XLT+V861Wfhz0zlEl5nyFuKUopdkFBPKqTllTUp06aOwPuH8iuUEb3yp3MpbQ==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "playwright": "1.65.0"
++      },
++      "bin": {
++        "playwright": "cli.js"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/@rolldown/binding-android-arm-eabi": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-android-arm-eabi/-/binding-android-arm-eabi-1.2.16.tgz",
++      "integrity": "sha512-ia3DwAs0OsMGS7+IConptSiyk9pEXkOx/AbJ2n/lAGxH3QkWQus1t8d7gnAT38FCU2sQu8lUbeR6AiZFv4JxaA==",
++      "cpu": [
++        "arm"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "android"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-android-arm64": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-android-arm64/-/binding-android-arm64-1.2.16.tgz",
++      "integrity": "sha512-kx5wBiMB6E7TEvpl2B9gjLU004BkvEm2Dr941BFjx/SontPwSzNuQUIoVKxHHoSjpFIfHMmcguyLOtyn0hObRg==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "android"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-darwin-arm64": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-darwin-arm64/-/binding-darwin-arm64-1.2.16.tgz",
++      "integrity": "sha512-qslZrXnKJU4cUpjoAmtAo/KQM9e2IRMlmpig6Zpwj+8KWxW8v+nkAf9216Bsek9lOC1jvg2yCjygCFo2f83msQ==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-darwin-x64": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-darwin-x64/-/binding-darwin-x64-1.2.16.tgz",
++      "integrity": "sha512-FdF+y48ND13eAyM2mQn+85kvAqNlvRWROy2rhgA463X/0Gv4vGtazZtfaF1mRBLscYvtOlh4QnLjOWiFzX69OQ==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-freebsd-x64": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-freebsd-x64/-/binding-freebsd-x64-1.2.16.tgz",
++      "integrity": "sha512-ddjqFM5e95AgLbUPtKIS7V1KTVlA0RUgCVr5mn+/IEhsdy3pr+Vuj/HZ7nlMN2FyxIwUktOH1LEPIQXO1v9y1Q==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "freebsd"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-arm-gnueabihf": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-arm-gnueabihf/-/binding-linux-arm-gnueabihf-1.2.16.tgz",
++      "integrity": "sha512-tHdKWbFkFBI687iim3LIyIvyL7j66VvQYkDPss5Stn/qyE2tWkR1YD0dXmXPFKKqT/o5ZEJVsaRsWS2meQwGOA==",
++      "cpu": [
++        "arm"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-arm64-gnu": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-arm64-gnu/-/binding-linux-arm64-gnu-1.2.16.tgz",
++      "integrity": "sha512-FJiLGAblPBMlBEdbOqw6kW6QcXDWAf/oJu7gYs9ZJZwmg+K+/zjFLxPTIY9izJUzxzc24FHvmseyA0IvJSl17w==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-arm64-musl": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-arm64-musl/-/binding-linux-arm64-musl-1.2.16.tgz",
++      "integrity": "sha512-hrJpblMsrQ58U9veWpbXzkhV5zStunds6HWLprqq1qauvgBr1E6P+24kLj6lSLI9vjRn/RYpjprhkHQPKGWpNg==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "libc": [
++        "musl"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-ppc64-gnu": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-ppc64-gnu/-/binding-linux-ppc64-gnu-1.2.16.tgz",
++      "integrity": "sha512-qJd/dC6j6CwLG9/s/RP2nb1RZ0GIgj7Ioj7x/SYa3RzjVrlzrmH0fhIOpfvqQDeIsdP0loi+kHaMhJzY1PBIaA==",
++      "cpu": [
++        "ppc64"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-s390x-gnu": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-s390x-gnu/-/binding-linux-s390x-gnu-1.2.16.tgz",
++      "integrity": "sha512-Vx7Xg5uUJuNcujJjI70OICaH0EYj80BtOLZTSN7uOYg8QOLlyKnaG0IW7Fn/J0IpJsaKzmDKMhOQv1JBM9m9vg==",
++      "cpu": [
++        "s390x"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-x64-gnu": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-x64-gnu/-/binding-linux-x64-gnu-1.2.16.tgz",
++      "integrity": "sha512-TNKhgE3uJTsTzatUSSYt0Kgo+Oa2uSlSjz4r1aEIea7HX6ULBym4fAlYUhG1i6pjNf2njfCUAfKwr6C3E9Xg1w==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-x64-musl": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-x64-musl/-/binding-linux-x64-musl-1.2.16.tgz",
++      "integrity": "sha512-7chXdpjXZ8qG0+mIxECN3cT9kvhZ3/oZhMX6Pp876P7CDrIy8nJswva6Mq357JR7eYXfuskwZxMeV1SzoZdHrA==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "libc": [
++        "musl"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-openharmony-arm64": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-openharmony-arm64/-/binding-openharmony-arm64-1.2.16.tgz",
++      "integrity": "sha512-Kwjt+7uNTJK5/MDkGWGVO2KQPnj8yAV75dMpfwyHZrJSXWHrniOB0aUEWlVYf3H1hOqFLIStLdM5QXq6bnKmOQ==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "openharmony"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-win32-arm64-msvc": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-win32-arm64-msvc/-/binding-win32-arm64-msvc-1.2.16.tgz",
++      "integrity": "sha512-/LH6WfjDRXXJz/p5xl4TmU+jpcnwcxbKEQBW/GZE0JHfN0lGIyTtsUEGaQ/q/GikkGJ2yLKe6pwm7AnEWO8pdw==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-win32-x64-msvc": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-win32-x64-msvc/-/binding-win32-x64-msvc-1.2.16.tgz",
++      "integrity": "sha512-1lv1KvX0Z871zfk7vw+dnXMMnHNyDwMzWG8Kv3HxDXMOhzCX4SHc7HK319fInP0i+0p9D8brkfzL7pJOaGl+tw==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/pluginutils": {
++      "version": "1.0.1",
++      "resolved": "https://registry.npmjs.org/@rolldown/pluginutils/-/pluginutils-1.0.1.tgz",
++      "integrity": "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@tailwindcss/node": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/node/-/node-4.3.5.tgz",
++      "integrity": "sha512-yT53FzV4ke0cr/BguDxhWMpm5MJu1O2muzk+tKw6lKHjODAsYArBbWwFbJiaksfzFv1tpkO9QHGzmfs1hJT66g==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@jridgewell/remapping": "^2.3.5",
++        "enhanced-resolve": "^5.24.5",
++        "jiti": "^2.7.0",
++        "lightningcss": "1.33.0",
++        "magic-string": "^1.1.0",
++        "source-map-js": "^1.2.1",
++        "tailwindcss": "4.3.5"
++      }
++    },
++    "node_modules/@tailwindcss/oxide": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide/-/oxide-4.3.5.tgz",
++      "integrity": "sha512-PynqGLZsZvwM9tqD/CUxkOIfyd6K5elZ2MooauzJryP/UqXYgi3yYbtt3N0Xe+MHV/eFKPFQCEfIKAqlAS1CBg==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">= 20"
++      },
++      "optionalDependencies": {
++        "@tailwindcss/oxide-android-arm64": "4.3.5",
++        "@tailwindcss/oxide-darwin-arm64": "4.3.5",
++        "@tailwindcss/oxide-darwin-x64": "4.3.5",
++        "@tailwindcss/oxide-freebsd-x64": "4.3.5",
++        "@tailwindcss/oxide-linux-arm-gnueabihf": "4.3.5",
++        "@tailwindcss/oxide-linux-arm64-gnu": "4.3.5",
++        "@tailwindcss/oxide-linux-arm64-musl": "4.3.5",
++        "@tailwindcss/oxide-linux-x64-gnu": "4.3.5",
++        "@tailwindcss/oxide-linux-x64-musl": "4.3.5",
++        "@tailwindcss/oxide-wasm32-wasi": "4.3.5",
++        "@tailwindcss/oxide-win32-arm64-msvc": "4.3.5",
++        "@tailwindcss/oxide-win32-x64-msvc": "4.3.5"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-android-arm64": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide-android-arm64/-/oxide-android-arm64-4.3.5.tgz",
++      "integrity": "sha512-Se0z5xMqcSQanJD1IYmO0cGpK3iv0fp3ZsIT7xRJZ1Da5PghvNoc46zz4jIQn+aan3dV9T8AermFNN9QPmsh0Q==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "android"
++      ],
++      "engines": {
++        "node": ">= 20"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-darwin-arm64": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide-darwin-arm64/-/oxide-darwin-arm64-4.3.5.tgz",
++      "integrity": "sha512-UPrgTDuUbvmqGMZuCnmI3FKee/tYKzKdp00/kuB4oSGB213VYg8QTdF7lVhnPoBXq/mIfJ+ILoBFqNOboWcMwQ==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": ">= 20"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-darwin-x64": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide-darwin-x64/-/oxide-darwin-x64-4.3.5.tgz",
++      "integrity": "sha512-E+p7HEtjI0b8D7kbbWxH067cGui6d4c79COGko9fAPVE3rwc1E7ld2HFCbaG86AOGWS5VKQYqZOaf38ya4uxTQ==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": ">= 20"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-freebsd-x64": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide-freebsd-x64/-/oxide-freebsd-x64-4.3.5.tgz",
++      "integrity": "sha512-yWEWcWyAG7rWOcTpJTjdhQ3pcaFY2h+0bqTRfgU3G2fz87ZU3AKdvdZKhslD+kyHnjBUWKvNdRYwIYC5dI1tIg==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "freebsd"
++      ],
++      "engines": {
++        "node": ">= 20"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-linux-arm-gnueabihf": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide-linux-arm-gnueabihf/-/oxide-linux-arm-gnueabihf-4.3.5.tgz",
++      "integrity": "sha512-WmeVjtJhZlr+smpqcdR2kQkkn6arHIJnUIBxTO2EJcTLGY1ecVXNo2hbSn8xc0IH2aEtys936iMWKGyj0GaKnA==",
++      "cpu": [
++        "arm"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 20"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-linux-arm64-gnu": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide-linux-arm64-gnu/-/oxide-linux-arm64-gnu-4.3.5.tgz",
++      "integrity": "sha512-DTCSyucc6ShMp1QMqV5R94Z7xlgNgUzkGmFF1rL5HH2Qjy4eSmEqy+YLGkqqYvWa4sILtgrBt1JjRKbneQtiFQ==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 20"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-linux-arm64-musl": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide-linux-arm64-musl/-/oxide-linux-arm64-musl-4.3.5.tgz",
++      "integrity": "sha512-H9lsvO4x9E4nE4Hi8h7NHHw0O/kcVSu+iOyFHNGdYzazGgDjFHZbE6S3hQ8kMcbNXSBlMdNi67LV5EVqtpaJtw==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "libc": [
++        "musl"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 20"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-linux-x64-gnu": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide-linux-x64-gnu/-/oxide-linux-x64-gnu-4.3.5.tgz",
++      "integrity": "sha512-4uxQvtBvPuIdl13WfUBj9xMZHH14PtHZ8OZdtLmdyDtG66sCa1t599NZT+jagkUzRtWhuul1qRZQ1nAJscXN5g==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 20"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-linux-x64-musl": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide-linux-x64-musl/-/oxide-linux-x64-musl-4.3.5.tgz",
++      "integrity": "sha512-0JQAzs7jwbA7O6+z/adU+Jk3AXwsu3npAhtr5escXS7TqEqWcaDV7qHuI+0Vy/KQRuVGnLQREcSJWYauyV3oqg==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "libc": [
++        "musl"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 20"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-wasm32-wasi": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide-wasm32-wasi/-/oxide-wasm32-wasi-4.3.5.tgz",
++      "integrity": "sha512-OJhFmlEfdzMr+avACdi40RPtnkW0B6hXyxL/8r+tnEHBWZji36CYRjEXrrvgBmaYsD3oEOBqwYFRKsYvzFe7Bw==",
++      "bundleDependencies": [
++        "@napi-rs/wasm-runtime",
++        "@emnapi/core",
++        "@emnapi/runtime",
++        "@tybys/wasm-util",
++        "@emnapi/wasi-threads",
++        "tslib"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "@emnapi/core": "^1.11.3",
++        "@emnapi/runtime": "^1.11.3",
++        "@emnapi/wasi-threads": "^1.2.3",
++        "@napi-rs/wasm-runtime": "^1.2.2",
++        "@tybys/wasm-util": "^0.10.3",
++        "tslib": "^2.8.1"
++      },
++      "engines": {
++        "node": "^20.19.0 || ^22.13.0 || >=23.5.0"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@emnapi/core": {
++      "version": "1.11.3",
++      "dev": true,
++      "inBundle": true,
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "@emnapi/wasi-threads": "1.2.3",
++        "tslib": "^2.4.0"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@emnapi/runtime": {
++      "version": "1.11.3",
++      "dev": true,
++      "inBundle": true,
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "tslib": "^2.4.0"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@emnapi/wasi-threads": {
++      "version": "1.2.3",
++      "dev": true,
++      "inBundle": true,
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "tslib": "^2.4.0"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@napi-rs/wasm-runtime": {
++      "version": "1.2.2",
++      "dev": true,
++      "inBundle": true,
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "@tybys/wasm-util": "^0.10.3"
++      },
++      "engines": {
++        "node": "^20.19.0 || ^22.13.0 || >=23.5.0"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/Brooooooklyn"
++      },
++      "peerDependencies": {
++        "@emnapi/core": "^1.7.1 || ^2.0.0-alpha.3",
++        "@emnapi/runtime": "^1.7.1 || ^2.0.0-alpha.3"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@tybys/wasm-util": {
++      "version": "0.10.3",
++      "dev": true,
++      "inBundle": true,
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "tslib": "^2.4.0"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/tslib": {
++      "version": "2.8.1",
++      "dev": true,
++      "inBundle": true,
++      "license": "0BSD",
++      "optional": true
++    },
++    "node_modules/@tailwindcss/oxide-win32-arm64-msvc": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide-win32-arm64-msvc/-/oxide-win32-arm64-msvc-4.3.5.tgz",
++      "integrity": "sha512-9o8jgthi+QE5eandnboiJT64VQfnIArfZzSTdgbhEK5aafdiu2jTW9Honi/mwYHxBZuH1vAC57IFyrh+0iK5Gg==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": ">= 20"
++      }
++    },
++    "node_modules/@tailwindcss/oxide-win32-x64-msvc": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/oxide-win32-x64-msvc/-/oxide-win32-x64-msvc-4.3.5.tgz",
++      "integrity": "sha512-XiKFfIy1RWe7qK4WqByxNW7Oz1/nkOy8o/BWhHminyV1PmpUd8Eedj5v2A8h2kpqeVlz6xRnwk9Fr/ZXNLcZfg==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": ">= 20"
++      }
++    },
++    "node_modules/@tailwindcss/vite": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/@tailwindcss/vite/-/vite-4.3.5.tgz",
++      "integrity": "sha512-BCNiY0a1ZjdOHVqw7kyb7U72BwfMF3dfUuN+tQsLWky/J5JOI/r7abibglXfygrZhVO/3u3V+E25kkKTeMkXaQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@tailwindcss/node": "4.3.5",
++        "@tailwindcss/oxide": "4.3.5",
++        "tailwindcss": "4.3.5"
++      },
++      "peerDependencies": {
++        "vite": "^5.2.0 || ^6 || ^7 || ^8"
++      }
++    },
++    "node_modules/@types/node": {
++      "version": "24.19.2",
++      "resolved": "https://registry.npmjs.org/@types/node/-/node-24.19.2.tgz",
++      "integrity": "sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "undici-types": ">=7.24.0 <7.24.7"
++      }
++    },
++    "node_modules/@types/prop-types": {
++      "version": "15.7.15",
++      "resolved": "https://registry.npmjs.org/@types/prop-types/-/prop-types-15.7.15.tgz",
++      "integrity": "sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@types/react": {
++      "version": "17.0.93",
++      "resolved": "https://registry.npmjs.org/@types/react/-/react-17.0.93.tgz",
++      "integrity": "sha512-KM4Ty/ZTLZupiYxZVAlP+InNJS3De6uBMdq0ePa6/04+eG9Y7ftnWfst1xTLQ5rwAhgHwQ4momt/O4KepdGBTw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/prop-types": "*",
++        "@types/scheduler": "^0.16",
++        "csstype": "^3.2.2"
++      }
++    },
++    "node_modules/@types/react-dom": {
++      "version": "17.0.26",
++      "resolved": "https://registry.npmjs.org/@types/react-dom/-/react-dom-17.0.26.tgz",
++      "integrity": "sha512-Z+2VcYXJwOqQ79HreLU/1fyQ88eXSSFh6I3JdrEHQIfYSI0kCQpTGvOrbE6jFGGYXKsHuwY9tBa/w5Uo6KzrEg==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@types/react": "^17.0.0"
++      }
++    },
++    "node_modules/@types/scheduler": {
++      "version": "0.16.8",
++      "resolved": "https://registry.npmjs.org/@types/scheduler/-/scheduler-0.16.8.tgz",
++      "integrity": "sha512-WZLiwShhwLRmeV6zH+GkbOFT6Z6VklCItrDioxUnv+u4Ll+8vKeFySoFyK/0ctcRpOmwAicELfmys1sDc/Rw+A==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/acorn": {
++      "version": "8.19.0",
++      "resolved": "https://registry.npmjs.org/acorn/-/acorn-8.19.0.tgz",
++      "integrity": "sha512-oJlA3XiRm7Cyk6qFD2Jn8ak9B7jSy0qy00ADO3+8dpT0LSjFihQYv4C02LFCSYJV3Q37xYwwRy5m+IpIiUzqWw==",
++      "dev": true,
++      "license": "MIT",
++      "bin": {
++        "acorn": "bin/acorn"
++      },
++      "engines": {
++        "node": ">=0.4.0"
++      }
++    },
++    "node_modules/buffer-from": {
++      "version": "1.1.2",
++      "resolved": "https://registry.npmjs.org/buffer-from/-/buffer-from-1.1.2.tgz",
++      "integrity": "sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/commander": {
++      "version": "2.20.3",
++      "resolved": "https://registry.npmjs.org/commander/-/commander-2.20.3.tgz",
++      "integrity": "sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/csstype": {
++      "version": "3.2.3",
++      "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz",
++      "integrity": "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/detect-libc": {
++      "version": "2.1.2",
++      "resolved": "https://registry.npmjs.org/detect-libc/-/detect-libc-2.1.2.tgz",
++      "integrity": "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=8"
++      }
++    },
++    "node_modules/enhanced-resolve": {
++      "version": "5.26.1",
++      "resolved": "https://registry.npmjs.org/enhanced-resolve/-/enhanced-resolve-5.26.1.tgz",
++      "integrity": "sha512-PPnnSJq3azKOIewXR/uppBV/6h98dprBJ/WaQ9Qgj10xX1lJLNfg+XShpbsrSqcDSy2yYYyhfXM1wWhftqgyzw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "graceful-fs": "^4.2.4",
++        "tapable": "^2.3.3"
++      },
++      "engines": {
++        "node": ">=10.13.0"
++      }
++    },
++    "node_modules/fdir": {
++      "version": "6.5.0",
++      "resolved": "https://registry.npmjs.org/fdir/-/fdir-6.5.0.tgz",
++      "integrity": "sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=12.0.0"
++      },
++      "peerDependencies": {
++        "picomatch": "^3 || ^4"
++      },
++      "peerDependenciesMeta": {
++        "picomatch": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/fsevents": {
++      "version": "2.3.3",
++      "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
++      "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
++      "dev": true,
++      "hasInstallScript": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": "^8.16.0 || ^10.6.0 || >=11.0.0"
++      }
++    },
++    "node_modules/graceful-fs": {
++      "version": "4.2.11",
++      "resolved": "https://registry.npmjs.org/graceful-fs/-/graceful-fs-4.2.11.tgz",
++      "integrity": "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==",
++      "dev": true,
++      "license": "ISC"
++    },
++    "node_modules/jiti": {
++      "version": "2.7.0",
++      "resolved": "https://registry.npmjs.org/jiti/-/jiti-2.7.0.tgz",
++      "integrity": "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==",
++      "dev": true,
++      "license": "MIT",
++      "bin": {
++        "jiti": "lib/jiti-cli.mjs"
++      }
++    },
++    "node_modules/js-tokens": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/js-tokens/-/js-tokens-4.0.0.tgz",
++      "integrity": "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==",
++      "license": "MIT"
++    },
++    "node_modules/lightningcss": {
++      "version": "1.33.0",
++      "resolved": "https://registry.npmjs.org/lightningcss/-/lightningcss-1.33.0.tgz",
++      "integrity": "sha512-WkUDrojuJs0xkgGf2udWxa3yGBRxPtxUkB79i6aCZLRgc7PM8fZe9TosfPDcvEpQZbuFASnHYmRLBLUbmLOIIA==",
++      "dev": true,
++      "license": "MPL-2.0",
++      "dependencies": {
++        "detect-libc": "^2.0.3"
++      },
++      "engines": {
++        "node": ">= 12.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/parcel"
++      },
++      "optionalDependencies": {
++        "lightningcss-android-arm64": "1.33.0",
++        "lightningcss-darwin-arm64": "1.33.0",
++        "lightningcss-darwin-x64": "1.33.0",
++        "lightningcss-freebsd-x64": "1.33.0",
++        "lightningcss-linux-arm-gnueabihf": "1.33.0",
++        "lightningcss-linux-arm64-gnu": "1.33.0",
++        "lightningcss-linux-arm64-musl": "1.33.0",
++        "lightningcss-linux-x64-gnu": "1.33.0",
++        "lightningcss-linux-x64-musl": "1.33.0",
++        "lightningcss-win32-arm64-msvc": "1.33.0",
++        "lightningcss-win32-x64-msvc": "1.33.0"
++      }
++    },
++    "node_modules/lightningcss-android-arm64": {
++      "version": "1.33.0",
++      "resolved": "https://registry.npmjs.org/lightningcss-android-arm64/-/lightningcss-android-arm64-1.33.0.tgz",
++      "integrity": "sha512-gEpRTalKdosp4Bb8qWtc2iOgE5SeIHlpS1up9bFq2wAyYhl1UdTObYiHe98zEM9SQvSoqQZ1IQD0JNpg3Ml5pg==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MPL-2.0",
++      "optional": true,
++      "os": [
++        "android"
++      ],
++      "engines": {
++        "node": ">= 12.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/parcel"
++      }
++    },
++    "node_modules/lightningcss-darwin-arm64": {
++      "version": "1.33.0",
++      "resolved": "https://registry.npmjs.org/lightningcss-darwin-arm64/-/lightningcss-darwin-arm64-1.33.0.tgz",
++      "integrity": "sha512-Sciaz8eenNTKn9b3t7+xr0ipTp9YxKQY4npwQ3mrRuL0BAVHBLyZxofhaKBAVtzmtRZ/zTyo0/to4B1uWG/Djg==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MPL-2.0",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": ">= 12.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/parcel"
++      }
++    },
++    "node_modules/lightningcss-darwin-x64": {
++      "version": "1.33.0",
++      "resolved": "https://registry.npmjs.org/lightningcss-darwin-x64/-/lightningcss-darwin-x64-1.33.0.tgz",
++      "integrity": "sha512-Z5UPAxzrjlWNNyGy6i65cJzzvgJ5D3T6wMvs+gWpY9d7qRhANrxqAp6LhxIgZhWEw18RfJTGcRxjuLIBr+m8XQ==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MPL-2.0",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": ">= 12.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/parcel"
++      }
++    },
++    "node_modules/lightningcss-freebsd-x64": {
++      "version": "1.33.0",
++      "resolved": "https://registry.npmjs.org/lightningcss-freebsd-x64/-/lightningcss-freebsd-x64-1.33.0.tgz",
++      "integrity": "sha512-QQM/Ti/hQajJwCY+RiWuCZ9sdtI/XQk7nDK5vC8kkdwixezOlDgvDx7+RT+QjK6FcFT4MpsuoBnHIo/O3StRRg==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MPL-2.0",
++      "optional": true,
++      "os": [
++        "freebsd"
++      ],
++      "engines": {
++        "node": ">= 12.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/parcel"
++      }
++    },
++    "node_modules/lightningcss-linux-arm-gnueabihf": {
++      "version": "1.33.0",
++      "resolved": "https://registry.npmjs.org/lightningcss-linux-arm-gnueabihf/-/lightningcss-linux-arm-gnueabihf-1.33.0.tgz",
++      "integrity": "sha512-N7FVBe6iS24MlM6R/4RBTxGhQheZGs7tiQ9U32UtF75NzP5Q7xWPRqLBCKxlRQRk3rY1jCIPLzx7WzOhuUIRLQ==",
++      "cpu": [
++        "arm"
++      ],
++      "dev": true,
++      "license": "MPL-2.0",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 12.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/parcel"
++      }
++    },
++    "node_modules/lightningcss-linux-arm64-gnu": {
++      "version": "1.33.0",
++      "resolved": "https://registry.npmjs.org/lightningcss-linux-arm64-gnu/-/lightningcss-linux-arm64-gnu-1.33.0.tgz",
++      "integrity": "sha512-j2v/itmy4HlNxlc6voKXYgBqNi0Ng2LShg4z7GufpEgs05P+2suBVyi9I6YHq5uoVFx9ETin3eCEhLVyXGQnKg==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MPL-2.0",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 12.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/parcel"
++      }
++    },
++    "node_modules/lightningcss-linux-arm64-musl": {
++      "version": "1.33.0",
++      "resolved": "https://registry.npmjs.org/lightningcss-linux-arm64-musl/-/lightningcss-linux-arm64-musl-1.33.0.tgz",
++      "integrity": "sha512-yiO5ROMuYQgXbC60yjZU5CYSFZGKXL0HFATXt9mHJn1+zW55oCtMI9NfcVhYLMFDL7gV7oBPon/EmMMGg2OvtQ==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "libc": [
++        "musl"
++      ],
++      "license": "MPL-2.0",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 12.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/parcel"
++      }
++    },
++    "node_modules/lightningcss-linux-x64-gnu": {
++      "version": "1.33.0",
++      "resolved": "https://registry.npmjs.org/lightningcss-linux-x64-gnu/-/lightningcss-linux-x64-gnu-1.33.0.tgz",
++      "integrity": "sha512-ar+Ju7LmcN0Jo4FpL4hpFybwNG9/3A/Br5KW2n2jyODg3MEZXaDYADdemoNS+BDNfMgKvylJLj4S5tyRActuAg==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MPL-2.0",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 12.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/parcel"
++      }
++    },
++    "node_modules/lightningcss-linux-x64-musl": {
++      "version": "1.33.0",
++      "resolved": "https://registry.npmjs.org/lightningcss-linux-x64-musl/-/lightningcss-linux-x64-musl-1.33.0.tgz",
++      "integrity": "sha512-RYiYbkokw0trfKqqzfF55lginwEPrD3OJDfTuJzFs1MK6iFnDenaz1fqLLtX4ITG3OktJQXOeTaw1awrBAlZPw==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "libc": [
++        "musl"
++      ],
++      "license": "MPL-2.0",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">= 12.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/parcel"
++      }
++    },
++    "node_modules/lightningcss-win32-arm64-msvc": {
++      "version": "1.33.0",
++      "resolved": "https://registry.npmjs.org/lightningcss-win32-arm64-msvc/-/lightningcss-win32-arm64-msvc-1.33.0.tgz",
++      "integrity": "sha512-1K+MPfLSFVpphzpdbfkhlWk6wBrTObBzS2T6db10PNOZgR9GoVsAWzwNyuhUYYbTp23j+4RrncfujZ4uAzXvwA==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MPL-2.0",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": ">= 12.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/parcel"
++      }
++    },
++    "node_modules/lightningcss-win32-x64-msvc": {
++      "version": "1.33.0",
++      "resolved": "https://registry.npmjs.org/lightningcss-win32-x64-msvc/-/lightningcss-win32-x64-msvc-1.33.0.tgz",
++      "integrity": "sha512-OlEICDx/Xl0FqSp4bry8zFnCvGpig3Gl4gCquvYwHuqJKEC1+n9NgDniFvqHGmMv1ZkqDJrDqKKSykTDX+ehuA==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MPL-2.0",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": ">= 12.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/parcel"
++      }
++    },
++    "node_modules/loose-envify": {
++      "version": "1.4.0",
++      "resolved": "https://registry.npmjs.org/loose-envify/-/loose-envify-1.4.0.tgz",
++      "integrity": "sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==",
++      "license": "MIT",
++      "dependencies": {
++        "js-tokens": "^3.0.0 || ^4.0.0"
++      },
++      "bin": {
++        "loose-envify": "cli.js"
++      }
++    },
++    "node_modules/magic-string": {
++      "version": "1.4.5",
++      "resolved": "https://registry.npmjs.org/magic-string/-/magic-string-1.4.5.tgz",
++      "integrity": "sha512-oLLC2+YvQUfAa+vxoufE/yc1icb87M9iXIRqAoR/2EhE/8cb3SF/+Gi0c2By1B+5Vz2e2vQtUvHiu1+63Znh+w==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@jridgewell/sourcemap-codec": "^1.6.0"
++      }
++    },
++    "node_modules/nanoid": {
++      "version": "3.3.20",
++      "resolved": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.20.tgz",
++      "integrity": "sha512-uKdg2G3GNCKQn9byYOpxbGqrT2fGO5KRt5J/8b3pok8rT6qxGWF6hxMyJiEYtAf+FVyYuD9hRaDqX5uPFYJ4ZQ==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/ai"
++        }
++      ],
++      "license": "MIT",
++      "bin": {
++        "nanoid": "bin/nanoid.cjs"
++      },
++      "engines": {
++        "node": "^10 || ^12 || ^13.7 || ^14 || >=15.0.1"
++      }
++    },
++    "node_modules/object-assign": {
++      "version": "4.1.1",
++      "resolved": "https://registry.npmjs.org/object-assign/-/object-assign-4.1.1.tgz",
++      "integrity": "sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
++    "node_modules/picocolors": {
++      "version": "1.1.1",
++      "resolved": "https://registry.npmjs.org/picocolors/-/picocolors-1.1.1.tgz",
++      "integrity": "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==",
++      "dev": true,
++      "license": "ISC"
++    },
++    "node_modules/picomatch": {
++      "version": "4.0.7",
++      "resolved": "https://registry.npmjs.org/picomatch/-/picomatch-4.0.7.tgz",
++      "integrity": "sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=12"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/jonschlinkert"
++      }
++    },
++    "node_modules/playwright": {
++      "version": "1.65.0",
++      "resolved": "https://registry.npmjs.org/playwright/-/playwright-1.65.0.tgz",
++      "integrity": "sha512-F3AMWcR44qMBt4kq+6Kb6mX7bjGXshktKFOPULd7reED6ZJWevjbNRqysP7q+AATE9kdPEZBibex1BYsvpVoeA==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "playwright-core": "1.65.0"
++      },
++      "bin": {
++        "playwright": "cli.js"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/playwright-core": {
++      "version": "1.65.0",
++      "resolved": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.65.0.tgz",
++      "integrity": "sha512-vNSKgH6YqtN7cdT/L334zo0a+YwkrpicyrHJlWWPIm/Q+Nn2SWInil01oT0mbu96U4GgoRtCYQD9CzJQgju+lA==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "bin": {
++        "playwright-core": "cli.js"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/postcss": {
++      "version": "8.5.32",
++      "resolved": "https://registry.npmjs.org/postcss/-/postcss-8.5.32.tgz",
++      "integrity": "sha512-LJlKCCAUFKOuZxipUdYw1NzIITEsPcgyOG9LkvRJvuKj/bRzbuRY0ARXvL0pWGpsZvn8jku+LMep2eU0seHp8g==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "opencollective",
++          "url": "https://opencollective.com/postcss/"
++        },
++        {
++          "type": "tidelift",
++          "url": "https://tidelift.com/funding/github/npm/postcss"
++        },
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/ai"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "nanoid": "^3.3.20",
++        "picocolors": "^1.1.1",
++        "source-map-js": "^1.2.2"
++      },
++      "engines": {
++        "node": "^10 || ^12 || >=14"
++      }
++    },
++    "node_modules/react": {
++      "version": "17.0.2",
++      "resolved": "https://registry.npmjs.org/react/-/react-17.0.2.tgz",
++      "integrity": "sha512-gnhPt75i/dq/z3/6q/0asP78D0u592D5L1pd7M8P+dck6Fu/jJeL6iVVK23fptSUZj8Vjf++7wXA8UNclGQcbA==",
++      "license": "MIT",
++      "dependencies": {
++        "loose-envify": "^1.1.0",
++        "object-assign": "^4.1.1"
++      },
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
++    "node_modules/react-dom": {
++      "version": "17.0.2",
++      "resolved": "https://registry.npmjs.org/react-dom/-/react-dom-17.0.2.tgz",
++      "integrity": "sha512-s4h96KtLDUQlsENhMn1ar8t2bEa+q/YAtj8pPPdIjPDGBDIVNsrD9aXNWqspUe6AzKCIG0C1HZZLqLV7qpOBGA==",
++      "license": "MIT",
++      "dependencies": {
++        "loose-envify": "^1.1.0",
++        "object-assign": "^4.1.1",
++        "scheduler": "^0.20.2"
++      },
++      "peerDependencies": {
++        "react": "17.0.2"
++      }
++    },
++    "node_modules/rolldown": {
++      "version": "1.2.16",
++      "resolved": "https://registry.npmjs.org/rolldown/-/rolldown-1.2.16.tgz",
++      "integrity": "sha512-bWvlMpFKiTfDKfnK7FC2MPgPeWCf/Kpwsq49ApdW+FQaBZb6O6dZ4MAPbPUjp7hYQrw/RobqCzn64BRrQecGHw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@oxc-project/types": "=0.156.0",
++        "@rolldown/pluginutils": "^1.0.0"
++      },
++      "bin": {
++        "rolldown": "bin/cli.mjs"
++      },
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      },
++      "optionalDependencies": {
++        "@rolldown/binding-android-arm-eabi": "1.2.16",
++        "@rolldown/binding-android-arm64": "1.2.16",
++        "@rolldown/binding-darwin-arm64": "1.2.16",
++        "@rolldown/binding-darwin-x64": "1.2.16",
++        "@rolldown/binding-freebsd-x64": "1.2.16",
++        "@rolldown/binding-linux-arm-gnueabihf": "1.2.16",
++        "@rolldown/binding-linux-arm64-gnu": "1.2.16",
++        "@rolldown/binding-linux-arm64-musl": "1.2.16",
++        "@rolldown/binding-linux-ppc64-gnu": "1.2.16",
++        "@rolldown/binding-linux-s390x-gnu": "1.2.16",
++        "@rolldown/binding-linux-x64-gnu": "1.2.16",
++        "@rolldown/binding-linux-x64-musl": "1.2.16",
++        "@rolldown/binding-openharmony-arm64": "1.2.16",
++        "@rolldown/binding-win32-arm64-msvc": "1.2.16",
++        "@rolldown/binding-win32-x64-msvc": "1.2.16"
++      }
++    },
++    "node_modules/scheduler": {
++      "version": "0.20.2",
++      "resolved": "https://registry.npmjs.org/scheduler/-/scheduler-0.20.2.tgz",
++      "integrity": "sha512-2eWfGgAqqWFGqtdMmcL5zCMK1U8KlXv8SQFGglL3CEtd0aDVDWgeF/YoCmvln55m5zSk3J/20hTaSBeSObsQDQ==",
++      "license": "MIT",
++      "dependencies": {
++        "loose-envify": "^1.1.0",
++        "object-assign": "^4.1.1"
++      }
++    },
++    "node_modules/source-map": {
++      "version": "0.6.1",
++      "resolved": "https://registry.npmjs.org/source-map/-/source-map-0.6.1.tgz",
++      "integrity": "sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==",
++      "dev": true,
++      "license": "BSD-3-Clause",
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
++    "node_modules/source-map-js": {
++      "version": "1.2.2",
++      "resolved": "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.2.tgz",
++      "integrity": "sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==",
++      "dev": true,
++      "license": "BSD-3-Clause",
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
++    "node_modules/source-map-support": {
++      "version": "0.5.21",
++      "resolved": "https://registry.npmjs.org/source-map-support/-/source-map-support-0.5.21.tgz",
++      "integrity": "sha512-uBHU3L3czsIyYXKX88fdrGovxdSCoTGDRZ6SYXtSRxLZUzHg5P/66Ht6uoUlHu9EZod+inXhKo3qQgwXUT/y1w==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "buffer-from": "^1.0.0",
++        "source-map": "^0.6.0"
++      }
++    },
++    "node_modules/tailwindcss": {
++      "version": "4.3.5",
++      "resolved": "https://registry.npmjs.org/tailwindcss/-/tailwindcss-4.3.5.tgz",
++      "integrity": "sha512-FcQk9BuffmEHJP2G0XmB2SplU1aLTI7j07Kunk+U74Ny+XiWOtzXz9aujFZ/avntw1e2cOv/3PkgzflQ7gX2vQ==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/tapable": {
++      "version": "2.3.3",
++      "resolved": "https://registry.npmjs.org/tapable/-/tapable-2.3.3.tgz",
++      "integrity": "sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=6"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/webpack"
++      }
++    },
++    "node_modules/terser": {
++      "version": "5.51.2",
++      "resolved": "https://registry.npmjs.org/terser/-/terser-5.51.2.tgz",
++      "integrity": "sha512-bWnjSNscmuI+GJze6ZupnHP8G/cTcsJF+bXCeQknk2SHQsgbNJnLrqiH9jZ2W4STPVXH2mDKKRX3iwPhc9Cn/Q==",
++      "dev": true,
++      "license": "BSD-2-Clause",
++      "dependencies": {
++        "@jridgewell/source-map": "^0.3.3",
++        "acorn": "^8.15.0",
++        "commander": "^2.20.0",
++        "source-map-support": "~0.5.20"
++      },
++      "bin": {
++        "terser": "bin/terser"
++      },
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/tinyglobby": {
++      "version": "0.2.17",
++      "resolved": "https://registry.npmjs.org/tinyglobby/-/tinyglobby-0.2.17.tgz",
++      "integrity": "sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "fdir": "^6.5.0",
++        "picomatch": "^4.0.4"
++      },
++      "engines": {
++        "node": ">=12.0.0"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/SuperchupuDev"
++      }
++    },
++    "node_modules/typescript": {
++      "version": "6.0.3",
++      "resolved": "https://registry.npmjs.org/typescript/-/typescript-6.0.3.tgz",
++      "integrity": "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "bin": {
++        "tsc": "bin/tsc",
++        "tsserver": "bin/tsserver"
++      },
++      "engines": {
++        "node": ">=14.17"
++      }
++    },
++    "node_modules/undici-types": {
++      "version": "7.24.6",
++      "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-7.24.6.tgz",
++      "integrity": "sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/vite": {
++      "version": "8.3.6",
++      "resolved": "https://registry.npmjs.org/vite/-/vite-8.3.6.tgz",
++      "integrity": "sha512-UI7dK29NnS54Fk+mmo7o+jI6U8Fp7hDl+X5Q1k45WH+d4dSlbLVUETGQ+hfkNgvLQGyoElPj837nZyv4MBc0VA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "lightningcss": "^1.33.0",
++        "picomatch": "^4.0.7",
++        "postcss": "^8.5.32",
++        "rolldown": "~1.2.16",
++        "tinyglobby": "^0.2.17"
++      },
++      "bin": {
++        "vite": "bin/vite.js"
++      },
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      },
++      "funding": {
++        "url": "https://github.com/vitejs/vite?sponsor=1"
++      },
++      "optionalDependencies": {
++        "fsevents": "~2.3.3"
++      },
++      "peerDependencies": {
++        "@types/node": "^20.19.0 || >=22.12.0",
++        "@vitejs/devtools": "^0.7.1 || ^0.8.0",
++        "esbuild": "^0.27.0 || ^0.28.0",
++        "jiti": ">=1.21.0",
++        "less": "^4.0.0",
++        "sass": "^1.70.0",
++        "sass-embedded": "^1.70.0",
++        "stylus": ">=0.54.8",
++        "sugarss": "^5.0.0",
++        "terser": "^5.16.0",
++        "tsx": "^4.8.1",
++        "yaml": "^2.4.2"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        },
++        "@vitejs/devtools": {
++          "optional": true
++        },
++        "esbuild": {
++          "optional": true
++        },
++        "jiti": {
++          "optional": true
++        },
++        "less": {
++          "optional": true
++        },
++        "sass": {
++          "optional": true
++        },
++        "sass-embedded": {
++          "optional": true
++        },
++        "stylus": {
++          "optional": true
++        },
++        "sugarss": {
++          "optional": true
++        },
++        "terser": {
++          "optional": true
++        },
++        "tsx": {
++          "optional": true
++        },
++        "yaml": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/horse-club-crm/tma/package.json b/horse-club-crm/tma/package.json
+new file mode 100644
+index 0000000..ac528a8
+--- /dev/null
++++ b/horse-club-crm/tma/package.json
+@@ -0,0 +1,29 @@
++{
++  "name": "horse-club-telegram-mini-app",
++  "private": true,
++  "type": "module",
++  "scripts": {
++    "dev": "vite --host 127.0.0.1 --port 5175",
++    "typecheck": "tsc --noEmit",
++    "lint": "node ../frontend/node_modules/oxlint/bin/oxlint src vite.config.ts e2e",
++    "test": "node --test test/*.test.cjs",
++    "test:e2e": "playwright test",
++    "build": "npm run typecheck && vite build && node scripts/check-size.cjs",
++    "preview": "vite preview --host 127.0.0.1 --port 5175"
++  },
++  "dependencies": {
++    "react": "17.0.2",
++    "react-dom": "17.0.2"
++  },
++  "devDependencies": {
++    "@playwright/test": "^1.65.0",
++    "@tailwindcss/vite": "^4.1.0",
++    "@types/node": "^24.13.3",
++    "@types/react": "^17.0.93",
++    "@types/react-dom": "^17.0.26",
++    "tailwindcss": "^4.1.0",
++    "terser": "^5.51.2",
++    "typescript": "~6.0.2",
++    "vite": "^8.2.2"
++  }
++}
+diff --git a/horse-club-crm/tma/playwright.config.ts b/horse-club-crm/tma/playwright.config.ts
+new file mode 100644
+index 0000000..ab49a1e
+--- /dev/null
++++ b/horse-club-crm/tma/playwright.config.ts
+@@ -0,0 +1,8 @@
++import { defineConfig, devices } from '@playwright/test';
++
++export default defineConfig({
++  testDir: './e2e', fullyParallel: true, reporter: 'list',
++  use: { baseURL: 'http://127.0.0.1:5175/tma/', screenshot: 'only-on-failure' },
++  projects: [{ name: 'mobile', use: { ...devices['iPhone SE'], defaultBrowserType: 'chromium' } }],
++  webServer: { command: 'node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5175', url: 'http://127.0.0.1:5175/tma/', reuseExistingServer: false },
++});
+diff --git a/horse-club-crm/tma/premium-ui.json b/horse-club-crm/tma/premium-ui.json
+new file mode 100644
+index 0000000..cd39205
+--- /dev/null
++++ b/horse-club-crm/tma/premium-ui.json
+@@ -0,0 +1,11 @@
++{
++  "profile": "product-admin",
++  "sourceRoots": ["src"],
++  "locale": "ru-RU",
++  "canonicalMap": "UX-CONTRACT.md",
++  "requiredCapabilities": ["Select/Listbox", "Date", "Form", "Scrollbar", "Toast", "CRUD"],
++  "ownership": { "Select/Listbox": "native", "Date": "native" },
++  "requiredCommands": ["unit", "typecheck", "build"],
++  "commands": { "unit": "npm --prefix tma test", "typecheck": "npm --prefix tma run typecheck", "build": "npm --prefix tma run build" },
++  "evidence": { "crudFullFlow": "e2e/booking.spec.ts", "failurePaths": "e2e/booking.spec.ts" }
++}
+diff --git a/horse-club-crm/tma/scripts/check-size.cjs b/horse-club-crm/tma/scripts/check-size.cjs
+new file mode 100644
+index 0000000..3aafd01
+--- /dev/null
++++ b/horse-club-crm/tma/scripts/check-size.cjs
+@@ -0,0 +1,14 @@
++const fs = require('node:fs');
++const path = require('node:path');
++const zlib = require('node:zlib');
++const root = path.resolve(__dirname, '../../frontend/dist/tma');
++const assets = fs.readdirSync(path.join(root, 'assets')).filter(name => /\.(js|css)$/.test(name));
++let raw = 0, gzip = 0;
++for (const name of assets) {
++  const bytes = fs.readFileSync(path.join(root, 'assets', name));
++  raw += bytes.length;
++  gzip += zlib.gzipSync(bytes).length;
++  if (/refinedev|antd/.test(bytes.toString())) throw new Error('CRM dependencies found in TMA');
++}
++console.log(`TMA JS + CSS: ${raw} bytes raw; ${gzip} bytes gzip (Telegram SDK excluded)`);
++if (raw >= 150_000) throw new Error('TMA exceeds the 150 KB uncompressed JS + CSS budget');
+diff --git a/horse-club-crm/tma/src/App.tsx b/horse-club-crm/tma/src/App.tsx
+new file mode 100644
+index 0000000..afcbf6e
+--- /dev/null
++++ b/horse-club-crm/tma/src/App.tsx
+@@ -0,0 +1,229 @@
++import { useEffect, useRef, useState } from 'react';
++import { api, dateTime, money, moscowDate, requireUuid, time, upcoming, type Booking, type Service, type Slot } from './api';
++import { applyTheme, haptic, telegram } from './telegram';
++import { useTelegramNavigation } from './useTelegramNavigation';
++
++const ADDRESS = 'Тамбов, ул. Бастионная, 22АС2';
++const FORMATS = [
++  { label: 'Первое знакомство', pattern: /знаком|перв|начал|нович/i },
++  { label: 'Пони для детей', pattern: /пони|дет/i },
++  { label: 'Прогулка', pattern: /прогул/i },
++  { label: 'Индивидуальная тренировка', pattern: /индивиду|трениров|конкур|выезд/i },
++];
++type Screen = 'catalog' | 'slots' | 'checkout' | 'success' | 'bookings';
++const errorText = (error: unknown): string => error instanceof Error ? error.message : 'Не удалось загрузить. Повторите попытку';
++const serviceTitle = (service: Service): string => service.title || service.name;
++const bookingTitle = (booking: Booking): string => booking.lesson?.service.title || booking.lesson?.service.name || 'Занятие в клубе';
++
++export function App() {
++  const [screen, setScreen] = useState<Screen>('catalog');
++  const [services, setServices] = useState<Service[]>([]);
++  const [consentVersion, setConsentVersion] = useState('');
++  const [service, setService] = useState<Service>();
++  const [format, setFormat] = useState('');
++  const [day, setDay] = useState(moscowDate);
++  const [slots, setSlots] = useState<Slot[]>([]);
++  const [slot, setSlot] = useState<Slot>();
++  const [trainerId, setTrainerId] = useState('');
++  const [phone, setPhone] = useState('');
++  const [consent, setConsent] = useState(false);
++  const [booking, setBooking] = useState<Booking>();
++  const [loading, setLoading] = useState(false);
++  const [busy, setBusy] = useState(false);
++  const [error, setError] = useState('');
++  const [retry, setRetry] = useState(0);
++  const submitting = useRef(false);
++  const requestId = useRef('');
++  const heading = useRef<HTMLHeadingElement>(null);
++  const phoneInput = useRef<HTMLInputElement>(null);
++  const tg = telegram();
++  const user = tg?.initDataUnsafe.user;
++  const native = Boolean(tg?.initData);
++  const validPhone = /^\+7\d{10}$/.test(phone.replace(/[\s()-]/g, ''));
++  const slotServiceId = screen === 'slots' ? service?.id : undefined;
++  const displayedServices = format ? services.filter(item => FORMATS.find(entry => entry.label === format)?.pattern.test(serviceTitle(item))) : services;
++
++  useEffect(() => {
++    applyTheme(); tg?.ready(); tg?.expand();
++    tg?.onEvent('themeChanged', applyTheme);
++    return () => tg?.offEvent('themeChanged', applyTheme);
++  }, [tg]);
++
++  useEffect(() => {
++    if (screen === 'checkout') tg?.enableClosingConfirmation(); else tg?.disableClosingConfirmation();
++    document.title = `${({ catalog: 'Выбор занятия', slots: 'Дата и время', checkout: 'Оформление записи', success: 'Запись создана', bookings: 'Мои записи' })[screen]} · КСК «СЛКС»`;
++    heading.current?.focus();
++  }, [screen, tg]);
++
++  useEffect(() => {
++    const controller = new AbortController();
++    if (screen !== 'catalog' && screen !== 'slots') return;
++    setLoading(true); setError('');
++    if (screen === 'catalog') {
++      api<{ services: Service[]; consentVersion: string }>('services', { signal: controller.signal })
++        .then(result => { setServices(result.services); setConsentVersion(result.consentVersion); })
++        .catch((failure: unknown) => { if (!controller.signal.aborted) setError(errorText(failure)); })
++        .finally(() => { if (!controller.signal.aborted) setLoading(false); });
++    } else if (slotServiceId) {
++      setSlots([]); setSlot(undefined); setTrainerId('');
++      api<{ slots: Slot[] }>(`slots?date=${day}&serviceId=${requireUuid(slotServiceId)}`, { signal: controller.signal })
++        .then(result => { if (!controller.signal.aborted) setSlots(result.slots); })
++        .catch((failure: unknown) => { if (!controller.signal.aborted) setError(errorText(failure)); })
++        .finally(() => { if (!controller.signal.aborted) setLoading(false); });
++    }
++    return () => controller.abort();
++  }, [screen, day, slotServiceId, retry]);
++
++  const navigate = (next: Screen) => { if (!submitting.current) { haptic(); setError(''); setScreen(next); } };
++  const back = screen === 'catalog' ? undefined : () => navigate(screen === 'checkout' ? 'slots' : 'catalog');
++  const next = () => {
++    if (screen === 'catalog' && service) navigate('slots');
++    else if (screen === 'slots' && slot) { requestId.current = crypto.randomUUID(); navigate('checkout'); }
++    else if (screen === 'checkout') void submit();
++  };
++  const text = screen === 'catalog' || screen === 'slots' ? 'Далее' : screen === 'checkout' ? 'Подтвердить запись' : undefined;
++  const enabled = !loading && !busy && (screen === 'catalog' ? Boolean(service) : screen === 'slots' ? Boolean(slot) : validPhone && consent);
++  useTelegramNavigation(text, enabled, busy, next, back);
++
++  async function submit() {
++    if (submitting.current || !service || !slot) return;
++    if (!validPhone || !consent) { setError('Укажите телефон +79991234567 и подтвердите согласие'); phoneInput.current?.focus(); return; }
++    submitting.current = true; setBusy(true); setError('');
++    try {
++      const result = await api<Booking>('bookings', { method: 'POST', body: JSON.stringify({
++        serviceId: requireUuid(service.id), trainerId: requireUuid(trainerId || slot.trainers[0].id),
++        startTime: slot.startTime, phone, consentAccepted: true, consentVersion, requestId: requestId.current,
++      }) });
++      setBooking(result); setScreen('success');
++    } catch (failure: unknown) { setError(errorText(failure)); }
++    finally { submitting.current = false; setBusy(false); }
++  }
++
++  const titles: Record<Screen, string> = { catalog: 'Время для лошадей', slots: 'Когда приедете?', checkout: 'Всё готово к записи', success: 'Ждём вас в клубе', bookings: 'Мои записи' };
++  return <main className="mx-auto max-w-xl px-5">
++    <header className="mb-6 flex items-center justify-between gap-3">
++      <span className="club-mark" aria-label="КСК СЛКС">СЛКС<span>КОННЫЙ КЛУБ · ТАМБОВ</span></span>
++      <button className="quiet" disabled={busy || screen === 'bookings'} onClick={() => navigate('bookings')}>Мои записи</button>
++    </header>
++    {!native && <p className="notice">Откройте запись через Telegram-бота клуба.</p>}
++    {back && !native && <button className="quiet mb-4" disabled={busy} onClick={back}>← Назад</button>}
++    <p className="eyebrow">{screen === 'catalog' ? 'В седле — ближе к природе' : screen === 'slots' ? 'Шаг 2 из 3' : screen === 'checkout' ? 'Шаг 3 из 3' : 'КСК «СЛКС»'}</p>
++    <h1 ref={heading} tabIndex={-1}>{titles[screen]}</h1>
++    {screen === 'catalog' && <>
++      <p className="hint mb-6">Выберите занятие — и до встречи в седле.</p>
++      <div className="formats mb-4" aria-label="Выбор формата">
++        {['Все занятия', ...FORMATS.map(entry => entry.label)].map(label => <button key={label} className="quiet"
++          aria-pressed={(format || 'Все занятия') === label} onClick={() => { haptic(); setFormat(label === 'Все занятия' ? '' : label); setService(undefined); }}>{label}</button>)}
++      </div>
++      <div className="stack" aria-label="Форматы занятий">
++        {!loading && !error && services.length === 0 && <p className="notice">Запись закрыта. Телефон: <a href="tel:+79156720030">+7 (915) 672-00-30</a>.</p>}
++        {!loading && !error && services.length > 0 && displayedServices.length === 0 && <p className="notice">Нет доступных услуг. Выберите «Все занятия».</p>}
++        {displayedServices.map(item => <button key={item.id} className="choice service" aria-pressed={service?.id === item.id}
++          disabled={loading} onClick={() => { haptic(); setService(item); }}>
++          <span><strong>{serviceTitle(item)}</strong><span className="hint">{item.durationMinutes} мин</span></span>
++          <span className="price">{money(item.price)} <span aria-hidden="true">↗</span></span>
++        </button>)}
++      </div>
++    </>}
++    {screen === 'slots' && <>
++      <p className="hint mb-6">{service && serviceTitle(service)} · Время московское</p>
++      <label className="field">День занятия<input type="date" value={day} min={moscowDate()} max={moscowDate(30)}
++        onChange={event => { if (event.target.value) { setDay(event.target.value); haptic(); } }} /></label>
++      <fieldset className="mt-4"><legend>Свободное время</legend>
++        <div className="mt-3 grid grid-cols-3 gap-2">{slots.map(item => <button className="choice slot" key={item.startTime}
++          aria-pressed={slot?.startTime === item.startTime} onClick={() => { haptic(); setSlot(item); setTrainerId(''); }}>{time(item.startTime)}</button>)}</div>
++      </fieldset>
++      {!loading && !error && slots.length === 0 && <p className="notice">Свободного времени нет. Выберите другой день.</p>}
++      {slot && <label className="field mt-4">Тренер<select value={trainerId} onChange={event => { haptic(); setTrainerId(event.target.value); }}>
++        <option value="">Любой доступный тренер</option>{slot.trainers.map(trainer => <option key={trainer.id} value={trainer.id}>{trainer.name}</option>)}
++      </select></label>}
++    </>}
++    {screen === 'checkout' && <>
++      <div className="summary my-5"><strong>{service && serviceTitle(service)}</strong><p>{slot && dateTime(slot.startTime)}</p>
++        <p>{slot?.trainers.find(trainer => trainer.id === trainerId)?.name ?? slot?.trainers[0]?.name}</p><p>{service && money(service.price)} · Оплата в клубе</p></div>
++      <form noValidate onSubmit={event => { event.preventDefault(); void submit(); }}>
++        <label className="field">Ваше имя<input readOnly value={[user?.first_name, user?.last_name].filter(Boolean).join(' ')} /></label>
++        {user?.username && <p className="hint mt-2">@{user.username}</p>}
++        <label className="field mt-4">Телефон<input ref={phoneInput} type="tel" inputMode="tel" autoComplete="tel" placeholder="+79991234567"
++          disabled={busy} value={phone} onChange={event => setPhone(event.target.value)} aria-describedby="phone-help" aria-invalid={phone.length > 0 && !validPhone} /></label>
++        <p className="hint mt-2" id="phone-help">Для связи: +79991234567.</p>
++        <label className="consent mt-4"><input type="checkbox" checked={consent} disabled={busy} onChange={event => { setConsent(event.target.checked); haptic(); }} />
++          <span>Даю <a href="https://club.horseclub68.ru/#consent" target="_blank" rel="noreferrer">согласие на обработку персональных данных</a> для записи в клуб (152-ФЗ). <a href="https://club.horseclub68.ru/#privacy" target="_blank" rel="noreferrer">Политика обработки данных</a>.</span></label>
++      </form>
++      <p className="notice">Лошадь подберёт администратор. Детали уточнит клуб.</p>
++    </>}
++    {screen === 'success' && booking && <section className="summary my-5" aria-label="Информация о записи">
++      <span className="badge">Запись создана</span><h2 className="mt-4">{bookingTitle(booking)}</h2>
++      <p>{dateTime(booking.lesson?.startTime ?? booking.startTime)}</p><p>Тренер: {booking.trainer.name}</p><p>{ADDRESS}</p>
++      <p className="hint mt-4">Запись сохранена. Детали уточнит администратор.</p>
++      <button className="primary mt-4 w-full" onClick={() => navigate('bookings')}>Перейти в мои записи</button>
++    </section>}
++    {screen === 'bookings' && <MyBookings />}
++    <div className="feedback" aria-live="polite">{loading && <p role="status">Проверяем свободные места…</p>}
++      {error && <div role="alert"><p>{error}</p>{screen !== 'checkout' && <button className="quiet mt-2" onClick={() => setRetry(value => value + 1)}>Повторить загрузку</button>}</div>}
++    </div>
++    {text && !native && <button className="primary w-full" disabled={!enabled} onClick={next}>{busy ? 'Сохраняем запись…' : text}</button>}
++    <footer className="hint mt-4"><p>{ADDRESS}</p><a href="tel:+79156720030">+7 (915) 672-00-30</a></footer>
++  </main>;
++}
++
++export function MyBookings() {
++  const [bookings, setBookings] = useState<Booking[]>([]);
++  const [hasMore, setHasMore] = useState(false);
++  const [loading, setLoading] = useState(true);
++  const [busy, setBusy] = useState('');
++  const [confirmId, setConfirmId] = useState('');
++  const [error, setError] = useState('');
++  const [notice, setNotice] = useState('');
++  const [retry, setRetry] = useState(0);
++  const active = useRef(true);
++  const pending = useRef(false);
++
++  async function load(offset: number, signal?: AbortSignal) {
++    setLoading(true); setError('');
++    try {
++      const result = await api<{ bookings: Booking[]; hasMore: boolean }>(`my-bookings?offset=${offset}&limit=20`, { signal });
++      if (active.current && !signal?.aborted) { setBookings(previous => offset ? [...previous, ...result.bookings] : result.bookings); setHasMore(result.hasMore); }
++    } catch (failure: unknown) { if (active.current && !signal?.aborted) setError(errorText(failure)); }
++    finally { if (active.current && !signal?.aborted) setLoading(false); }
++  }
++  useEffect(() => {
++    active.current = true;
++    const controller = new AbortController(); void load(0, controller.signal);
++    return () => { active.current = false; controller.abort(); };
++  }, [retry]);
++
++  async function cancel(booking: Booking) {
++    if (pending.current) return;
++    pending.current = true; setBusy(booking.id); setError(''); haptic();
++    try {
++      const updated = await api<Booking>(`bookings/${requireUuid(booking.id)}/cancel-request`, { method: 'POST' });
++      if (active.current) {
++        setBookings(previous => previous.map(item => item.id === updated.id ? updated : item));
++        setConfirmId(''); setNotice('Запрос на отмену сохранён. Администратор уточнит условия.');
++      }
++    } catch (failure: unknown) { if (active.current) setError(errorText(failure)); }
++    finally { pending.current = false; if (active.current) setBusy(''); }
++  }
++  return <section className="stack mt-4" aria-label="Список записей">
++    {bookings.map(booking => {
++      const cancelled = booking.status === 'cancelled' || booking.lesson?.status === 'CANCELLED' || Boolean(booking.lesson?.deletedAt);
++      const status = cancelled ? 'Отменено' : booking.status === 'completed' || booking.lesson?.status === 'COMPLETED' ? 'Завершено'
++        : booking.clientCancellationRequested ? 'Запрошена отмена' : booking.clientConfirmed ? 'Подтверждено' : 'Ожидает';
++      return <article className="summary" key={booking.id}><span className="badge">{status}</span>
++        <h2 className="mt-3">{bookingTitle(booking)}</h2><p>{dateTime(booking.lesson?.startTime ?? booking.startTime)}</p>
++        <p>Тренер: {booking.trainer.name}</p><p className="hint">{ADDRESS}</p>
++        {upcoming(booking) && !booking.clientCancellationRequested && (confirmId === booking.id
++          ? <div className="mt-4"><p>Запросить отмену? Запись сохранится до решения администратора.</p>
++              <div className="mt-3 flex flex-wrap gap-3"><button disabled={Boolean(busy)} className="quiet" onClick={() => setConfirmId('')}>Оставить запись</button>
++              <button disabled={Boolean(busy)} className="quiet danger" onClick={() => void cancel(booking)}>{busy === booking.id ? 'Отправляем…' : 'Запросить отмену'}</button></div></div>
++          : <button className="quiet mt-4" disabled={Boolean(busy)} onClick={() => { haptic(); setConfirmId(booking.id); }}>Отменить занятие</button>)}
++      </article>;
++    })}
++    {loading && <p role="status">Загружаем ваши записи…</p>}
++    {!loading && !error && bookings.length === 0 && <p className="notice">Записей пока нет. Выберите занятие в каталоге.</p>}
++    {error && <div role="alert"><p>{error}</p><button className="quiet mt-2" onClick={() => setRetry(value => value + 1)}>Обновить записи</button></div>}
++    <p role="status">{notice}</p>
++    {hasMore && <button className="quiet w-full" disabled={loading} onClick={() => void load(bookings.length)}>Загрузить ещё</button>}
++  </section>;
++}
+diff --git a/horse-club-crm/tma/src/api.ts b/horse-club-crm/tma/src/api.ts
+new file mode 100644
+index 0000000..2286f6d
+--- /dev/null
++++ b/horse-club-crm/tma/src/api.ts
+@@ -0,0 +1,39 @@
++import { telegram } from './telegram';
++
++export interface Service { id: string; title: string; name: string; description: string | null; price: string; durationMinutes: number }
++export interface Slot { startTime: string; endTime: string; trainers: { id: string; name: string }[] }
++export interface Booking {
++  id: string; startTime: string; endTime: string; status: string; clientConfirmed: boolean;
++  clientCancellationRequested: boolean; costAmount: string; trainer: { name: string };
++  lesson: { status: string; deletedAt: string | null; startTime: string; endTime: string; service: { title: string; name: string } } | null;
++}
++export const isUuid = (value: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
++export function requireUuid(value: string): string {
++  if (!isUuid(value)) throw new Error('Обновите данные записи');
++  return value;
++}
++export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
++  const initData = telegram()?.initData;
++  if (!initData) throw new Error('Откройте запись через Telegram-бота');
++  const response = await fetch(`/api/tma/${path}`, { ...options, credentials: 'omit',
++    headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData, ...options.headers } });
++  if (!response.ok) {
++    const body: unknown = await response.json().catch(() => null);
++    const message = body && typeof body === 'object' && 'message' in body ? body.message : undefined;
++    throw new Error(response.status === 401 ? 'Сессия истекла. Откройте запись заново через бота'
++      : typeof message === 'string' ? message : 'Проверьте соединение и повторите запрос');
++  }
++  return response.json() as Promise<T>;
++}
++export const money = (value: string): string => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(Number(value));
++export const dateTime = (value: string): string => new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
++export const time = (value: string): string => new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
++export const moscowDate = (offset = 0): string => {
++  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
++  const date = new Date(`${today}T12:00:00+03:00`);
++  date.setUTCDate(date.getUTCDate() + offset);
++  return date.toISOString().slice(0, 10);
++};
++export const upcoming = (booking: Booking): boolean => booking.status === 'scheduled'
++  && (!booking.lesson || (!booking.lesson.deletedAt && booking.lesson.status === 'SCHEDULED'))
++  && new Date(booking.lesson?.startTime ?? booking.startTime).getTime() > Date.now();
+diff --git a/horse-club-crm/tma/src/main.tsx b/horse-club-crm/tma/src/main.tsx
+new file mode 100644
+index 0000000..a099984
+--- /dev/null
++++ b/horse-club-crm/tma/src/main.tsx
+@@ -0,0 +1,6 @@
++import React from 'react';
++import { render } from 'react-dom';
++import { App } from './App';
++import './styles.css';
++
++render(<React.StrictMode><App /></React.StrictMode>, document.getElementById('root')!);
+diff --git a/horse-club-crm/tma/src/styles.css b/horse-club-crm/tma/src/styles.css
+new file mode 100644
+index 0000000..1f63be5
+--- /dev/null
++++ b/horse-club-crm/tma/src/styles.css
+@@ -0,0 +1,71 @@
++@import 'tailwindcss/theme' layer(theme);
++@import 'tailwindcss/utilities' layer(utilities) source('./');
++
++:root {
++  color-scheme: light dark;
++  --tma-bg: #f7f4f0;
++  --tma-text: #3a2f2b;
++  --tma-button: #234d3c;
++  --tma-button-text: #ffffff;
++  --tma-hint: #6c655f;
++  --tma-surface: #ffffff;
++  --tma-border: color-mix(in srgb, var(--tma-text) 22%, transparent);
++  --tma-success: #3e5f48;
++  --tma-success-bg: #e7f0e9;
++  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
++  background: var(--tma-bg);
++  color: var(--tma-text);
++  scrollbar-color: var(--tma-hint) var(--tma-bg);
++  scrollbar-width: thin;
++}
++* { box-sizing: border-box; }
++body { margin: 0; min-width: 280px; }
++button, input, select { color: inherit; }
++button, fieldset { margin: 0; }
++fieldset { padding: 0; border: 0; }
++main { padding-bottom: calc(2rem + env(safe-area-inset-bottom)); padding-top: max(1.5rem, env(safe-area-inset-top)); }
++h1 { font: 400 clamp(1.8rem, 8vw, 2.6rem)/1.15 Georgia, serif; margin: .5rem 0 1rem; }
++h2 { font-size: 1.1rem; font-weight: 650; }
++p { line-height: 1.55; }
++button, input, select { font: inherit; }
++button { cursor: pointer; touch-action: manipulation; transition: background-color .15s; }
++button:disabled { cursor: default; opacity: .5; }
++button:enabled:hover { filter: brightness(.95); }
++button:enabled:active { filter: brightness(.9); }
++:focus-visible { outline: 3px solid var(--tma-button); outline-offset: 3px; }
++h1:focus { outline: none; }
++a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
++.club-mark { font: 700 1.6rem/1 Georgia, serif; letter-spacing: .1em; }
++.club-mark span { display: block; margin-top: .5rem; font: 600 .55rem/1.4 sans-serif; letter-spacing: .12em; }
++.eyebrow { font-size: .7rem; font-weight: 650; letter-spacing: .09em; text-transform: uppercase; color: var(--tma-hint); }
++.hint { color: var(--tma-hint); font-size: .85rem; }
++.quiet, .choice, .summary, .field input, .field select { border: 1px solid var(--tma-border); background: var(--tma-surface); border-radius: .75rem; }
++.quiet { padding: .65rem .85rem; min-height: 44px; background: transparent; }
++.choice { border-radius: 1rem; padding: 1rem; text-align: left; }
++.choice[aria-pressed='true'] { border: 2px solid var(--tma-button); padding: calc(1rem - 1px); box-shadow: inset 3px 0 var(--tma-button); }
++.service { display: flex; align-items: center; justify-content: space-between; gap: 1rem; width: 100%; }
++.service strong { font-size: 1.05rem; font-weight: 650; display: block; }
++.price { white-space: nowrap; font-size: .85rem; font-weight: 600; }
++.slot { text-align: center; min-height: 48px; }
++.field { display: flex; flex-direction: column; gap: .5rem; font-weight: 600; }
++.field input, .field select { min-height: 48px; width: 100%; min-width: 0; padding: .75rem; font-weight: 400; }
++.field input[readonly] { color: var(--tma-hint); }
++.primary { min-height: 50px; border-radius: .75rem; border: 0; background: var(--tma-button); color: var(--tma-button-text); font-weight: 650; padding: .8rem 1rem; }
++.summary { border-radius: 1rem; padding: 1.25rem; overflow-wrap: anywhere; }
++.summary p { margin-top: .4rem; }
++.badge { display: inline-block; border-radius: 999px; color: var(--tma-success); background: var(--tma-success-bg); font-size: .75rem; padding: .35rem .7rem; }
++.notice { border-left: 3px solid var(--tma-button); padding: .75rem 1rem; margin: 1rem 0; font-size: .85rem; }
++.consent { display: flex; gap: .75rem; align-items: flex-start; font-size: .85rem; line-height: 1.55; cursor: pointer; }
++.consent input { width: 24px; height: 24px; flex-shrink: 0; accent-color: var(--tma-button); }
++.feedback { min-height: 3rem; margin: 1rem 0; font-size: .9rem; }
++.danger { font-weight: 650; }
++.stack { display: grid; gap: .75rem; }
++.formats { display: flex; gap: .5rem; overflow-x: auto; padding: .25rem; }
++.formats button { flex-shrink: 0; font-size: .75rem; }
++.formats [aria-pressed='true'] { background: var(--tma-button); color: var(--tma-button-text); }
++@media (prefers-color-scheme: dark) {
++  :root { --tma-bg: #1c2420; --tma-text: #edf2ed; --tma-button: #a4d5b8; --tma-button-text: #163326; --tma-hint: #b3bdb6; --tma-surface: #28332c; }
++}
++@media (max-width: 350px) { .service { flex-direction: column; align-items: flex-start; gap: .5rem; } }
++@media (prefers-reduced-motion: reduce) { button { transition: none; } }
++@media (forced-colors: active) { :root { scrollbar-color: auto; } .choice[aria-pressed='true'] { outline: 2px solid Highlight; } }
+diff --git a/horse-club-crm/tma/src/telegram.ts b/horse-club-crm/tma/src/telegram.ts
+new file mode 100644
+index 0000000..2177ebb
+--- /dev/null
++++ b/horse-club-crm/tma/src/telegram.ts
+@@ -0,0 +1,29 @@
++export interface TelegramUser { id: number; first_name: string; last_name?: string; username?: string }
++interface TelegramButton {
++  show(): void; hide(): void;
++  onClick(callback: () => void): void; offClick(callback: () => void): void;
++}
++export interface TelegramWebApp {
++  initData: string;
++  initDataUnsafe: { user?: TelegramUser };
++  themeParams: { bg_color?: string; text_color?: string; button_color?: string; button_text_color?: string; hint_color?: string; secondary_bg_color?: string };
++  MainButton: TelegramButton & { setParams(params: { text: string; is_active: boolean; is_visible: boolean }): void; showProgress(): void; hideProgress(): void };
++  BackButton: TelegramButton;
++  HapticFeedback?: { impactOccurred(style: 'light'): void };
++  ready(): void; expand(): void;
++  enableClosingConfirmation(): void; disableClosingConfirmation(): void;
++  onEvent(event: 'themeChanged', callback: () => void): void;
++  offEvent(event: 'themeChanged', callback: () => void): void;
++}
++declare global { interface Window { Telegram?: { WebApp: TelegramWebApp } } }
++export const telegram = (): TelegramWebApp | undefined => window.Telegram?.WebApp;
++export const haptic = (): void => telegram()?.HapticFeedback?.impactOccurred('light');
++
++export function applyTheme(): void {
++  const theme = telegram()?.themeParams;
++  const tokens = { bg: theme?.bg_color, text: theme?.text_color, button: theme?.button_color,
++    'button-text': theme?.button_text_color, hint: theme?.hint_color, surface: theme?.secondary_bg_color };
++  for (const [key, value] of Object.entries(tokens)) {
++    if (value && /^#[\da-f]{6}$/i.test(value)) document.documentElement.style.setProperty(`--tma-${key}`, value);
++  }
++}
+diff --git a/horse-club-crm/tma/src/useTelegramNavigation.ts b/horse-club-crm/tma/src/useTelegramNavigation.ts
+new file mode 100644
+index 0000000..7da98ed
+--- /dev/null
++++ b/horse-club-crm/tma/src/useTelegramNavigation.ts
+@@ -0,0 +1,20 @@
++import { useEffect } from 'react';
++import { haptic, telegram } from './telegram';
++
++export function useTelegramNavigation(text: string | undefined, enabled: boolean, busy: boolean,
++  action: () => void, back: (() => void) | undefined): void {
++  useEffect(() => {
++    const app = telegram();
++    if (!app?.initData) return;
++    const click = () => { if (enabled && !busy) { haptic(); action(); } };
++    app.MainButton.setParams({ text: text ?? '', is_active: enabled && !busy, is_visible: Boolean(text) });
++    if (busy) app.MainButton.showProgress(); else app.MainButton.hideProgress();
++    app.MainButton.onClick(click);
++    if (back) { app.BackButton.show(); app.BackButton.onClick(back); } else app.BackButton.hide();
++    return () => {
++      app.MainButton.offClick(click); app.MainButton.hide(); app.MainButton.hideProgress();
++      if (back) app.BackButton.offClick(back);
++      app.BackButton.hide();
++    };
++  }, [text, enabled, busy, action, back]);
++}
+diff --git a/horse-club-crm/tma/test/isolation.test.cjs b/horse-club-crm/tma/test/isolation.test.cjs
+new file mode 100644
+index 0000000..f6e9dc7
+--- /dev/null
++++ b/horse-club-crm/tma/test/isolation.test.cjs
+@@ -0,0 +1,15 @@
++const { test } = require('node:test');
++const assert = require('node:assert/strict');
++const fs = require('node:fs');
++const path = require('node:path');
++const root = path.join(__dirname, '..');
++test('TMA dependency graph excludes CRM frameworks and keeps a strict size gate', () => {
++  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
++  assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['react', 'react-dom']);
++  for (const name of fs.readdirSync(path.join(root, 'src'))) {
++    const source = fs.readFileSync(path.join(root, 'src', name), 'utf8');
++    assert.doesNotMatch(source, /from ['"](?:@refinedev|antd|axios|.*frontend\/src)/);
++    assert.doesNotMatch(source, /\b(?:localStorage|sessionStorage)\b/);
++  }
++  assert.match(fs.readFileSync(path.join(root, 'scripts/check-size.cjs'), 'utf8'), /raw >= 150_000/);
++});
+diff --git a/horse-club-crm/tma/tsconfig.json b/horse-club-crm/tma/tsconfig.json
+new file mode 100644
+index 0000000..a6b21a1
+--- /dev/null
++++ b/horse-club-crm/tma/tsconfig.json
+@@ -0,0 +1,10 @@
++{
++  "compilerOptions": {
++    "target": "ES2023", "lib": ["ES2023", "DOM", "DOM.Iterable"],
++    "module": "ESNext", "moduleResolution": "bundler", "jsx": "react-jsx",
++    "strict": true, "noEmit": true, "skipLibCheck": true,
++    "noUnusedLocals": true, "noUnusedParameters": true,
++    "types": ["vite/client", "node"]
++  },
++  "include": ["src", "vite.config.ts", "playwright.config.ts", "e2e"]
++}
+diff --git a/horse-club-crm/tma/vite.config.ts b/horse-club-crm/tma/vite.config.ts
+new file mode 100644
+index 0000000..3616edd
+--- /dev/null
++++ b/horse-club-crm/tma/vite.config.ts
+@@ -0,0 +1,10 @@
++import { defineConfig } from 'vite';
++import tailwindcss from '@tailwindcss/vite';
++
++export default defineConfig({
++  base: '/tma/',
++  plugins: [tailwindcss()],
++  build: { outDir: '../frontend/dist/tma', emptyOutDir: true, target: 'es2020', cssTarget: 'chrome120',
++    minify: 'terser', terserOptions: { ecma: 2020, compress: { passes: 3 }, format: { comments: false } } },
++  server: { proxy: { '/api': 'http://localhost:3000' } },
++});

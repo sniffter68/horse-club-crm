@@ -1,0 +1,88 @@
+diff --git a/horse-club-crm/deploy.sh b/horse-club-crm/deploy.sh
+index f1f0968..a055a03 100755
+--- a/horse-club-crm/deploy.sh
++++ b/horse-club-crm/deploy.sh
+@@ -40,7 +40,11 @@ echo "===> 2.1. Building landing dist..."
+ npm --prefix landing ci
+ "${compose[@]}" config --format json | node scripts/build-landing.cjs
+ 
+-echo "===> 3. Building backend, applying migrations and waiting for health..."
++echo "===> 3. Applying migrations in a disposable container..."
++"${compose[@]}" up -d --wait postgres
++"${compose[@]}" run --rm --build migrate
++
++echo "===> 3.0. Building backend and waiting for health..."
+ "${compose[@]}" up -d --build --wait backend
+ 
+ echo "===> 3.1. Checking running public lead endpoint (without storing a test application)..."
+diff --git a/horse-club-crm/docker-compose.prod.yml b/horse-club-crm/docker-compose.prod.yml
+index 9851440..308d362 100644
+--- a/horse-club-crm/docker-compose.prod.yml
++++ b/horse-club-crm/docker-compose.prod.yml
+@@ -20,6 +20,7 @@ services:
+       options: { max-size: '10m', max-file: '3' }
+ 
+   migrate:
++    profiles: [migration]
+     build:
+       context: .
+       dockerfile: docker/backend.Dockerfile
+@@ -69,7 +70,6 @@ services:
+       PUBLIC_LEADS_ENABLED: ${PUBLIC_LEADS_ENABLED:?Set PUBLIC_LEADS_ENABLED=true to accept landing applications or false for maintenance}
+     depends_on:
+       postgres: { condition: service_healthy }
+-      migrate: { condition: service_completed_successfully }
+     networks: [crm_network]
+     read_only: true
+     volumes:
+diff --git a/horse-club-crm/docs/automatic-deploy.md b/horse-club-crm/docs/automatic-deploy.md
+index 5af17c2..66b893c 100644
+--- a/horse-club-crm/docs/automatic-deploy.md
++++ b/horse-club-crm/docs/automatic-deploy.md
+@@ -1,5 +1,17 @@
+ # Автоматический деплой
+ 
++## Отдельный шаг миграций Docker Compose
++
++В production сервис `migrate` включён в профиль `migration`, не имеет фиксированного `container_name` и использует `restart: 'no'`. Backend зависит только от готовности PostgreSQL. Обычный `compose up` не запускает миграции.
++
++`deploy.sh` сначала дожидается PostgreSQL, затем выполняет `docker compose run --rm --build migrate` и только после успешного завершения обновляет backend. Для ручного запуска из корня проекта:
++
++```bash
++docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --build migrate
++```
++
++Compose создаёт одноразовый контейнер с уникальным именем и удаляет его после завершения. При ошибке миграции `deploy.sh` завершается до обновления backend. Перед прямым запуском новой версии backend миграции нужно выполнить отдельно.
++
+ ## Prisma и варианты запуска (01.11.2026)
+ 
+ Workflow готовит движки закреплённой в `backend/package.json` Prisma 6.19.3 на Ubuntu runner,
+diff --git a/horse-club-crm/test-results/deploy-shell-smoke.py b/horse-club-crm/test-results/deploy-shell-smoke.py
+index edec09c..74b65f7 100644
+--- a/horse-club-crm/test-results/deploy-shell-smoke.py
++++ b/horse-club-crm/test-results/deploy-shell-smoke.py
+@@ -24,13 +24,14 @@ docker() {
+     fi
+     case "$FAIL_STAGE" in
+       config) [[ "$*" != *"config --quiet"* ]] ;;
++      migration) [[ "$*" != *"run --rm --build migrate"* ]] ;;
+       backend) [[ "$*" != *"up -d --build --wait backend"* ]] ;;
+       caddy) [[ "$*" != *"up -d --force-recreate caddy"* ]] ;;
+       *) return 0 ;;
+     esac
+ }
+ ''', encoding='utf-8')
+-    for stage in ['success', 'config', 'pipeline', 'frontend', 'backend', 'caddy', 'native']:
++    for stage in ['success', 'config', 'pipeline', 'frontend', 'migration', 'backend', 'caddy', 'native']:
+         env = dict(os.environ, BASH_ENV=env_script.as_posix(), FAIL_STAGE=stage, ENV_FILE='no-such-test-env')
+         result = subprocess.run([bash, str(root / 'deploy.sh')], env=env, capture_output=True, text=True)
+         output = result.stdout + result.stderr
+@@ -46,6 +47,8 @@ docker() {
+             assert result.returncode != 0, output
+             assert 'Deployment failed:' in output and 'command:' in output, output
+             assert 'Deployment successful:' not in output
++            if stage == 'migration':
++                assert 'up -d --build --wait backend' not in output, output
+             if stage != 'caddy':
+                 assert 'up -d --force-recreate caddy' not in output
+         print(f'deploy.sh {stage}: passed')

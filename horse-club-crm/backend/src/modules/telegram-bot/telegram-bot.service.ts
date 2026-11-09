@@ -11,7 +11,12 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     if (!token) return;
     const url = new URL(process.env.TELEGRAM_WEBAPP_URL?.trim() || 'https://crm.horseclub68.ru/tma');
     if (url.protocol !== 'https:' || url.username || url.password) throw new Error('TELEGRAM_WEBAPP_URL must be an HTTPS URL');
-    const bot = new Bot(token);
+    const apiRoot = process.env.TELEGRAM_API_ROOT?.trim();
+    const bot = new Bot(token, {
+      client: {
+        ...(apiRoot ? { apiRoot } : {}),
+      },
+    });
     this.bot = bot;
     bot.command('start', async ctx => {
       if (ctx.chat.type !== 'private') return;

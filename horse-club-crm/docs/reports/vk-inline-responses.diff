@@ -1,0 +1,503 @@
+diff --git a/horse-club-crm/backend/prisma/migrations/20261108120000_vk_booking_responses/migration.sql b/horse-club-crm/backend/prisma/migrations/20261108120000_vk_booking_responses/migration.sql
+new file mode 100644
+index 0000000..5903877
+--- /dev/null
++++ b/horse-club-crm/backend/prisma/migrations/20261108120000_vk_booking_responses/migration.sql
+@@ -0,0 +1,3 @@
++ALTER TABLE "Booking"
++  ADD COLUMN "clientConfirmed" BOOLEAN NOT NULL DEFAULT false,
++  ADD COLUMN "clientCancellationRequested" BOOLEAN NOT NULL DEFAULT false;
+diff --git a/horse-club-crm/backend/prisma/schema.prisma b/horse-club-crm/backend/prisma/schema.prisma
+index a756090..7dd6386 100644
+--- a/horse-club-crm/backend/prisma/schema.prisma
++++ b/horse-club-crm/backend/prisma/schema.prisma
+@@ -502,6 +502,8 @@ model Booking {
+   status              BookingStatus       @default(scheduled)
+   costAmount          Decimal             @default(0) @db.Decimal(14, 2)
+   cancellationReason  String?
++  clientConfirmed     Boolean             @default(false)
++  clientCancellationRequested Boolean     @default(false)
+   trainer             Trainer             @relation(fields: [trainerId], references: [id], onDelete: Restrict)
+   arena               Arena?              @relation(fields: [arenaId], references: [id], onDelete: Restrict)
+   transactions        LedgerTransaction[]
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-booking-response.service.ts b/horse-club-crm/backend/src/vk-bot/vk-booking-response.service.ts
+new file mode 100644
+index 0000000..6e8c4e8
+--- /dev/null
++++ b/horse-club-crm/backend/src/vk-bot/vk-booking-response.service.ts
+@@ -0,0 +1,59 @@
++import { Injectable, ServiceUnavailableException } from '@nestjs/common';
++import { Prisma } from '@prisma/client';
++import { DateTime } from 'luxon';
++import { PrismaService } from '../prisma/prisma.service';
++import { isSerializationFailure } from '../common/serialization-failure';
++import { queueVkAdministratorNotification } from './vk-delivery.module';
++import type { BookingResponse } from './vk-booking-response';
++
++export const bookingResponseText = {
++  confirmed: 'Спасибо, зафиксировали! Ждём вас на занятии в назначенное время 🐴',
++  cancellationRequested: 'Передали администратору ваш запрос на отмену записи. Он подтвердит отмену и согласует условия. Записаться снова можно на horseclub68.ru или по телефону +7 (915) 672-00-30.',
++  stale: 'Эта запись уже завершена или была отменена.',
++  unavailable: 'Запись не найдена или недоступна для вашего профиля VK.',
++} as const;
++
++@Injectable()
++export class VkBookingResponseService {
++  constructor(private readonly prisma: PrismaService) {}
++
++  async respond(sender: number, payload: BookingResponse): Promise<string> {
++    for (let attempt = 0; attempt < 3; attempt++) {
++      try {
++        return await this.prisma.$transaction(async tx => {
++          const booking = await tx.booking.findUnique({ where: { id: payload.bookingId }, include: { client: true, lesson: true } });
++          // Do not disclose other clients' bookings, even their status.
++          if (!booking || booking.client.vkUserId !== BigInt(sender)) return bookingResponseText.unavailable;
++          const now = new Date();
++          const start = booking.lesson?.startTime ?? booking.startTime;
++          if (start <= now || booking.status !== 'scheduled' || booking.attendanceStatus !== 'PENDING'
++            || (booking.lesson && (booking.lesson.status !== 'SCHEDULED' || booking.lesson.deletedAt))) return bookingResponseText.stale;
++          if (booking.clientCancellationRequested) return bookingResponseText.cancellationRequested;
++          const cancel = payload.action === 'cancel_booking';
++          if (!cancel && booking.clientConfirmed) return bookingResponseText.confirmed;
++          const changed = await tx.booking.updateMany({
++            where: { id: booking.id, updatedAt: booking.updatedAt, status: 'scheduled', attendanceStatus: 'PENDING',
++              clientCancellationRequested: false, client: { vkUserId: BigInt(sender) },
++              OR: [{ lessonId: null, startTime: { gt: now } },
++                { lesson: { is: { status: 'SCHEDULED', deletedAt: null, startTime: { gt: now } } } }] },
++            data: cancel ? { clientCancellationRequested: true, clientConfirmed: false } : { clientConfirmed: true },
++          });
++          if (!changed.count) return bookingResponseText.stale;
++          if (cancel) {
++            // An administrator applies the existing cancellation/refund policy.
++            // Never bypass membership charges or cancel all riders in a group lesson.
++            const recipients = await queueVkAdministratorNotification(tx, `booking-cancel-request:${booking.id}:${start.toISOString()}`,
++              `⚠️ Клиент ${booking.client.name} запросил отмену записи #${booking.id} на ${DateTime.fromJSDate(start, { zone: 'Europe/Moscow' }).toFormat('dd.MM.yyyy HH:mm')} через бота! Подтвердите отмену в CRM, чтобы освободить слот.`);
++            if (!recipients) throw new ServiceUnavailableException('Не удалось передать запрос: администратор VK не настроен. Позвоните +7 (915) 672-00-30.');
++          }
++          return cancel ? bookingResponseText.cancellationRequested : bookingResponseText.confirmed;
++        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
++      } catch (error: unknown) {
++        if (isSerializationFailure(error) && attempt < 2) continue;
++        if (error instanceof ServiceUnavailableException) throw error;
++        throw new ServiceUnavailableException('Не удалось сохранить ответ. Повторите нажатие позже или позвоните +7 (915) 672-00-30.');
++      }
++    }
++    throw new ServiceUnavailableException('Повторите нажатие позже.');
++  }
++}
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-booking-response.ts b/horse-club-crm/backend/src/vk-bot/vk-booking-response.ts
+new file mode 100644
+index 0000000..6c39dff
+--- /dev/null
++++ b/horse-club-crm/backend/src/vk-bot/vk-booking-response.ts
+@@ -0,0 +1,26 @@
++import { BadRequestException } from '@nestjs/common';
++import { isUUID } from 'class-validator';
++
++export type BookingResponse = { action: 'confirm_booking' | 'cancel_booking'; bookingId: string };
++
++export function parseBookingResponse(payload: unknown): BookingResponse | undefined {
++  let value: unknown = payload;
++  if (typeof value === 'string') {
++    try { value = JSON.parse(value); }
++    catch { throw new BadRequestException('Некорректные данные кнопки VK'); }
++  }
++  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
++  const data = value as Record<string, unknown>;
++  if (data.action !== 'confirm_booking' && data.action !== 'cancel_booking') return undefined;
++  if (typeof data.bookingId !== 'string' || !isUUID(data.bookingId)) {
++    throw new BadRequestException('Некорректный номер записи');
++  }
++  return { action: data.action, bookingId: data.bookingId };
++}
++
++export function reminderKeyboard(bookingId: string): string {
++  return JSON.stringify({ inline: true, one_time: false, buttons: [[
++    { action: { type: 'callback', label: '✅ Подтверждаю', payload: JSON.stringify({ action: 'confirm_booking', bookingId }) }, color: 'positive' },
++    { action: { type: 'callback', label: '❌ Не смогу прийти', payload: JSON.stringify({ action: 'cancel_booking', bookingId }) }, color: 'negative' },
++  ]] });
++}
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-bot.module.ts b/horse-club-crm/backend/src/vk-bot/vk-bot.module.ts
+index 5ab97d3..1befd9c 100644
+--- a/horse-club-crm/backend/src/vk-bot/vk-bot.module.ts
++++ b/horse-club-crm/backend/src/vk-bot/vk-bot.module.ts
+@@ -13,5 +13,6 @@ import { AuthModule } from '../auth/auth.module';
+ import { VkSettingsController } from './vk-settings.controller';
+ import { VkSettingsService } from './vk-settings.service';
+ import { VkLinkController } from './vk-link.controller';
+-@Module({ imports: [VkIdentityModule, PrismaModule, AuthModule, MembershipsModule, LeadsModule, VkDeliveryModule, VkRemindersModule], controllers: [VkBotController, VkIdentityController, VkSettingsController, VkLinkController], providers: [VkBotService, VkLinkService, VkSettingsService] })
++import { VkBookingResponseService } from './vk-booking-response.service';
++@Module({ imports: [VkIdentityModule, PrismaModule, AuthModule, MembershipsModule, LeadsModule, VkDeliveryModule, VkRemindersModule], controllers: [VkBotController, VkIdentityController, VkSettingsController, VkLinkController], providers: [VkBotService, VkLinkService, VkSettingsService, VkBookingResponseService] })
+ export class VkBotModule {}
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-bot.service.ts b/horse-club-crm/backend/src/vk-bot/vk-bot.service.ts
+index fdea392..2b09e13 100644
+--- a/horse-club-crm/backend/src/vk-bot/vk-bot.service.ts
++++ b/horse-club-crm/backend/src/vk-bot/vk-bot.service.ts
+@@ -14,6 +14,8 @@ import { queueVkAdminChatNotification } from './vk-delivery.module';
+ import { currentLeadConsentVersion as consentVersion } from '../common/lead-consent';
+ import { membershipAccessWhere } from '../memberships/membership-access';
+ import { splitVkText } from './vk-message-text';
++import { parseBookingResponse } from './vk-booking-response';
++import { VkBookingResponseService } from './vk-booking-response.service';
+ 
+ function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
+ const welcome = welcomeMenu();
+@@ -40,7 +42,8 @@ export class VkBotService {
+   private readonly firstNames = new Map<number, { value: Promise<string | undefined>; expiresAt: number }>();
+   constructor(private readonly prisma: PrismaService, private readonly links: VkLinkService,
+     private readonly ledger: MembershipLedgerService, private readonly leads: LeadsService,
+-    private readonly identity: VkIdentityService = new VkIdentityService(prisma)) {
++    private readonly identity: VkIdentityService = new VkIdentityService(prisma),
++    private readonly bookingResponses: VkBookingResponseService = new VkBookingResponseService(prisma)) {
+     const token = vkGroupToken();
+     if (token) this.vk = new VK({ token, apiVersion: '5.199', apiTimeout: 5000, apiRetryLimit: 0 });
+   }
+@@ -138,6 +141,12 @@ export class VkBotService {
+     if (typeof sender !== 'number' || !Number.isSafeInteger(sender) || typeof peer !== 'number' || !Number.isSafeInteger(peer)
+       || typeof text !== 'string' || typeof eventId !== 'string' || !eventId || eventId.length > 200) throw new BadRequestException('Некорректное сообщение VK');
+     if (sender <= 0 || peer !== sender || out === 1) return;
++    let bookingPayload: unknown = payload;
++    if (typeof payload === 'string') {
++      try { bookingPayload = JSON.parse(payload); }
++      catch { bookingPayload = undefined; } // Preserve text commands with legacy/non-JSON payloads.
++    }
++    if (bookingPayload !== undefined && await this.replyBookingResponse(sender, eventId, bookingPayload) !== undefined) return;
+     const resetText = ['меню', '/start'].includes(text.trim().toLowerCase());
+     let resetPause = resetText;
+     let command = normalizeVkCommand(text);
+@@ -343,7 +352,15 @@ export class VkBotService {
+   }
+   async handleEvent(object: unknown): Promise<void> {
+     if (!record(object) || typeof object.user_id !== 'number' || !Number.isSafeInteger(object.user_id) || object.user_id <= 0
+-      || object.peer_id !== object.user_id || typeof object.event_id !== 'string' || !object.event_id || !record(object.payload)) throw new BadRequestException('Некорректное нажатие VK');
++      || object.peer_id !== object.user_id || typeof object.event_id !== 'string' || !object.event_id || object.event_id.length > 200) throw new BadRequestException('Некорректное нажатие VK');
++    const response = await this.replyBookingResponse(object.user_id, object.event_id, object.payload);
++    if (response !== undefined) {
++      if (!this.vk) throw new ServiceUnavailableException('VK-бот не настроен');
++      await this.vk.api.messages.sendMessageEventAnswer({ event_id: object.event_id, user_id: object.user_id, peer_id: object.user_id,
++        event_data: JSON.stringify({ type: 'show_snackbar', text: response.slice(0, 90) }) });
++      return;
++    }
++    if (!record(object.payload)) throw new BadRequestException('Некорректные данные кнопки VK');
+     const { bookingId, attended, action } = object.payload;
+     if (action !== 'attendance' || typeof bookingId !== 'string' || !isUUID(bookingId) || typeof attended !== 'boolean') throw new BadRequestException('Неизвестная команда');
+     let answer = 'Посещение отмечено';
+@@ -363,4 +380,18 @@ export class VkBotService {
+         event_data: JSON.stringify({ type: 'show_snackbar', text: answer.slice(0, 90) }) });
+     } catch { throw new ServiceUnavailableException('Не удалось подтвердить действие VK'); }
+   }
++
++  private async replyBookingResponse(sender: number, eventId: string, payload: unknown): Promise<string | undefined> {
++    let answer: string;
++    try {
++      const response = parseBookingResponse(payload);
++      if (!response) return undefined;
++      answer = await this.bookingResponses.respond(sender, response);
++    } catch (error: unknown) {
++      if (!(error instanceof HttpException)) throw error;
++      answer = error.message;
++    }
++    await this.send(sender, eventId, answer);
++    return answer;
++  }
+ }
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-delivery.module.ts b/horse-club-crm/backend/src/vk-bot/vk-delivery.module.ts
+index d35ab3c..a843523 100644
+--- a/horse-club-crm/backend/src/vk-bot/vk-delivery.module.ts
++++ b/horse-club-crm/backend/src/vk-bot/vk-delivery.module.ts
+@@ -6,6 +6,7 @@ import type { Prisma } from '@prisma/client';
+ import { PrismaModule } from '../prisma/prisma.module';
+ import { PrismaService } from '../prisma/prisma.service';
+ import { reminderKey, reminderKind } from './vk-reminder-key';
++import { reminderKeyboard } from './vk-booking-response';
+ 
+ // Persist alongside the business change; VK is contacted only after commit.
+ export async function queueVkNotification(tx: Prisma.TransactionClient, key: string, peerId: bigint, message: string): Promise<void> {
+@@ -60,7 +61,7 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
+       where: { id: row.key.split(':')[1] }, include: { lesson: true, client: true },
+     });
+     const start = booking?.lesson?.startTime || booking?.startTime;
+-    if (booking && start && start > new Date() && booking.status === 'scheduled' && booking.attendanceStatus === 'PENDING'
++    if (booking && start && start > new Date() && booking.status === 'scheduled' && booking.attendanceStatus === 'PENDING' && !booking.clientCancellationRequested
+       && (!booking.lesson || booking.lesson.status === 'SCHEDULED') && booking.client.vkUserId === row.peerId
+       && reminderKey(kind, booking.id, start, row.peerId) === row.key) return false;
+     await this.prisma.vkNotification.deleteMany({ where: { id: row.id, sentAt: null } });
+@@ -92,7 +93,9 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
+             });
+             if (claimed.count === 0) continue;
+           }
+-          await this.vk.api.messages.send({ peer_id: Number(row.peerId), message: row.message, random_id: createHash('sha256').update(row.id).digest().readInt32BE(0) || 1 });
++          await this.vk.api.messages.send({ peer_id: Number(row.peerId), message: row.message,
++            ...(isReminder ? { keyboard: reminderKeyboard(row.key.split(':')[1]) } : {}),
++            random_id: createHash('sha256').update(row.id).digest().readInt32BE(0) || 1 });
+           await this.prisma.vkNotification.update({ where: { id: row.id }, data: { sentAt: new Date() } });
+           this.logger.log({ event: 'vk_notification_sent', notificationId: row.id, key: row.key, peerId: String(row.peerId) });
+         } catch (error: unknown) {
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-reminders.module.ts b/horse-club-crm/backend/src/vk-bot/vk-reminders.module.ts
+index cc43e4a..096940e 100644
+--- a/horse-club-crm/backend/src/vk-bot/vk-reminders.module.ts
++++ b/horse-club-crm/backend/src/vk-bot/vk-reminders.module.ts
+@@ -33,7 +33,7 @@ export class VkReminders implements OnModuleInit {
+     // Lesson is authoritative for legacy participants; standalone bookings own their time.
+     const bookings = await this.prisma.booking.findMany({
+       where: {
+-        status: 'scheduled', attendanceStatus: 'PENDING', client: { vkUserId: { not: null } },
++        status: 'scheduled', attendanceStatus: 'PENDING', clientCancellationRequested: false, client: { vkUserId: { not: null } },
+         OR: [
+           { lesson: { is: { status: 'SCHEDULED', startTime } } },
+           { lessonId: null, startTime },
+diff --git a/horse-club-crm/backend/test/vk-booking-response.test.cjs b/horse-club-crm/backend/test/vk-booking-response.test.cjs
+new file mode 100644
+index 0000000..feb94ea
+--- /dev/null
++++ b/horse-club-crm/backend/test/vk-booking-response.test.cjs
+@@ -0,0 +1,198 @@
++const assert = require('node:assert/strict');
++const { test } = require('node:test');
++require('reflect-metadata');
++const { parseBookingResponse, reminderKeyboard } = require('../dist/vk-bot/vk-booking-response');
++const { VkBookingResponseService, bookingResponseText: text } = require('../dist/vk-bot/vk-booking-response.service');
++const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
++const { VkNotifications } = require('../dist/vk-bot/vk-delivery.module');
++
++const id = '11111111-1111-4111-8111-111111111111';
++const payload = action => ({ action, bookingId: id });
++function harness(patch = {}) {
++  const start = new Date(Date.now() + 86400000);
++  const booking = { id, updatedAt: new Date(), clientId: 'client', client: { name: 'Анна', vkUserId: 42n },
++    status: 'scheduled', attendanceStatus: 'PENDING', clientConfirmed: false, clientCancellationRequested: false,
++    startTime: start, lessonId: null, lesson: null, ...patch };
++  const notifications = new Map(), updates = [], transactions = [];
++  const prisma = {
++    booking: { findUnique: async () => booking,
++      updateMany: async args => { updates.push(args); Object.assign(booking, args.data); return { count: 1 }; } },
++    user: { findMany: async () => [{ vkUserId: 99n }] },
++    vkNotification: { upsert: async args => notifications.set(args.where.key, args.create) },
++    $transaction: async (fn, options) => {
++      transactions.push(options);
++      const snapshot = { ...booking };
++      try { return await fn(prisma); }
++      catch (error) { Object.assign(booking, snapshot); notifications.clear(); throw error; }
++    },
++  };
++  const responses = new VkBookingResponseService(prisma);
++  const bot = new VkBotService(prisma, {}, {}, {}, {}, responses);
++  const sent = [], answers = [];
++  bot.vk = { api: { messages: { send: async args => sent.push(args), sendMessageEventAnswer: async args => answers.push(args) } } };
++  return { booking, prisma, responses, bot, notifications, updates, transactions, sent, answers };
++}
++
++test('keyboard has two colored inline callbacks and exact JSON payloads', () => {
++  const keyboard = JSON.parse(reminderKeyboard(id));
++  assert.equal(keyboard.inline, true); assert.equal(keyboard.one_time, false);
++  assert.equal(keyboard.buttons.length, 1); assert.equal(keyboard.buttons[0].length, 2);
++  for (const [index, action] of ['confirm_booking', 'cancel_booking'].entries()) {
++    const button = keyboard.buttons[0][index];
++    assert.equal(button.color, index ? 'negative' : 'positive');
++    assert.equal(button.action.type, 'callback');
++    assert.equal(button.action.label, index ? '❌ Не смогу прийти' : '✅ Подтверждаю');
++    assert.equal(button.action.payload, JSON.stringify(payload(action)));
++  }
++});
++
++test('payload accepts string or object, rejects malformed JSON and UUID, and ignores other commands', () => {
++  for (const action of ['confirm_booking', 'cancel_booking']) {
++    assert.deepEqual(parseBookingResponse(payload(action)), payload(action));
++    assert.deepEqual(parseBookingResponse(JSON.stringify(payload(action))), payload(action));
++    for (const bookingId of ['', 'not-uuid', null, 1, undefined]) {
++      assert.throws(() => parseBookingResponse({ action, bookingId }), /номер записи/);
++    }
++  }
++  assert.throws(() => parseBookingResponse('{broken'), /данные кнопки/);
++  for (const value of [null, [], 42, {}, { command: 'bookings' }, { action: 'attendance', bookingId: id }]) {
++    assert.equal(parseBookingResponse(value), undefined);
++  }
++});
++
++test('confirmation persists once and does not alter scheduling or attendance', async () => {
++  const h = harness();
++  for (let i = 0; i < 2; i++) assert.equal(await h.responses.respond(42, payload('confirm_booking')), text.confirmed);
++  assert.equal(h.updates.length, 1);
++  assert.equal(h.booking.clientConfirmed, true);
++  assert.equal(h.booking.status, 'scheduled'); assert.equal(h.booking.attendanceStatus, 'PENDING');
++  assert.equal(h.notifications.size, 0);
++  assert.equal(h.transactions[0].isolationLevel, 'Serializable');
++  assert.equal(h.updates[0].where.client.vkUserId, 42n);
++});
++
++test('cancellation request is durable, idempotent and queues an administrator alert in Moscow time', async () => {
++  const h = harness({ startTime: new Date('2099-01-01T21:30:00Z'), clientConfirmed: true });
++  for (const action of ['cancel_booking', 'cancel_booking', 'confirm_booking']) {
++    assert.equal(await h.responses.respond(42, payload(action)), text.cancellationRequested);
++  }
++  assert.equal(h.updates.length, 1); assert.equal(h.notifications.size, 1);
++  assert.equal(h.booking.clientCancellationRequested, true); assert.equal(h.booking.clientConfirmed, false);
++  // The existing cancellation/refund workflow remains an administrator action.
++  assert.equal(h.booking.status, 'scheduled');
++  const notification = [...h.notifications.values()][0];
++  assert.equal(notification.peerId, 99n);
++  assert.match(notification.message, /Анна.*11111111.*02.01.2099 00:30/);
++  assert.match(notification.message, /Подтвердите отмену в CRM/);
++});
++
++for (const patch of [
++  { startTime: new Date(0) }, { status: 'cancelled_client' }, { status: 'completed' },
++  { status: 'no_show' }, { status: 'penalty_cancellation' }, { attendanceStatus: 'ATTENDED' },
++  { lesson: { status: 'CANCELLED', startTime: new Date('2099-01-01') } },
++  { lesson: { status: 'SCHEDULED', deletedAt: new Date(), startTime: new Date('2099-01-01') } },
++  { lesson: { status: 'SCHEDULED', startTime: new Date(0) } },
++]) test(`expired/terminal booking is not mutated: ${JSON.stringify(patch)}`, async () => {
++  const h = harness(patch);
++  for (const action of ['confirm_booking', 'cancel_booking']) assert.equal(await h.responses.respond(42, payload(action)), text.stale);
++  assert.equal(h.updates.length, 0); assert.equal(h.notifications.size, 0);
++});
++
++test('lesson time is authoritative and cancellation applies only to this rider', async () => {
++  const h = harness({ startTime: new Date(0), lessonId: 'lesson', lesson: { status: 'SCHEDULED', startTime: new Date('2099-01-01') } });
++  assert.equal(await h.responses.respond(42, payload('confirm_booking')), text.confirmed);
++  assert.equal(h.updates[0].where.id, id);
++});
++
++test('missing and foreign bookings do not disclose status or mutate data', async () => {
++  const h = harness();
++  assert.equal(await h.responses.respond(43, payload('cancel_booking')), text.unavailable);
++  h.prisma.booking.findUnique = async () => null;
++  assert.equal(await h.responses.respond(42, payload('confirm_booking')), text.unavailable);
++  assert.equal(h.updates.length, 0);
++});
++
++test('notification failure rolls back the request and a retry succeeds', async () => {
++  const h = harness();
++  const upsert = h.prisma.vkNotification.upsert;
++  h.prisma.vkNotification.upsert = async () => { throw new Error('database offline'); };
++  await assert.rejects(h.responses.respond(42, payload('cancel_booking')), /Не удалось сохранить ответ/);
++  assert.equal(h.booking.clientCancellationRequested, false);
++  h.prisma.vkNotification.upsert = upsert;
++  assert.equal(await h.responses.respond(42, payload('cancel_booking')), text.cancellationRequested);
++});
++
++test('missing VK administrator rolls back request instead of claiming it was delivered', async () => {
++  const original = process.env.VK_ADMIN_PEER_ID;
++  delete process.env.VK_ADMIN_PEER_ID;
++  try {
++    const h = harness(); h.prisma.user.findMany = async () => [];
++    await assert.rejects(h.responses.respond(42, payload('cancel_booking')), /администратор VK не настроен/);
++    assert.equal(h.booking.clientCancellationRequested, false);
++  } finally {
++    if (original === undefined) delete process.env.VK_ADMIN_PEER_ID; else process.env.VK_ADMIN_PEER_ID = original;
++  }
++});
++
++test('serialization conflict retries transaction and persistent errors return a friendly failure', async () => {
++  const h = harness(), transaction = h.prisma.$transaction;
++  let attempts = 0;
++  h.prisma.$transaction = (...args) => {
++    if (++attempts < 3) throw { code: 'P2034' };
++    return transaction(...args);
++  };
++  assert.equal(await h.responses.respond(42, payload('confirm_booking')), text.confirmed);
++  assert.equal(attempts, 3);
++  h.prisma.$transaction = async () => { throw { code: 'P2034' }; };
++  await assert.rejects(h.responses.respond(42, payload('cancel_booking')), /Не удалось сохранить ответ/);
++});
++
++test('optimistic update prevents mutation if booking changed concurrently', async () => {
++  const h = harness(); h.prisma.booking.updateMany = async () => ({ count: 0 });
++  assert.equal(await h.responses.respond(42, payload('cancel_booking')), text.stale);
++  assert.equal(h.notifications.size, 0);
++});
++
++for (const action of ['confirm_booking', 'cancel_booking']) for (const type of ['message_new', 'message_event']) {
++  test(`${type} routes ${action}, bypasses bot pause and sends a full reply`, async () => {
++    const h = harness();
++    if (type === 'message_new') {
++      await h.bot.handleMessage({ message: { from_id: 42, peer_id: 42, text: '', payload: JSON.stringify(payload(action)) } }, 'event-1');
++      assert.equal(h.answers.length, 0);
++    } else {
++      await h.bot.handleEvent({ user_id: 42, peer_id: 42, event_id: 'event-1', payload: payload(action) });
++      assert.equal(h.answers.length, 1);
++      assert.equal(JSON.parse(h.answers[0].event_data).type, 'show_snackbar');
++    }
++    assert.equal(h.sent.length, 1);
++    assert.equal(h.sent[0].message, action === 'confirm_booking' ? text.confirmed : text.cancellationRequested);
++  });
++}
++
++test('malformed payload and database failure produce a reply and acknowledge callback', async () => {
++  const h = harness();
++  await h.bot.handleEvent({ user_id: 42, peer_id: 42, event_id: 'bad', payload: '{bad' });
++  assert.match(h.sent[0].message, /данные кнопки/); assert.equal(h.answers.length, 1);
++  h.prisma.$transaction = async () => { throw new Error('offline'); };
++  await h.bot.handleEvent({ user_id: 42, peer_id: 42, event_id: 'offline', payload: JSON.stringify(payload('confirm_booking')) });
++  assert.match(h.sent[1].message, /Не удалось сохранить ответ/); assert.equal(h.answers.length, 2);
++});
++
++test('forwarded messages and group callbacks cannot act on a booking', async () => {
++  const h = harness();
++  await h.bot.handleMessage({ message: { from_id: 42, peer_id: 2000000001, text: '', payload: JSON.stringify(payload('cancel_booking')) } }, 'group');
++  await assert.rejects(h.bot.handleEvent({ user_id: 42, peer_id: 2000000001, event_id: 'group', payload: payload('cancel_booking') }));
++  assert.equal(h.updates.length, 0); assert.equal(h.sent.length, 0);
++});
++
++for (const kind of ['24h', '2h']) test(`${kind} outbox delivery attaches the inline keyboard`, async () => {
++  const h = harness();
++  const sent = [];
++  const row = { id: 'notification', key: `reminder${kind}:${id}:${h.booking.startTime.toISOString()}:42`, peerId: 42n, message: 'Напоминание', attemptCount: 0 };
++  const delivery = new VkNotifications({ booking: h.prisma.booking, vkNotification: {
++    findMany: async () => [row], updateMany: async () => ({ count: 1 }), update: async () => {},
++  } });
++  delivery.vk = { api: { messages: { send: async args => sent.push(args) } } };
++  await delivery.flush();
++  assert.equal(sent.length, 1); assert.equal(sent[0].keyboard, reminderKeyboard(id));
++});
+diff --git a/horse-club-crm/backend/test/vk-bot.test.cjs b/horse-club-crm/backend/test/vk-bot.test.cjs
+index 6ac03a5..77c82bc 100644
+--- a/horse-club-crm/backend/test/vk-bot.test.cjs
++++ b/horse-club-crm/backend/test/vk-bot.test.cjs
+@@ -5,6 +5,7 @@ const { Test } = require('@nestjs/testing');
+ const request = require('supertest');
+ const { VkBotController } = require('../dist/vk-bot/vk-bot.controller');
+ const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
++const { VkBookingResponseService } = require('../dist/vk-bot/vk-booking-response.service');
+ const { PrismaService } = require('../dist/prisma/prisma.service');
+ const { VkLinkService } = require('../dist/vk-bot/vk-link.service');
+ const { MembershipLedgerService } = require('../dist/memberships/membership-ledger.service');
+@@ -16,7 +17,7 @@ before(async () => {
+   const module = await Test.createTestingModule({ controllers: [VkBotController], providers: [VkBotService, { provide: require('../dist/vk-bot/vk-identity.service').VkIdentityService, useValue: { identify: async vkId => { lookup.push({ where: { vkId } }); return { type: 'CLIENT', clientId: 'client', name: 'Анна' }; } } },
+     { provide: VkLinkService, useValue: { bind: async (sender, phone, code) => {
+       assert.equal(sender, 42); assert.equal(phone, '+79991234567'); assert.equal(code, '1234'); return 'CLIENT';
+-    } } }, { provide: MembershipLedgerService, useValue: {} }, { provide: LeadsService, useValue: {} },
++    } } }, { provide: MembershipLedgerService, useValue: {} }, { provide: LeadsService, useValue: {} }, VkBookingResponseService,
+     { provide: PrismaService, useValue: { trainer: { findUnique: async () => null }, client: { findUnique: async args => { lookup.push(args); return { id: 'client', firstName: 'Анна' }; } } } }] }).compile();
+   bot = module.get(VkBotService);
+   bot.prisma.vkConversationState = require('./helpers/vk-identity.cjs').idleConversation();
+diff --git a/horse-club-crm/docs/vk-inline-responses.md b/horse-club-crm/docs/vk-inline-responses.md
+new file mode 100644
+index 0000000..90d17ff
+--- /dev/null
++++ b/horse-club-crm/docs/vk-inline-responses.md
+@@ -0,0 +1,24 @@
++# Ответы на VK-напоминания
++
++Напоминания за 24 часа и за 2 часа получают inline-клавиатуру при доставке из существующей очереди `VkNotification`. Две callback-кнопки передают `confirm_booking` / `cancel_booking` и UUID записи. Обрабатываются также текстовые кнопки через `message_new`.
++
++Подтверждение сохраняется в `Booking.clientConfirmed`. Статус `scheduled` и отметка посещения не меняются. При повторном подтверждении запись не обновляется.
++
++Выбран разрешённый в задаче сценарий отмены через администратора: `Booking.clientCancellationRequested = true`. Клиенту сообщается, что запрос передан, а администратор получает имя, UUID, дату и время по Москве и указание подтвердить отмену в CRM. Слот освобождается после штатной отмены администратором. Это сохраняет существующие правила штрафа за отмену менее чем за 12 часов, возвратов и групповых занятий. Автоматическое сообщение «запись отменена» в этом сценарии не отправляется.
++
++Запрос и уведомления администраторам сохраняются одной Serializable-транзакцией с ограниченным повтором при конфликте. Повторные нажатия не создают уведомлений; после запроса отмены новые напоминания не отправляются. Ошибки БД не превращаются в успешный ответ. Другой пользователь VK не может изменить запись; прошедшие, отменённые и завершённые занятия отклоняются.
++
++## Развёртывание
++
++- Применить миграцию `20261108120000_vk_booking_responses` на сервере через `npx prisma migrate deploy` до запуска новой версии.
++- Сгенерировать Prisma Client при сборке (`npx prisma generate`, локально выполнено).
++- Включить `message_event` в событиях VK Callback API; `message_new` остаётся включённым.
++- Настроить `VK_ADMIN_PEER_ID` либо привязать VK пользователю CRM с ролью `ADMIN`. Если получателей нет, запрос откатывается, клиент получает телефон клуба.
++
++## Проверки
++
++- Backend: typecheck, lint и build прошли; 699 тестов прошли, 20 PostgreSQL-тестов пропущены по условиям окружения, ошибок нет. Линтер сообщает три прежних предупреждения в неизменённых тестах.
++- Frontend: typecheck, lint и build прошли; 165 тестов прошли.
++- Playwright: `vk-link.spec.ts` и `vk-settings.spec.ts`, mock-проект — 11 сценариев прошли.
++- Новые unit-тесты проверяют клавиатуру, оба вида событий, валидацию, владельца записи, финальные статусы, повторные ответы, транзакционный откат и обработку конфликтов.
++- Реальная доставка VK и миграция на PostgreSQL в рамках локальной проверки не выполнялись.

@@ -1,0 +1,235 @@
+diff --git a/horse-club-crm/landing/DESIGN.md b/horse-club-crm/landing/DESIGN.md
+index 2cb6d02..aeccb71 100644
+--- a/horse-club-crm/landing/DESIGN.md
++++ b/horse-club-crm/landing/DESIGN.md
+@@ -15,3 +15,6 @@
+ Проверки: `npm run typecheck`, `npm run lint`, `npm run build`, `npm test`. `tests/booking-cro.spec.ts` проверяет путь на 375px, обычную и уменьшенную анимацию, уникальные варианты, отсутствие ID дисциплины в заявке первого занятия, политику и подтверждение API. Остальные сценарии проверяют ошибки, повтор и сохранение контекста CRM.
+ 
+ Исправления ассетов и записи: статичные фотографии конной тематики берутся из public/images, BASE_URL сохраняет корректные пути Vite; Hero использует импорт из src/assets. Подготовка находится один раз перед FAQ/записью; пять вопросов используют нативный details/summary. Мобильная плашка записи и звонка резервирует место внизу, учитывает safe area. Политика переиспользует PrivacyPolicyLink с уникальным dialog для каждого экземпляра; открытие политики не отмечает согласие. Возраст необязателен и передаётся в notes, сертификат — в выбранной услуге. Реквизиты используют существующие VITE_LEGAL_* с подтверждёнными значениями клуба по умолчанию; Новости клуба содержат ВКонтакте и MAX (https://max.ru); телефон остаётся одной строкой и открывает tel:+79156720030. Номиналы 2/4/6 тысяч показаны как желаемые и требуют подтверждения администратора.
++
++Подвал: классическая сетка из пяти колонок от 1280px, трёх от 768px, двух от 640px и компактный стек на телефоне. Фон — club-sand, заголовки — Georgia/club-ink, ссылки — club-secondary, hover — club-deep. Используется существующая политика; ссылка правил ведёт к подготовке первого занятия. MAX использует переданный владельцем адрес канала. Реквизиты оператора сохраняются в колонке клиентов.
++Отзывы открываются в новой вкладке по предоставленной владельцем ссылке https://vk.ru/reviews-226780791.
+diff --git a/horse-club-crm/landing/src/components/Footer.tsx b/horse-club-crm/landing/src/components/Footer.tsx
+index 8e13097..15bea1c 100644
+--- a/horse-club-crm/landing/src/components/Footer.tsx
++++ b/horse-club-crm/landing/src/components/Footer.tsx
+@@ -1,20 +1,74 @@
+-import type { ReactElement } from 'react';
++import type { MouseEvent, ReactElement } from 'react';
++import { landingData } from '../data/landingContent';
++import { handleCatalogImageError } from '../catalogImage';
+ import { legal } from '../legal';
+ import { PrivacyPolicyLink } from './PrivacyPolicyLink';
+ 
++const navigation = [
++  { label: 'О клубе', href: '#about' },
++  { label: 'Услуги клуба', href: '#services' },
++  { label: 'Тренеры', href: '#trainers' },
++  { label: 'Лошади', href: '#horses' },
++  { label: 'Отзывы', href: 'https://vk.ru/reviews-226780791' },
++  { label: 'FAQ', href: '#faq' },
++  { label: 'Контакты', href: '#contacts' },
++];
++
++function scrollToSection(event: MouseEvent<HTMLAnchorElement>): void {
++  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
++  const target = document.getElementById(event.currentTarget.hash.slice(1));
++  if (!target) return;
++  event.preventDefault();
++  if (target instanceof HTMLButtonElement) target.click();
++  (target.closest('section') ?? target).scrollIntoView({
++    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start',
++  });
++}
++
+ export function Footer({ brandName }: { brandName: string }): ReactElement {
+-  const year = new Intl.DateTimeFormat('ru-RU', { year: 'numeric', timeZone: 'Europe/Moscow' }).format(new Date());
+-  return <footer className="border-t border-white/10 bg-luxury-deep px-6 py-8 text-sm text-luxury-bg">
+-    <div className="mx-auto max-w-7xl space-y-2">
+-      <p>© {year} {brandName}. Все права защищены.</p>
+-      <p>{legal.operatorName}</p>
+-      <p>{legal.registration}</p>
+-      <p>{legal.operatorAddress}</p>
+-      <div className="flex flex-wrap items-center gap-x-6">
+-        <PrivacyPolicyLink>Политика обработки персональных данных</PrivacyPolicyLink>
+-        <a className="inline-flex min-h-11 items-center underline hover:text-white" href={`mailto:${legal.privacyEmail}`}>{legal.privacyEmail}</a>
+-        <a className="inline-flex min-h-11 items-center hover:text-white" href="#contacts">Контакты</a>
++  return <footer className="club-footer border-t border-club-ink/15 bg-club-sand px-6 py-10 text-sm leading-relaxed text-club-secondary sm:px-10 md:py-14 lg:px-16">
++    <div className="mx-auto grid max-w-7xl grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-[1.2fr_0.85fr_1fr_1.2fr_1fr]">
++      <div className="flex min-w-0 flex-col items-start">
++        <a href="#hero" onClick={scrollToSection} className="inline-flex min-h-11 items-center gap-3 font-serif text-lg text-club-ink" aria-label={`${brandName} — на главную`}>
++          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-club-ink">
++            <img src={landingData.brand.logoUrl} onError={handleCatalogImageError} alt="" width={48} height={48} className="h-12 w-12 object-contain" />
++          </span>
++          {brandName}
++        </a>
++        <p className="mt-4 max-w-60">КСК «Союз любителей конного спорта»</p>
++        <p className="mt-6 xl:mt-auto xl:pt-8">© КСК «СЛКС». Все права защищены.</p>
+       </div>
++      <nav aria-labelledby="footer-navigation" className="min-w-0">
++        <h4 id="footer-navigation" className="mb-3 font-serif text-lg font-normal text-club-ink">Навигация:</h4>
++        <ul>{navigation.map(item => <li key={item.href}><a href={item.href} onClick={scrollToSection}
++          target={item.href.startsWith('#') ? undefined : '_blank'}
++          rel={item.href.startsWith('#') ? undefined : 'noopener noreferrer'}>{item.label}</a></li>)}</ul>
++      </nav>
++      <section aria-labelledby="footer-contacts" className="min-w-0">
++        <h4 id="footer-contacts" className="mb-3 font-serif text-lg font-normal text-club-ink">Контакты:</h4>
++        <ul>
++          <li><a href="tel:+79156720030" className="whitespace-nowrap">+7 (915) 672-00-30</a></li>
++          <li><a href={landingData.contacts.vkGroup} target="_blank" rel="noopener noreferrer">ВКонтакте</a></li>
++          <li><a href={landingData.contacts.max} target="_blank" rel="noopener noreferrer">MAX</a></li>
++        </ul>
++      </section>
++      <section aria-labelledby="footer-address" className="min-w-0">
++        <h4 id="footer-address" className="mb-3 font-serif text-lg font-normal text-club-ink">Наш адрес:</h4>
++        <address className="not-italic">г. Тамбов, ул. Бастионная, 22АС2.</address>
++        <p className="mt-4">Ежедневно с 09:00 до 19:00<br />(по предварительной записи)</p>
++        <a href="https://yandex.ru/maps/?text=Тамбов+ул+Бастионная+22АС2" target="_blank" rel="noopener noreferrer" className="mt-3 underline underline-offset-4">Смотреть карту</a>
++      </section>
++      <section aria-labelledby="footer-clients" className="min-w-0">
++        <h4 id="footer-clients" className="mb-3 font-serif text-lg font-normal text-club-ink">Для клиентов:</h4>
++        <ul>
++          <li><PrivacyPolicyLink>Политика конфиденциальности</PrivacyPolicyLink></li>
++          <li><a href="#first-lesson" onClick={scrollToSection}>Правила посещения клуба и техника безопасности</a></li>
++        </ul>
++        <div className="mt-5 space-y-1">
++          <p>{legal.operatorName}</p><p>{legal.registration}</p><p>{legal.operatorAddress}</p>
++          <a href={`mailto:${legal.privacyEmail}`} className="break-all">{legal.privacyEmail}</a>
++        </div>
++      </section>
+     </div>
+   </footer>;
+ }
+diff --git a/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx b/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx
+index b0670db..405d233 100644
+--- a/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx
++++ b/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx
+@@ -119,6 +119,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+             <button
+               type="button"
+               aria-pressed={tab === 'horses'}
++              id="horses"
+               onClick={() => setTab('horses')}
+               className={`rounded-full px-6 py-2.5 text-sm font-medium   transition-all duration-300 ${
+                 tab === 'horses'
+@@ -131,6 +132,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+             <button
+               type="button"
+               aria-pressed={tab === 'trainers'}
++              id="trainers"
+               onClick={() => setTab('trainers')}
+               className={`rounded-full px-6 py-2.5 text-sm font-medium   transition-all duration-300 ${
+                 tab === 'trainers'
+diff --git a/horse-club-crm/landing/src/data/landingContent.ts b/horse-club-crm/landing/src/data/landingContent.ts
+index 5b7810e..20d2526 100644
+--- a/horse-club-crm/landing/src/data/landingContent.ts
++++ b/horse-club-crm/landing/src/data/landingContent.ts
+@@ -303,7 +303,7 @@ export const landingData: LandingData = {
+     altPhone: "+7 (902) 936-47-27",
+     workingHours: "Ежедневно с 09:00 до 19:00 (по предварительной записи)",
+     vkGroup: "https://vk.com/soyuz68ru",
+-    max: "https://max.ru",
++    max: "https://max.ru/join/Evl2Mp0moqVwQAeBIPaY5ozOrE6rs83dO45_5SrqAvo",
+     yandexMapsUrl: "https://yandex.ru/maps/?text=%D0%A1%D0%BE%D1%8E%D0%B7%20%D0%BB%D1%8E%D0%B1%D0%B8%D1%82%D0%B5%D0%BB%D0%B5%D0%B9%20%D0%BA%D0%BE%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE%20%D1%81%D0%BF%D0%BE%D1%80%D1%82%D0%B0%20%D0%A2%D0%B0%D0%BC%D0%B1%D0%BE%D0%B2&ll=41.369035%2C52.745154&z=16",
+     coordinates: [52.745154, 41.369035],
+     mapCoords: [52.745154, 41.369035],
+@@ -311,4 +311,4 @@ export const landingData: LandingData = {
+     lat: 52.745154,
+     lng: 41.369035,
+   },
+-};
+\ No newline at end of file
++};
+diff --git a/horse-club-crm/landing/src/style.css b/horse-club-crm/landing/src/style.css
+index 86d0a76..cba5196 100644
+--- a/horse-club-crm/landing/src/style.css
++++ b/horse-club-crm/landing/src/style.css
+@@ -1,6 +1,16 @@
+ @import "tailwindcss";
+ @config "../tailwind.config.js";
+ 
++.club-footer a {
++  display: inline-flex;
++  align-items: center;
++  min-height: 44px;
++  max-width: 100%;
++  cursor: pointer;
++  transition: color .2s;
++}
++.club-footer a:hover, .club-footer a:active { color: var(--color-club-deep); }
++
+ /* A clipped viewport owns horizontal movement; the document never scrolls sideways. */
+ .club-carousel { min-width: 0; }
+ .club-carousel__viewport { overflow: hidden; padding: 10px 4px 36px; margin: -10px -4px -20px; }
+diff --git a/horse-club-crm/landing/tests/footer.spec.ts b/horse-club-crm/landing/tests/footer.spec.ts
+new file mode 100644
+index 0000000..ef3d120
+--- /dev/null
++++ b/horse-club-crm/landing/tests/footer.spec.ts
+@@ -0,0 +1,32 @@
++import { expect, test } from '@playwright/test';
++
++for (const [width, columns] of [[320, 1], [640, 2], [900, 3], [1440, 5]] as const) {
++  test(`footer layout and navigation at ${width}px`, async ({ page }) => {
++    await page.setViewportSize({ width, height: 900 });
++    await page.emulateMedia({ reducedMotion: 'reduce' });
++    await page.route('**/api/public/content', route => route.fulfill({ json: { horses: [], trainers: [], services: [] } }));
++    await page.goto('/');
++    const footer = page.locator('footer');
++    await footer.scrollIntoViewIfNeeded();
++    expect(await footer.locator(':scope > div').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(columns);
++    for (const link of await footer.getByRole('link').all()) {
++      const box = (await link.boundingBox())!;
++      expect(box.x).toBeGreaterThanOrEqual(0);
++      expect(box.x + box.width).toBeLessThanOrEqual(width);
++      expect(box.height).toBeGreaterThanOrEqual(44);
++    }
++    await expect(footer.getByRole('link', { name: 'MAX', exact: true })).toHaveAttribute('href', 'https://max.ru/join/Evl2Mp0moqVwQAeBIPaY5ozOrE6rs83dO45_5SrqAvo');
++    await expect(footer.getByRole('link', { name: 'Отзывы', exact: true })).toHaveAttribute('href', 'https://vk.ru/reviews-226780791');
++    const policy = footer.getByRole('link', { name: 'Политика конфиденциальности' });
++    await policy.click();
++    await expect(page.getByRole('dialog')).toContainText('152-ФЗ');
++    await page.keyboard.press('Escape');
++    await expect(policy).toBeFocused();
++    await footer.getByRole('link', { name: 'Тренеры', exact: true }).click();
++    await expect(page.locator('#trainers')).toHaveAttribute('aria-pressed', 'true');
++    await footer.getByRole('link', { name: 'Лошади', exact: true }).click();
++    await expect(page.locator('#horses')).toHaveAttribute('aria-pressed', 'true');
++    await footer.scrollIntoViewIfNeeded();
++    await footer.screenshot({ path: test.info().outputPath(`footer-${width}.png`) });
++  });
++}
+diff --git a/horse-club-crm/landing/tests/landing-fixes.spec.ts b/horse-club-crm/landing/tests/landing-fixes.spec.ts
+index 182bb67..a965042 100644
+--- a/horse-club-crm/landing/tests/landing-fixes.spec.ts
++++ b/horse-club-crm/landing/tests/landing-fixes.spec.ts
+@@ -43,7 +43,7 @@ test('policy links are independent of consent; preparation and FAQ have one sour
+     await question.locator('summary').click();
+     await expect(question).toHaveAttribute('open', '');
+   }
+-  await page.locator('footer').getByRole('link', { name: 'Политика обработки персональных данных' }).click();
++  await page.locator('footer').getByRole('link', { name: 'Политика конфиденциальности' }).click();
+   await expect(page.getByRole('dialog')).toBeVisible();
+   await page.keyboard.press('Escape');
+ });
+@@ -76,6 +76,6 @@ test('mobile actions meet 44px targets and certificate plus age reach the API',
+   expect(payload.notes).toBe('Возраст всадника: 7–12 лет');
+   expect(payload.direction).toContain('Подарочный сертификат на 4');
+   expect(payload).not.toHaveProperty('serviceId');
+-  await expect(page.getByRole('link', { name: 'MAX', exact: true })).toHaveAttribute('href', 'https://max.ru');
++  await expect(page.locator('#contacts').getByRole('link', { name: 'MAX', exact: true })).toHaveAttribute('href', 'https://max.ru/join/Evl2Mp0moqVwQAeBIPaY5ozOrE6rs83dO45_5SrqAvo');
+   await page.screenshot({ path: test.info().outputPath('mobile-success.png'), fullPage: true });
+ });
+diff --git a/horse-club-crm/landing/tests/owner-visual.spec.ts b/horse-club-crm/landing/tests/owner-visual.spec.ts
+index b432bef..f646a5b 100644
+--- a/horse-club-crm/landing/tests/owner-visual.spec.ts
++++ b/horse-club-crm/landing/tests/owner-visual.spec.ts
+@@ -52,7 +52,7 @@ for (const width of [320, 375, 768, 1280, 1440]) {
+       const card = el.parentElement!.getBoundingClientRect();
+       return rects.length === 1 && rects[0].right <= card.right - 12;
+     })).toBe(true);
+-    await expect(page.getByRole('link', { name: 'MAX', exact: true })).toHaveAttribute('href', 'https://max.ru');
++    await expect(page.locator('#contacts').getByRole('link', { name: 'MAX', exact: true })).toHaveAttribute('href', 'https://max.ru/join/Evl2Mp0moqVwQAeBIPaY5ozOrE6rs83dO45_5SrqAvo');
+     await expect(page.getByRole('link', { name: /Telegram/i })).toHaveCount(0);
+     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+     await page.locator('#contacts').scrollIntoViewIfNeeded();

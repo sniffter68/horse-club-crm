@@ -1,0 +1,1171 @@
+diff --git a/horse-club-crm/DESIGN.md b/horse-club-crm/DESIGN.md
+index 3dbb73d..6b243f9 100644
+--- a/horse-club-crm/DESIGN.md
++++ b/horse-club-crm/DESIGN.md
+@@ -41,6 +41,8 @@ components:
+ 
+ # Horse Club OS Design System
+ 
++Привязка VK тренера переиспользует `VkProfileField`, `VkProfileLink` и существующую шторку CatalogForm. Единственное поле «VK ID» принимает ID или ссылку; ошибка сохраняет ввод и позволяет повторить сохранение. Цвета и токены не меняются. Контракт: `docs/trainer-vk-binding.md`.
++
+ Двухшаговое закрытие месяца использует существующий Ant Design Modal, Collapse и ResponsiveTable: на телефоне ведомость переходит в карточки, длинные подписи сверки располагаются над неразрывными суммами. Тело диалога прокручивается, кнопка переноса остается доступной. Входящее сальдо отображается Ant Design Alert; новые токены не добавлены. Контракт: `docs/membership-accrual.md`.
+ 
+ Полный сброс в настройках использует текущие Ant Design Card/Modal/Input/Alert и danger Button. Диалог фокусирует отмену, требует точную контрольную фразу и сохраняет ввод при ошибке; на время запроса закрытие блокируется. Новые визуальные токены не вводятся. Контракт: `docs/operational-reset.md`.
+diff --git a/horse-club-crm/UX-CONTRACT.md b/horse-club-crm/UX-CONTRACT.md
+index bf021da..a61afa1 100644
+--- a/horse-club-crm/UX-CONTRACT.md
++++ b/horse-club-crm/UX-CONTRACT.md
+@@ -1,5 +1,9 @@
+ # UX Contract
+ 
++## VK тренера (2026-11-05)
++
++Источник: задача владельца и `docs/trainer-vk-binding.md`. Формой владеет CatalogForm/EntryOverlay, полем «VK ID» — общий VkProfileField, привязкой в карточке — VkProfileLink. ADMIN/MANAGER с FULL SCHEDULE видят мутации. Ошибка сохраняет ввод и отображается в Alert; во время запроса повтор заблокирован. Переход к персоналу не нужен. Проверки: `backend/test/trainer-vk-binding.test.cjs`, `frontend/e2e/vk-link.spec.ts`.
++
+ ## Общие настройки колонок (2026-11-05)
+ 
+ Источник — задача владельца о масштабировании паттерна клиентов, `docs/table-columns.md`. Владелец предпочтений — `useTableColumns` / `useColumnPreferences`; панель — общий `TableColumnSettings` (Ant Design Popover/Checkbox/Button), таблица — `ConfigurableTable` / `ResponsiveTable`. Фиксированные поля не скрываются и не перемещаются. `hidden` и отсутствие колонки по RBAC имеют приоритет над localStorage. Ошибка сохранения оставляет изменения в памяти с предупреждением. Escape закрывает панель и возвращает фокус кнопке. Поиск, URL, сортировка, пагинация и мутации остаются у прежних владельцев. Проверки: `useTableColumns.test.ts`, `table-columns.spec.ts`, прежние сценарии клиентов и CRUD.
+diff --git a/horse-club-crm/backend/prisma/migrations/20261105120000_simplify_trainer_vk_binding/migration.sql b/horse-club-crm/backend/prisma/migrations/20261105120000_simplify_trainer_vk_binding/migration.sql
+new file mode 100644
+index 0000000..5274eb1
+--- /dev/null
++++ b/horse-club-crm/backend/prisma/migrations/20261105120000_simplify_trainer_vk_binding/migration.sql
+@@ -0,0 +1,5 @@
++-- Rename in place: preserve all existing trainer bindings without copying accounts.
++ALTER TABLE "Trainer" RENAME COLUMN "vkUserId" TO "vkId";
++ALTER INDEX "Trainer_vkUserId_key" RENAME TO "Trainer_vkId_key";
++-- Trainer binding no longer uses temporary codes. Client codes remain unchanged.
++DELETE FROM "VkLinkCode" WHERE "kind" = 'TRAINER';
+diff --git a/horse-club-crm/backend/prisma/schema.prisma b/horse-club-crm/backend/prisma/schema.prisma
+index 9f3048f..a756090 100644
+--- a/horse-club-crm/backend/prisma/schema.prisma
++++ b/horse-club-crm/backend/prisma/schema.prisma
+@@ -266,7 +266,7 @@ model Trainer {
+   id            String   @id @default(uuid()) @db.Uuid
+   name          String   @default("")
+   phone         String?  @unique
+-  vkUserId      BigInt?  @unique
++  vkId          BigInt?  @unique
+   qualification String?
+   maxDailyLoad  Int      @default(480)
+   maxParallelLessons Int @default(4)
+diff --git a/horse-club-crm/backend/src/lessons/lessons.service.ts b/horse-club-crm/backend/src/lessons/lessons.service.ts
+index 82b7c80..8ac0b42 100644
+--- a/horse-club-crm/backend/src/lessons/lessons.service.ts
++++ b/horse-club-crm/backend/src/lessons/lessons.service.ts
+@@ -651,7 +651,7 @@ export class LessonsService {
+   private async notifyLesson(tx: TransactionClient, lesson: LessonDetails, event: string, title: string,
+     clientIds?: string[], previousStart?: Date): Promise<void> {
+     const participants = (lesson.bookings ?? []).filter(row => !clientIds || clientIds.includes(row.clientId));
+-    if (!lesson.trainer?.vkUserId && !participants.some(row => row.client?.vkUserId)) return;
++    if (!lesson.trainer?.vkId && !participants.some(row => row.client?.vkUserId)) return;
+     if (event === 'created' || event.startsWith('booking:')) {
+       await queueTrainingConfirmation(tx, `lesson:${lesson.id}:${event}`, {
+         startTime: lesson.startTime, endTime: lesson.endTime, trainer: lesson.trainer,
+@@ -661,7 +661,7 @@ export class LessonsService {
+       return;
+     }
+     const recipients = new Set<bigint>();
+-    if (lesson.trainer?.vkUserId) recipients.add(lesson.trainer.vkUserId);
++    if (lesson.trainer?.vkId) recipients.add(lesson.trainer.vkId);
+     for (const booking of lesson.bookings ?? []) {
+       if ((!clientIds || clientIds.includes(booking.clientId)) && booking.client?.vkUserId) recipients.add(booking.client.vkUserId);
+     }
+diff --git a/horse-club-crm/backend/src/trainers/dto/create-trainer.dto.ts b/horse-club-crm/backend/src/trainers/dto/create-trainer.dto.ts
+index 38e3df5..046c79f 100644
+--- a/horse-club-crm/backend/src/trainers/dto/create-trainer.dto.ts
++++ b/horse-club-crm/backend/src/trainers/dto/create-trainer.dto.ts
+@@ -1,8 +1,16 @@
++import { Transform } from 'class-transformer';
+ import { PublicationDto } from '../../common/dto/publication.dto';
+ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+ import { IsBoolean, Matches, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
+ 
+ export class CreateTrainerDto extends PublicationDto {
++  @ApiPropertyOptional({ nullable: true })
++  @Transform(({ value }: { value: unknown }) => typeof value === 'number' && Number.isSafeInteger(value) ? String(value) : value)
++  @IsOptional()
++  @IsString()
++  @MaxLength(256)
++  vkId?: string | null;
++
+   @ApiPropertyOptional({ default: 4, description: 'Максимум одновременных всадников' })
+   @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+   @IsInt()
+diff --git a/horse-club-crm/backend/src/trainers/trainers.service.ts b/horse-club-crm/backend/src/trainers/trainers.service.ts
+index 2132594..3518064 100644
+--- a/horse-club-crm/backend/src/trainers/trainers.service.ts
++++ b/horse-club-crm/backend/src/trainers/trainers.service.ts
+@@ -5,13 +5,14 @@ import type { RefineQueryDto } from '../common/dto/refine-query.dto';
+ import { rethrowCatalogMutation } from '../common/prisma-errors';
+ import { parseRefineQuery } from '../common/refine';
+ import type { PaginatedResult } from '../common/refine';
++import { VkIdentityService } from '../vk-bot/vk-identity.service';
+ import { PrismaService } from '../prisma/prisma.service';
+ import type { CreateTrainerDto } from './dto/create-trainer.dto';
+ import type { UpdateTrainerDto } from './dto/update-trainer.dto';
+ 
+ @Injectable()
+ export class TrainersService {
+-  constructor(private readonly prisma: PrismaService) {}
++  constructor(private readonly prisma: PrismaService, private readonly identity: VkIdentityService = new VkIdentityService(prisma)) {}
+ 
+   async findAll(query: RefineQueryDto): Promise<PaginatedResult<Trainer>> {
+     const options = parseRefineQuery(query, ['id', 'name', 'phone', 'baseRate', 'maxDailyLoad'], 'name');
+@@ -42,13 +43,24 @@ export class TrainersService {
+     return trainer;
+   }
+ 
+-  create(dto: CreateTrainerDto): Promise<Trainer> {
+-    return this.prisma.trainer.create({ data: dto });
++  async create(dto: CreateTrainerDto): Promise<Trainer> {
++    const { vkId: input, ...data } = dto;
++    const vk = input === undefined ? null : await this.identity.normalize(input);
++    return this.identity.atomic(async tx => {
++      await this.identity.assertAvailable(tx, vk?.vkId ?? null, 'TRAINER');
++      return tx.trainer.create({ data: { ...data, vkId: vk?.vkId ? BigInt(vk.vkId) : null } });
++    });
+   }
+ 
+   async update(id: string, dto: UpdateTrainerDto): Promise<Trainer> {
++    const { vkId: input, ...data } = dto;
++    const vk = input === undefined ? undefined : await this.identity.normalize(input);
+     try {
+-      return await this.prisma.trainer.update({ where: { id }, data: dto });
++      if (!vk) return await this.prisma.trainer.update({ where: { id }, data });
++      return await this.identity.atomic(async tx => {
++        await this.identity.applyTrainer(tx, id, vk.vkId);
++        return tx.trainer.update({ where: { id }, data });
++      });
+     } catch (error: unknown) {
+       return rethrowCatalogMutation(error, 'Тренер');
+     }
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-bot.service.ts b/horse-club-crm/backend/src/vk-bot/vk-bot.service.ts
+index 53d4a2d..fdea392 100644
+--- a/horse-club-crm/backend/src/vk-bot/vk-bot.service.ts
++++ b/horse-club-crm/backend/src/vk-bot/vk-bot.service.ts
+@@ -160,7 +160,7 @@ export class VkBotService {
+         data: { isBotPaused: false, botPausedUntil: null } });
+       const identity = await this.identity.identify(String(sender));
+       await this.send(peer, eventId, `Здравствуйте${identity.type !== 'UNKNOWN' && identity.name ? `, ${identity.name}` : ''}! Выберите действие.`,
+-        identity.type === 'UNKNOWN' ? welcome : menu(identity.type === 'STAFF'));
++        identity.type === 'UNKNOWN' ? welcome : menu(identity.type === 'STAFF' || identity.type === 'TRAINER'));
+       return;
+     }
+     if (state?.botPausedUntil && state.botPausedUntil.getTime() > Date.now()) return;
+@@ -192,14 +192,14 @@ export class VkBotService {
+       }
+       const client = identity.type === 'CLIENT' ? { id: identity.clientId, firstName: identity.name } : null;
+       const staff = identity.type === 'STAFF' ? identity : null;
+-      const trainer = staff?.role === 'TRAINER' && staff.trainerId ? { id: staff.trainerId, name: staff.name } : null;
+-      const keyboard = staff || client ? menu(Boolean(staff)) : welcome;
++      const trainer = identity.type === 'TRAINER' ? { id: identity.id, name: identity.name } : null;
++      const keyboard = trainer || staff || client ? menu(Boolean(trainer || staff)) : welcome;
+       if (command === 'link') {
+         const phone = '+79991234567';
+-        await this.send(peer, eventId, `Для привязки отправьте номер телефона из CRM и одноразовый код, выданный администратором:\nпривязать ${phone} 1234\nНомер без кода не открывает доступ к профилю. Код действует 5 минут.`, keyboard);
++        await this.send(peer, eventId, `Тренеру: укажите VK ID или ссылку на профиль в карточке тренера в CRM.\nДля привязки клиента отправьте номер телефона из CRM и одноразовый код, выданный администратором:\nпривязать ${phone} 1234\nНомер без кода не открывает доступ к профилю. Код клиента действует 5 минут.`, keyboard);
+         return;
+       }
+-      if (binding && !client && !staff) {
++      if (binding && !client && !staff && !trainer) {
+         const kind = await this.links.bind(sender, binding[1], binding[2]);
+         await this.send(peer, eventId, 'Профиль CRM привязан. Выберите действие.', menu(kind === 'TRAINER')); return;
+       }
+@@ -212,7 +212,7 @@ export class VkBotService {
+         const account = await this.prisma.client.findUniqueOrThrow({ where: { id: client.id }, select: { boardingBalance: true } });
+         await this.send(peer, eventId, `Баланс постоя: ${Number(account.boardingBalance).toLocaleString('ru-RU')} ₽\nПоследние оплаты:\n${payments.map(row => `• ${date(row.paidAt || row.createdAt)} — ${Number(row.amount).toLocaleString('ru-RU')} ₽`).join('\n') || 'Оплат пока нет.'}\nОстаток занятий — в разделе «Мой абонемент».`, keyboard); return;
+       }
+-      if (command === 'начать' && !client && !staff) {
++      if (command === 'начать' && !client && !staff && !trainer) {
+         const firstName = await this.getFirstName(sender);
+         await this.send(peer, eventId, `Здравствуйте${firstName ? `, ${firstName}` : ''}! Приглашаем вас в конный клуб.\nЕсли вы уже наш клиент, попросите администратора привязать ваш VK к профилю в CRM.\n${clubCard()}`, welcome);
+         return;
+@@ -230,7 +230,7 @@ export class VkBotService {
+         return;
+       }
+       if (command === 'guide') { await this.send(peer, eventId, riderGuide(), keyboard); return; }
+-      if (!client && !staff) {
++      if (!client && !staff && !trainer) {
+         if (lead) {
+           const accepted = await this.prisma.vkConsent.findUnique({ where: { vkUserId: BigInt(sender) } });
+           if (!accepted || accepted.consentVersion !== consentVersion()) {
+@@ -349,7 +349,7 @@ export class VkBotService {
+     let answer = 'Посещение отмечено';
+     try {
+       const profile = await this.identity.identify(String(object.user_id));
+-      const trainer = profile.type === 'STAFF' && profile.role === 'TRAINER' && profile.trainerId ? { id: profile.trainerId } : null;
++      const trainer = profile.type === 'TRAINER' ? { id: profile.id } : null;
+       if (!trainer) throw new ForbiddenException('Действие доступно только тренеру');
+       await this.ledger.markAttendance(bookingId, attended, { trainerId: trainer.id, noShow: !attended });
+       if (!attended) answer = 'Неявка отмечена';
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-identity.service.ts b/horse-club-crm/backend/src/vk-bot/vk-identity.service.ts
+index 62dcec3..830dcb1 100644
+--- a/horse-club-crm/backend/src/vk-bot/vk-identity.service.ts
++++ b/horse-club-crm/backend/src/vk-bot/vk-identity.service.ts
+@@ -45,14 +45,17 @@ export class VkIdentityService {
+     return { vkId: String(user.id), vkScreenName: parsed.vkScreenName! };
+   }
+ 
+-  async assertAvailable(tx: Prisma.TransactionClient, vkId: string | null, kind: 'CLIENT' | 'STAFF', id?: string, trainerId?: string | null) {
++  async assertAvailable(tx: Prisma.TransactionClient, vkId: string | null, kind: 'CLIENT' | 'STAFF' | 'TRAINER', id?: string, trainerId?: string | null) {
+     if (!vkId) return;
+     const [client, user, trainer] = await Promise.all([
+       tx.client.findFirst({ where: { OR: [{ vkId }, { vkUserId: BigInt(vkId) }] }, select: { id: true } }),
+-      tx.user.findFirst({ where: { OR: [{ vkId }, { vkUserId: BigInt(vkId) }] }, select: { id: true } }),
+-      tx.trainer.findUnique({ where: { vkUserId: BigInt(vkId) }, select: { id: true } }),
++      tx.user.findFirst({ where: { OR: [{ vkId }, { vkUserId: BigInt(vkId) }] }, select: { id: true, trainerId: true } }),
++      tx.trainer.findUnique({ where: { vkId: BigInt(vkId) }, select: { id: true } }),
+     ]);
+-    if ((client && (kind !== 'CLIENT' || client.id !== id)) || (user && (kind !== 'STAFF' || user.id !== id)) || (trainer && (kind !== 'STAFF' || trainer.id !== trainerId))) {
++    const ownsClient = kind === 'CLIENT' && client?.id === id;
++    const ownsUser = kind === 'STAFF' && user?.id === id || kind === 'TRAINER' && id !== undefined && user?.trainerId === id;
++    const ownsTrainer = kind === 'TRAINER' && trainer?.id === id || kind === 'STAFF' && trainer?.id === trainerId;
++    if ((client && !ownsClient) || (user && !ownsUser) || (trainer && !ownsTrainer)) {
+       throw new ConflictException('Этот VK ID уже привязан к другому клиенту или сотруднику');
+     }
+   }
+@@ -71,9 +74,19 @@ export class VkIdentityService {
+   }
+ 
+   async setTrainer(trainerId: string, input: string | null) {
+-    const user = await this.prisma.user.findUnique({ where: { trainerId } });
+-    if (!user) throw new BadRequestException('Сначала привяжите тренера к учетной записи сотрудника');
+-    return this.setStaff(user.id, input);
++    const { vkId } = await this.normalize(input);
++    return this.atomic(tx => this.applyTrainer(tx, trainerId, vkId));
++  }
++
++  async applyTrainer(tx: Prisma.TransactionClient, id: string, vkId: string | null) {
++    const trainer = await tx.trainer.findUnique({ where: { id } });
++    if (!trainer) throw new NotFoundException('Тренер не найден');
++    await this.assertAvailable(tx, vkId, 'TRAINER', id);
++    const nextPeer = vkId ? BigInt(vkId) : null;
++    if (trainer.vkId && trainer.vkId !== nextPeer) {
++      await tx.vkNotification.deleteMany({ where: { peerId: trainer.vkId, sentAt: null } });
++    }
++    return tx.trainer.update({ where: { id }, data: { vkId: nextPeer } });
+   }
+ 
+   async setStaff(id: string, input: string | null) {
+@@ -85,20 +98,20 @@ export class VkIdentityService {
+     const user = await tx.user.findUnique({ where: { id } });
+     if (!user) throw new NotFoundException('Сотрудник не найден');
+     await this.assertAvailable(tx, vkId, 'STAFF', id, user.trainerId);
+-    const trainer = user.trainerId ? await tx.trainer.findUnique({ where: { id: user.trainerId } }) : null;
+     const nextPeer = vkId ? BigInt(vkId) : null;
+-    const previousPeers = [...new Set([user.vkUserId, trainer?.vkUserId].filter((peer): peer is bigint => peer != null && peer !== nextPeer))];
++    const previousPeers = [...new Set([user.vkUserId].filter((peer): peer is bigint => peer != null && peer !== nextPeer))];
+     if (previousPeers.length) await tx.vkNotification.deleteMany({ where: { peerId: { in: previousPeers }, sentAt: null } });
+-    if (user.trainerId) await tx.trainer.update({ where: { id: user.trainerId }, data: { vkUserId: nextPeer } });
+     return tx.user.update({ where: { id }, data: { vkId, vkUserId: nextPeer },
+       select: { id: true, email: true, role: true, trainerId: true, vkId: true, vkUserId: true, createdAt: true, updatedAt: true } });
+   }
+ 
+   async identify(vkId: string) {
+     if (!/^[1-9]\d{0,14}$/.test(vkId)) throw new BadRequestException('Укажите числовой VK ID');
+-    const user = await this.prisma.user.findUnique({ where: { vkId }, include: { staffProfile: true, trainer: true } });
+-    if (user && user.staffProfile?.isActive !== false && user.trainer?.isActive !== false) return {
+-      type: 'STAFF' as const, role: user.role, name: user.staffProfile?.fullName || user.trainer?.name || user.email, staffId: user.id, trainerId: user.trainerId,
++    const trainer = await this.prisma.trainer.findFirst({ where: { vkId: BigInt(vkId), isActive: true } });
++    if (trainer) return { type: 'TRAINER' as const, id: trainer.id, name: trainer.name };
++    const user = await this.prisma.user.findUnique({ where: { vkId }, include: { staffProfile: true } });
++    if (user && user.role !== 'TRAINER' && user.staffProfile?.isActive !== false) return {
++      type: 'STAFF' as const, role: user.role, name: user.staffProfile?.fullName || user.email, staffId: user.id, trainerId: user.trainerId,
+     };
+     const client = await this.prisma.client.findUnique({ where: { vkId } });
+     if (!client || client.deletedAt) return { type: 'UNKNOWN' as const };
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-link.service.ts b/horse-club-crm/backend/src/vk-bot/vk-link.service.ts
+index 10b2abd..4457fc2 100644
+--- a/horse-club-crm/backend/src/vk-bot/vk-link.service.ts
++++ b/horse-club-crm/backend/src/vk-bot/vk-link.service.ts
+@@ -17,7 +17,8 @@ export class VkLinkService {
+   private readonly attempts = new Map<number, { count: number; until: number }>();
+   constructor(private readonly prisma: PrismaService) {}
+   async issue(kind: 'CLIENT' | 'TRAINER', id: string) {
+-    const row = kind === 'CLIENT' ? await this.prisma.client.findUnique({ where: { id } }) : await this.prisma.trainer.findUnique({ where: { id } });
++    if (kind !== 'CLIENT') throw new BadRequestException('Укажите VK ID в карточке тренера');
++    const row = await this.prisma.client.findUnique({ where: { id } });
+     if (!row?.phone) throw new BadRequestException('У записи должен быть указан телефон');
+     if (row.vkUserId || ('vkId' in row && row.vkId)) throw new ConflictException('Профиль уже привязан');
+     if (kind === 'CLIENT' && 'deletedAt' in row && row.deletedAt) throw new BadRequestException('Клиент находится в архиве');
+@@ -44,13 +45,10 @@ export class VkLinkService {
+       const target = kind === 'CLIENT' ? await tx.client.findUnique({ where: { id } }) : await tx.trainer.findUnique({ where: { id } });
+       if (!target) throw new BadRequestException('Профиль не найден');
+       if (kind === 'CLIENT') await tx.client.update({ where: { id }, data: { vkUserId: null, vkId: null, vkScreenName: null } });
+-      else {
+-        const account = await tx.user.findUnique({ where: { trainerId: id } });
+-        if (account) await new VkIdentityService(this.prisma).applyStaff(tx, account.id, null);
+-        else await tx.trainer.update({ where: { id }, data: { vkUserId: null } });
+-      }
++      else await new VkIdentityService(this.prisma).applyTrainer(tx, id, null);
+       await tx.vkLinkCode.deleteMany({ where: { kind, recordId: id } });
+-      if (target.vkUserId) await tx.vkNotification.deleteMany({ where: { peerId: target.vkUserId, sentAt: null } });
++      const peerId = 'vkUserId' in target ? target.vkUserId : target.vkId;
++      if (peerId) await tx.vkNotification.deleteMany({ where: { peerId, sentAt: null } });
+       return { success: true };
+     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+   }
+@@ -64,30 +62,23 @@ export class VkLinkService {
+     const phone = normalizePhone(phoneInput);
+     const kind = await this.prisma.$transaction(async tx => {
+       const grant = await tx.vkLinkCode.findUnique({ where: { codeHash: digest(code) } });
+-      if (!grant || grant.phone !== phone || grant.expiresAt < new Date() || (grant.usedBy !== null && grant.usedBy !== BigInt(sender))) {
++      if (!grant || grant.kind !== 'CLIENT' || grant.phone !== phone || grant.expiresAt < new Date() || (grant.usedBy !== null && grant.usedBy !== BigInt(sender))) {
+         throw new BadRequestException('Код недействителен или истёк');
+       }
+       const [clientBinding, trainerBinding] = await Promise.all([
+-        tx.client.findUnique({ where: { vkUserId: BigInt(sender) } }), tx.trainer.findUnique({ where: { vkUserId: BigInt(sender) } }),
++        tx.client.findUnique({ where: { vkUserId: BigInt(sender) } }), tx.trainer.findUnique({ where: { vkId: BigInt(sender) } }),
+       ]);
+-      if ((clientBinding && (grant.kind !== 'CLIENT' || clientBinding.id !== grant.recordId)) || (trainerBinding && (grant.kind !== 'TRAINER' || trainerBinding.id !== grant.recordId))) {
++      if ((clientBinding && (grant.kind !== 'CLIENT' || clientBinding.id !== grant.recordId)) || trainerBinding) {
+         throw new ConflictException('VK уже связан с другим профилем');
+       }
+-      const target = grant.kind === 'CLIENT' ? await tx.client.findUnique({ where: { id: grant.recordId } }) : await tx.trainer.findUnique({ where: { id: grant.recordId } });
++      const target = await tx.client.findUnique({ where: { id: grant.recordId } });
+       if (!target?.phone || normalizePhone(target.phone) !== phone || (target.vkUserId !== null && target.vkUserId !== BigInt(sender))) throw new ConflictException('Профиль изменён или уже привязан');
+       const identity = new VkIdentityService(this.prisma);
+-      if (grant.kind === 'CLIENT') {
+-        if ('deletedAt' in target && target.deletedAt) throw new ConflictException('Клиент находится в архиве');
+-        await identity.assertAvailable(tx, String(sender), 'CLIENT', target.id);
+-        await tx.client.update({ where: { id: target.id }, data: { vkUserId: BigInt(sender), vkId: String(sender) } });
+-      } else {
+-        if ('isActive' in target && !target.isActive) throw new ConflictException('Тренер неактивен');
+-        const account = await tx.user.findUnique({ where: { trainerId: target.id } });
+-        if (!account) throw new BadRequestException('Тренер не привязан к учетной записи сотрудника');
+-        await identity.applyStaff(tx, account.id, String(sender));
+-      }
++      if (target.deletedAt) throw new ConflictException('Клиент находится в архиве');
++      await identity.assertAvailable(tx, String(sender), 'CLIENT', target.id);
++      await tx.client.update({ where: { id: target.id }, data: { vkUserId: BigInt(sender), vkId: String(sender) } });
+       await tx.vkLinkCode.update({ where: { id: grant.id }, data: { usedBy: BigInt(sender) } });
+-      return grant.kind === 'CLIENT' ? 'CLIENT' : 'TRAINER';
++      return 'CLIENT' as const;
+     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+     this.attempts.delete(sender);
+     return kind;
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-training-notifications.ts b/horse-club-crm/backend/src/vk-bot/vk-training-notifications.ts
+index 4586beb..fecb5b2 100644
+--- a/horse-club-crm/backend/src/vk-bot/vk-training-notifications.ts
++++ b/horse-club-crm/backend/src/vk-bot/vk-training-notifications.ts
+@@ -13,7 +13,7 @@ interface VkPerson {
+ interface TrainingNotification {
+   startTime: Date;
+   endTime: Date;
+-  trainer?: VkPerson | null;
++  trainer?: (VkPerson & { vkId?: bigint | null }) | null;
+   trainingType: string;
+   notes?: string | null;
+   participants: { client?: VkPerson | null; horse?: { name: string } | null }[];
+@@ -25,17 +25,17 @@ const horseName = (horse?: { name: string } | null) => horse?.name?.trim() || '
+ 
+ // Only persist here. The worker contacts VK after the business transaction commits.
+ export async function queueTrainingConfirmation(tx: Prisma.TransactionClient, key: string, training: TrainingNotification): Promise<void> {
+-  if (!training.trainer?.vkUserId && !training.participants.some(row => row.client?.vkUserId)) return;
++  if (!training.trainer?.vkId && !training.participants.some(row => row.client?.vkUserId)) return;
+   const zone = process.env.CLUB_TIME_ZONE || 'Europe/Moscow';
+   const format = (date: Date) => new Intl.DateTimeFormat('ru-RU', {
+     dateStyle: 'short', timeStyle: 'short', timeZone: zone,
+   }).format(date);
+   const when = `${format(training.startTime)} — ${format(training.endTime)} (${zone})`;
+-  if (training.trainer?.vkUserId) {
++  if (training.trainer?.vkId) {
+     const participants = training.participants.length ? training.participants.map(row =>
+       `• Клиент: ${personName(row.client)} (${row.client?.phone?.trim() || 'телефон не указан'})\n• Лошадь: ${horseName(row.horse)}`
+     ).join('\n') : '• Клиент: пока не записан\n• Лошадь: не назначена';
+-    await queueVkNotification(tx, `${key}:trainer:${training.trainer.vkUserId}`, training.trainer.vkUserId,
++    await queueVkNotification(tx, `${key}:trainer:${training.trainer.vkId}`, training.trainer.vkId,
+       `📅 Новое занятие в вашем расписании!\n• Дата и время: ${when}\n${participants}\n• Тип занятия: ${training.trainingType}\n• Примечание: ${training.notes?.trim() || 'не указано'}`);
+   }
+   const clients = new Map<bigint, string[]>();
+diff --git a/horse-club-crm/backend/test/helpers/vk-identity.cjs b/horse-club-crm/backend/test/helpers/vk-identity.cjs
+index e4905e3..ffed4c4 100644
+--- a/horse-club-crm/backend/test/helpers/vk-identity.cjs
++++ b/horse-club-crm/backend/test/helpers/vk-identity.cjs
+@@ -7,8 +7,8 @@ exports.idleConversation = () => ({
+ exports.identityFixture = prisma => {
+   prisma.vkConversationState ??= exports.idleConversation();
+   return { identify: async () => {
+-    const trainer = await prisma.trainer?.findUnique({ where: { vkUserId: 42n } });
+-    if (trainer) return { type: 'STAFF', role: 'TRAINER', staffId: 'staff', trainerId: trainer.id, name: trainer.name };
++    const trainer = await prisma.trainer?.findUnique({ where: { vkId: 42n } });
++    if (trainer) return { type: 'TRAINER', id: trainer.id, name: trainer.name };
+     const client = await prisma.client?.findUnique({ where: { vkId: '42' } });
+     return client ? { type: 'CLIENT', clientId: client.id, name: client.name || client.firstName } : { type: 'UNKNOWN' };
+   } };
+diff --git a/horse-club-crm/backend/test/lead-conversion-lesson.test.cjs b/horse-club-crm/backend/test/lead-conversion-lesson.test.cjs
+index dd7ac6e..5b92f44 100644
+--- a/horse-club-crm/backend/test/lead-conversion-lesson.test.cjs
++++ b/horse-club-crm/backend/test/lead-conversion-lesson.test.cjs
+@@ -18,7 +18,7 @@ function harness({ existing = false, collision, failLeadUpdate = false, missingS
+   let state = { lead: { id: ids.lead, status: 'PENDING', serviceId: missingService ? null : ids.service },
+     clients: existing ? [{ id: ids.client, phone: dto().phone, firstName: 'Старое имя', vkUserId: 42n }] : [], lessons: [], notifications: [] };
+   let transactionCount = 0, validateCount = 0;
+-  const trainer = { id: ids.trainer, isActive: true, maxParallelLessons, name: 'Мария', vkUserId: 77n };
++  const trainer = { id: ids.trainer, isActive: true, maxParallelLessons, name: 'Мария', vkId: 77n };
+   const horse = { id: ids.horse, name: 'Валдай', status: 'active', isUnavailable: false,
+     requiredRestMinutes: 45, maxDailyWorkloadMinutes: 240, maxDailyMinutes: 240, maxRiderWeight: 85 };
+   const arena = { id: ids.arena, name: 'Манеж', isActive: true, isUnavailable: false, capacity: 6, maxRidersCapacity: 6 };
+diff --git a/horse-club-crm/backend/test/trainer-vk-binding.test.cjs b/horse-club-crm/backend/test/trainer-vk-binding.test.cjs
+new file mode 100644
+index 0000000..b520016
+--- /dev/null
++++ b/horse-club-crm/backend/test/trainer-vk-binding.test.cjs
+@@ -0,0 +1,142 @@
++require('reflect-metadata');
++const { test } = require('node:test');
++const assert = require('node:assert/strict');
++const { plainToInstance } = require('class-transformer');
++const { validate } = require('class-validator');
++const { VkIdentityService } = require('../dist/vk-bot/vk-identity.service');
++const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
++const { TrainersService } = require('../dist/trainers/trainers.service');
++const { CreateTrainerDto } = require('../dist/trainers/dto/create-trainer.dto');
++
++function fixture(patch = {}) {
++  const row = { id: 'trainer', name: 'Анна', isActive: true, vkId: null, ...patch };
++  const tx = {
++    trainer: {
++      findUnique: async ({ where }) => where.id === row.id || where.vkId != null && where.vkId === row.vkId ? { ...row } : null,
++      findFirst: async ({ where }) => row.vkId === where.vkId && row.isActive ? { ...row } : null,
++      update: async ({ data, omit }) => { Object.assign(row, data); return Object.fromEntries(Object.entries(row).filter(([key]) => !omit?.[key])); },
++      updateMany: async () => ({ count: 0 }),
++      create: async ({ data }) => { Object.assign(row, data); return row; },
++    },
++    user: { findUnique: async () => null, findFirst: async () => null },
++    client: { findFirst: async () => null },
++    vkNotification: { deleteMany: async () => ({ count: 0 }) },
++  };
++  const prisma = { ...tx, $transaction: async (work, options) => {
++    assert.equal(options.isolationLevel, 'Serializable'); return work(tx);
++  } };
++  return { row, tx, prisma, service: new VkIdentityService(prisma) };
++}
++
++test('trainer resolves with one direct indexed query and no account/profile lookup', async () => {
++  const service = new VkIdentityService({ trainer: { findFirst: async query => {
++    assert.deepEqual(query.where, { vkId: 42n, isActive: true });
++    return { id: 'trainer', name: 'Анна' };
++  } } });
++  assert.deepEqual(await service.identify('42'), { type: 'TRAINER', id: 'trainer', name: 'Анна' });
++});
++
++test('trainer can bind and unbind a VK URL without Staff/User, using only the direct BigInt field', async () => {
++  const { row, service } = fixture();
++  const result = await service.setTrainer('trainer', 'https://vk.com/id42');
++  assert.equal(row.vkId, 42n);
++  assert.equal('bindPin' in result, false);
++  await service.setTrainer('trainer', null);
++  assert.equal(row.vkId, null);
++});
++
++test('direct binding rejects a VK owned by another client or trainer', async () => {
++  const { tx, service, row } = fixture();
++  tx.client.findFirst = async () => ({ id: 'client' });
++  await assert.rejects(service.setTrainer('trainer', '42'), error => error.getStatus() === 409);
++  assert.equal(row.vkId, null);
++  tx.client.findFirst = async () => null;
++  const read = tx.trainer.findUnique;
++  tx.trainer.findUnique = async query => query.where.vkId ? { id: 'other' } : read(query);
++  await assert.rejects(service.setTrainer('trainer', '42'), error => error.getStatus() === 409);
++});
++
++test('inactive trainer and a legacy trainer account cannot grant trainer identity', async () => {
++  const { prisma, service } = fixture({ vkId: 42n, isActive: false });
++  prisma.user.findUnique = async () => ({ id: 'account', role: 'TRAINER', trainerId: 'trainer', staffProfile: { isActive: true } });
++  prisma.client.findUnique = async () => null;
++  assert.deepEqual(await service.identify('42'), { type: 'UNKNOWN' });
++});
++
++test('changing or clearing trainer VK revokes pending notifications without writing accounts', async () => {
++  const { row, tx, service } = fixture({ vkId: 41n });
++  const removed = [];
++  tx.vkNotification.deleteMany = async query => removed.push(query.where.peerId);
++  await service.setTrainer('trainer', '42');
++  assert.equal(row.vkId, 42n);
++  await service.setTrainer('trainer', null);
++  assert.deepEqual(removed, [41n, 42n]);
++});
++
++test('create/update normalize VK and preserve schedule fields without a staff account', async () => {
++  const { prisma, service, row } = fixture();
++  const trainers = new TrainersService(prisma, service);
++  await trainers.create({ name: 'Анна', baseRate: 0, vkId: 'vk.com/id42', maxParallelLessons: 4 });
++  assert.equal(row.vkId, 42n); assert.equal(row.maxParallelLessons, 4);
++  await trainers.update('trainer', { vkId: 'id43', maxDailyLoad: 480 });
++  assert.equal(row.vkId, 43n); assert.equal(row.maxDailyLoad, 480);
++  const dto = plainToInstance(CreateTrainerDto, { name: 'Анна', baseRate: 0, vkId: 42 });
++  assert.equal(dto.vkId, '42'); assert.equal((await validate(dto)).length, 0);
++});
++
++for (const command of ['код 1234', 'тренер 1234']) test(`bot ignores removed PIN command: ${command}`, async () => {
++  const bot = new VkBotService({ vkConversationState: require('./helpers/vk-identity.cjs').idleConversation() }, {}, {}, {}, {
++    identify: async () => { throw Error('PIN command must not resolve identity'); },
++  });
++  bot.vk = { api: { messages: { send: async () => { throw Error('PIN command must not reply'); } } } };
++  await bot.handleMessage({ message: { from_id: 42, peer_id: 42, text: command, out: 0 } }, command);
++});
++
++test('direct trainer can open menu, request schedule and mark attendance', async () => {
++  const sent = [], days = [], attendance = [];
++  const identity = { identify: async () => ({ type: 'TRAINER', id: 'trainer', name: 'Анна' }) };
++  const bot = new VkBotService({ vkConversationState: require('./helpers/vk-identity.cjs').idleConversation() }, {}, {
++    markAttendance: async (...args) => attendance.push(args),
++  }, {}, identity);
++  bot.vk = { api: { messages: { send: async message => sent.push(message), sendMessageEventAnswer: async () => {} } } };
++  bot.today = async (...args) => days.push(args);
++  await bot.handleMessage({ message: { from_id: 42, peer_id: 42, text: '/start', out: 0 } }, 'menu');
++  assert.match(String(sent[0].keyboard), /Мои всадники/);
++  await bot.handleMessage({ message: { from_id: 42, peer_id: 42, text: 'today', out: 0 } }, 'today');
++  assert.equal(days[0][0], 'trainer');
++  await bot.handleEvent({ user_id: 42, peer_id: 42, event_id: 'attendance', payload: {
++    action: 'attendance', bookingId: '11111111-1111-4111-8111-111111111111', attended: true,
++  } });
++  assert.equal(attendance[0][2].trainerId, 'trainer');
++});
++
++test('trainer VK API validates UUID and requires writable schedule and administrator/manager role', async () => {
++  const { Test } = require('@nestjs/testing');
++  const { ValidationPipe } = require('@nestjs/common');
++  const request = require('supertest');
++  const { TrainersController } = require('../dist/trainers/trainers.controller');
++  const { JwtAuthGuard } = require('../dist/auth/guards/jwt-auth.guard');
++  const { RolesGuard } = require('../dist/auth/guards/roles.guard');
++  const { ModuleAccessService } = require('../dist/settings/module-access.service');
++  let level = 'FULL';
++  let calls = 0;
++  const module = await Test.createTestingModule({ controllers: [TrainersController], providers: [RolesGuard,
++    { provide: TrainersService, useValue: {} },
++    { provide: VkIdentityService, useValue: { setTrainer: async (_id, vkId) => { calls++; return { vkId }; } } },
++    { provide: ModuleAccessService, useValue: { forRole: async () => [{ module: 'SCHEDULE', isEnabled: true, accessLevel: level }] } },
++  ] }).overrideGuard(JwtAuthGuard).useValue({ canActivate(context) {
++    const req = context.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] || 'MANAGER' }; return true;
++  } }).compile();
++  const app = module.createNestApplication(); app.setGlobalPrefix('api');
++  app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true })); await app.init();
++  const post = (id = '11111111-1111-4111-8111-111111111111') => request(app.getHttpServer()).patch(`/api/trainers/${id}/vk`).send({ vkId: '42' });
++  try {
++    assert.equal((await post().expect(200)).body.vkId, '42');
++    await request(app.getHttpServer()).post('/api/trainers/11111111-1111-4111-8111-111111111111/bind-code').expect(404);
++    await post('invalid').expect(400);
++    await post().set('x-role', 'TRAINER').expect(403);
++    level = 'READ_ONLY'; await post().expect(403);
++    level = 'HIDDEN'; await post().expect(403);
++    assert.equal(calls, 1);
++  } finally { await app.close(); }
++});
+diff --git a/horse-club-crm/backend/test/vk-bot-free-text.test.cjs b/horse-club-crm/backend/test/vk-bot-free-text.test.cjs
+index e61d0c6..dc72429 100644
+--- a/horse-club-crm/backend/test/vk-bot-free-text.test.cjs
++++ b/horse-club-crm/backend/test/vk-bot-free-text.test.cjs
+@@ -24,32 +24,32 @@ function harness(role) {
+ }
+ 
+ for (const role of ['guest', 'client', 'trainer']) {
+-  test(`ordinary messages from ${role} are identified and receive their role menu`, async () => {
++  test(`ordinary messages from ${role} stay silent without identity lookup`, async () => {
+     const h = harness(role);
+     for (const text of [
+       'Добрый вечер! Все в силе?', 'Привет', 'Здравствуйте!', 'Спасибо!', 'Да',
+       'Можно записаться завтра?', '1234', '', '   ', '🐎',
+       'Расскажите о клубе', 'Нужна помощь',
+-      'привязаться', '/starter', 'help me',
++      'привязаться', '/starter', 'help me', 'Тест', 'случайное', '+79991234567',
++      'Привязать профиль', '/start 1234',
+     ]) await h.send(text);
+     await h.send('Добрый вечер!', '{invalid');
+     await h.send('Добрый вечер!', JSON.stringify({ command: 'unknown' }));
+     await h.send('Добрый вечер!', JSON.stringify({ offset: 10 }));
+-    assert.ok(h.sent.length > 0);
+-    assert.ok(h.queries.includes('client') || h.queries.includes('trainer'));
+-    for (const row of h.sent) assert.match(row.message, role === 'guest' ? /Приглашаем/ : /Здравствуйте/);
++    assert.deepEqual(h.sent, []);
++    assert.deepEqual(h.queries, []);
+   });
+ }
+ 
+ for (const [role, text, payload, expected] of [
+   ['guest', 'Начать', undefined, /Здравствуйте, Анна!/],
++  ['guest', '/start', undefined, /Выберите действие/],
++  ['client', ' Меню ', undefined, /Здравствуйте, Анна!/],
+   ['guest', '', { command: 'start' }, /Здравствуйте, Анна!/],
+   ['guest', '', { command: 'about' }, /Конный клуб/],
+   ['guest', '', { command: 'guide' }, /Шлем/],
+   ['guest', '', { command: 'первичная заявка' }, /Ознакомьтесь с согласием/],
+   ['guest', 'Первичная заявка', undefined, /Ознакомьтесь с согласием/],
+-  ['guest', 'Привязать профиль', undefined, /привязать ваш VK/],
+-  ['guest', '/start 1234', undefined, /привязать ваш VK/],
+   ['client', '', { command: 'balance' }, /нет активных абонементов/],
+   ['client', '', { command: 'bookings' }, /тренировок пока нет/],
+   ['trainer', '', { command: 'today' }, /занятий нет/],
+diff --git a/horse-club-crm/backend/test/vk-bot-pause.test.cjs b/horse-club-crm/backend/test/vk-bot-pause.test.cjs
+index ac04452..1e296a0 100644
+--- a/horse-club-crm/backend/test/vk-bot-pause.test.cjs
++++ b/horse-club-crm/backend/test/vk-bot-pause.test.cjs
+@@ -69,7 +69,7 @@ test('active pause ignores free text, attachments and old menu buttons before id
+   await h.send('Мои тренировки', JSON.stringify({ command: 'bookings' }));
+   await h.send('Позвать администратора');
+   assert.equal(h.sent.length, 0); assert.equal(h.identified.length, 0);
+-  await h.send('Здравствуйте', undefined, 43);
++  await h.send('Меню', undefined, 43);
+   assert.equal(h.sent.length, 1); assert.equal(h.sent[0].peer_id, 43);
+ });
+ 
+@@ -82,21 +82,23 @@ for (const [text, payload] of [
+     assert.equal(h.states.get(42n).isBotPaused, false);
+     assert.equal(h.states.get(42n).botPausedUntil, null);
+     assert.equal(String(h.sent[0].keyboard), String(profile.type === 'UNKNOWN' ? welcomeMenu() : mainMenu()));
+-    await h.send('Спасибо'); assert.equal(h.sent.length, 2);
++    await h.send('Спасибо'); assert.equal(h.sent.length, 1);
++    await h.send('О клубе'); assert.equal(h.sent.length, 2);
+   });
+ }
+ 
+ test('expired pause resumes replies and clears the persisted flag', async () => {
+   const h = harness(); h.pause(new Date(Date.now() - 1));
+-  await h.send('Здравствуйте');
++  await h.send('Здравствуйте'); assert.equal(h.sent.length, 0);
++  await h.send('О клубе');
+   assert.equal(h.sent.length, 1); assert.equal(h.states.get(42n).isBotPaused, false);
+   assert.equal(h.states.get(42n).botPausedUntil, null);
+ });
+ 
+-test('administrator button pauses for four hours, queues a notification and offers inline reset', async () => {
++for (const payload of [undefined, JSON.stringify({ command: 'help' })]) test(`administrator button pauses for four hours, queues a notification and offers inline reset: ${payload}`, async () => {
+   const oldPeer = process.env.VK_ADMIN_PEER_ID; process.env.VK_ADMIN_PEER_ID = '77';
+   try {
+-    const h = harness(); const now = Date.now(); await h.send('Позвать администратора');
++    const h = harness(); const now = Date.now(); await h.send(payload ? 'Кнопка' : 'Позвать администратора', payload);
+     assert.equal(h.states.get(42n).isBotPaused, true);
+     assert.ok(h.states.get(42n).botPausedUntil.getTime() >= now + 14400000);
+     assert.equal(h.queued.length, 1); assert.equal(h.queued[0].create.peerId, 77n);
+@@ -104,6 +106,9 @@ test('administrator button pauses for four hours, queues a notification and offe
+     const keyboard = JSON.parse(String(h.sent[0].keyboard));
+     assert.equal(keyboard.inline, true);
+     assert.equal(keyboard.buttons[0][0].action.label, 'Вернуться в меню бота');
++    await h.send('Тест');
++    await h.send('Кнопка', JSON.stringify({ command: 'about' }));
++    assert.equal(h.sent.length, 1);
+     await h.send('Кнопка', keyboard.buttons[0][0].action.payload);
+     assert.equal(h.states.get(42n).isBotPaused, false);
+   } finally {
+diff --git a/horse-club-crm/backend/test/vk-bot-scenarios.live.cjs b/horse-club-crm/backend/test/vk-bot-scenarios.live.cjs
+index 458acab..50b1d05 100644
+--- a/horse-club-crm/backend/test/vk-bot-scenarios.live.cjs
++++ b/horse-club-crm/backend/test/vk-bot-scenarios.live.cjs
+@@ -21,7 +21,7 @@ test('real DB: protected link-code, VK binding, ownership and idempotent attenda
+   const ids = Object.fromEntries(['trainer', 'client', 'horse', 'service', 'lesson', 'booking', 'membership'].map(key => [key, randomUUID()]));
+   const phone = '+79991234567';
+   let vkId;
+-  do { vkId = randomInt(100000000, 1000000000); } while (await p.trainer.findUnique({ where: { vkUserId: BigInt(vkId) } }) || await p.client.findUnique({ where: { vkUserId: BigInt(vkId) } }));
++  do { vkId = randomInt(100000000, 1000000000); } while (await p.trainer.findUnique({ where: { vkId: BigInt(vkId) } }) || await p.client.findUnique({ where: { vkUserId: BigInt(vkId) } }));
+   try {
+     await p.trainer.create({ data: { id: ids.trainer, name: 'QA VK trainer', phone } });
+     await p.client.create({ data: { id: ids.client, name: 'QA VK rider' } });
+@@ -31,9 +31,9 @@ test('real DB: protected link-code, VK binding, ownership and idempotent attenda
+     await p.lesson.create({ data: { id: ids.lesson, trainerId: ids.trainer, serviceId: ids.service, startTime: new Date(Date.now() - 3600000), endTime: new Date(), bookings: { create: { id: ids.booking, clientId: ids.client, horseId: ids.horse, membershipId: ids.membership } } } });
+     await request(app.getHttpServer()).post('/api/vk/link-codes').send({ kind: 'TRAINER', id: ids.trainer }).expect(401);
+     const auth = await request(app.getHttpServer()).post('/api/auth/login').send({ email: 'admin@test.ru', password: 'admin123' }).expect(200);
+-    const code = await request(app.getHttpServer()).post('/api/vk/link-codes').set('Authorization', `Bearer ${auth.body.access_token}`).send({ kind: 'TRAINER', id: ids.trainer }).expect(201);
+-    await bot.handleMessage({ message: { from_id: vkId, peer_id: vkId, out: 0, text: code.body.instruction } }, 'link');
+-    assert.equal((await p.trainer.findUnique({ where: { id: ids.trainer } })).vkUserId, BigInt(vkId));
++    await request(app.getHttpServer()).patch(`/api/trainers/${ids.trainer}`).set('Authorization', `Bearer ${auth.body.access_token}`).send({ vkId: String(vkId) }).expect(200);
++    assert.equal((await p.trainer.findUnique({ where: { id: ids.trainer } })).vkId, BigInt(vkId));
++    await bot.handleMessage({ message: { from_id: vkId, peer_id: vkId, out: 0, text: '/start' } }, 'start');
+     const action = { user_id: vkId, peer_id: vkId, event_id: 'attendance', payload: { action: 'attendance', bookingId: ids.booking, attended: true } };
+     await bot.handleEvent(action); await bot.handleEvent(action);
+     assert.equal((await p.membership.findUnique({ where: { id: ids.membership } })).remainedLessons, 1);
+@@ -45,7 +45,7 @@ test('real DB: protected link-code, VK binding, ownership and idempotent attenda
+     await bot.handleEvent({ ...action, event_id: 'cancelled' });
+     assert.match(answers.at(-1).event_data, /отменено/);
+     assert.equal((await p.booking.findUnique({ where: { id: ids.booking } })).attendanceStatus, 'NO_SHOW');
+-    assert.match(messages[0].message, /успешно привязан/);
++    assert.match(messages[0].message, /Выберите действие/);
+   } finally {
+     await p.vkLinkCode.deleteMany({ where: { recordId: ids.trainer } });
+     await p.membershipOp.deleteMany({ where: { membershipId: ids.membership } });
+diff --git a/horse-club-crm/backend/test/vk-bot-scenarios.test.cjs b/horse-club-crm/backend/test/vk-bot-scenarios.test.cjs
+index 6a52741..db5c57d 100644
+--- a/horse-club-crm/backend/test/vk-bot-scenarios.test.cjs
++++ b/horse-club-crm/backend/test/vk-bot-scenarios.test.cjs
+@@ -22,7 +22,7 @@ test('normalizes Russian national and international phone numbers', () => {
+   assert.equal(normalizePhone('+7 999 123 45 67'), '+79991234567');
+   assert.throws(() => normalizePhone('123'));
+ });
+-for (const kind of ['CLIENT', 'TRAINER']) test(`links ${kind} by normalized phone and single-use administrator code`, async () => {
++for (const kind of ['CLIENT']) test(`links ${kind} by normalized phone and single-use administrator code`, async () => {
+   const target = { id: 'target', phone: '+79991234567', vkUserId: null };
+   const account = { id: 'user', trainerId: 'target', vkUserId: null };
+   let grant;
+@@ -33,7 +33,7 @@ for (const kind of ['CLIENT', 'TRAINER']) test(`links ${kind} by normalized phon
+   };
+   const prisma = {
+     client: kind === 'CLIENT' ? targetModel : { findUnique: async () => null, findFirst: async () => null },
+-    trainer: kind === 'TRAINER' ? targetModel : { findUnique: async () => null },
++    trainer: kind === 'TRAINER' ? targetModel : { findUnique: async () => null, findFirst: async () => null },
+     vkLinkCode: {
+       deleteMany: async () => { grant = undefined; },
+       create: async ({ data }) => { grant = { id: 'grant', usedBy: null, ...data }; },
+@@ -59,7 +59,7 @@ for (const kind of ['CLIENT', 'TRAINER']) test(`links ${kind} by normalized phon
+ test('client balance query is limited to the linked owner and active memberships', async () => {
+   let query;
+   const { service, sent } = bot({
+-    client: { findUnique: async () => ({ id: 'owner' }) }, trainer: { findUnique: async () => null },
++    client: { findUnique: async () => ({ id: 'owner' }) }, trainer: { findFirst: async () => null, findUnique: async () => null },
+     membership: { findMany: async args => { query = args; return [{ id: 'membership', clientId: 'owner', title: '', remainingUnits: 4, validTo: new Date('2030-01-01T00:00:00Z') }]; } },
+   });
+   await service.handleMessage(message('Мой баланс'), 'balance-1');
+@@ -67,7 +67,7 @@ test('client balance query is limited to the linked owner and active memberships
+   assert.ok(query.where.validTo.gte instanceof Date); assert.match(sent[0].message, /4 занятия/);
+ });
+ test('unlinked visitor is offered supported VK keyboard and a lead form', async () => {
+-  const { service, sent } = bot({ client: { findUnique: async () => null }, trainer: { findUnique: async () => null } });
++  const { service, sent } = bot({ client: { findUnique: async () => null }, trainer: { findFirst: async () => null, findUnique: async () => null } });
+   await service.handleMessage(message('начать'), 'welcome');
+   assert.match(sent[0].message, /Приглашаем вас в конный клуб/);
+   assert.match(String(sent[0].keyboard), /Наш прайс и услуги/);
+@@ -76,7 +76,7 @@ test('unlinked visitor is offered supported VK keyboard and a lead form', async
+ test('VK lead requires a separately recorded current consent', async () => {
+   let accepted, created;
+   const prisma = {
+-    client: { findUnique: async () => null }, trainer: { findUnique: async () => null },
++    client: { findUnique: async () => null }, trainer: { findFirst: async () => null, findUnique: async () => null },
+     vkConsent: {
+       findUnique: async () => accepted,
+       upsert: async ({ create }) => { accepted = create; return create; },
+@@ -92,14 +92,14 @@ test('VK lead requires a separately recorded current consent', async () => {
+ });
+ test('inline attendance invokes billing with authenticated trainer context', async () => {
+   const calls = [];
+-  const { service, answers } = bot({ trainer: { findUnique: async () => ({ id: 'trainer' }) } }, { ledger: { markAttendance: async (...args) => calls.push(args) } });
++  const { service, answers } = bot({ trainer: { findFirst: async () => null, findUnique: async () => ({ id: 'trainer' }) } }, { ledger: { markAttendance: async (...args) => calls.push(args) } });
+   for (const attended of [true, false]) await service.handleEvent({ user_id: 42, peer_id: 42, event_id: `event-${attended}`, payload: { action: 'attendance', bookingId, attended } });
+   assert.deepEqual(calls, [[bookingId, true, { trainerId: 'trainer', noShow: false }], [bookingId, false, { trainerId: 'trainer', noShow: true }]]);
+   assert.equal(answers.length, 2);
+ });
+ test('client cannot invoke trainer inline action', async () => {
+   let billed = false;
+-  const { service, answers } = bot({ trainer: { findUnique: async () => null } }, { ledger: { markAttendance: async () => { billed = true; } } });
++  const { service, answers } = bot({ trainer: { findFirst: async () => null, findUnique: async () => null } }, { ledger: { markAttendance: async () => { billed = true; } } });
+   await service.handleEvent({ user_id: 42, peer_id: 42, event_id: 'forbidden', payload: { action: 'attendance', bookingId, attended: true } });
+   assert.equal(billed, false); assert.match(answers[0].event_data, /только тренеру/);
+ });
+@@ -108,7 +108,7 @@ test('today uses club day bounds and includes lessons without bookings', async (
+   process.env.CLUB_TIME_ZONE = 'Europe/Moscow';
+   let query;
+   const { service, sent } = bot({
+-    client: { findUnique: async () => null }, trainer: { findUnique: async () => ({ id: 'trainer' }) },
++    client: { findUnique: async () => null }, trainer: { findFirst: async () => null, findUnique: async () => ({ id: 'trainer' }) },
+     booking: { findMany: async () => [] },
+     lesson: { findMany: async args => { query = args; return [{ id: 'lesson', startTime: new Date(), bookings: [] }]; } },
+   });
+@@ -171,7 +171,7 @@ function notificationLessons() {
+       findFirst: async () => null, findMany: async () => [],
+       findUnique: async () => lesson,
+       findUniqueOrThrow: async () => lesson,
+-      create: async ({ data }) => { lesson = { ...data, id: 'lesson', trainer: { name: 'Мария', vkUserId: 42n },
++      create: async ({ data }) => { lesson = { ...data, id: 'lesson', trainer: { name: 'Мария', vkId: 42n },
+         service: { title: 'Выездка', allowMembership: false }, operations: [], bookings: [
+           { id: 'booking', clientId: 'client', membershipId: null, horseId: null, client: { name: 'Анна', vkUserId: 43n } },
+           { id: 'booking2', clientId: 'client2', membershipId: null, horseId: null, client: { name: 'Борис', vkUserId: null } },
+@@ -246,10 +246,10 @@ test('failed lesson transaction leaves no notification and transport failure can
+ });
+ 
+ test('legacy /start text no longer requests a phone; direct identity opens client menu', async () => {
+-  const { service, sent } = bot({ client: { findUnique: async () => ({ firstName: 'Анна' }) }, trainer: { findUnique: async () => null } });
++  const { service, sent } = bot({ client: { findUnique: async () => ({ firstName: 'Анна' }) }, trainer: { findFirst: async () => null, findUnique: async () => null } });
+   for (const text of ['/start 1234']) {
+     await service.handleMessage(message(text), `code-${text}`);
+-    assert.match(sent.at(-1).message, /Здравствуйте, Анна/);
++    assert.equal(sent.length, 0);
+   }
+   await service.handleMessage(message('/start'), 'start');
+   assert.match(sent.at(-1).message, /Здравствуйте, Анна/);
+diff --git a/horse-club-crm/backend/test/vk-bot.test.cjs b/horse-club-crm/backend/test/vk-bot.test.cjs
+index f7a9251..6ac03a5 100644
+--- a/horse-club-crm/backend/test/vk-bot.test.cjs
++++ b/horse-club-crm/backend/test/vk-bot.test.cjs
+@@ -40,11 +40,11 @@ for (const patch of [{ secret: 'wrong' }, { secret: null }, { group_id: 456 }])
+ });
+ const message = { ...event, type: 'message_new', event_id: 'event-1', object: { message: { from_id: 42, peer_id: 42, text: '/start', out: 0 } } };
+ 
+-test('/start binding command returns personalized role greeting through the callback', async () => {
++test('legacy /start binding text is acknowledged without replying or identifying', async () => {
+   await request(app.getHttpServer()).post('/api/vk/callback').send({ ...message,
+     object: { message: { ...message.object.message, text: '/start +79991234567 1234' } } }).expect(200);
+-  assert.match(sent[0].message, /Здравствуйте, Анна/);
+-  assert.match(String(sent[0].keyboard), /Мой абонемент/);
++  assert.equal(sent.length, 0);
++  assert.equal(lookup.length, 0);
+ });
+ test('message routes by BigInt vkUserId and repeats use stable random_id', async () => {
+   for (let i = 0; i < 2; i++) assert.equal((await request(app.getHttpServer()).post('/api/vk/callback').send(message).expect(200)).text, 'ok');
+diff --git a/horse-club-crm/backend/test/vk-callback.test.cjs b/horse-club-crm/backend/test/vk-callback.test.cjs
+index f910ba3..b2eb677 100644
+--- a/horse-club-crm/backend/test/vk-callback.test.cjs
++++ b/horse-club-crm/backend/test/vk-callback.test.cjs
+@@ -69,14 +69,13 @@ for (const text of ['Начать', 'start']) test(`${text} greets after identit
+   assert.ok(Number.isInteger(sent[0].random_id)); assert.notEqual(sent[0].random_id, 0);
+ });
+ 
+-test('ordinary messages are acknowledged and receive an identity menu', async () => {
++test('ordinary messages are acknowledged without a bot reply', async () => {
+   for (const text of ['Добрый вечер! Все в силе?', 'Привет', '1234']) {
+     const response = await request(app.getHttpServer()).post(path).send(event(text)).expect(200);
+     assert.equal(response.text, 'ok');
+   }
+   await nextTurn();
+-  assert.equal(sent.length, 3);
+-  assert.ok(sent.every(row => /Приглашаем/.test(row.message)));
++  assert.equal(sent.length, 0);
+   assert.deepEqual(failures, []);
+ });
+ 
+diff --git a/horse-club-crm/backend/test/vk-finalization.test.cjs b/horse-club-crm/backend/test/vk-finalization.test.cjs
+index e34ab64..180d48c 100644
+--- a/horse-club-crm/backend/test/vk-finalization.test.cjs
++++ b/horse-club-crm/backend/test/vk-finalization.test.cjs
+@@ -119,7 +119,7 @@ test('guest linking requests phone plus administrator code and booking links to
+ });
+ test('tomorrow schedule has Moscow boundaries and shows rider and optional horse', async () => {
+   let range;
+-  const h = bot({ type: 'STAFF', role: 'TRAINER', trainerId: 'trainer' }, {
++  const h = bot({ type: 'TRAINER', id: 'trainer' }, {
+     lesson: { findMany: async query => { range = query.where.startTime; return []; } },
+     booking: { findMany: async () => [{ id: 'booking', startTime: new Date(), client: { name: 'Анна' }, horse: null }] },
+   });
+diff --git a/horse-club-crm/backend/test/vk-identity.test.cjs b/horse-club-crm/backend/test/vk-identity.test.cjs
+index ed22d2e..da3bbb2 100644
+--- a/horse-club-crm/backend/test/vk-identity.test.cjs
++++ b/horse-club-crm/backend/test/vk-identity.test.cjs
+@@ -38,7 +38,7 @@ test('screen name resolves through VK to a numeric ID; unavailable/deactivated p
+ const fixtures = (patch = {}) => ({
+   client: { findFirst: async () => null, findUnique: async () => null },
+   user: { findFirst: async () => null, findUnique: async () => null },
+-  trainer: { findUnique: async () => null }, ...patch,
++  trainer: { findFirst: async () => null, findUnique: async () => null }, ...patch,
+ });
+ test('uniqueness covers both tables and legacy trainer bindings, permits same owner', async () => {
+   const service = new VkIdentityService({});
+@@ -57,28 +57,28 @@ test('concurrent unique conflicts return a helpful 409, serialization failures r
+   service.prisma.$transaction = async () => { throw error('P2002'); };
+   await assert.rejects(service.atomic(async () => {}), error => error.getStatus() === 409 && /VK ID/.test(error.message));
+ });
+-test('staff update and clear synchronize user/trainer delivery IDs and revoke pending notifications', async () => {
++test('staff update and clear affect only the user and revoke its pending notifications', async () => {
+   const account = { id: 'staff', trainerId: 'trainer', vkUserId: 41n };
+   const writes = [];
+   const tx = fixtures({ user: { findUnique: async () => account, findFirst: async () => null, update: async query => { writes.push(['user', query]); return query.data; } },
+-    trainer: { findUnique: async () => ({ id: 'trainer', vkUserId: 41n }), update: async query => writes.push(['trainer', query]) },
++    trainer: { findFirst: async () => null, findUnique: async () => ({ id: 'trainer', vkUserId: 41n }), update: async query => writes.push(['trainer', query]) },
+     vkNotification: { deleteMany: async query => writes.push(['queue', query]) } });
+   const service = new VkIdentityService({ $transaction: async work => work(tx) });
+   const result = await service.setStaff('staff', 'id42');
+   assert.equal(result.vkId, '42'); assert.equal(result.vkUserId, 42n);
+-  assert.equal(writes.find(([kind]) => kind === 'trainer')[1].data.vkUserId, 42n);
++  assert.equal(writes.some(([kind]) => kind === 'trainer'), false);
+   assert.deepEqual(writes.find(([kind]) => kind === 'queue')[1].where.peerId, { in: [41n] });
+   assert.equal((await service.setStaff('staff', null)).vkId, null);
+ });
+ test('identification prioritizes staff, rejects inactive profiles, returns client summary and UNKNOWN', async () => {
+-  let user = { id: 'staff', role: 'TRAINER', trainerId: 'trainer', trainer: { name: 'Тренер', isActive: true }, staffProfile: { fullName: 'Иван', isActive: true } };
++  let user = { id: 'staff', role: 'MANAGER', trainerId: 'trainer', trainer: { name: 'Тренер', isActive: true }, staffProfile: { fullName: 'Иван', isActive: true } };
+   let client = { id: 'client', name: 'Анна', deletedAt: null };
+   let clientReads = 0;
+-  const service = new VkIdentityService({ user: { findUnique: async query => { assert.deepEqual(query.where, { vkId: '42' }); return user; } },
++  const service = new VkIdentityService({ trainer: { findFirst: async () => null }, user: { findUnique: async query => { assert.deepEqual(query.where, { vkId: '42' }); return user; } },
+     client: { findUnique: async () => { clientReads++; return client; } },
+     membership: { count: async query => { assert.equal(query.where.status, 'active'); assert.deepEqual(query.where.remainingUnits, { gt: 0 }); return 2; } },
+     booking: { findFirst: async query => { assert.equal(query.where.status, 'scheduled'); return { id: 'booking' }; } } });
+-  assert.deepEqual(await service.identify('42'), { type: 'STAFF', staffId: 'staff', role: 'TRAINER', trainerId: 'trainer', name: 'Иван' });
++  assert.deepEqual(await service.identify('42'), { type: 'STAFF', staffId: 'staff', role: 'MANAGER', trainerId: 'trainer', name: 'Иван' });
+   assert.equal(clientReads, 0);
+   user = null;
+   assert.deepEqual(await service.identify('42'), { type: 'CLIENT', clientId: 'client', name: 'Анна', activeMembershipsCount: 2, nextBooking: { id: 'booking' } });
+@@ -137,7 +137,7 @@ test('bot identifies actual from_id and immediately opens the correct menu witho
+   const { VkBotService } = require('../dist/vk-bot/vk-bot.service');
+   for (const profile of [
+     { type: 'CLIENT', clientId: 'client', name: 'Анна' },
+-    { type: 'STAFF', role: 'TRAINER', staffId: 'user', trainerId: 'trainer', name: 'Иван' },
++    { type: 'TRAINER', id: 'trainer', name: 'Иван' },
+     { type: 'UNKNOWN' },
+   ]) {
+     const calls = [], sent = [];
+@@ -146,10 +146,10 @@ test('bot identifies actual from_id and immediately opens the correct menu witho
+     });
+     bot.prisma.vkConversationState = require('./helpers/vk-identity.cjs').idleConversation();
+     bot.vk = { api: { messages: { send: async params => sent.push(params) } } };
+-    await bot.handleMessage({ message: { from_id: 9876, peer_id: 9876, text: 'Здравствуйте', out: 0 } }, 'direct-message');
++    await bot.handleMessage({ message: { from_id: 9876, peer_id: 9876, text: '/start', out: 0 } }, 'direct-message');
+     assert.deepEqual(calls, ['9876']);
+-    assert.match(sent[0].message, profile.type === 'UNKNOWN' ? /Приглашаем/ : new RegExp(profile.name));
+-    assert.match(String(sent[0].keyboard), profile.type === 'STAFF' ? /Мои всадники/ : profile.type === 'CLIENT' ? /Мой абонемент/ : /Наш прайс и услуги/);
++    assert.match(sent[0].message, profile.type === 'UNKNOWN' ? /Выберите действие/ : new RegExp(profile.name));
++    assert.match(String(sent[0].keyboard), ['STAFF', 'TRAINER'].includes(profile.type) ? /Мои всадники/ : profile.type === 'CLIENT' ? /Мой абонемент/ : /Наш прайс и услуги/);
+     assert.doesNotMatch(sent[0].message, /код|ВАШ_ТЕЛЕФОН/);
+   }
+ });
+diff --git a/horse-club-crm/backend/test/vk-personal-menus.test.cjs b/horse-club-crm/backend/test/vk-personal-menus.test.cjs
+index 90308dd..6bb94a4 100644
+--- a/horse-club-crm/backend/test/vk-personal-menus.test.cjs
++++ b/horse-club-crm/backend/test/vk-personal-menus.test.cjs
+@@ -50,7 +50,7 @@ function harness(prisma, profile) {
+   } }, `message-${sent.length}`) };
+ }
+ const client = { type: 'CLIENT', clientId: 'child', name: 'Анна' };
+-const trainer = { type: 'STAFF', role: 'TRAINER', staffId: 'account', trainerId: 'trainer', name: 'Иван' };
++const trainer = { type: 'TRAINER', id: 'trainer', name: 'Иван' };
+ 
+ test('family membership reply queries active shared lesson packages and shows their common balance', async () => {
+   let query;
+@@ -122,7 +122,8 @@ test('guest prices use only public CRM services; directions and explanation rema
+   } } }, { type: 'UNKNOWN' });
+   await h.send('Услуги и цены'); assert.match(h.sent[0].message, /Индивидуальная тренировка/); assert.match(h.sent[0].message, /1.500 ₽.*45 мин/);
+   await h.send('Как доехать'); assert.match(h.sent[1].message, /Адрес/);
+-  await h.send('Здравствуйте'); assert.match(h.sent[2].message, /попросите администратора привязать ваш VK к профилю в CRM/);
++  await h.send('Здравствуйте'); assert.equal(h.sent.length, 2);
++  await h.send('Начать'); assert.match(h.sent[2].message, /попросите администратора привязать ваш VK к профилю в CRM/);
+ });
+ 
+ test('webhook confirmation, secret headers/body, missing configuration and group checks', async () => {
+diff --git a/horse-club-crm/backend/test/vk-training-notifications.test.cjs b/horse-club-crm/backend/test/vk-training-notifications.test.cjs
+index 6fcc247..1faf4e5 100644
+--- a/horse-club-crm/backend/test/vk-training-notifications.test.cjs
++++ b/horse-club-crm/backend/test/vk-training-notifications.test.cjs
+@@ -7,7 +7,7 @@ const { VkNotifications } = require('../dist/vk-bot/vk-delivery.module');
+ 
+ const training = () => ({
+   startTime: new Date('2026-10-17T08:00:00Z'), endTime: new Date('2026-10-17T09:00:00Z'),
+-  trainer: { name: 'Анна Сергеевна', vkUserId: 77n }, trainingType: 'Индивидуальное занятие', notes: 'Первое занятие',
++  trainer: { name: 'Анна Сергеевна', vkId: 77n }, trainingType: 'Индивидуальное занятие', notes: 'Первое занятие',
+   participants: [
+     { client: { name: 'Иван', phone: '+79991234567', vkUserId: 42n }, horse: { name: 'Гранит' } },
+     { client: { name: 'Мария', phone: '+79997654321', vkUserId: 43n }, horse: { name: 'Искра' } },
+@@ -60,14 +60,14 @@ test('notification time uses CLUB_TIME_ZONE across midnight', async () => {
+ test('missing VK IDs skip recipients, while missing phone, horse and notes have readable fallbacks', async () => {
+   const { tx, rows } = queue();
+   const value = training();
+-  value.trainer.vkUserId = null;
++  value.trainer.vkId = null;
+   value.participants[1].client.vkUserId = null;
+   await queueTrainingConfirmation(tx, 'one', value);
+   assert.deepEqual([...rows.values()].map(row => row.peerId), [42n]);
+   rows.clear(); value.participants[0].client.vkUserId = null;
+   await queueTrainingConfirmation(tx, 'none', value);
+   assert.equal(rows.size, 0);
+-  value.trainer.vkUserId = 77n;
++  value.trainer.vkId = 77n;
+   value.notes = null; value.participants = [{ client: { firstName: 'Иван', lastName: 'Петров' } }];
+   await queueTrainingConfirmation(tx, 'fallback', value);
+   const message = [...rows.values()][0].message;
+diff --git a/horse-club-crm/docs/reports/trainer-vk-binding.md b/horse-club-crm/docs/reports/trainer-vk-binding.md
+new file mode 100644
+index 0000000..8ad08ae
+--- /dev/null
++++ b/horse-club-crm/docs/reports/trainer-vk-binding.md
+@@ -0,0 +1,27 @@
++# Проверка прямой привязки тренера к VK — 2026-11-05
++
++Результат: Trainer.vkId — единственное поле привязки VK, BigInt с уникальным индексом. Создание, редактирование и карточка принимают ID или ссылку. Бот получает TRAINER прямым запросом; расписание, посещаемость и уведомления используют Trainer.id/vkId. User/Staff не нужны. Временные поля, выдача и команды PIN тренера отсутствуют.
++
++| Проверка | Результат |
++| --- | --- |
++| backend `npm run typecheck` | успешно |
++| backend `npm run lint` | успешно, 3 прежних предупреждения в dashboard/vet-records/audit-http тестах |
++| backend `npm run build` | успешно |
++| backend `npm test` | 657 успешно, 20 пропущено, 0 ошибок |
++| frontend `npm run typecheck` | успешно |
++| frontend `npm run lint` | успешно |
++| frontend `npm run build` | успешно |
++| frontend `npm test` | 18 файлов, 159 тестов успешно |
++| `npx playwright test --project=mock e2e/vk-link.spec.ts` | 9 успешно |
++| `npx prisma generate` / `npx prisma validate` | успешно, Prisma 6.19.3 |
++| `git diff --check` | успешно |
++
++На Windows команды запускались через npm.cmd/npx.cmd из-за запрета PowerShell-скриптов.
++
++Браузер: привязка в карточке тренера при 1280/390px, ошибка 409 с сохранением ввода, повтор клавиатурой, очистка, сохранение VK в форме редактирования, отсутствие кнопок кода. Существующие клиентские и кадровые сценарии, READ_ONLY, тёмная тема, reduced motion и Escape также проходят. В одном предварительном прогоне существующая проверка возврата фокуса после Escape упала; повторный полный прогон прошёл. Скриншот мобильной карточки просмотрен.
++
++Новые backend-тесты проверяют прямой запрос BigInt без чтения аккаунтов, работу без User/Staff, конфликты, неактивного тренера, отзыв очереди старого получателя, DTO с числом, сохранение полей расписания, игнорирование удалённых PIN-команд, расписание/посещение и RBAC/UUID. Обновлены тесты уведомлений и контракт фикстур VK.
++
++Дополнительный статический premium UI-аудит вернул 207 общепроектных замечаний, включая ложные срабатывания на Ant Design Form.Item/Select. Он не прошёл; массовые изменения интерфейсов вне задачи не выполнялись. Результат сохранён локально в `docs/reports/trainer-vk-premium-audit.json` (игнорируется Git).
++
++PostgreSQL-сценарии не запускались: нужна отдельная доступная тестовая БД. Миграция подготовлена и локально не применялась. На сервере необходимо выполнить `npx prisma migrate deploy` вместе с обновлением backend: миграция сохраняет значения старой колонки Trainer.vkUserId путём переименования и удаляет старые коды TRAINER; клиентские коды остаются. Ссылки trainerId в Lessons/Bookings не меняются.
+diff --git a/horse-club-crm/docs/trainer-vk-binding.md b/horse-club-crm/docs/trainer-vk-binding.md
+new file mode 100644
+index 0000000..b3e0ff9
+--- /dev/null
++++ b/horse-club-crm/docs/trainer-vk-binding.md
+@@ -0,0 +1,13 @@
++# Прямая привязка тренера к VK
++
++В `/trainers` при создании или редактировании тренера указывается единственное поле «VK ID»: число, `id123`, ссылка `vk.com/id123` или имя личной страницы. Имена разрешаются общим `VkIdentityService.normalize` через API VK; для этого нужен настроенный токен сообщества. Пустое поле снимает привязку. После сохранения тренер пишет боту `/start` и сразу получает своё меню.
++
++Модель Trainer содержит только `vkId BigInt? @unique` для VK. Полей и команд временных кодов нет. User/Staff не создаются и не требуются. Прямой поиск активного тренера первым запросом возвращает `{ type: 'TRAINER', id, name }`; просмотр расписания и отметка посещения используют только этот id. Привязка User к Trainer сама по себе не открывает тренерские действия бота. Настройки VK сотрудников больше не изменяют VK тренеров и наоборот.
++
++API создания и обновления принимает числовой или строковый vkId; хранит проверенный числовой ID в BigInt. JSON-интерцептор возвращает его строкой для сохранения точности. PATCH `/api/trainers/:id/vk` сохранён как короткий маршрут того же прямого обновления из карточки. Доступ к мутациям: ADMIN/MANAGER с FULL SCHEDULE. READ_ONLY скрывает действия. Уникальность проверяется в serializable-транзакции; чужой клиент/сотрудник/тренер вызывает 409. Существующая учётная запись того же тренера с тем же ID допускается для совместимости, но не используется для идентификации тренера.
++
++Уведомления о создании, переносе и отмене занятий получают получателя напрямую из Trainer.vkId. Смена или очистка ID отзывает неотправленные уведомления для прежнего получателя. trainerId в Lessons/Bookings не меняется. Старые коды тренеров удаляются миграцией, выдача и применение кодов для TRAINER запрещены; существующие клиентские коды сохранены.
++
++Миграция `20261105120000_simplify_trainer_vk_binding` переименовывает прежнюю BigInt-колонку vkUserId и её уникальный индекс, сохраняя значения. Миграция с PIN из промежуточной реализации не применялась. На сервере перед запуском новой версии выполнить `npx prisma migrate deploy`; Prisma Client сгенерирован локально. Обновлять backend и схему следует совместно: прежняя версия ожидает старое имя колонки.
++
++Проверки: `backend/test/trainer-vk-binding.test.cjs`, существующие тесты VK и уведомлений, `frontend/e2e/vk-link.spec.ts` (1280/390px, ошибка/повтор/очистка, клавиатура). PostgreSQL-сценарии требуют доступной тестовой БД.
+diff --git a/horse-club-crm/frontend/e2e/vk-link.spec.ts b/horse-club-crm/frontend/e2e/vk-link.spec.ts
+index 0e43289..2050918 100644
+--- a/horse-club-crm/frontend/e2e/vk-link.spec.ts
++++ b/horse-club-crm/frontend/e2e/vk-link.spec.ts
+@@ -3,6 +3,65 @@ import { test, expect } from './fixtures'
+ const id = '11111111-1111-4111-8111-111111111111'
+ const profile = { id, name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова', phone: null, vkId: null as string | null,
+   membership: null, isRider: true, isPayer: false, createdAt: '2026-10-08T10:00:00Z', preferences: '' }
++
++for (const width of [1280, 390]) test(`trainer binds directly in its card without codes at ${width}px`, async ({ page }) => {
++  await page.setViewportSize({ width, height: 850 })
++  let vkId: string | null = null
++  let fail = true
++  const trainer = () => ({ id, name: 'Анна Орлова', phone: null, vkId, isActive: true, isPublic: true, order: 0, baseRate: 0, maxDailyLoad: 480, maxParallelLessons: 4 })
++  await page.route('**/api/trainers?*', route => route.fulfill({ json: [trainer()], headers: { 'x-total-count': '1' } }))
++  await page.route(`**/api/trainers/${id}`, route => route.fulfill({ json: trainer() }))
++  await page.route(`**/api/trainers/${id}/vk`, async route => {
++    const input = route.request().postDataJSON()
++    expect(Object.keys(input)).toEqual(['vkId'])
++    if (fail) return route.fulfill({ status: 409, json: { message: 'Этот VK ID уже привязан к другому клиенту или сотруднику' } })
++    vkId = input.vkId ? '42' : null
++    await route.fulfill({ json: trainer() })
++  })
++  await page.goto('/trainers')
++  await page.getByRole('button', { name: 'Анна Орлова', exact: true }).click()
++  const card = page.getByRole('dialog', { name: 'Карточка тренера' })
++  await expect(card.getByRole('button', { name: 'Получить код для бота' })).toHaveCount(0)
++  await card.getByRole('button', { name: 'Привязать VK', exact: true }).click()
++  const drawer = page.getByRole('dialog', { name: 'Привязка VK · Анна Орлова' })
++  await drawer.getByLabel('VK ID', { exact: true }).fill('vk.com/id42')
++  await drawer.getByRole('button', { name: 'Сохранить', exact: true }).click()
++  await expect(drawer.getByRole('alert')).toContainText('уже привязан')
++  await expect(drawer.getByLabel('VK ID', { exact: true })).toHaveValue('vk.com/id42')
++  fail = false
++  await drawer.getByRole('button', { name: 'Сохранить', exact: true }).focus()
++  await page.keyboard.press('Enter')
++  await expect(drawer).not.toBeVisible()
++  await expect(card.getByRole('link', { name: 'Страница ВКонтакте' })).toHaveAttribute('href', 'https://vk.com/id42')
++  await page.screenshot({ path: test.info().outputPath('trainer-vk-card.png') })
++  await card.getByRole('button', { name: 'Изменить VK', exact: true }).click()
++  await drawer.getByLabel('VK ID', { exact: true }).fill('')
++  await drawer.getByRole('button', { name: 'Сохранить', exact: true }).click()
++  await expect(drawer).not.toBeVisible()
++  await expect(card.getByText('VK не привязан', { exact: true })).toBeVisible()
++  await expect(page).toHaveURL(/\/trainers/)
++})
++
++test('trainer edit form saves its single VK field directly', async ({ page }) => {
++  const trainer = { id, name: 'Анна', phone: null, vkId: '41', isActive: true, isPublic: true, order: 0, baseRate: 0, maxDailyLoad: 480, maxParallelLessons: 4 }
++  let saved = false
++  await page.route(`**/api/trainers/${id}`, async route => {
++    if (route.request().method() === 'PATCH') {
++      expect(route.request().postDataJSON().vkId).toBe('https://vk.com/id42')
++      saved = true
++    }
++    await route.fulfill({ json: trainer })
++  })
++  await page.route('**/api/trainers?*', route => route.fulfill({ json: [trainer], headers: { 'x-total-count': '1' } }))
++  await page.goto(`/trainers/edit/${id}`)
++  await expect(page.getByLabel('VK ID', { exact: true })).toHaveValue('41')
++  await page.getByLabel('VK ID', { exact: true }).fill('https://vk.com/id42')
++  await expect(page.getByRole('button', { name: 'Получить код для бота' })).toHaveCount(0)
++  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
++  await expect(page).toHaveURL(/\/trainers$/)
++  expect(saved).toBe(true)
++})
++
+ test.beforeEach(async ({ page }) => {
+   await page.addInitScript(() => {
+     localStorage.setItem('horsecrm.access_token', 'cookie-session')
+diff --git a/horse-club-crm/frontend/src/components/VkProfileLink.tsx b/horse-club-crm/frontend/src/components/VkProfileLink.tsx
+index f0da5be..fb40456 100644
+--- a/horse-club-crm/frontend/src/components/VkProfileLink.tsx
++++ b/horse-club-crm/frontend/src/components/VkProfileLink.tsx
+@@ -12,8 +12,8 @@ export function VkIcon() {
+   return <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12.8 17.5C6.7 17.5 3.2 13.3 3 6.5h3.1c.2 5 2.4 7.1 4.1 7.6V6.5h2.9v4.4c1.7-.2 3.5-2.2 4.1-4.4h2.9c-.5 2.7-2.5 4.7-3.9 5.5 1.4.7 3.7 2.5 4.6 5.5h-3.2c-.7-2.1-2.3-3.8-4.6-4v4h-.2Z" /></svg>
+ }
+ 
+-export function VkProfileField({ initialValue }: { initialValue?: string | null }) {
+-  return <Form.Item name="vkId" label="VK ID или ссылка на страницу" initialValue={initialValue}
++export function VkProfileField({ initialValue, label = 'VK ID или ссылка на страницу' }: { initialValue?: string | null; label?: string }) {
++  return <Form.Item name="vkId" label={label} initialValue={initialValue}
+     extra="Например, 12345678 или vk.com/username. Очистите поле, чтобы снять привязку."
+     rules={[{ max: 256, message: 'Не более 256 символов' }]}>
+     <Input prefix={<VkIcon />} placeholder="vk.com/id12345678" maxLength={256} autoComplete="off" />
+@@ -54,9 +54,9 @@ export function VkProfileLink({ id, name, vkId, vkUserId, kind, readOnly }: Prof
+     {!readOnly && <Button ref={triggerRef} size="small" icon={<VkIcon />} onClick={() => { form.setFieldsValue({ vkId: linkedId || '' }); setError(undefined); setOpen(true) }}>{linkedId ? 'Изменить VK' : 'Привязать VK'}</Button>}
+     <EntryOverlay variant="drawer" title={`Привязка VK · ${name}`} open={open} onCancel={close} destroyOnHidden
+       closable={!busy} maskClosable={!busy} keyboard={!busy} confirmLoading={busy} okButtonProps={{ 'aria-label': 'Сохранить', disabled: busy }} cancelButtonProps={{ disabled: busy }} onOk={() => form.submit()} afterClose={() => triggerRef.current?.focus()}>
+-      <Typography.Paragraph>Укажите страницу клиента или сотрудника. Бот узнает его по VK ID при первом сообщении в сообщество клуба.</Typography.Paragraph>
++      <Typography.Paragraph>{kind === 'TRAINER' ? 'Укажите страницу тренера. После сохранения отправьте боту /start, чтобы открыть расписание.' : 'Укажите страницу клиента или сотрудника. Бот узнает его по VK ID при первом сообщении в сообщество клуба.'}</Typography.Paragraph>
+       <Form form={form} layout="vertical" noValidate onFinish={values => void save(values)} disabled={busy}>
+-        <VkProfileField />
++        <VkProfileField label={kind === 'TRAINER' ? 'VK ID' : undefined} />
+       </Form>
+       {error && <Alert type="error" role="alert" showIcon message={error} />}
+     </EntryOverlay>
+diff --git a/horse-club-crm/frontend/src/pages/catalogs/types.ts b/horse-club-crm/frontend/src/pages/catalogs/types.ts
+index f6e0fe3..2587133 100644
+--- a/horse-club-crm/frontend/src/pages/catalogs/types.ts
++++ b/horse-club-crm/frontend/src/pages/catalogs/types.ts
+@@ -49,10 +49,9 @@ export interface HorseDetails extends Horse {
+     client: { id: string; name: string; firstName: string; lastName: string } | null; stall: { id: string; name: string } | null; payments: RelationPayment[] }>;
+   bookings: Array<RelationBooking & { client: { id: string; name: string; firstName: string; lastName: string } }>;
+ }
+-export interface TrainerValues extends PublicationValues { name: string; phone?: string | null; scheduleColor?: string | null; qualification?: string; maxDailyLoad: number; maxParallelLessons?: number; baseRate?: number }
++export interface TrainerValues extends PublicationValues { name: string; vkId?: string | null; phone?: string | null; scheduleColor?: string | null; qualification?: string; maxDailyLoad: number; maxParallelLessons?: number; baseRate?: number }
+ export interface Trainer extends Omit<TrainerValues, 'baseRate' | 'phone' | 'qualification'> {
+   fullName?: string; specializations?: string[]; isActive?: boolean;
+-  vkUserId?: string | null;
+   id: string; baseRate?: string | number; phone: string | null; qualification: string | null;
+ }
+ export interface ServiceValues extends PublicationValues {
+diff --git a/horse-club-crm/frontend/src/pages/trainers/form.tsx b/horse-club-crm/frontend/src/pages/trainers/form.tsx
+index 7c9a275..d0956ee 100644
+--- a/horse-club-crm/frontend/src/pages/trainers/form.tsx
++++ b/horse-club-crm/frontend/src/pages/trainers/form.tsx
+@@ -6,6 +6,7 @@ import { usePermissions } from '../../modulePermissions'
+ import { PhoneField } from '../../components/PhoneField'
+ import { phonePayload } from '../../components/formatPhone'
+ import { Form, Input } from 'antd'
++import { VkProfileField } from '../../components/VkProfileLink'
+ 
+ export function TrainerForm({ action }: { action: 'create' | 'edit' }) {
+   const { canManage } = useCatalogPermissions()
+@@ -13,9 +14,10 @@ export function TrainerForm({ action }: { action: 'create' | 'edit' }) {
+   const editRate = canManage && canWrite('STAFF_PAYROLL')
+   return <CatalogForm<Trainer, TrainerValues> resource="trainers" action={action}
+     title={action === 'create' ? 'Новый тренер' : 'Редактирование тренера'} defaults={{ isPublic: true, order: 0, maxDailyLoad: 480, maxParallelLessons: 4, baseRate: 0 }}
+-    toPayload={({ baseRate, ...values }) => ({ ...values, phone: phonePayload(values.phone), ...(editRate ? { baseRate: Number(baseRate) } : {}) })}>
++    toPayload={({ baseRate, ...values }) => ({ ...values, vkId: values.vkId?.trim() || null, phone: phonePayload(values.phone), ...(editRate ? { baseRate: Number(baseRate) } : {}) })}>
+     <TextField name="name" label="ФИО" required />
+     <PhoneField />
++    <VkProfileField label="VK ID" />
+     <Form.Item name="scheduleColor" label="Цвет в расписании" rules={[{ pattern: /^#[0-9a-fA-F]{6}$/, message: 'Укажите цвет в формате #724C39' }]}><Input aria-label="Цвет в расписании" placeholder="#724C39" maxLength={7} /></Form.Item>
+     <TextField name="qualification" label="Роль / специализация" multiline max={1000} />
+     <NumberField name="maxDailyLoad" label="Дневная нагрузка, мин" min={1} />
+diff --git a/horse-club-crm/frontend/src/pages/trainers/list.tsx b/horse-club-crm/frontend/src/pages/trainers/list.tsx
+index 5953950..02219d8 100644
+--- a/horse-club-crm/frontend/src/pages/trainers/list.tsx
++++ b/horse-club-crm/frontend/src/pages/trainers/list.tsx
+@@ -18,7 +18,7 @@ export function TrainerList() {
+   const columns: TableColumnsType<Trainer> = [
+     { key: 'name', fixed: 'left', width: 180, title: 'ФИО', sorter: true, render: (_, row) => <CardLink onClick={() => setSelectedId(row.id)}>{row.name}</CardLink> },
+     { key: 'phone', fixed: 'left', width: 145, dataIndex: 'phone', title: 'Телефон' },
+-    { key: 'vk', align: 'center', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name} kind="TRAINER" vkUserId={row.vkUserId} /> },
++    { key: 'vk', align: 'center', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name} kind="TRAINER" vkId={row.vkId} /> },
+     { key: 'qualification', dataIndex: 'qualification', title: 'Квалификация', width: 170 },
+     { key: 'maxDailyLoad', align: 'right', width: 115, dataIndex: 'maxDailyLoad', title: 'Дневная нагрузка, мин', sorter: true },
+   ]
+@@ -26,6 +26,7 @@ export function TrainerList() {
+   return <><CatalogList<Trainer> resource="trainers" storageKey="horse_crm_trainers_columns_v1" defaultHiddenColumns={['vk', 'qualification']} title="Тренеры" columns={columns} />
+     <DetailsModal<Trainer> resource="trainers" id={selectedId} title="Карточка тренера" onClose={() => setSelectedId(undefined)}>
+       {trainer => <><CatalogEditAction resource="trainers" id={trainer.id}><TrainerForm action="edit" /></CatalogEditAction>
++        {canManage && <VkProfileLink id={trainer.id} name={trainer.name} kind="TRAINER" vkId={trainer.vkId} />}
+         <Descriptions bordered column={1} style={{ marginTop: 16 }} items={[
+           { key: 'name', label: 'ФИО', children: trainer.name },
+           { key: 'phone', label: 'Телефон', children: trainer.phone || '—' },

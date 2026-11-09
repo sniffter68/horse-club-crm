@@ -16,3 +16,7 @@ uploads/
 __pycache__/
 docs/deploy_history.log
 .deploy/
+
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/.playwright/

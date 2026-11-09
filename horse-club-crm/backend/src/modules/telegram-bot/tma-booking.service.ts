@@ -6,6 +6,7 @@ import { currentLeadConsentVersion } from '../../common/lead-consent';
 import { isSerializationFailure } from '../../common/serialization-failure';
 import { LessonsService } from '../../lessons/lessons.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { normalizePhone } from '../../vk-bot/vk-link.service';
 import type { TmaBookingsQuery, TmaCreateBookingDto, TmaSlotsQuery } from './telegram-bot.dto';
 
 const ZONE = 'Europe/Moscow';
@@ -128,12 +129,26 @@ export class TmaBookingService {
       if (!trainer) throw new ConflictException('Тренер недоступен');
       const client = await tx.client.findUnique({ where: { id: clientId } });
       if (!client || client.deletedAt) throw new NotFoundException('Профиль недоступен');
-      // A typed phone number is NOT proof of ownership of an existing CRM account.
-      const phoneOwner = await tx.client.findUnique({ where: { phone: dto.phone }, select: { id: true } });
-      if (phoneOwner && phoneOwner.id !== clientId) throw new ConflictException('Этот телефон уже есть в клубе. Позвоните +7 (915) 672-00-30 для привязки Telegram');
-      await tx.client.update({ where: { id: clientId }, data: { phone: dto.phone } });
+      const phone = normalizePhone(dto.phone);
+      const phoneOwner = await tx.client.findUnique({ where: { phone } });
+      if (phoneOwner?.telegramUserId && phoneOwner.telegramUserId !== client.telegramUserId) {
+        throw new BadRequestException('Этот номер привязан к другому Telegram-аккаунту');
+      }
+      if (phoneOwner?.deletedAt) throw new NotFoundException('Профиль недоступен');
+      let bookingClientId = clientId;
+      if (phoneOwner && phoneOwner.id !== clientId) {
+        // The guard already created a Telegram profile. Release the unique ID first;
+        // retain that profile and all its history, and link the existing CRM card atomically.
+        await tx.client.update({ where: { id: clientId }, data: { telegramUserId: null, telegramUsername: null } });
+        await tx.client.update({ where: { id: phoneOwner.id }, data: {
+          telegramUserId: client.telegramUserId, telegramUsername: client.telegramUsername,
+        } });
+        bookingClientId = phoneOwner.id;
+      } else {
+        await tx.client.update({ where: { id: clientId }, data: { phone } });
+      }
       const lesson = await this.lessons.createLesson({ serviceId: service.id, trainerId: trainer.id,
-        startTime: start.toISO()!, participants: [{ clientId }] }, tx);
+        startTime: start.toISO()!, participants: [{ clientId: bookingClientId }] }, tx);
       return tx.booking.update({ where: { id: lesson.bookings[0].id }, data: { telegramRequestId: dto.requestId,
         telegramConsentVersion: dto.consentVersion, telegramConsentedAt: new Date() }, select: bookingView });
     });

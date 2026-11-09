@@ -1,0 +1,1534 @@
+diff --git a/horse-club-crm/docs/reports/landing-stage-one.md b/horse-club-crm/docs/reports/landing-stage-one.md
+new file mode 100644
+index 0000000..8473a9d
+--- /dev/null
++++ b/horse-club-crm/docs/reports/landing-stage-one.md
+@@ -0,0 +1,33 @@
++# Лендинг: этап 1 — читаемость, типографика и контраст
++
++Дата: 6 ноября 2026 года. Основание: `docs/reports/landing-hallmark-audit.md`.
++
++## Изменения
++
++Фактическая точка реализации — `landing/`, каталог `frontend/src/pages/landing/` отсутствует. Стили админки Ant Design не изменялись.
++
++- Hero разделён на текст и существующего всадника в независимых колонках общего контейнера. До 1024px текст, действия и изображение идут последовательно. Убраны абсолютное позиционирование всадника, параллакс, бесконечное парение, белая карточка предложения и тень H1. Проп `onBookFirstLesson` и переход к форме сохранены.
++- В `style.css` собраны шесть цветовых токенов отчёта; прежние роли Tailwind `luxury` ссылаются на них. Контраст вторичных подписей, формы, длительности услуги, футера и содержимого модалок усилен с учётом светлого/тёмного фона.
++- Georgia первым в serif-стеке; один системный sans. H1 40/44px на телефоне и 48–76px на desktop; H2 32/36px и 48/54px. Основной текст 16px, подписи минимум 14px, действия 15/20px. Убраны caps/разрядка мелких подписей и курсив второй половины H1.
++- Компактная навигация сохраняется до 1024px. Добавлен общий видимый фокус с контуром и светлой подложкой; reduced motion отключает CSS-анимации и fade-reveal. Все обработчики выбора, пропсы каталогов, модалки, UUID-проверки, согласие, ошибки/retry и API-контракт сохранены.
++- В существующих браузерных проверках включено ранее отключённое правило axe `color-contrast`. Добавлены проверки геометрии Hero, видимости CTA, фокуса, размеров подписей и контраста страницы/модалки тренера.
++
++## Проверки
++
++| Проект | TypeScript | Lint | Build | npm test |
++| --- | --- | --- | --- | --- |
++| backend | exit 0 | exit 0, 3 прежних warning | exit 0 | 661 passed, 20 skipped, exit 0 |
++| frontend | exit 0 | exit 0 | exit 0 | 165 passed / 20 файлов, exit 0 |
++| landing | exit 0 | exit 0, deny-warnings | exit 0 | 48 passed, 1 skipped, exit 0 |
++
++Для каждого проекта выполнены `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd test`. Использован `npm.cmd`, поскольку запуск PowerShell-обёртки npm.ps1 запрещён политикой среды.
++
++Для лендинга предварительно поднят `node test-server.mjs`, итоговый полный прогон выполнен с `$env:LANDING_TEST_EXTERNAL_SERVER='1'; npm.cmd test`: это устраняет известное зависание teardown управляемого Playwright-сервера. Тесты выполнялись по собранному Vite bundle в режиме test, production build также успешен.
++
++Hero проверен на 375/390/768/1023/1024/1025/1280/1440/1920px; для 1280 высота 800px, для остальных 1080px. H1 не пересекает изображение, мобильные CTA расположены выше него, документ не шире viewport, CTA видна при 1280×800. Снимки Hero телефона и desktop просмотрены визуально. Дополнительно существующие сценарии формы/каталогов проходят на 320/390/768/1440px, включая обычную и уменьшенную анимацию, клавиатуру, модалки, ошибки и повтор отправки.
++
++Axe не обнаружил подтверждённых нарушений `color-contrast` в проверенных состояниях страницы, формы, карточки лошади, карточки тренера и меню. Это не полный WCAG-аудит и не проверка фотографий реального API. Live-отправка заявки штатно пропущена.
++
++Три прежних предупреждения backend: неиспользуемый `role` в `test/dashboard.test.cjs` и GET с body в `test/vet-records.test.cjs` / `test/audit-http-20261019.cjs`.
++
++Prisma schema не менялась; миграции и генерация Client не требуются. Исходный untracked-аудит и четыре посторонних `.diff` не изменялись и в коммит этапа не включены. Точный Git patch сохранён отдельно в `docs/reports/landing-stage-one.diff`.
+diff --git a/horse-club-crm/landing/DESIGN.md b/horse-club-crm/landing/DESIGN.md
+index d6c557c..7d4010b 100644
+--- a/horse-club-crm/landing/DESIGN.md
++++ b/horse-club-crm/landing/DESIGN.md
+@@ -2,6 +2,10 @@
+ 
+ Лендинг сохраняет клубную палитру и типографику из `src/style.css` и существующих компонентов: тёмный шоколад `#241E1C`, седельный акцент `#614535`, бежевый `#E4DAD0`, белая поверхность формы. Основной сценарий — заявка новичка на первое занятие; сведения о клубе и спортивный каталог остаются доступны отдельно.
+ 
++Этап 1 по `docs/reports/landing-hallmark-audit.md`: equestrian classic / warm minimal. Канонические цвета находятся в `src/style.css` → `@theme`: `club-paper` #FAF7F2, `club-sand` #E4DAD0, `club-ink` #3A2F2B, `club-deep` #241E1C, `club-action` #614535, `club-secondary` #5A483E. Tailwind генерирует из них `text-club-*`/`bg-club-*`; прежние роли `luxury.*` в `tailwind.config.js` ссылаются на эти же переменные. Белый оставлен для формы и текста основного CTA. Эти токены принадлежат только сборке `landing`, тема Ant Design не меняется.
++
++Заголовки используют Georgia первым в serif-стеке, текст — системный sans без загрузки нового шрифта. H1: 40/44px до 1024px, затем clamp(48px, 5vw, 76px)/1.05; единое прямое начертание. H2: 32/36px и 48/54px, основной текст 16px с межстрочным 1.625, подписи минимум 14px, кнопки 15/20px. Caps и разрядка мелких подписей убраны. Hero до 1024px идёт в потоке «текст → всадник», затем — две независимые колонки одного контейнера; изображение не вылетает за свою колонку. Существующий rider сохранён без заявления о происхождении фотографии. Фокус — контур 2px с отступом 3px и светлой подложкой для тёмных секций; reduced motion отключает CSS-анимации и задержанные fade-reveal, JS-трансформации контролирует общий MotionConfig.
++
+ `src/booking.ts` владеет названиями услуг и переходом к форме. Hero, навигация и блок первого занятия явно выбирают «Первое занятие по верховой езде». `ContactsSection` показывает выбранную услугу и нативное раскрытие дополнительных вариантов; имя и телефон обязательны, пожелания необязательны. Обязательное согласие сохраняется, политика открывается в нативном модальном dialog с Escape и возвратом фокуса.
+ 
+ Переход фокусирует заголовок формы, контейнер имеет scroll-margin-top 5rem. Ошибки сохраняют данные, успешный ответ API объясняет звонок администратора для согласования времени. Защита от повторной отправки и проверка UUID перед передачей serviceId принадлежат форме; HTTP-контракт остаётся в `src/lead.ts`.
+diff --git a/horse-club-crm/landing/src/App.tsx b/horse-club-crm/landing/src/App.tsx
+index 4b544b9..81794b7 100644
+--- a/horse-club-crm/landing/src/App.tsx
++++ b/horse-club-crm/landing/src/App.tsx
+@@ -19,7 +19,7 @@ export default function App(): ReactElement {
+   };
+   const bookFirstLesson = () => choose('service', { ...firstLesson });
+   return (
+-    <div className="min-h-screen bg-[#E4DAD0] text-[#3A2F2B] selection:bg-[#3A2F2B] selection:text-[#E4DAD0] antialiased">
++    <div className="landing-shell min-h-screen bg-luxury-bg text-luxury-dark selection:bg-luxury-dark selection:text-luxury-bg antialiased">
+       {/* Умная навигационная капсула (сворачивается в бургер при скролле) */}
+       <Navbar onBookFirstLesson={bookFirstLesson} />
+ 
+@@ -47,7 +47,7 @@ export default function App(): ReactElement {
+       </main>
+ 
+       {/* Футер */}
+-      <footer className="border-t border-white/10 bg-[#1D1817] px-6 py-8 text-center text-xs text-[#8C7E77]">
++      <footer className="border-t border-white/10 bg-luxury-deep px-6 py-8 text-center text-sm text-luxury-bg">
+         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
+           <p>© 2026 СЛКС Тамбов. Конный клуб и спортивная школа верховой езды.</p>
+           <div className="flex items-center gap-6">
+diff --git a/horse-club-crm/landing/src/components/ClubStandardsSection.tsx b/horse-club-crm/landing/src/components/ClubStandardsSection.tsx
+index 4b23b07..23c0171 100644
+--- a/horse-club-crm/landing/src/components/ClubStandardsSection.tsx
++++ b/horse-club-crm/landing/src/components/ClubStandardsSection.tsx
+@@ -60,26 +60,26 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+   return (
+     <section
+       id="about"
+-      className="relative overflow-hidden bg-[#FAF7F2] px-6 py-10 md:py-16 text-[#3A2F2B] sm:px-10 lg:px-16 border-t border-black/5"
++      className="relative overflow-hidden bg-club-paper px-6 py-10 md:py-16 text-club-ink sm:px-10 lg:px-16 border-t border-black/5"
+     >
+       {/* Декоративный теплый фон */}
+       <div
+         aria-hidden="true"
+-        className="pointer-events-none absolute -left-40 top-1/3 h-[500px] w-[500px] rounded-full bg-[#E4DAD0]/50 blur-3xl"
++        className="pointer-events-none absolute -left-40 top-1/3 h-[500px] w-[500px] rounded-full bg-club-sand/50 blur-3xl"
+       />
+ 
+       <div className="relative mx-auto max-w-7xl">
+         {/* Заголовок секции */}
+         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
+           <div>
+-            <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#724C39]">
++            <span className="text-sm font-semibold text-club-action">
+               Философия и качество
+             </span>
+-            <h2 className="mt-3 font-serif text-4xl font-normal tracking-tight text-[#3A2F2B] sm:text-6xl">
++            <h2 className="leading-[1.125] mt-3 font-serif text-[2rem] font-normal tracking-tight text-club-ink sm:text-5xl">
+               Стандарты клуба
+             </h2>
+           </div>
+-          <p className="max-w-md text-xs sm:text-sm leading-relaxed text-[#6E645F]">
++          <p className="max-w-md text-base leading-relaxed text-club-secondary">
+             Безупречная среда для лошадей турнирного класса и всадников, ценящих приватность, комфорт и безопасность высочайшего уровня.
+           </p>
+         </div>
+@@ -99,22 +99,22 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+                 <div>
+                   {/* Верхняя строка карточки */}
+                   <div className="flex items-center justify-between gap-3 flex-wrap">
+-                    <span className="font-serif text-3xl font-light text-[#724C39]/70">
++                    <span className="font-serif text-3xl font-light text-club-action/70">
+                       {item.number}
+                     </span>
+-                    <span className="rounded-full bg-[#FAF7F2] border border-black/5 px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5A483E]">
++                    <span className="rounded-full bg-club-paper border border-black/5 px-3.5 py-1 text-sm font-semibold text-club-secondary">
+                       {item.tag}
+                     </span>
+                   </div>
+ 
+                   <div className="mt-8">
+-                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7E77]">
++                    <span className="text-sm font-semibold text-club-secondary">
+                       {item.category}
+                     </span>
+-                    <h3 className="mt-2 font-serif text-2xl sm:text-3xl font-normal leading-snug text-[#3A2F2B]">
++                    <h3 className="mt-2 font-serif text-2xl sm:text-3xl font-normal leading-snug text-club-ink">
+                       {item.title}
+                     </h3>
+-                    <p className="mt-4 text-xs sm:text-sm leading-relaxed text-[#6E645F]">
++                    <p className="mt-4 text-base leading-relaxed text-club-secondary">
+                       {item.description}
+                     </p>
+                   </div>
+@@ -122,10 +122,10 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+ 
+                 {/* Нижняя метрика */}
+                 <div className="mt-10 flex items-baseline justify-between gap-3 flex-wrap border-t border-black/5 pt-6">
+-                  <span className="text-xs uppercase tracking-wider text-[#8C7E77]">
++                  <span className="text-sm text-club-secondary">
+                     {item.metricLabel}
+                   </span>
+-                  <span className="font-serif text-2xl sm:text-3xl font-light text-[#3A2F2B]">
++                  <span className="font-serif text-2xl sm:text-3xl font-light text-club-ink">
+                     {item.metricValue}
+                   </span>
+                 </div>
+@@ -135,19 +135,19 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+         </div>
+ 
+         {/* Нижняя инфо-плашка с цитатой клуба */}
+-        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-[#E4DAD0]/50 p-8 sm:p-10 backdrop-blur-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
++        <div className="mt-6 md:mt-8 rounded-[2.2rem] border border-black/5 bg-club-sand/50 p-8 sm:p-10 backdrop-blur-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+           <div className="max-w-2xl">
+-            <h4 className="font-serif text-xl sm:text-2xl font-normal text-[#3A2F2B]">
++            <h4 className="font-serif text-xl sm:text-2xl font-normal text-club-ink">
+               «Лошадь — не спортивный инвентарь, а равноправный партнер»
+             </h4>
+-            <p className="mt-2 text-xs text-[#6E645F] leading-relaxed">
++            <p className="mt-2 text-base text-club-secondary leading-relaxed">
+               Каждое решение в обустройстве конноспортивного клуба СЛКС Тамбов принималось с позиции биомеханики, физиологии и психологии лошадей.
+             </p>
+           </div>
+           <a
+             href="#booking-form"
+             onClick={event => { event.preventDefault(); onChoose('service', otherServices[3]); }}
+-            className="shrink-0 rounded-full bg-[#3A2F2B] px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition-all hover:bg-[#5A483E] hover:scale-105 active:scale-95"
++            className="shrink-0 rounded-full bg-club-ink px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-club-secondary hover:scale-105 active:scale-95"
+           >
+             Приехать на экскурсию ↗
+           </a>
+diff --git a/horse-club-crm/landing/src/components/ContactsSection.tsx b/horse-club-crm/landing/src/components/ContactsSection.tsx
+index ea024b4..7132302 100644
+--- a/horse-club-crm/landing/src/components/ContactsSection.tsx
++++ b/horse-club-crm/landing/src/components/ContactsSection.tsx
+@@ -66,26 +66,26 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+   return (
+     <section
+       id="contacts"
+-      className="relative overflow-hidden bg-[#241E1C] px-6 py-10 md:py-16 text-white sm:px-10 lg:px-16"
++      className="relative overflow-hidden bg-club-deep px-6 py-10 md:py-16 text-white sm:px-10 lg:px-16"
+     >
+       {/* Декоративное теплое свечение сзади */}
+       <div
+         aria-hidden="true"
+-        className="pointer-events-none absolute -right-32 top-1/4 h-[550px] w-[550px] rounded-full bg-[#724C39]/15 blur-3xl"
++        className="pointer-events-none absolute -right-32 top-1/4 h-[550px] w-[550px] rounded-full bg-club-action/15 blur-3xl"
+       />
+ 
+       <div className="relative mx-auto max-w-7xl">
+         {/* Верхний заголовок секции */}
+         <div className="mb-6 md:mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+           <div>
+-            <span className="text-xs font-semibold uppercase tracking-[0.25em] text-[#A6988E]">
++            <span className="text-sm font-semibold text-club-sand">
+               Связь и бронирование
+             </span>
+-            <h2 className="mt-3 font-serif text-4xl font-normal tracking-tight text-[#E4DAD0] sm:text-6xl">
++            <h2 className="leading-[1.125] mt-3 font-serif text-[2rem] font-normal tracking-tight text-club-sand sm:text-5xl">
+               Визит в клуб
+             </h2>
+           </div>
+-          <p className="max-w-md text-xs sm:text-sm leading-relaxed text-[#A6988E]">
++          <p className="max-w-md text-base leading-relaxed text-club-sand">
+             Мы ценим приватность и индивидуальный подход: все тренировки и посещения клуба проходят по предварительной записи.
+           </p>
+         </div>
+@@ -95,13 +95,13 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+           <div className="flex flex-col gap-10 lg:col-span-5">
+             {/* Карточка адреса и режима */}
+             <div className="rounded-[2.4rem] border border-white/10 bg-white/5 p-8 backdrop-blur-md">
+-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A6988E]">
++              <span className="text-sm font-semibold text-club-sand">
+                 Локация клуба
+               </span>
+               <h3 className="mt-2 font-serif text-2xl font-light text-white">
+                 Тамбов, ул. Бастионная, 22АС2
+               </h3>
+-              <p className="mt-2 text-xs leading-relaxed text-[#A6988E]">
++              <p className="mt-2 text-base leading-relaxed text-club-sand">
+                 Удобный подъезд с закрытой охраняемой парковкой для гостей клуба.
+               </p>
+ 
+@@ -110,19 +110,19 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                   href="https://yandex.ru/maps/?text=Тамбов+ул+Бастионная+22АС2"
+                   target="_blank"
+                   rel="noreferrer"
+-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-medium text-[#E4DAD0] transition-all hover:bg-white/20 active:scale-95"
++                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-club-sand transition-all hover:bg-white/20 active:scale-95"
+                 >
+                   <span>Яндекс Карты</span>
+-                  <span className="text-xs">↗</span>
++                  <span className="text-sm">↗</span>
+                 </a>
+                 <a
+                   href="https://2gis.ru/tambov"
+                   target="_blank"
+                   rel="noreferrer"
+-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-medium text-[#E4DAD0] transition-all hover:bg-white/20 active:scale-95"
++                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-club-sand transition-all hover:bg-white/20 active:scale-95"
+                 >
+                   <span>2ГИС</span>
+-                  <span className="text-xs">↗</span>
++                  <span className="text-sm">↗</span>
+                 </a>
+               </div>
+             </div>
+@@ -130,22 +130,22 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+             {/* Карточка контактов и часов работы */}
+             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+-                <span className="block text-[10px] font-semibold uppercase tracking-widest text-[#A6988E]">
++                <span className="block text-sm font-semibold text-club-sand">
+                   Прямой телефон
+                 </span>
+                 <a
+                   href={`tel:${landingData.contacts.phone.replace(/[^+\d]/g, '')}`}
+-                  className="mt-2 block font-serif text-xl text-white transition-colors hover:text-[#E4DAD0]"
++                  className="mt-2 block font-serif text-xl text-white transition-colors hover:text-club-sand"
+                 >
+                   {landingData.contacts.phone}
+                 </a>
+-                <span className="mt-1 block text-[11px] text-[#A6988E]">
++                <span className="mt-1 block text-sm text-club-sand">
+                   {landingData.contacts.workingHours}
+                 </span>
+               </div>
+ 
+               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+-                <span className="block text-[10px] font-semibold uppercase tracking-widest text-[#A6988E]">
++                <span className="block text-sm font-semibold text-club-sand">
+                   Новости клуба
+                 </span>
+                 <div className="mt-2 flex gap-3">
+@@ -153,20 +153,20 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                     href={landingData.contacts.vkGroup}
+                     target="_blank"
+                     rel="noreferrer"
+-                    className="font-serif text-base text-[#E4DAD0] underline underline-offset-4 hover:text-white transition-colors"
++                    className="font-serif text-base text-club-sand underline underline-offset-4 hover:text-white transition-colors"
+                   >
+                     ВКонтакте
+                   </a>
+                 </div>
+-                <span className="mt-1 block text-[11px] text-[#A6988E]">
++                <span className="mt-1 block text-sm text-club-sand">
+                   События и жизнь клуба
+                 </span>
+               </div>
+             </div>
+ 
+             {/* Памятка первого визита */}
+-            <div className="rounded-3xl border border-white/10 bg-[#724C39]/15 p-6 text-xs text-[#E4DAD0]/90">
+-              <div className="flex items-center gap-2 font-semibold uppercase tracking-wider text-white mb-2">
++            <div className="rounded-3xl border border-white/10 bg-club-action/15 p-6 text-sm text-club-sand/90">
++              <div className="flex items-center gap-2 font-semibold text-white mb-2">
+                 <span>✦</span>
+                 <span>Рекомендации к первому визиту</span>
+               </div>
+@@ -178,7 +178,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+ 
+           {/* Правая колонка: Форма записи */}
+           <div id="booking-form" className="scroll-mt-20 lg:col-span-7">
+-            <div className="relative rounded-[2.8rem] bg-white p-8 text-[#241E1C] shadow-2xl sm:p-12">
++            <div className="relative rounded-[2.8rem] bg-white p-8 text-club-deep shadow-2xl sm:p-12">
+               <AnimatePresence mode="wait">
+                 {isSubmitted ? (
+                   <motion.div
+@@ -189,13 +189,13 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                     exit={{ opacity: 0, scale: 0.95 }}
+                     className="flex flex-col items-center justify-center py-12 text-center"
+                   >
+-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#E4DAD0] text-2xl text-[#3A2F2B] mb-5">
++                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-club-sand text-2xl text-club-ink mb-5">
+                       ✓
+                     </div>
+-                    <h3 className="font-serif text-3xl font-normal text-[#241E1C]">
++                    <h3 className="font-serif text-3xl font-normal text-club-deep">
+                       Заявка принята!
+                     </h3>
+-                    <p className="mt-3 max-w-md text-sm leading-relaxed text-[#6E645F]">
++                    <p className="mt-3 max-w-md text-base leading-relaxed text-club-secondary">
+                       Мы получили ваши контакты. Администратор клуба свяжется с вами в ближайшее время, чтобы согласовать дату и время первого занятия.
+                     </p>
+                     <button
+@@ -209,7 +209,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                         setError('');
+                         onReset();
+                       }}
+-                      className="mt-8 rounded-full border border-black/15 bg-transparent px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-[#3A2F2B] transition-all hover:bg-black/5"
++                      className="mt-8 rounded-full border border-black/15 bg-transparent px-6 py-2.5 text-sm font-semibold text-club-ink transition-all hover:bg-black/5"
+                     >
+                       Отправить ещё одну заявку
+                     </button>
+@@ -226,24 +226,24 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                     className="flex flex-col gap-6"
+                   >
+                     <div>
+-                      <div className="inline-block rounded-full bg-[#E4DAD0]/60 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5A483E] mb-3">
++                      <div className="inline-block rounded-full bg-club-sand/60 px-4 py-1 text-sm font-semibold text-club-secondary mb-3">
+                         Онлайн-запись
+                       </div>
+-                      <h3 id="booking-heading" tabIndex={-1} className="font-serif text-3xl sm:text-4xl font-normal text-[#241E1C]">
++                      <h3 id="booking-heading" tabIndex={-1} className="font-serif text-3xl sm:text-4xl font-normal text-club-deep">
+                         Запись на первое занятие
+                       </h3>
+-                      <p className="mt-1 text-xs text-[#6E645F]">
++                      <p className="mt-1 text-base text-club-secondary">
+                         Оставьте контактные данные — администратор клуба перезвонит вам и поможет подобрать удобное время
+                       </p>
+                     </div>
+ 
+                     {/* Выбор направления */}
+                     <div>
+-                      <p className="rounded-2xl bg-[#E4DAD0]/60 px-4 py-3 text-sm text-[#3A2F2B]" aria-live="polite">
++                      <p className="rounded-2xl bg-club-sand/60 px-4 py-3 text-base text-club-ink" aria-live="polite">
+                         Выбранная услуга: <strong>{selectedService}</strong>
+                       </p>
+                       <details ref={serviceList} className="mt-2">
+-                        <summary className="w-fit cursor-pointer rounded-lg py-2 text-sm text-[#5A483E] underline underline-offset-4 hover:text-[#241E1C]">
++                        <summary className="w-fit cursor-pointer rounded-lg py-2 text-sm text-club-secondary underline underline-offset-4 hover:text-club-deep">
+                           Выбрать другую услугу
+                         </summary>
+                         <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Услуги">
+@@ -255,8 +255,8 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                                 serviceList.current?.querySelector('summary')?.focus();
+                               }}
+                               className={`min-h-11 cursor-pointer rounded-2xl border px-4 py-2 text-left text-sm transition-colors disabled:cursor-wait disabled:opacity-60 ${selectedService === srv.name
+-                                ? 'border-[#3A2F2B] bg-[#3A2F2B] text-white'
+-                                : 'border-black/10 bg-[#FAF7F2] text-[#5A483E] hover:border-black/30'}`}>
++                                ? 'border-club-ink bg-club-ink text-white'
++                                : 'border-black/10 bg-club-paper text-club-secondary hover:border-black/30'}`}>
+                               {srv.name}
+                             </button>
+                           ))}
+@@ -264,7 +264,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                       </details>
+                       <div className="mt-3 flex flex-wrap gap-2" aria-live="polite">
+                         {(['horse', 'trainer'] as const).map(kind => selection[kind] && <button key={kind} type="button"
+-                          disabled={loading} className="rounded-full border border-black/10 bg-[#FAF7F2] px-4 py-2 text-xs font-medium text-[#6E645F]" onClick={() => onRemove(kind)}
++                          disabled={loading} className="rounded-full border border-black/10 bg-club-paper px-4 py-2 text-sm font-medium text-club-secondary" onClick={() => onRemove(kind)}
+                           aria-label={`Убрать ${kind === 'horse' ? 'лошадь' : 'тренера'}: ${selection[kind]!.name}`}>
+                           {kind === 'horse' ? 'Лошадь' : 'Тренер'}: {selection[kind]!.name} <span aria-hidden="true">×</span>
+                         </button>)}
+@@ -274,7 +274,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                     {/* Поля ввода: Имя и Телефон */}
+                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                       <div>
+-                        <label htmlFor="contact-name" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
++                        <label htmlFor="contact-name" className="block text-sm font-semibold text-club-secondary mb-1.5">
+                           Ваше имя *
+                         </label>
+                         <input
+@@ -289,12 +289,12 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                           value={name}
+                           onChange={(e) => setName(e.target.value)}
+                           placeholder="Например, Анна"
+-                          className="w-full rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
++                          className="w-full rounded-2xl border border-black/10 bg-club-paper px-4 py-3.5 text-base text-club-deep outline-none transition-all placeholder:text-club-secondary focus:border-club-ink focus:bg-white"
+                         />
+                       </div>
+ 
+                       <div>
+-                        <label htmlFor="contact-phone" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
++                        <label htmlFor="contact-phone" className="block text-sm font-semibold text-club-secondary mb-1.5">
+                           Телефон *
+                         </label>
+                         <input
+@@ -308,14 +308,14 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                           value={phone}
+                           onChange={(e) => setPhone(phoneMask(e.target.value))}
+                           placeholder="+7 (___) ___-__-__"
+-                          className="w-full rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
++                          className="w-full rounded-2xl border border-black/10 bg-club-paper px-4 py-3.5 text-base text-club-deep outline-none transition-all placeholder:text-club-secondary focus:border-club-ink focus:bg-white"
+                         />
+                       </div>
+                     </div>
+ 
+                     {/* Пожелания / комментарий */}
+                     <div>
+-                      <label htmlFor="contact-notes" className="block text-[11px] font-semibold uppercase tracking-wider text-[#8C7E77] mb-1.5">
++                      <label htmlFor="contact-notes" className="block text-sm font-semibold text-club-secondary mb-1.5">
+                         Пожелания к занятию (необязательно)
+                       </label>
+                       <textarea
+@@ -328,17 +328,17 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                         value={notes}
+                         onChange={(e) => setNotes(e.target.value)}
+                         placeholder="Для ребёнка / для взрослого, удобные выходные или будни"
+-                        className="w-full resize-none rounded-2xl border border-black/10 bg-[#FAF7F2] px-4 py-3.5 text-base text-[#241E1C] outline-none transition-all placeholder:text-[#B3A8A0] focus:border-[#3A2F2B] focus:bg-white"
++                        className="w-full resize-none rounded-2xl border border-black/10 bg-club-paper px-4 py-3.5 text-base text-club-deep outline-none transition-all placeholder:text-club-secondary focus:border-club-ink focus:bg-white"
+                       />
+                     </div>
+ 
+                     {/* Кнопка отправки и согласие */}
+                     <div className="pt-2">
+-                      <label className="mb-4 flex items-start gap-3 text-xs text-[#6E645F]">
++                      <label className="mb-4 flex items-start gap-3 text-sm text-club-secondary">
+                         <input id="personal-data-consent" type="checkbox" checked={consent} disabled={loading}
+                           aria-invalid={invalidField === 'personal-data-consent'}
+                           aria-describedby={invalidField === 'personal-data-consent' ? 'contact-error' : undefined}
+-                          onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 accent-[#614535]" />
++                          onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 accent-club-action" />
+                         <span>Я даю согласие на обработку персональных данных для рассмотрения заявки.</span>
+                       </label>
+                       <div className="min-h-12 text-sm text-[#8C3838]" aria-live="polite">
+@@ -347,12 +347,12 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+                       <button
+                         type="submit"
+                         disabled={loading}
+-                        className="w-full cursor-pointer rounded-2xl bg-[#614535] py-4 text-xs font-semibold uppercase tracking-[0.16em] text-white shadow-lg transition-all hover:bg-[#432F24] hover:scale-[1.01] active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 disabled:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#614535]"
++                        className="w-full cursor-pointer rounded-2xl bg-club-action py-4 text-sm font-semibold text-white shadow-lg transition-all hover:bg-club-deep hover:scale-[1.01] active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 disabled:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-club-action"
+                       >
+                         {loading ? 'Отправляем…' : 'Оставить заявку на первое занятие'}
+                       </button>
+ 
+-                      <div className="mt-3 text-center text-[11px] text-[#9C8F87]">
++                      <div className="mt-3 text-center text-sm text-club-secondary">
+                         Нажимая кнопку, вы соглашаетесь с <PrivacyPolicyLink />
+                       </div>
+                     </div>
+diff --git a/horse-club-crm/landing/src/components/FirstLessonSection.tsx b/horse-club-crm/landing/src/components/FirstLessonSection.tsx
+index a8a616c..4c598ee 100644
+--- a/horse-club-crm/landing/src/components/FirstLessonSection.tsx
++++ b/horse-club-crm/landing/src/components/FirstLessonSection.tsx
+@@ -35,10 +35,10 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
+     >
+       <div className="relative mx-auto max-w-7xl">
+         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
+-          <h2 id="first-lesson-heading" className="mt-3 max-w-2xl font-serif text-4xl font-normal tracking-tight text-luxury-dark sm:text-6xl">
++          <h2 id="first-lesson-heading" className="leading-[1.125] mt-3 max-w-2xl font-serif text-[2rem] font-normal tracking-tight text-luxury-dark sm:text-5xl">
+             Впервые в седле? Это проще и безопаснее, чем кажется
+           </h2>
+-          <p className="max-w-md text-xs leading-relaxed text-[#6E645F] sm:text-sm">
++          <p className="max-w-md text-base leading-relaxed text-club-secondary">
+             70% наших гостей приходят без опыта верховой езды. Мы бережно проведём вас через каждое мгновение первого знакомства с лошадью.
+           </p>
+         </div>
+@@ -49,11 +49,11 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
+               <article key={step.number} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md">
+                 <div className="flex items-center justify-between gap-4">
+                   <span aria-hidden="true" className="font-serif text-3xl font-light text-luxury-brown/70">{step.number}</span>
+-                  <span className="rounded-full border border-black/5 bg-luxury-card px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5A483E]">{step.duration}</span>
++                  <span className="rounded-full border border-black/5 bg-luxury-card px-3.5 py-1 text-sm font-semibold text-club-secondary">{step.duration}</span>
+                 </div>
+                 <div className="mt-8">
+                   <h3 className="mt-2 font-serif text-2xl font-normal leading-snug text-luxury-dark sm:text-3xl">{step.title}</h3>
+-                  <p className="mt-4 text-xs leading-relaxed text-[#6E645F] sm:text-sm">{step.description}</p>
++                  <p className="mt-4 text-base leading-relaxed text-club-secondary">{step.description}</p>
+                 </div>
+               </article>
+             ))}
+@@ -65,8 +65,8 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
+           <dl className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+             {preparation.map(item => (
+               <div key={item.title}>
+-                <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-luxury-brown">{item.title}</dt>
+-                <dd className="mt-2 text-xs leading-relaxed text-[#6E645F] sm:text-sm">{item.description}</dd>
++                <dt className="text-sm font-semibold text-luxury-brown">{item.title}</dt>
++                <dd className="mt-2 text-sm leading-relaxed text-club-secondary sm:text-sm">{item.description}</dd>
+               </div>
+             ))}
+           </dl>
+@@ -76,7 +76,7 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
+           <a
+             href="#booking-form"
+             onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
+-            className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition-all hover:scale-105 hover:bg-[#5A483E] active:scale-95"
++            className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 hover:bg-club-secondary active:scale-95"
+           >
+             Записаться на первое занятие
+           </a>
+diff --git a/horse-club-crm/landing/src/components/GiftCertificatesSection.tsx b/horse-club-crm/landing/src/components/GiftCertificatesSection.tsx
+index bfbaab6..5004020 100644
+--- a/horse-club-crm/landing/src/components/GiftCertificatesSection.tsx
++++ b/horse-club-crm/landing/src/components/GiftCertificatesSection.tsx
+@@ -25,10 +25,10 @@ export function GiftCertificatesSection(): ReactElement {
+     >
+       <div className="relative mx-auto max-w-7xl">
+         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
+-          <h2 id="gift-certificates-heading" className="mt-3 max-w-2xl font-serif text-4xl font-normal tracking-tight text-luxury-dark sm:text-6xl">
++          <h2 id="gift-certificates-heading" className="leading-[1.125] mt-3 max-w-2xl font-serif text-[2rem] font-normal tracking-tight text-luxury-dark sm:text-5xl">
+             Подарочные сертификаты
+           </h2>
+-          <p className="max-w-md text-xs leading-relaxed text-[#6E645F] sm:text-sm">
++          <p className="max-w-md text-base leading-relaxed text-club-secondary">
+             Подарите время рядом с лошадьми — для первого знакомства или нового шага в верховой езде.
+           </p>
+         </div>
+@@ -37,7 +37,7 @@ export function GiftCertificatesSection(): ReactElement {
+           {benefits.map(benefit => (
+             <li key={benefit.title} className="relative flex flex-col rounded-[2.5rem] border border-black/5 bg-white/90 p-8 shadow-[0_15px_35px_rgba(58,47,43,0.04)] backdrop-blur-md sm:p-12">
+               <h3 className="mt-2 font-serif text-2xl font-normal leading-snug text-luxury-dark sm:text-3xl">{benefit.title}</h3>
+-              <p className="mt-4 text-xs leading-relaxed text-[#6E645F] sm:text-sm">{benefit.description}</p>
++              <p className="mt-4 text-base leading-relaxed text-club-secondary">{benefit.description}</p>
+             </li>
+           ))}
+         </ul>
+@@ -46,7 +46,7 @@ export function GiftCertificatesSection(): ReactElement {
+           <a
+             href="#booking-form"
+             onClick={event => { event.preventDefault(); scrollToBooking(); }}
+-            className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm transition-all hover:scale-105 hover:bg-[#5A483E] active:scale-95"
++            className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 hover:bg-club-secondary active:scale-95"
+           >
+             Заказать сертификат
+           </a>
+diff --git a/horse-club-crm/landing/src/components/HeroSection.tsx b/horse-club-crm/landing/src/components/HeroSection.tsx
+index 1c72da1..5c7a518 100644
+--- a/horse-club-crm/landing/src/components/HeroSection.tsx
++++ b/horse-club-crm/landing/src/components/HeroSection.tsx
+@@ -1,163 +1,41 @@
+-import { useRef, type ReactElement } from 'react';
+-import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
++import { type ReactElement } from 'react';
+ import riderImg from '../assets/rider.png';
+ 
+ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
+-  const containerRef = useRef<HTMLElement>(null);
+-
+-  // Скролл-прогресс по секции Hero
+-  const { scrollYProgress } = useScroll({
+-    target: containerRef,
+-    offset: ['start start', 'end start'],
+-  });
+-
+-  // Инерционная пружина для гладкого движения
+-  const smoothProgress = useSpring(scrollYProgress, {
+-    stiffness: 85,
+-    damping: 24,
+-    restDelta: 0.001,
+-  });
+-
+-  // 1. Полёт влево по направлению прыжка
+-  const riderX = useTransform(smoothProgress, [0, 0.45, 1], ['0%', '-28%', '-70%']);
+-
+-  // 2. Взмывание вверх
+-  const riderY = useTransform(smoothProgress, [0, 0.4, 1], ['0%', '-35%', '-95%']);
+-
+-  // 3. Динамический наклон
+-  const riderRotate = useTransform(smoothProgress, [0, 0.5, 1], [0, -6, -12]);
+-
+-  // 4. Перспективный зум
+-  const riderScale = useTransform(smoothProgress, [0, 0.4, 1], [1, 1.08, 0.95]);
+-
+-  // 5. Плавное затухание в конце секции
+-  const riderOpacity = useTransform(smoothProgress, [0, 0.65, 0.95], [1, 0.95, 0]);
+-
+   return (
+-    <section
+-      ref={containerRef}
+-      id="hero"
+-      className="relative flex min-h-[85svh] w-full max-w-full flex-col justify-between overflow-hidden bg-[#E4DAD0] px-4 pb-4 pt-24 sm:px-10 sm:pb-6 lg:px-16"
+-    >
+-      {/* Декоративное мягкое свечение фона */}
+-      <div
+-        aria-hidden="true"
+-        className="pointer-events-none absolute top-16 right-1/4 h-[550px] w-[550px] rounded-full bg-white/40 blur-3xl -z-10"
+-      />
+-
+-      {/* Верхний отступ под парящий Navbar */}
+-      <div />
+-
+-      {/* Интерактивный слой со всадником */}
+-      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-end overflow-hidden pr-0 sm:pr-8 lg:pr-14">
+-        <motion.div
+-          style={{
+-            x: riderX,
+-            y: riderY,
+-            rotate: riderRotate,
+-            scale: riderScale,
+-            opacity: riderOpacity,
+-          }}
+-          /* Опустили ниже навбара: top-16 на мобильных, top-20 на планшетах, top-24 на десктопе */
+-          className="relative right-[-3rem] top-10 w-[270px] drop-shadow-[0_25px_35px_rgba(58,47,43,0.18)] sm:right-6 sm:top-20 sm:w-[460px] md:w-[540px] lg:right-10 lg:top-24 lg:w-[620px]"
+-        >
+-          {/* Мягкое парение на месте в покое */}
+-          <motion.div
+-            animate={{
+-              y: [0, -6, 0],
+-            }}
+-            transition={{
+-              duration: 4,
+-              repeat: Infinity,
+-              ease: 'easeInOut',
+-            }}
+-          >
+-            <img
+-              src={riderImg}
+-              alt="Всадник СЛКС Тамбов"
+-              className="h-auto w-full object-contain"
+-              loading="eager"
+-            />
+-          </motion.div>
+-        </motion.div>
+-      </div>
+-
+-      {/* Контентный блок: Заголовок слева и карточка справа */}
+-      <div className="relative z-20 mx-auto grid w-full max-w-7xl grid-cols-1 items-end gap-8 pb-4 lg:grid-cols-12">
+-        {/* Левая часть: Гео-бейдж и заголовок */}
+-        <motion.div
+-          initial={{ opacity: 0, y: 24 }}
+-          animate={{ opacity: 1, y: 0 }}
+-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+-          className="flex flex-col items-start lg:col-span-7"
+-        >
+-          <div className="mb-5 inline-flex items-center rounded-full border border-black/10 bg-white/80 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-luxury-dark/90 shadow-sm backdrop-blur-md">
+-            Тамбов · ул. Бастионная, 22АС2
+-          </div>
+-
+-          <h1 className="max-w-full font-serif tracking-tight text-luxury-dark drop-shadow-sm">
+-            <span className="block text-3xl font-normal leading-[1.05] tracking-[-0.02em] sm:text-5xl lg:text-7xl">
+-              Искусство
+-            </span>
+-            <span className="mt-1 block text-3xl italic font-normal tracking-tight sm:text-5xl lg:text-7xl">
+-              быть в седле
+-            </span>
++    <section id="hero" aria-labelledby="hero-heading" className="landing-hero bg-luxury-bg px-6 pb-12 pt-28 sm:px-10 lg:px-16">
++      <div className="mx-auto grid w-full max-w-7xl items-center gap-8 lg:grid-cols-2 lg:gap-12">
++        <div className="min-w-0">
++          <p className="mb-6 text-sm leading-5 text-luxury-muted">Тамбов · ул. Бастионная, 22АС2</p>
++          <h1 id="hero-heading" className="landing-hero__heading font-serif font-normal text-luxury-dark">
++            Искусство<br />быть в седле
+           </h1>
+-        </motion.div>
+-
+-        {/* Правая часть: Плавающая карточка */}
+-        <motion.div
+-          initial={{ opacity: 0, y: 24 }}
+-          animate={{ opacity: 1, y: 0 }}
+-          transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+-          className="relative z-30 lg:col-span-5"
+-        >
+-          <div className="rounded-[2rem] border border-white/80 bg-white/95 p-5 shadow-[0_20px_50px_rgba(58,47,43,0.12)] backdrop-blur-xl sm:rounded-[2.2rem] sm:p-9">
+-            <p className="text-xs font-normal leading-relaxed text-luxury-muted sm:text-sm">
+-              Семейный конный клуб, где обучение, спорт и забота о лошадях
+-              соединяются в одно красивое движение.
+-            </p>
+-
+-            <div className="mt-5 flex w-full flex-col items-stretch gap-3 sm:mt-6 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+-              <a
+-                href="#booking-form"
+-                onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
+-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[#36423A] px-6 py-3 text-xs font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-luxury-brown active:scale-95 sm:w-auto"
+-              >
+-                <span>Записаться на первое занятие</span>
+-                <span aria-hidden="true" className="text-[12px]">↗</span>
+-              </a>
+-
+-              <a
+-                href="#about"
+-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-luxury-border bg-white px-6 py-3 text-xs font-medium text-luxury-dark transition-all hover:scale-105 hover:bg-luxury-bg active:scale-95 sm:w-auto"
+-              >
+-                <span>О клубе</span>
+-                <span className="text-[12px]">↗</span>
+-              </a>
+-            </div>
++          <p className="mt-6 max-w-lg text-base leading-relaxed text-luxury-muted sm:text-lg">
++            Семейный конный клуб, где обучение, спорт и забота о лошадях
++            соединяются в одно красивое движение.
++          </p>
++          <div className="mt-8 flex flex-wrap items-center gap-4">
++            <a href="#booking-form"
++              onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
++              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-luxury-brown px-6 py-3 text-[15px] font-medium text-white transition-colors hover:bg-luxury-dark active:bg-luxury-deep">
++              Записаться на первое занятие
++            </a>
++            <a href="#about" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-luxury-muted px-6 py-3 text-[15px] font-medium text-luxury-dark transition-colors hover:bg-luxury-card active:bg-white">
++              О клубе
++            </a>
+           </div>
+-        </motion.div>
+-      </div>
+-
+-      {/* Круглая кнопка скролла */}
+-      <div className="relative z-20 mx-auto flex justify-center pb-2">
+-        <a
+-          href="#services"
+-          aria-label="Прокрутить к услугам"
+-          className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/90 text-luxury-dark shadow-md backdrop-blur-sm transition-all hover:scale-110 active:scale-95"
+-        >
+-          <svg
+-            className="h-4 w-4 animate-bounce text-luxury-dark"
+-            fill="none"
+-            viewBox="0 0 24 24"
+-            stroke="currentColor"
+-            strokeWidth="2.5"
+-          >
+-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+-          </svg>
+-        </a>
++        </div>
++        <div className="landing-hero__visual min-w-0">
++          <img src={riderImg} alt="Всадник СЛКС Тамбов" loading="eager"
++            className="h-full w-full object-contain" />
++        </div>
+       </div>
++      <a href="#services" aria-label="Прокрутить к услугам"
++        className="mx-auto mt-8 flex h-11 w-11 items-center justify-center rounded-full border border-luxury-muted text-luxury-dark transition-colors hover:bg-luxury-card">
++        <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
++          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
++        </svg>
++      </a>
+     </section>
+   );
+ }
+diff --git a/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx b/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx
+index 94bf8e6..826eec8 100644
+--- a/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx
++++ b/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx
+@@ -103,13 +103,13 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+   };
+ 
+   return (
+-    <section id="horses-trainers" className="relative overflow-hidden bg-[#E4DAD0] px-6 py-10 md:py-16 sm:px-10 lg:px-16">
++    <section id="horses-trainers" className="relative overflow-hidden bg-club-sand px-6 py-10 md:py-16 sm:px-10 lg:px-16">
+       <div className="mx-auto max-w-7xl">
+         {/* Заголовок и переключатель */}
+         <div className="flex flex-col items-start justify-between gap-8 sm:flex-row sm:items-end">
+           <div>
+-            <span className="text-xs uppercase tracking-[0.2em] text-[#724C39]">Команда клуба</span>
+-            <h2 className="mt-3 font-serif text-4xl sm:text-6xl font-normal tracking-tight text-[#3A2F2B]">
++            <span className="text-sm text-club-action">Команда клуба</span>
++            <h2 className="leading-[1.125] mt-3 font-serif text-[2rem] sm:text-5xl font-normal tracking-tight text-club-ink">
+               Лошади и наставники
+             </h2>
+           </div>
+@@ -120,10 +120,10 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+               type="button"
+               aria-pressed={tab === 'horses'}
+               onClick={() => setTab('horses')}
+-              className={`rounded-full px-6 py-2.5 text-xs font-medium uppercase tracking-[0.12em] transition-all duration-300 ${
++              className={`rounded-full px-6 py-2.5 text-sm font-medium   transition-all duration-300 ${
+                 tab === 'horses'
+-                  ? 'bg-[#3A2F2B] text-white shadow-sm'
+-                  : 'text-[#5C4F49] hover:text-[#3A2F2B]'
++                  ? 'bg-club-ink text-white shadow-sm'
++                  : 'text-club-secondary hover:text-club-ink'
+               }`}
+             >
+               Лошади клуба
+@@ -132,10 +132,10 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+               type="button"
+               aria-pressed={tab === 'trainers'}
+               onClick={() => setTab('trainers')}
+-              className={`rounded-full px-6 py-2.5 text-xs font-medium uppercase tracking-[0.12em] transition-all duration-300 ${
++              className={`rounded-full px-6 py-2.5 text-sm font-medium   transition-all duration-300 ${
+                 tab === 'trainers'
+-                  ? 'bg-[#3A2F2B] text-white shadow-sm'
+-                  : 'text-[#5C4F49] hover:text-[#3A2F2B]'
++                  ? 'bg-club-ink text-white shadow-sm'
++                  : 'text-club-secondary hover:text-club-ink'
+               }`}
+             >
+               Тренеры
+@@ -164,7 +164,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+                       modalTriggerRef.current = event.currentTarget;
+                       setSelectedItem(horse);
+                     }}
+-                    className="group relative flex w-full flex-col overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/90 text-left shadow-[0_15px_35px_rgba(58,47,43,0.06)] backdrop-blur-lg transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_45px_rgba(58,47,43,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#724C39]"
++                    className="group relative flex w-full flex-col overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/90 text-left shadow-[0_15px_35px_rgba(58,47,43,0.06)] backdrop-blur-lg transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_45px_rgba(58,47,43,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-club-action"
+                   >
+                     <div className="relative h-72 w-full overflow-hidden">
+                       <img loading="lazy" decoding="async"
+@@ -173,27 +173,27 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+                         alt={horse.name}
+                         className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                       />
+-                      <div className="absolute top-4 right-4 rounded-full bg-white/90 px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#3A2F2B] backdrop-blur-md">
++                      <div className="absolute top-4 right-4 rounded-full bg-white/90 px-3.5 py-1 text-sm font-semibold text-club-ink backdrop-blur-md">
+                         {horse.breed || horse.discipline}
+                       </div>
+                     </div>
+ 
+                     <div className="flex flex-1 flex-col justify-between p-7">
+                       <div>
+-                        <span className="text-[11px] uppercase tracking-[0.16em] text-[#724C39]">
++                        <span className="text-sm text-club-action">
+                           {horse.breed}
+                         </span>
+-                        <h3 className="mt-1 font-serif text-2xl font-normal text-[#3A2F2B]">
++                        <h3 className="mt-1 font-serif text-2xl font-normal text-club-ink">
+                           {horse.name}
+                         </h3>
+-                        <p className="mt-3 text-xs leading-relaxed text-[#6E645F] line-clamp-2">
++                        <p className="mt-3 text-base leading-relaxed text-club-secondary line-clamp-2">
+                           {horse.character}
+                         </p>
+                       </div>
+ 
+-                      <div className="mt-6 flex items-center justify-between border-t border-black/5 pt-4 text-xs">
+-                        <span className="font-medium text-[#3A2F2B]">{horse.discipline}</span>
+-                        <span className="inline-flex items-center gap-1 font-semibold text-[#724C39] group-hover:translate-x-1 transition-transform">
++                      <div className="mt-6 flex items-center justify-between border-t border-black/5 pt-4 text-sm">
++                        <span className="font-medium text-club-ink">{horse.discipline}</span>
++                        <span className="inline-flex items-center gap-1 font-semibold text-club-action group-hover:translate-x-1 transition-transform">
+                           Подробнее ↗
+                         </span>
+                       </div>
+@@ -221,7 +221,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+                       modalTriggerRef.current = event.currentTarget;
+                       setSelectedItem(trainer);
+                     }}
+-                    className="group relative flex w-full flex-col overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/90 text-left shadow-[0_15px_35px_rgba(58,47,43,0.06)] backdrop-blur-lg transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_45px_rgba(58,47,43,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#724C39]"
++                    className="group relative flex w-full flex-col overflow-hidden rounded-[2.2rem] border border-white/80 bg-white/90 text-left shadow-[0_15px_35px_rgba(58,47,43,0.06)] backdrop-blur-lg transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_25px_45px_rgba(58,47,43,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-club-action"
+                   >
+                     <div className="relative h-72 w-full overflow-hidden">
+                       <img loading="lazy" decoding="async"
+@@ -230,32 +230,32 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+                         alt={trainer.name}
+                         className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                       />
+-                      <div className="absolute top-4 right-4 rounded-full bg-[#3A2F2B]/85 px-3.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-white backdrop-blur-md">
++                      <div className="absolute top-4 right-4 rounded-full bg-club-ink/85 px-3.5 py-1 text-sm font-medium text-white backdrop-blur-md">
+                         {trainer.experience}
+                       </div>
+                     </div>
+ 
+                     <div className="flex flex-1 flex-col justify-between p-7">
+                       <div>
+-                        <span className="text-[11px] uppercase tracking-[0.16em] text-[#724C39]">
++                        <span className="text-sm text-club-action">
+                           {trainer.role}
+                         </span>
+-                        <h3 className="mt-1 font-serif text-2xl font-normal text-[#3A2F2B]">
++                        <h3 className="mt-1 font-serif text-2xl font-normal text-club-ink">
+                           {trainer.name}
+                         </h3>
+-                        <p className="mt-2 text-xs font-medium text-[#5C4F49]">
++                        <p className="mt-2 text-base font-medium text-club-secondary">
+                           {trainer.qualification}
+                         </p>
+-                        <p className="mt-3 text-xs italic leading-relaxed text-[#7C716B] line-clamp-2">
++                        <p className="mt-3 text-base italic leading-relaxed text-club-secondary line-clamp-2">
+                           {trainer.quote}
+                         </p>
+                       </div>
+ 
+                       <div className="mt-6 flex items-center justify-between border-t border-black/5 pt-4">
+-                        <span className="text-xs font-medium text-[#3A2F2B] group-hover:text-[#724C39] transition-colors">
++                        <span className="text-sm font-medium text-club-ink group-hover:text-club-action transition-colors">
+                           Биография наставника
+                         </span>
+-                        <span className="inline-flex items-center gap-1 font-semibold text-[#724C39] group-hover:translate-x-1 transition-transform">
++                        <span className="inline-flex items-center gap-1 font-semibold text-club-action group-hover:translate-x-1 transition-transform">
+                           Подробнее ↗
+                         </span>
+                       </div>
+@@ -280,7 +280,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+               animate={{ opacity: 1 }}
+               exit={{ opacity: 0 }}
+               onClick={() => setSelectedItem(null)}
+-              className="absolute inset-0 bg-[#241E1C]/60 backdrop-blur-md"
++              className="absolute inset-0 bg-club-deep/60 backdrop-blur-md"
+             />
+ 
+             {/* Раскрытая карточка */}
+@@ -293,7 +293,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+               aria-modal="true"
+               aria-label={`Подробная информация: ${selectedItem.name}`}
+               onKeyDown={handleModalKeyDown}
+-              className="relative z-10 flex max-h-[85vh] w-full max-w-4xl flex-col overflow-y-auto rounded-[2rem] border border-white/80 bg-[#FAF7F2] shadow-[0_30px_70px_rgba(0,0,0,0.35)] sm:rounded-[2.5rem] md:flex-row"
++              className="relative z-10 flex max-h-[85vh] w-full max-w-4xl flex-col overflow-y-auto rounded-[2rem] border border-white/80 bg-club-paper shadow-[0_30px_70px_rgba(0,0,0,0.35)] sm:rounded-[2.5rem] md:flex-row"
+             >
+               {/* Круглая кнопка закрытия с крестиком */}
+               <button
+@@ -301,7 +301,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+                 type="button"
+                 onClick={() => setSelectedItem(null)}
+                 aria-label="Закрыть"
+-                className="absolute right-3 top-3 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-black/10 bg-white/95 text-[#3A2F2B] shadow-md backdrop-blur-sm transition-transform hover:scale-110 active:scale-95 sm:right-5 sm:top-5"
++                className="absolute right-3 top-3 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-black/10 bg-white/95 text-club-ink shadow-md backdrop-blur-sm transition-transform hover:scale-110 active:scale-95 sm:right-5 sm:top-5"
+               >
+                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+@@ -322,16 +322,16 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+               {/* Правая половина: детали и параметры */}
+               <div className="flex shrink-0 flex-col justify-between p-5 sm:p-10 md:min-h-0 md:flex-1 md:shrink">
+                 <div>
+-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#724C39]">
++                  <span className="text-sm font-semibold text-club-action">
+                     {selectedItem.type === 'horse' ? selectedItem.breed : selectedItem.role}
+                   </span>
+ 
+-                  <h3 className="mt-1 font-serif text-3xl sm:text-4xl font-normal text-[#3A2F2B]">
++                  <h3 className="mt-1 font-serif text-3xl sm:text-4xl font-normal text-club-ink">
+                     {selectedItem.name}
+                   </h3>
+ 
+                   {selectedItem.type === 'trainer' && (
+-                    <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-[#8C7E77]">
++                    <p className="mt-2 text-base font-semibold text-club-secondary">
+                       {[selectedItem.qualification, selectedItem.experience].filter(Boolean).join(' · ')}
+                     </p>
+                   )}
+@@ -340,40 +340,40 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+                   {selectedItem.type === 'horse' && selectedItem.age && (
+                     <div className="mt-5 grid grid-cols-3 gap-3 rounded-2xl bg-white/80 p-3.5 border border-black/5 text-center">
+                       <div>
+-                        <span className="block text-[10px] uppercase text-[#8C7E77]">Возраст</span>
+-                        <span className="font-semibold text-xs text-[#3A2F2B]">{selectedItem.age}</span>
++                        <span className="block text-sm text-club-secondary">Возраст</span>
++                        <span className="font-semibold text-sm text-club-ink">{selectedItem.age}</span>
+                       </div>
+                       <div>
+-                        <span className="block text-[10px] uppercase text-[#8C7E77]">Рост</span>
+-                        <span className="font-semibold text-xs text-[#3A2F2B]">{selectedItem.height}</span>
++                        <span className="block text-sm text-club-secondary">Рост</span>
++                        <span className="font-semibold text-sm text-club-ink">{selectedItem.height}</span>
+                       </div>
+                       <div>
+-                        <span className="block text-[10px] uppercase text-[#8C7E77]">Масть</span>
+-                        <span className="font-semibold text-xs text-[#3A2F2B]">{selectedItem.suit}</span>
++                        <span className="block text-sm text-club-secondary">Масть</span>
++                        <span className="font-semibold text-sm text-club-ink">{selectedItem.suit}</span>
+                       </div>
+                     </div>
+                   )}
+ 
+                   {/* Цитата тренера */}
+                   {selectedItem.type === 'trainer' && selectedItem.quote && (
+-                    <blockquote className="mt-4 rounded-2xl border-l-2 border-[#724C39] bg-white/70 p-4 text-xs italic leading-relaxed text-[#5C4F49]">
++                    <blockquote className="mt-4 rounded-2xl border-l-2 border-club-action bg-white/70 p-4 text-sm italic leading-relaxed text-club-secondary">
+                       {selectedItem.quote}
+                     </blockquote>
+                   )}
+ 
+                   {/* Полный биографический текст */}
+                   {selectedItem.fullBio && <div className="mt-5">
+-                    <h4 className="text-[11px] uppercase tracking-wider text-[#8C7E77] font-semibold mb-1.5">
++                    <h4 className="text-sm text-club-secondary font-semibold mb-1.5">
+                       {selectedItem.type === 'horse' ? 'Особенности и подготовка' : 'О наставнике'}
+                     </h4>
+-                    <p className="text-xs sm:text-sm leading-relaxed text-[#6E645F]">
++                    <p className="text-base leading-relaxed text-club-secondary">
+                       {selectedItem.fullBio}
+                     </p>
+                   </div>}
+ 
+                   {/* Список достижений / специализаций */}
+                   {(selectedItem.type === 'horse' ? selectedItem.achievements : selectedItem.specialization).length > 0 && <div className="mt-5">
+-                    <h4 className="text-[11px] uppercase tracking-wider text-[#8C7E77] font-semibold mb-2">
++                    <h4 className="text-sm text-club-secondary font-semibold mb-2">
+                       {selectedItem.type === 'horse' ? 'Ключевые преимущества' : 'Специализация'}
+                     </h4>
+                     <ul className="flex flex-col gap-1.5">
+@@ -381,8 +381,8 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+                         ? selectedItem.achievements
+                         : selectedItem.specialization
+                       ).map((point, idx) => (
+-                        <li key={idx} className="flex items-start gap-2 text-xs text-[#5C4F49]">
+-                          <span className="text-[#724C39] font-bold">✓</span>
++                        <li key={idx} className="flex items-start gap-2 text-sm text-club-secondary">
++                          <span className="text-club-action font-bold">✓</span>
+                           <span>{point}</span>
+                         </li>
+                       ))}
+@@ -392,7 +392,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+ 
+                 {/* Нижняя планка с кнопкой записи */}
+                 <div className="mt-8 flex flex-col items-stretch justify-between gap-4 border-t border-black/10 pt-5 sm:flex-row sm:items-center">
+-                  <div className="text-xs text-[#8C7E77]">
++                  <div className="text-sm text-club-secondary">
+                     {selectedItem.type === 'horse' ? selectedItem.discipline : 'Индивидуальные тренировки'}
+                   </div>
+ 
+@@ -403,7 +403,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+                       setSelectedItem(null);
+                       onChoose(selectedItem.type, { id: selectedItem.id, name: selectedItem.name });
+                     }}
+-                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[#3A2F2B] px-6 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-sm transition-all hover:scale-105 hover:bg-[#5A483E] active:scale-95 sm:w-auto"
++                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-club-ink px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 hover:bg-club-secondary active:scale-95 sm:w-auto"
+                   >
+                     <span>Записаться</span>
+                     <span aria-hidden="true">↗</span>
+diff --git a/horse-club-crm/landing/src/components/Navbar.tsx b/horse-club-crm/landing/src/components/Navbar.tsx
+index 97ce9fd..90d07f0 100644
+--- a/horse-club-crm/landing/src/components/Navbar.tsx
++++ b/horse-club-crm/landing/src/components/Navbar.tsx
+@@ -5,7 +5,7 @@ import {
+   type MouseEvent,
+   type ReactElement,
+ } from 'react';
+-import { AnimatePresence, motion } from 'framer-motion';
++import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+ 
+ interface NavigationItem {
+   label: string;
+@@ -28,7 +28,7 @@ function Brand({ inverse = false }: BrandProps): ReactElement {
+     <span className="flex min-w-0 items-center gap-2.5">
+       <span
+         className={`grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border ${
+-          inverse ? 'border-white/15 bg-white/10' : 'border-black/10 bg-[#3A2F2B]'
++          inverse ? 'border-white/15 bg-white/10' : 'border-black/10 bg-club-ink'
+         }`}
+       >
+         <img
+@@ -40,7 +40,7 @@ function Brand({ inverse = false }: BrandProps): ReactElement {
+       </span>
+       <span
+         className={`truncate font-serif text-base tracking-normal ${
+-          inverse ? 'text-[#E4DAD0]' : 'text-[#3A2F2B]'
++          inverse ? 'text-club-sand' : 'text-club-ink'
+         }`}
+       >
+         СЛКС Тамбов
+@@ -50,6 +50,7 @@ function Brand({ inverse = false }: BrandProps): ReactElement {
+ }
+ 
+ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
++  const reduceMotion = useReducedMotion();
+   const [isScrolled, setIsScrolled] = useState<boolean>(false);
+   const [isOpen, setIsOpen] = useState<boolean>(false);
+   const menuRef = useRef<HTMLDivElement>(null);
+@@ -129,7 +130,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+         <div className="mx-auto max-w-7xl">
+           <nav
+             aria-label="Мобильная навигация"
+-            className="pointer-events-auto flex w-full items-center justify-between rounded-full border border-white/10 bg-[#241E1C]/95 px-3 py-2 shadow-[0_16px_40px_rgba(36,30,28,0.22)] backdrop-blur-xl md:hidden"
++            className="pointer-events-auto flex w-full items-center justify-between rounded-full border border-white/10 bg-club-deep/95 px-3 py-2 shadow-[0_16px_40px_rgba(36,30,28,0.22)] backdrop-blur-xl lg:hidden"
+           >
+             <a href="#hero" onClick={(event) => handleNavigation(event, '#hero')}>
+               <Brand inverse />
+@@ -145,7 +146,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+               aria-expanded={isOpen}
+               aria-controls="mobile-navigation-drawer"
+               aria-label={isOpen ? 'Закрыть меню' : 'Открыть меню'}
+-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/15 bg-white/10 text-[#E4DAD0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E4DAD0]"
++              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/15 bg-white/10 text-club-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-club-sand"
+             >
+               <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                 {isOpen ? (
+@@ -157,25 +158,25 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+             </motion.button>
+           </nav>
+ 
+-          <div className="hidden items-center justify-center md:flex">
++          <div className="hidden items-center justify-center lg:flex">
+             <AnimatePresence mode="wait">
+               {!isScrolled ? (
+                 <motion.nav
+                   key="desktop-navigation"
+                   aria-label="Основная навигация"
+-                  initial={{ opacity: 0, y: -20, scale: 0.95 }}
++                  initial={reduceMotion ? false : { opacity: 0, y: -20, scale: 0.95 }}
+                   animate={{ opacity: 1, y: 0, scale: 1 }}
+                   exit={{ opacity: 0, y: -20, scale: 0.95 }}
+-                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
++                  transition={{ duration: reduceMotion ? 0 : 0.35, ease: [0.16, 1, 0.3, 1] }}
+                   className="pointer-events-auto flex items-center gap-8 rounded-full border border-black/10 bg-white/85 px-4 py-2 shadow-lg backdrop-blur-xl lg:gap-10"
+                 >
+                   <a href="#hero" className="flex items-center" onClick={(event) => handleNavigation(event, '#hero')}>
+                     <Brand />
+                   </a>
+ 
+-                  <div className="flex items-center gap-5 text-[11px] uppercase tracking-[0.14em] text-[#6E645F] lg:gap-6">
++                  <div className="flex items-center gap-5 text-sm text-club-secondary lg:gap-6">
+                     {navigationItems.map((item) => (
+-                      <a key={item.href} href={item.href} className="transition-colors hover:text-[#3A2F2B]">
++                      <a key={item.href} href={item.href} className="transition-colors hover:text-club-ink">
+                         {item.label}
+                       </a>
+                     ))}
+@@ -184,7 +185,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+                   <a
+                     href="#booking-form"
+                     onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
+-                    className="rounded-full bg-[#3A2F2B] px-5 py-2.5 text-xs font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-[#724C39] active:scale-95"
++                    className="rounded-full bg-club-ink px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-club-action active:scale-95"
+                   >
+                     Записаться ↗
+                   </a>
+@@ -193,7 +194,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+                 <motion.button
+                   key="desktop-menu-button"
+                   type="button"
+-                  initial={{ opacity: 0, scale: 0.75 }}
++                  initial={reduceMotion ? false : { opacity: 0, scale: 0.75 }}
+                   animate={{ opacity: 1, scale: 1 }}
+                   exit={{ opacity: 0, scale: 0.75 }}
+                   onClick={(event) => {
+@@ -205,7 +206,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+                   aria-expanded={isOpen}
+                   aria-controls="mobile-navigation-drawer"
+                   aria-label={isOpen ? 'Закрыть меню' : 'Открыть меню'}
+-                  className="pointer-events-auto ml-auto grid h-12 w-12 place-items-center rounded-full border border-black/10 bg-white/95 text-[#3A2F2B] shadow-xl backdrop-blur-xl"
++                  className="pointer-events-auto ml-auto grid h-12 w-12 place-items-center rounded-full border border-black/10 bg-white/95 text-club-ink shadow-xl backdrop-blur-xl"
+                 >
+                   <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                     {isOpen ? (
+@@ -233,7 +234,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0 }}
+             transition={{ duration: 0.25 }}
+-            className="fixed inset-0 z-[60] overflow-y-auto bg-[#241E1C]/95 px-5 pb-8 pt-28 text-[#E4DAD0] backdrop-blur-2xl sm:px-8"
++            className="fixed inset-0 z-[60] overflow-y-auto bg-club-deep/95 px-5 pb-8 pt-28 text-club-sand backdrop-blur-2xl sm:px-8"
+           >
+             <motion.div
+               initial={{ opacity: 0, y: 24 }}
+@@ -243,7 +244,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+               className="mx-auto flex min-h-[calc(100dvh-9rem)] max-w-2xl flex-col justify-between"
+             >
+               <div className="flex flex-col">
+-                <p className="mb-7 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#E4DAD0]/55">
++                <p className="mb-7 text-base font-semibold text-club-sand">
+                   Навигация
+                 </p>
+                 {navigationItems.map((item, index) => (
+@@ -266,7 +267,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+                 onClick={event => { event.preventDefault(); setIsOpen(false); onBookFirstLesson(); }}
+                 whileHover={{ scale: 1.015 }}
+                 whileTap={{ scale: 0.98 }}
+-                className="mt-10 flex min-h-14 w-full items-center justify-between rounded-2xl bg-[#E4DAD0] px-6 text-sm font-semibold uppercase tracking-[0.12em] text-[#241E1C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
++                className="mt-10 flex min-h-14 w-full items-center justify-between rounded-2xl bg-club-sand px-6 text-sm font-semibold text-club-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+               >
+                 <span>Записаться</span>
+                 <span aria-hidden="true">↗</span>
+diff --git a/horse-club-crm/landing/src/components/PrivacyPolicyLink.tsx b/horse-club-crm/landing/src/components/PrivacyPolicyLink.tsx
+index 5431075..d851519 100644
+--- a/horse-club-crm/landing/src/components/PrivacyPolicyLink.tsx
++++ b/horse-club-crm/landing/src/components/PrivacyPolicyLink.tsx
+@@ -4,17 +4,17 @@ import { privacyPolicy } from '../legal';
+ export function PrivacyPolicyLink() {
+   const dialog = useRef<HTMLDialogElement>(null);
+   return <>
+-    <a href="#privacy" className="text-[#5A483E] underline underline-offset-4 hover:text-[#241E1C]"
++    <a href="#privacy" className="text-club-secondary underline underline-offset-4 hover:text-club-deep"
+       onClick={event => { event.preventDefault(); dialog.current?.showModal(); }}>
+       Политикой конфиденциальности
+     </a>
+     <dialog ref={dialog} id="privacy" aria-labelledby="privacy-heading"
+-      className="fixed inset-0 m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-2xl overflow-auto rounded-3xl bg-white p-6 text-left text-sm leading-relaxed text-[#3A2F2B] shadow-xl backdrop:bg-black/60">
++      className="fixed inset-0 m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-2xl overflow-auto rounded-3xl bg-white p-6 text-left text-sm leading-relaxed text-club-ink shadow-xl backdrop:bg-black/60">
+       <div className="sticky top-0 flex justify-end bg-white pb-3">
+         <button type="button" autoFocus onClick={() => dialog.current?.close()}
+-          className="min-h-11 cursor-pointer rounded-full border border-black/20 px-5 hover:bg-[#FAF7F2]">Закрыть</button>
++          className="min-h-11 cursor-pointer rounded-full border border-black/20 px-5 hover:bg-club-paper">Закрыть</button>
+       </div>
+-      <h2 id="privacy-heading" className="mb-4 font-serif text-2xl">Политика конфиденциальности</h2>
++      <h2 id="privacy-heading" className="leading-[1.125] mb-4 font-serif text-2xl">Политика конфиденциальности</h2>
+       <div className="space-y-3" dangerouslySetInnerHTML={{ __html: privacyPolicy() }} />
+     </dialog>
+   </>;
+diff --git a/horse-club-crm/landing/src/components/ServicesSection.tsx b/horse-club-crm/landing/src/components/ServicesSection.tsx
+index a205fca..2d5bfac 100644
+--- a/horse-club-crm/landing/src/components/ServicesSection.tsx
++++ b/horse-club-crm/landing/src/components/ServicesSection.tsx
+@@ -26,18 +26,18 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+   if (!currentService) return <></>;
+ 
+   return (
+-    <section id="services" className="relative overflow-hidden bg-[#241E1C] px-4 py-10 md:py-16 text-white sm:px-10 lg:px-16">
++    <section id="services" className="relative overflow-hidden bg-club-deep px-4 py-10 md:py-16 text-white sm:px-10 lg:px-16">
+       <div
+         aria-hidden="true"
+-        className="pointer-events-none absolute -bottom-32 -left-32 h-[500px] w-[500px] rounded-full bg-[#724C39]/20 blur-3xl"
++        className="pointer-events-none absolute -bottom-32 -left-32 h-[500px] w-[500px] rounded-full bg-club-action/20 blur-3xl"
+       />
+ 
+       <div className="relative mx-auto max-w-7xl">
+         <div className="mb-6 md:mb-8 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+-          <h2 className="font-serif text-4xl sm:text-6xl font-normal tracking-tight text-[#E4DAD0]">
++          <h2 className="leading-[1.125] font-serif text-[2rem] sm:text-5xl font-normal tracking-tight text-club-sand">
+             Услуги
+           </h2>
+-          <span className="text-xs uppercase tracking-[0.2em] text-[#A6988E]">
++          <span className="text-sm text-club-sand">
+             Направления обучения
+           </span>
+         </div>
+@@ -56,7 +56,7 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+                   className={`group relative flex shrink-0 snap-start items-center justify-between rounded-full px-5 py-3 text-left transition-all duration-300 lg:w-full lg:rounded-2xl lg:px-7 lg:py-5 ${
+                     isActive
+                       ? 'border border-white/20 bg-white/10 text-white shadow-lg backdrop-blur-md'
+-                      : 'text-[#8C7E77] hover:text-[#E4DAD0] hover:bg-white/5'
++                      : 'text-club-sand hover:text-club-sand hover:bg-white/5'
+                   }`}
+                 >
+                   <span className="text-sm font-medium tracking-tight transition-transform duration-300 group-hover:translate-x-1 lg:text-3xl lg:font-light">
+@@ -66,7 +66,7 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+                   {isActive && (
+                     <motion.div
+                       layoutId="active-indicator"
+-                      className="ml-3 flex h-6 w-6 items-center justify-center rounded-full bg-[#E4DAD0] text-xs font-bold text-[#241E1C] lg:h-7 lg:w-7 lg:text-sm"
++                      className="ml-3 flex h-6 w-6 items-center justify-center rounded-full bg-club-sand text-sm font-bold text-club-deep lg:h-7 lg:w-7 lg:text-sm"
+                     >
+                       →
+                     </motion.div>
+@@ -113,9 +113,9 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+             </div>
+ 
+             {/* Карточка с зафиксированной минимальной высотой min-h */}
+-            <div className="relative z-10 flex min-h-[500px] flex-col justify-between rounded-[2rem] bg-white p-6 text-[#241E1C] shadow-2xl sm:rounded-[2.8rem] sm:p-12">
++            <div className="relative z-10 flex min-h-[500px] flex-col justify-between rounded-[2rem] bg-white p-6 text-club-deep shadow-2xl sm:rounded-[2.8rem] sm:p-12">
+               <div className="min-h-[19rem] sm:min-h-[18rem]">
+-                <div className="inline-block rounded-full bg-[#E4DAD0]/60 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5A483E] mb-6">
++                <div className="inline-block rounded-full bg-club-sand/60 px-4 py-1 text-sm font-semibold text-club-secondary mb-6">
+                   {currentService.badge}
+                 </div>
+ 
+@@ -129,14 +129,14 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+                   >
+                     {/* Фиксированная минимальная высота для заголовка */}
+                     <div className="flex min-h-[92px] items-start pr-24 sm:min-h-[108px] sm:pr-36 lg:min-h-[84px] lg:pr-28">
+-                      <h3 className="font-serif text-2xl sm:text-4xl font-normal leading-snug tracking-tight text-[#241E1C]">
++                      <h3 className="font-serif text-2xl sm:text-4xl font-normal leading-snug tracking-tight text-club-deep">
+                         {currentService.cardTitle}
+                       </h3>
+                     </div>
+ 
+                     {/* Фиксированная минимальная высота для блока описания */}
+                     <div className="mt-4 min-h-[132px] max-w-lg sm:min-h-[120px]">
+-                      <p className="text-sm sm:text-base leading-relaxed text-[#6E645F]">
++                      <p className="text-base sm:text-base leading-relaxed text-club-secondary">
+                         {currentService.desc}
+                       </p>
+                     </div>
+@@ -150,13 +150,13 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+ 
+                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+                   <div>
+-                    <span className="block text-xs uppercase tracking-wider text-[#9C8F87]">
++                    <span className="block text-sm text-club-secondary">
+                       Стоимость:
+                     </span>
+-                    <span className="text-3xl sm:text-4xl font-light text-[#241E1C]">
++                    <span className="text-3xl sm:text-4xl font-light text-club-deep">
+                       {currentService.price}
+                     </span>
+-                    <span className="block mt-1 text-xs text-[#8C7E77]">
++                    <span className="block mt-1 text-sm text-club-secondary">
+                       {currentService.duration}
+                     </span>
+                   </div>
+@@ -164,7 +164,7 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+                   <a
+                     href="#booking-form"
+                     onClick={event => { event.preventDefault(); onChoose('service', { id: currentService.id, name: currentService.title }); }}
+-                    className="inline-flex w-full items-center justify-center rounded-2xl bg-[#614535] px-6 py-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-md transition-all hover:scale-105 hover:bg-[#432F24] active:scale-95 sm:w-auto sm:px-8"
++                    className="inline-flex w-full items-center justify-center rounded-2xl bg-club-action px-6 py-4 text-center text-sm font-semibold text-white shadow-md transition-all hover:scale-105 hover:bg-club-deep active:scale-95 sm:w-auto sm:px-8"
+                   >
+                     Записаться на занятие
+                   </a>
+diff --git a/horse-club-crm/landing/src/style.css b/horse-club-crm/landing/src/style.css
+index 8f1decf..b3c116e 100644
+--- a/horse-club-crm/landing/src/style.css
++++ b/horse-club-crm/landing/src/style.css
+@@ -8,23 +8,29 @@
+ .club-carousel__slide { flex: 0 0 84%; min-width: 0; display: flex; }
+ .club-carousel__slide > * { width: 100%; }
+ .club-carousel__controls { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1rem; }
+-.club-carousel__arrow { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; border: 1px solid rgb(58 47 43 / .15); border-radius: 999px; background: rgb(255 255 255 / .7); color: #724C39; cursor: pointer; transition: background .2s, color .2s; }
+-.club-carousel__arrow:hover:not(:disabled) { background: #3A2F2B; color: white; }
+-.club-carousel__arrow:active:not(:disabled) { background: #5A483E; }
++.club-carousel__arrow { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; border: 1px solid rgb(58 47 43 / .15); border-radius: 999px; background: rgb(255 255 255 / .7); color: var(--color-club-action); cursor: pointer; transition: background .2s, color .2s; }
++.club-carousel__arrow:hover:not(:disabled) { background: var(--color-club-ink); color: white; }
++.club-carousel__arrow:active:not(:disabled) { background: var(--color-club-secondary); }
+ .club-carousel__arrow:disabled { opacity: .3; cursor: default; }
+ .club-carousel__dots { display: flex; flex-wrap: wrap; justify-content: center; }
+ .club-carousel__dot { display: grid; place-items: center; width: 28px; height: 44px; cursor: pointer; }
+-.club-carousel__dot span { width: 6px; height: 6px; border-radius: 999px; background: #8C7E77; transition: width .2s, background .2s; }
+-.club-carousel__dot[aria-current] span { width: 18px; background: #724C39; }
+-.club-carousel :is(button, [tabindex]):focus-visible { outline: 2px solid #724C39; outline-offset: 2px; }
++.club-carousel__dot span { width: 6px; height: 6px; border-radius: 999px; background: var(--color-club-secondary); transition: width .2s, background .2s; }
++.club-carousel__dot[aria-current] span { width: 18px; background: var(--color-club-action); }
++.club-carousel :is(button, [tabindex]):focus-visible { outline: 2px solid var(--color-club-action); outline-offset: 2px; }
+ @media (min-width: 640px) { .club-carousel__slide { flex-basis: calc((100% - 3rem) / 2.2); } }
+ @media (min-width: 1025px) { .club-carousel__slide { flex-basis: calc((100% - 4rem) / 3); } }
+ @media (prefers-reduced-motion: reduce) { .club-carousel *, .club-carousel *::before, .club-carousel *::after { transition-duration: 0s !important; } }
+ 
+ /* Preserve the original Tailwind 3 theme with the existing Tailwind 4 build. */
+ @theme {
++  --color-club-paper: #FAF7F2;
++  --color-club-sand: #E4DAD0;
++  --color-club-ink: #3A2F2B;
++  --color-club-deep: #241E1C;
++  --color-club-action: #614535;
++  --color-club-secondary: #5A483E;
+   --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+-  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
++  --font-serif: Georgia, "Times New Roman", serif;
+   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / .05);
+   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / .1), 0 2px 4px -2px rgb(0 0 0 / .1);
+   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1);
+@@ -33,17 +39,17 @@
+ }
+ 
+ :root {
+-  color: #ffffff;
+-  background: #0b0c0e;
+-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
++  color: var(--color-club-ink);
++  background: var(--color-club-paper);
++  font-family: var(--font-sans);
+   font-synthesis: none;
+   text-rendering: optimizeLegibility;
+-  scrollbar-color: rgb(82 82 91) #0b0c0e;
++  scrollbar-color: var(--color-club-secondary) var(--color-club-paper);
+   scrollbar-width: thin;
+ }
+ 
+ html {
+-  background: #0b0c0e;
++  background: var(--color-club-paper);
+   overflow-x: hidden;
+   scroll-padding-top: 6rem;
+ }
+@@ -53,7 +59,7 @@ body {
+   min-height: 100vh;
+   margin: 0;
+   overflow-x: hidden;
+-  background: #0b0c0e;
++  background: var(--color-club-paper);
+ }
+ 
+ * {
+@@ -66,26 +72,52 @@ body {
+ }
+ 
+ *::-webkit-scrollbar-track {
+-  background: #0b0c0e;
++  background: var(--color-club-paper);
+ }
+ 
+ *::-webkit-scrollbar-thumb {
+-  border: 3px solid #0b0c0e;
++  border: 3px solid var(--color-club-paper);
+   border-radius: 999px;
+-  background: rgb(82 82 91);
++  background: var(--color-club-secondary);
+ }
+ 
+ *::-webkit-scrollbar-thumb:hover {
+-  background: rgb(113 113 122);
++  background: var(--color-club-action);
+ }
+ 
+ *::-webkit-scrollbar-thumb:active {
+-  background: rgb(161 161 170);
++  background: var(--color-club-deep);
+ }
+ 
+ ::selection {
+-  color: #18181b;
+-  background: #fef3c7;
++  color: var(--color-club-paper);
++  background: var(--color-club-ink);
++}
++
++.landing-hero__heading { font-size: 40px; line-height: 1.1; letter-spacing: -.02em; }
++.landing-hero__visual { height: clamp(240px, 48vw, 480px); }
++@media (min-width: 1024px) {
++  .landing-hero__heading { font-size: clamp(48px, 5vw, 76px); line-height: 1.05; }
++}
++
++.landing-shell :is(a, button, summary, input, textarea, select, [tabindex]):focus-visible {
++  outline: 2px solid var(--color-club-action);
++  outline-offset: 3px;
++  box-shadow: 0 0 0 5px var(--color-club-paper);
++}
++.landing-shell :is(a, button, summary) { cursor: pointer; }
++.landing-shell :is(a, button)[class*="font-medium"],
++.landing-shell :is(a, button)[class*="font-semibold"] { font-size: 15px; line-height: 20px; }
++.landing-shell :is(button, input, textarea, select):disabled { cursor: not-allowed; }
++
++/* MotionConfig handles JS transforms; reduced motion also removes opacity reveals. */
++@media (prefers-reduced-motion: reduce) {
++  .landing-shell *, .landing-shell *::before, .landing-shell *::after {
++    animation: none !important;
++    transition-duration: 0s !important;
++    scroll-behavior: auto !important;
++  }
++  .landing-shell [style*="opacity"] { opacity: 1 !important; }
+ }
+ 
+ @media (prefers-reduced-motion: reduce) {
+diff --git a/horse-club-crm/landing/tailwind.config.js b/horse-club-crm/landing/tailwind.config.js
+index 3cf9f4b..ad3521f 100644
+--- a/horse-club-crm/landing/tailwind.config.js
++++ b/horse-club-crm/landing/tailwind.config.js
+@@ -8,14 +8,15 @@ export default {
+     extend: {
+       colors: {
+         luxury: {
+-          bg: '#E4DAD0',        // 01 — основной тёплый фон
+-          sand: '#EBD4AB',      // 02 — золотисто-песочный акцент
+-          brown: '#724C39',     // 03 — кожа / кнопки
+-          taupe: '#BF9D85',     // 04 — мягкий беж
+-          dark: '#3A2F2B',      // 05 — глубокий эспрессо (текст)
+-          card: '#FAF7F2',      // светлые карточки
+-          border: '#D8C8BB',    // рамки
+-          muted: '#6E5D53',     // второстепенный текст
++          bg: 'var(--color-club-sand)',
++          sand: 'var(--color-club-sand)',
++          brown: 'var(--color-club-action)',
++          taupe: 'var(--color-club-secondary)',
++          dark: 'var(--color-club-ink)',
++          deep: 'var(--color-club-deep)',
++          card: 'var(--color-club-paper)',
++          border: 'var(--color-club-secondary)',
++          muted: 'var(--color-club-secondary)',
+         },
+       },
+       boxShadow: {
+diff --git a/horse-club-crm/landing/tests/polish.spec.ts b/horse-club-crm/landing/tests/polish.spec.ts
+index 01967be..3e0dd1b 100644
+--- a/horse-club-crm/landing/tests/polish.spec.ts
++++ b/horse-club-crm/landing/tests/polish.spec.ts
+@@ -42,8 +42,8 @@ for (const width of [320, 390, 768, 1440]) {
+     await expect(page.locator('#horses-trainers')).toContainText('Для начинающих');
+     await page.locator('#about').scrollIntoViewIfNeeded();
+     await expect(page.locator('#about > div').last()).toBeVisible();
+-    // The owner explicitly restored the original palette; keep all non-visual a11y rules.
+-    const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).disableRules(['color-contrast']).analyze();
++    // Stage one keeps the card layout and checks AA contrast in every open state.
++    const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+     expect(axe.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))).toEqual([]);
+     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+     // Preserve the original h-72 photo containers instead of enforcing the rejected 4:3 redesign.
+@@ -65,7 +65,7 @@ for (const width of [320, 390, 768, 1440]) {
+     await expect(dialog.getByRole('link', { name: 'Записаться', exact: true })).toBeFocused();
+     await page.keyboard.press('Tab');
+     await expect(dialog.getByRole('button', { name: 'Закрыть', exact: true })).toBeFocused();
+-    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).disableRules(['color-contrast']).analyze()).violations).toEqual([]);
++    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations).toEqual([]);
+     await page.keyboard.press('Escape');
+     await expect(open).toBeFocused();
+     await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
+@@ -75,7 +75,7 @@ for (const width of [320, 390, 768, 1440]) {
+     if (width < 1024) {
+       await page.getByRole('button', { name: 'Открыть меню', exact: true }).click();
+       await expect(page.getByRole('dialog', { name: 'Меню сайта' })).toBeVisible();
+-      expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).disableRules(['color-contrast']).analyze()).violations).toEqual([]);
++      expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations).toEqual([]);
+       await page.keyboard.press('Escape');
+       await expect(page.getByRole('button', { name: 'Открыть меню', exact: true })).toBeFocused();
+     }
+diff --git a/horse-club-crm/landing/tests/stage-one.spec.ts b/horse-club-crm/landing/tests/stage-one.spec.ts
+new file mode 100644
+index 0000000..81b11a2
+--- /dev/null
++++ b/horse-club-crm/landing/tests/stage-one.spec.ts
+@@ -0,0 +1,45 @@
++import { expect, test } from '@playwright/test';
++import AxeBuilder from '@axe-core/playwright';
++
++for (const width of [375, 390, 768, 1023, 1024, 1025, 1280, 1440, 1920]) {
++  test(`hero text and rider stay separate at ${width}px`, async ({ page }) => {
++    await page.setViewportSize({ width, height: width === 1280 ? 800 : 1080 });
++    await page.emulateMedia({ reducedMotion: 'reduce' });
++    await page.route('**/api/public/content', route => route.fulfill({ json: {} }));
++    await page.goto('/');
++    const heading = page.locator('#hero-heading');
++    await expect(heading).toHaveText('Искусствобыть в седле');
++    const text = (await heading.boundingBox())!;
++    const rider = (await page.locator('#hero img').boundingBox())!;
++    expect(text.x + text.width <= rider.x || text.y + text.height <= rider.y).toBe(true);
++    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
++    const cta = page.locator('#hero').getByRole('link', { name: 'Записаться на первое занятие', exact: true });
++    const action = (await cta.boundingBox())!;
++    if (width < 1024) expect(action.y + action.height).toBeLessThanOrEqual(rider.y);
++    if (width === 1280) await expect(cta).toBeInViewport();
++    await cta.focus();
++    await expect(cta).toHaveCSS('outline-style', 'solid');
++    await page.screenshot({ path: test.info().outputPath(`hero-${width}.png`) });
++  });
++}
++
++test('landing text meets AA contrast after reveals and in the booking form', async ({ page }) => {
++  await page.setViewportSize({ width: 1440, height: 900 });
++  await page.emulateMedia({ reducedMotion: 'reduce' });
++  await page.route('**/api/public/content', route => route.fulfill({ json: {} }));
++  await page.goto('/');
++  await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
++  for (const id of ['services', 'horses-trainers', 'about', 'first-lesson', 'gift-certificates', 'contacts']) {
++    await page.locator(`#${id}`).scrollIntoViewIfNeeded();
++  }
++  const results = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
++  expect(results.violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(node => ({ target: node.target, summary: node.failureSummary })) }))).toEqual([]);
++  expect(await page.locator('p, label').evaluateAll(elements => elements.filter(el => {
++    const style = getComputedStyle(el);
++    return el.getClientRects().length > 0 && Number.parseFloat(style.fontSize) < 14;
++  }).map(el => el.textContent))).toEqual([]);
++  await page.locator('#horses-trainers .club-carousel__slide > button').first().click();
++  await expect(page.getByRole('dialog')).toBeVisible();
++  expect((await new AxeBuilder({ page }).withRules(['color-contrast']).analyze()).violations).toEqual([]);
++  await page.keyboard.press('Escape');
++});

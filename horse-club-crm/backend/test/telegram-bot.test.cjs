@@ -81,8 +81,8 @@ test('create uses serializable existing lesson rules, server-owned client and au
 });
 test('rejects stale consent, phone takeover, unpublished services and unoffered start times', async () => {
   let f = fixture(); await assert.rejects(f.service.create(clientId, { ...f.dto, consentVersion: 'old' }), status(400));
-  f = fixture(); f.tx.client.findUnique = async ({ where }) => where.phone ? { id: 'another' } : { id: clientId };
-  await assert.rejects(f.service.create(clientId, f.dto), status(409)); assert.equal(f.writes.length, 0);
+  f = fixture(); f.tx.client.findUnique = async ({ where }) => where.phone ? { id: 'another', telegramUserId: '456' } : { id: clientId, telegramUserId: '123' };
+  await assert.rejects(f.service.create(clientId, f.dto), status(400)); assert.equal(f.writes.length, 0);
   f = fixture(); f.tx.service.findFirst = async () => null; await assert.rejects(f.service.create(clientId, f.dto), status(404));
   f = fixture(); await assert.rejects(f.service.create(clientId, { ...f.dto, startTime: f.start.plus({ minutes: 1 }).toISO() }), status(409));
 });
@@ -119,6 +119,77 @@ test('bot is disabled without a token and rejects non-HTTPS WebApp URLs before p
     assert.throws(() => new TelegramBotService().onModuleInit(), /HTTPS/);
   } finally {
     for (const [name, value] of [['TELEGRAM_BOT_TOKEN', previous.token], ['TELEGRAM_WEBAPP_URL', previous.url]]) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+  }
+});
+
+test('bot routes getMe through TELEGRAM_API_ROOT without waiting for the network during Nest initialization', { timeout: 5000 }, async t => {
+  const { createServer } = require('node:http');
+  const { Bot } = require('grammy');
+  const previous = Object.fromEntries(['TELEGRAM_BOT_TOKEN', 'TELEGRAM_API_ROOT', 'TELEGRAM_WEBAPP_URL'].map(name => [name, process.env[name]]));
+  const requests = [];
+  let finishResponse;
+  let receivedRequest;
+  const received = new Promise(resolve => { receivedRequest = resolve; });
+  const server = createServer((req, res) => {
+    requests.push(req.url);
+    finishResponse = () => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ ok: true, result: { id: 123, is_bot: true, first_name: 'Test', username: 'test_bot' } }));
+    };
+    receivedRequest();
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  let probe;
+  t.mock.method(Bot.prototype, 'start', function () {
+    probe = this.api.getMe();
+    return probe.then(() => undefined);
+  });
+  try {
+    process.env.TELEGRAM_BOT_TOKEN = token;
+    process.env.TELEGRAM_API_ROOT = ` http://127.0.0.1:${server.address().port}/telegram `;
+    process.env.TELEGRAM_WEBAPP_URL = 'https://example.test/tma';
+    const service = new TelegramBotService();
+    assert.equal(service.onModuleInit(), undefined);
+    await received;
+    // The proxy is still holding getMe open while Nest initialization has returned.
+    finishResponse();
+    assert.equal((await probe).username, 'test_bot');
+    assert.deepEqual(requests, [`/telegram/bot${token}/getMe`]);
+    await service.onModuleDestroy();
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('empty API root keeps the Telegram default and polling failure is handled without leaking credentials', async t => {
+  const { Bot } = require('grammy');
+  const { Logger } = require('@nestjs/common');
+  const previous = Object.fromEntries(['TELEGRAM_BOT_TOKEN', 'TELEGRAM_API_ROOT', 'TELEGRAM_WEBAPP_URL'].map(name => [name, process.env[name]]));
+  const messages = [];
+  t.mock.method(Logger.prototype, 'error', message => messages.push(message));
+  t.mock.method(Bot.prototype, 'start', function () {
+    assert.equal(this.api.options.apiRoot, undefined);
+    return Promise.reject(new Error(`network unavailable: ${token}`));
+  });
+  try {
+    process.env.TELEGRAM_BOT_TOKEN = token;
+    process.env.TELEGRAM_API_ROOT = '   ';
+    process.env.TELEGRAM_WEBAPP_URL = 'https://example.test/tma';
+    const service = new TelegramBotService();
+    assert.equal(service.onModuleInit(), undefined);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(messages.length, 1);
+    assert.match(messages[0], /network/);
+    assert.ok(!messages[0].includes(token));
+    await service.onModuleDestroy();
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[name]; else process.env[name] = value;
     }
   }

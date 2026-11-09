@@ -1,11 +1,36 @@
-import { defineConfig } from '@playwright/test'
+import { defineConfig, devices } from '@playwright/test'
+
 export default defineConfig({
-  projects: [
-    { name: 'live', testMatch: '**/*.live.spec.ts' },
-    { name: 'operational-reset', testMatch: '**/operational-reset.spec.ts' },
-    { name: 'mock', testMatch: ['**/schedule-interactions.spec.ts', '**/live-search.spec.ts', '**/table-columns.spec.ts', '**/staff-payroll-lock.spec.ts', '**/staff-lifecycle.spec.ts', '**/client-preferences.spec.ts', '**/entity-edit.spec.ts', '**/client-archive.spec.ts', '**/lead-notifications.spec.ts', '**/lesson-payments.spec.ts', '**/dashboard.spec.ts', '**/module-access.spec.ts', '**/stall-map.spec.ts', '**/s3-01.spec.ts', '**/clients-memberships.spec.ts', '**/horse-workload.spec.ts', '**/horse-replacement.spec.ts', '**/vet-log.spec.ts', '**/vet-records.spec.ts', '**/role-access.spec.ts', '**/vk-link.spec.ts', '**/vk-settings.spec.ts', '**/quick-boarding.spec.ts', '**/triad-booking.spec.ts', '**/cash-desk.spec.ts', '**/lead-conversion.spec.ts', '**/public-content.spec.ts'] },
+  testDir: './e2e',
+  testMatch: '**/landing.spec.ts',
+  timeout: 30_000,
+  expect: { timeout: 5_000 },
+  fullyParallel: true,
+  retries: process.env.CI ? 2 : 0,
+  reporter: [['html', { open: 'never' }], ['list']],
+  use: {
+    baseURL: 'http://localhost:5173',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+  webServer: [
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:5173',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      // The public landing is a separate Vite application in this repository.
+      command: 'npm --prefix ../landing run dev -- --host localhost',
+      url: 'http://localhost:5174',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
   ],
-  testDir: './e2e', workers: 1, timeout: 20000,
-  reporter: [['list'], ['html', { open: 'never' }]],
-  use: { baseURL: process.env.CRM_TEST_BASE_URL || 'http://localhost:5173', channel: 'msedge', headless: true, screenshot: 'only-on-failure' },
+  projects: [
+    { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'mobile-chrome', use: { ...devices['Pixel 5'] } },
+  ],
 })

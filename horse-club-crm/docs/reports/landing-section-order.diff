@@ -1,0 +1,623 @@
+diff --git a/horse-club-crm/docs/reports/landing-section-order.md b/horse-club-crm/docs/reports/landing-section-order.md
+new file mode 100644
+index 0000000..1d4163e
+--- /dev/null
++++ b/horse-club-crm/docs/reports/landing-section-order.md
+@@ -0,0 +1,17 @@
++# Последовательность блоков лендинга
++
++Изменена фактическая точка входа `landing/src/App.tsx`: Hero → О клубе → Услуги → Лошади → Тренеры → Подготовка → Отзывы → FAQ → Запись/контакты → Footer → ScrollToTop. Сертификаты сохранены внутри раздела услуг. Каталоги используют общий компонент карточек и модальных подробностей, но отображаются двумя самостоятельными секциями.
++
++Якоря меню и футера согласованы с секциями. Добавлены #coaches, #preparation, #reviews и #booking; старые #horses-trainers, #first-lesson и #booking-form сохранены. Глобальный smooth scroll учитывает prefers-reduced-motion. Блок отзывов открывает ранее предоставленный источник ВКонтакте, без вымышленных цитат или рейтингов.
++
++## Проверки
++
++- `npm run typecheck`, `npm run lint`, `npm run build` — успешно в landing, frontend и backend. Линтер backend оставляет три существующих предупреждения в тестах, без ошибок.
++- `npm test` в frontend: 165 passed.
++- `npm test` в backend: 661 passed, 20 skipped.
++- `LANDING_TEST_EXTERNAL_SERVER=1 CI=1 npm test -- --reporter=line` в landing: 71 passed, 1 skipped (live API/БД). Использован production preview, поднятый тестовым сервером. Отдельный запуск потребовался из-за зависшего завершения управляемого Playwright сервера на Windows.
++- Проверены карусели, форма и ошибки API, клавиатура, доступность, reduced motion, адаптивные размеры 320–1920 px. Новый сценарий проверяет строгий порядок блоков и переходы по якорям на 375/1440 px; скриншоты сохраняются в landing/test-results.
++- `npm run audit:ui` из корня: оба проектных аудита прошли без замечаний. Стандартный audit_project.py навыка также проходит для landing; его дополнительный запуск на неизменённом frontend сообщает 214 замечаний, преимущественно распознавая Ant Design Form.Item как самостоятельные формы. Изменения CRM в задачу не входят.
++- `git diff --check`: успешно.
++
++Схема БД не менялась, миграция и генерация Prisma Client не требуются. Ранее существовавшие неотслеживаемые отчёты не включены в коммит.
+diff --git a/horse-club-crm/landing/DESIGN.md b/horse-club-crm/landing/DESIGN.md
+index aeccb71..4fe3f45 100644
+--- a/horse-club-crm/landing/DESIGN.md
++++ b/horse-club-crm/landing/DESIGN.md
+@@ -17,4 +17,6 @@
+ Исправления ассетов и записи: статичные фотографии конной тематики берутся из public/images, BASE_URL сохраняет корректные пути Vite; Hero использует импорт из src/assets. Подготовка находится один раз перед FAQ/записью; пять вопросов используют нативный details/summary. Мобильная плашка записи и звонка резервирует место внизу, учитывает safe area. Политика переиспользует PrivacyPolicyLink с уникальным dialog для каждого экземпляра; открытие политики не отмечает согласие. Возраст необязателен и передаётся в notes, сертификат — в выбранной услуге. Реквизиты используют существующие VITE_LEGAL_* с подтверждёнными значениями клуба по умолчанию; Новости клуба содержат ВКонтакте и MAX (https://max.ru); телефон остаётся одной строкой и открывает tel:+79156720030. Номиналы 2/4/6 тысяч показаны как желаемые и требуют подтверждения администратора.
+ 
+ Подвал: классическая сетка из пяти колонок от 1280px, трёх от 768px, двух от 640px и компактный стек на телефоне. Фон — club-sand, заголовки — Georgia/club-ink, ссылки — club-secondary, hover — club-deep. Используется существующая политика; ссылка правил ведёт к подготовке первого занятия. MAX использует переданный владельцем адрес канала. Реквизиты оператора сохраняются в колонке клиентов.
+-Отзывы открываются в новой вкладке по предоставленной владельцем ссылке https://vk.ru/reviews-226780791.
++Порядок блоков: Hero → О клубе → Услуги (включая сертификаты) → Лошади → Тренеры → Подготовка → Отзывы → FAQ → Запись и контакты → Footer → ScrollToTop. Каталоги лошадей и тренеров отображаются последовательно, каждый со своей каруселью и подробными карточками.
++
++Канонические якоря: #about, #services, #horses, #coaches, #preparation, #reviews, #faq, #booking, #contacts. Старые #horses-trainers, #first-lesson и #booking-form сохранены для совместимости. Глобальный плавный скролл отключается при prefers-reduced-motion. Ссылка отзывов в футере ведёт к #reviews; из блока отзывов посетитель открывает предоставленный владельцем источник https://vk.ru/reviews-226780791 в новой вкладке. Цитаты и рейтинги без подтверждённых данных не добавляются.
+diff --git a/horse-club-crm/landing/src/App.tsx b/horse-club-crm/landing/src/App.tsx
+index ead91c3..61906f5 100644
+--- a/horse-club-crm/landing/src/App.tsx
++++ b/horse-club-crm/landing/src/App.tsx
+@@ -4,13 +4,14 @@ import { firstLesson, scrollToBooking, type BookingSelection, type ChooseBooking
+ import { Navbar } from './components/Navbar';
+ import { HeroSection } from './components/HeroSection';
+ import { ServicesSection } from './components/ServicesSection';
+-import { HorsesAndTrainersSection } from './components/HorsesAndTrainersSection';
++import { HorsesCatalogSection, CoachesSection } from './components/HorsesAndTrainersSection';
+ import { ClubStandardsSection } from './components/ClubStandardsSection';
+ import { FirstLessonSection } from './components/FirstLessonSection';
+ import { GiftCertificatesSection } from './components/GiftCertificatesSection';
+ import { ContactsSection } from './components/ContactsSection';
+ import { Footer } from './components/Footer';
+ import { FaqSection } from './components/FaqSection';
++import { ReviewsSection } from './components/ReviewsSection';
+ import { ScrollToTop } from './components/ScrollToTop';
+ 
+ export function App(): ReactElement {
+@@ -31,20 +32,20 @@ export function App(): ReactElement {
+         {/* 1. Секция Hero с кинематографичным взмыванием всадника */}
+         <HeroSection onBookFirstLesson={bookFirstLesson} />
+ 
+-        {/* 2. Тёмная секция услуг с интерактивными парящими предметами */}
+-        <ServicesSection services={content.services} onChoose={(kind, choice) => {
+-          setSelection(previous => ({ ...previous, [kind]: choice }));
+-          setQuickBookingOpen(true);
+-        }} />
+-
+-        {/* 3. Каталог лошадей и тренеров с модальными окнами */}
+-        <HorsesAndTrainersSection horses={content.horses} trainers={content.trainers} onChoose={choose} />
+-
+-        {/* 4. Блок "Стандарты клуба" (архитектура, еврогрунт, гуманный тренинг) */}
+         <ClubStandardsSection onChoose={choose} />
+-
+-        <GiftCertificatesSection onChoose={choose} />
++        <section id="services">
++          <ServicesSection services={content.services} onChoose={(kind, choice) => {
++            setSelection(previous => ({ ...previous, [kind]: choice }));
++            setQuickBookingOpen(true);
++          }} />
++          <GiftCertificatesSection onChoose={choose} />
++        </section>
++        <div id="horses-trainers">
++          <HorsesCatalogSection horses={content.horses} trainers={content.trainers} onChoose={choose} />
++          <CoachesSection horses={content.horses} trainers={content.trainers} onChoose={choose} />
++        </div>
+         <FirstLessonSection onBookFirstLesson={bookFirstLesson} />
++        <ReviewsSection />
+         <FaqSection />
+ 
+         {/* 5. Премиальный блок контактов с интерактивной формой бронирования */}
+diff --git a/horse-club-crm/landing/src/booking.ts b/horse-club-crm/landing/src/booking.ts
+index 55a6f33..1d26557 100644
+--- a/horse-club-crm/landing/src/booking.ts
++++ b/horse-club-crm/landing/src/booking.ts
+@@ -20,7 +20,7 @@ export function bookingNotes(selection: BookingSelection, notes: string): string
+ export function scrollToBooking(): void {
+   requestAnimationFrame(() => {
+     document.getElementById('booking-heading')?.focus({ preventScroll: true });
+-    document.getElementById('booking-form')?.scrollIntoView({
++    document.getElementById('booking')?.scrollIntoView({
+       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start',
+     });
+   });
+diff --git a/horse-club-crm/landing/src/components/ClubStandardsSection.tsx b/horse-club-crm/landing/src/components/ClubStandardsSection.tsx
+index b1af6d5..269b072 100644
+--- a/horse-club-crm/landing/src/components/ClubStandardsSection.tsx
++++ b/horse-club-crm/landing/src/components/ClubStandardsSection.tsx
+@@ -145,7 +145,7 @@ export function ClubStandardsSection({ onChoose }: { onChoose: ChooseBooking }):
+             </p>
+           </div>
+           <a
+-            href="#booking-form"
++            href="#booking"
+             onClick={event => { event.preventDefault(); onChoose('service', otherServices[3]); }}
+             className="shrink-0 rounded-full bg-club-ink px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-club-secondary hover:scale-105 active:scale-95"
+           >
+diff --git a/horse-club-crm/landing/src/components/ContactsSection.tsx b/horse-club-crm/landing/src/components/ContactsSection.tsx
+index 56587c8..e5258ea 100644
+--- a/horse-club-crm/landing/src/components/ContactsSection.tsx
++++ b/horse-club-crm/landing/src/components/ContactsSection.tsx
+@@ -80,7 +80,7 @@ export function ContactsSection({ services, selection, onChoose, onRemove, onRes
+ 
+   const bookingPanel = (
+     <div id="booking-form" className="scroll-mt-20 lg:col-span-7">
+-      <div className="relative rounded-[2.8rem] bg-white p-5 md:p-6 text-club-deep shadow-2xl">
++      <div id="booking" className="relative scroll-mt-20 rounded-[2.8rem] bg-white p-5 md:p-6 text-club-deep shadow-2xl">
+         <AnimatePresence mode="wait">
+           {isSubmitted ? (
+             <motion.div
+diff --git a/horse-club-crm/landing/src/components/FirstLessonSection.tsx b/horse-club-crm/landing/src/components/FirstLessonSection.tsx
+index b50348b..896d166 100644
+--- a/horse-club-crm/landing/src/components/FirstLessonSection.tsx
++++ b/horse-club-crm/landing/src/components/FirstLessonSection.tsx
+@@ -29,11 +29,11 @@ const preparation = [
+ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: () => void }): ReactElement {
+   return (
+     <section
+-      id="first-lesson"
++      id="preparation"
+       aria-labelledby="first-lesson-heading"
+       className="relative overflow-hidden border-t border-black/5 bg-luxury-card px-6 py-10 md:py-16 text-luxury-dark sm:px-10 lg:px-16"
+     >
+-      <div className="relative mx-auto max-w-7xl">
++      <div id="first-lesson" className="relative mx-auto max-w-7xl">
+         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
+           <h2 id="first-lesson-heading" className="leading-[1.125] mt-3 max-w-2xl font-serif tracking-tight text-luxury-dark text-2xl sm:text-3xl lg:text-4xl font-normal">
+             Впервые в седле? Это проще и безопаснее, чем кажется
+@@ -74,7 +74,7 @@ export function FirstLessonSection({ onBookFirstLesson }: { onBookFirstLesson: (
+ 
+         <div className="mt-6 md:mt-8 text-center">
+           <a
+-            href="#booking-form"
++            href="#booking"
+             onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
+             className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 hover:bg-club-secondary active:scale-95"
+           >
+diff --git a/horse-club-crm/landing/src/components/Footer.tsx b/horse-club-crm/landing/src/components/Footer.tsx
+index 15bea1c..ceb5efd 100644
+--- a/horse-club-crm/landing/src/components/Footer.tsx
++++ b/horse-club-crm/landing/src/components/Footer.tsx
+@@ -7,10 +7,12 @@ import { PrivacyPolicyLink } from './PrivacyPolicyLink';
+ const navigation = [
+   { label: 'О клубе', href: '#about' },
+   { label: 'Услуги клуба', href: '#services' },
+-  { label: 'Тренеры', href: '#trainers' },
+   { label: 'Лошади', href: '#horses' },
+-  { label: 'Отзывы', href: 'https://vk.ru/reviews-226780791' },
++  { label: 'Тренеры', href: '#coaches' },
++  { label: 'Подготовка к визиту', href: '#preparation' },
++  { label: 'Отзывы', href: '#reviews' },
+   { label: 'FAQ', href: '#faq' },
++  { label: 'Онлайн-запись', href: '#booking' },
+   { label: 'Контакты', href: '#contacts' },
+ ];
+ 
+@@ -19,8 +21,7 @@ function scrollToSection(event: MouseEvent<HTMLAnchorElement>): void {
+   const target = document.getElementById(event.currentTarget.hash.slice(1));
+   if (!target) return;
+   event.preventDefault();
+-  if (target instanceof HTMLButtonElement) target.click();
+-  (target.closest('section') ?? target).scrollIntoView({
++  target.scrollIntoView({
+     behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start',
+   });
+ }
+@@ -62,7 +63,7 @@ export function Footer({ brandName }: { brandName: string }): ReactElement {
+         <h4 id="footer-clients" className="mb-3 font-serif text-lg font-normal text-club-ink">Для клиентов:</h4>
+         <ul>
+           <li><PrivacyPolicyLink>Политика конфиденциальности</PrivacyPolicyLink></li>
+-          <li><a href="#first-lesson" onClick={scrollToSection}>Правила посещения клуба и техника безопасности</a></li>
++          <li><a href="#preparation" onClick={scrollToSection}>Правила посещения клуба и техника безопасности</a></li>
+         </ul>
+         <div className="mt-5 space-y-1">
+           <p>{legal.operatorName}</p><p>{legal.registration}</p><p>{legal.operatorAddress}</p>
+diff --git a/horse-club-crm/landing/src/components/GiftCertificatesSection.tsx b/horse-club-crm/landing/src/components/GiftCertificatesSection.tsx
+index 85b8fc3..8161773 100644
+--- a/horse-club-crm/landing/src/components/GiftCertificatesSection.tsx
++++ b/horse-club-crm/landing/src/components/GiftCertificatesSection.tsx
+@@ -54,7 +54,7 @@ export function GiftCertificatesSection({ onChoose }: { onChoose: ChooseBooking
+           </select>
+           <p className="mb-4 text-sm text-club-secondary">Стоимость равна номиналу. Доступность номинала и способ оплаты подтвердит администратор.</p>
+           <a
+-            href="#booking-form"
++            href="#booking"
+             onClick={event => { event.preventDefault(); onChoose('service', { id: 'gift-certificate', name: `Подарочный сертификат на ${Number(amount).toLocaleString('ru-RU')} ₽` }); }}
+             className="inline-flex rounded-full bg-luxury-dark px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 hover:bg-club-secondary active:scale-95"
+           >
+diff --git a/horse-club-crm/landing/src/components/HeroSection.tsx b/horse-club-crm/landing/src/components/HeroSection.tsx
+index 9650798..2ab3b0c 100644
+--- a/horse-club-crm/landing/src/components/HeroSection.tsx
++++ b/horse-club-crm/landing/src/components/HeroSection.tsx
+@@ -21,7 +21,7 @@ export function HeroSection({ onBookFirstLesson }: { onBookFirstLesson: () => vo
+             <li>• Забота о лошадях</li>
+           </ul>
+           <div className="mt-6 flex flex-wrap items-center gap-4">
+-            <a href="#booking-form"
++            <a href="#booking"
+               onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
+               className="inline-flex min-h-12 items-center justify-center rounded-xl bg-luxury-brown px-6 py-3 text-[15px] font-medium text-white transition-colors hover:bg-luxury-dark active:bg-luxury-deep">
+               Записаться на первое занятие
+diff --git a/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx b/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx
+index 405d233..0e34281 100644
+--- a/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx
++++ b/horse-club-crm/landing/src/components/HorsesAndTrainersSection.tsx
+@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent,
+ import { motion, AnimatePresence } from 'framer-motion';
+ import type { ChooseBooking } from '../booking';
+ 
+-type TabType = 'horses' | 'trainers';
++type CatalogKind = 'horses' | 'trainers';
+ 
+ interface HorseItem {
+   id: string;
+@@ -37,7 +37,17 @@ interface TrainerItem {
+ 
+ type ModalItem = HorseItem | TrainerItem;
+ 
+-export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horses: PublicHorse[]; trainers: PublicTrainer[]; onChoose: ChooseBooking }): ReactElement {
++interface CatalogProps { horses: PublicHorse[]; trainers: PublicTrainer[]; onChoose: ChooseBooking }
++
++export function HorsesCatalogSection(props: CatalogProps): ReactElement {
++  return <CatalogSection {...props} catalog="horses" />;
++}
++
++export function CoachesSection(props: CatalogProps): ReactElement {
++  return <CatalogSection {...props} catalog="trainers" />;
++}
++
++function CatalogSection({ horses, trainers, onChoose, catalog }: CatalogProps & { catalog: CatalogKind }): ReactElement {
+   const horsesData: HorseItem[] = horses.map(item => ({
+     id: item.id, type: 'horse', name: item.name, breed: item.breed, discipline: item.role,
+     age: '', height: '', suit: '', character: item.description,
+@@ -48,8 +58,6 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+     qualification: item.qualification, quote: '', fullBio: item.description,
+     specialization: item.specializations, image: item.imageUrl,
+   }));
+-  const carouselPositions = useRef({ horses: 0, trainers: 0 });
+-  const [tab, setTab] = useState<TabType>('horses');
+   const [selectedItem, setSelectedItem] = useState<ModalItem | null>(null);
+   const modalTriggerRef = useRef<HTMLButtonElement>(null);
+   const closeButtonRef = useRef<HTMLButtonElement>(null);
+@@ -103,51 +111,21 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+   };
+ 
+   return (
+-    <section id="horses-trainers" className="relative overflow-hidden bg-club-sand px-6 py-10 md:py-16 sm:px-10 lg:px-16">
++    <section id={catalog === 'horses' ? 'horses' : 'coaches'} className="relative overflow-hidden bg-club-sand px-6 py-10 md:py-16 sm:px-10 lg:px-16">
+       <div className="mx-auto max-w-7xl">
+-        {/* Заголовок и переключатель */}
++        {/* Заголовок каталога */}
+         <div className="flex flex-col items-start justify-between gap-4 md:gap-6 sm:flex-row sm:items-end">
+           <div>
+             <span className="text-sm text-club-action">Команда клуба</span>
+             <h2 className="leading-[1.125] mt-3 font-serif tracking-tight text-club-ink text-2xl sm:text-3xl lg:text-4xl font-normal">
+-              Лошади и наставники
++              {catalog === 'horses' ? 'Лошади клуба' : 'Тренеры и наставники'}
+             </h2>
+           </div>
+-
+-          {/* Таб-переключатель */}
+-          <div className="inline-flex rounded-full border border-black/10 bg-white/70 p-1.5 backdrop-blur-md">
+-            <button
+-              type="button"
+-              aria-pressed={tab === 'horses'}
+-              id="horses"
+-              onClick={() => setTab('horses')}
+-              className={`rounded-full px-6 py-2.5 text-sm font-medium   transition-all duration-300 ${
+-                tab === 'horses'
+-                  ? 'bg-club-ink text-white shadow-sm'
+-                  : 'text-club-secondary hover:text-club-ink'
+-              }`}
+-            >
+-              Лошади клуба
+-            </button>
+-            <button
+-              type="button"
+-              aria-pressed={tab === 'trainers'}
+-              id="trainers"
+-              onClick={() => setTab('trainers')}
+-              className={`rounded-full px-6 py-2.5 text-sm font-medium   transition-all duration-300 ${
+-                tab === 'trainers'
+-                  ? 'bg-club-ink text-white shadow-sm'
+-                  : 'text-club-secondary hover:text-club-ink'
+-              }`}
+-            >
+-              Тренеры
+-            </button>
+-          </div>
+         </div>
+ 
+         {/* Сетка карточек с кликом для раскрытия */}
+         <AnimatePresence mode="wait">
+-          {tab === 'horses' ? (
++          {catalog === 'horses' ? (
+             <motion.div
+               key="horses-grid"
+               initial={{ opacity: 0, y: 20 }}
+@@ -156,8 +134,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+               transition={{ duration: 0.45 }}
+               className="mt-6 md:mt-8"
+             >
+-              <Carousel nativeMobile label="Лошади клуба" initialIndex={carouselPositions.current.horses}
+-                onIndexChange={index => { carouselPositions.current.horses = index; }}>
++              <Carousel nativeMobile label="Лошади клуба">
+                 {horsesData.map((horse) => (
+                   <button
+                     key={horse.id}
+@@ -213,8 +190,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+               transition={{ duration: 0.45 }}
+               className="mt-6 md:mt-8"
+             >
+-              <Carousel nativeMobile label="Тренеры" initialIndex={carouselPositions.current.trainers}
+-                onIndexChange={index => { carouselPositions.current.trainers = index; }}>
++              <Carousel nativeMobile label="Тренеры">
+                 {trainersData.map((trainer) => (
+                   <button
+                     key={trainer.id}
+@@ -399,7 +375,7 @@ export function HorsesAndTrainersSection({ horses, trainers, onChoose }: { horse
+                   </div>
+ 
+                   <a
+-                    href="#booking-form"
++                    href="#booking"
+                     onClick={event => {
+                       event.preventDefault();
+                       setSelectedItem(null);
+diff --git a/horse-club-crm/landing/src/components/Navbar.tsx b/horse-club-crm/landing/src/components/Navbar.tsx
+index 54de7bf..1dab11b 100644
+--- a/horse-club-crm/landing/src/components/Navbar.tsx
++++ b/horse-club-crm/landing/src/components/Navbar.tsx
+@@ -16,9 +16,10 @@ interface NavigationItem {
+ }
+ 
+ const navigationItems: NavigationItem[] = [
+-  { label: 'Услуги', href: '#services' },
+-  { label: 'Лошади и тренеры', href: '#horses-trainers' },
+   { label: 'О клубе', href: '#about' },
++  { label: 'Услуги', href: '#services' },
++  { label: 'Лошади', href: '#horses' },
++  { label: 'Тренеры', href: '#coaches' },
+   { label: 'Контакты', href: '#contacts' },
+ ];
+ 
+@@ -186,7 +187,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+                   </div>
+ 
+                   <a
+-                    href="#booking-form"
++                    href="#booking"
+                     onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
+                     className="rounded-full bg-club-ink px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:scale-105 hover:bg-club-action active:scale-95"
+                   >
+@@ -226,7 +227,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+       </header>
+ 
+       {!isOpen && <nav aria-label="Быстрая запись" className="mobile-booking fixed inset-x-4 bottom-3 z-50 flex items-center gap-2 rounded-2xl border border-white/15 bg-club-deep p-2 text-white shadow-lg lg:hidden">
+-        <a href="#booking-form" onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
++        <a href="#booking" onClick={event => { event.preventDefault(); onBookFirstLesson(); }}
+           className="flex min-h-11 flex-1 items-center justify-center rounded-xl bg-club-action px-4 font-semibold hover:bg-club-secondary">Записаться</a>
+         <a href={`tel:${landingData.contacts.phone.replace(/[^+\d]/g, '')}`} aria-label="Позвонить в клуб"
+           className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/30 hover:bg-white/10"><Phone aria-hidden="true" size={20} /></a>
+@@ -272,7 +273,7 @@ export function Navbar({ onBookFirstLesson }: { onBookFirstLesson: () => void })
+               </div>
+ 
+               <motion.a
+-                href="#booking-form"
++                href="#booking"
+                 onClick={event => { event.preventDefault(); setIsOpen(false); onBookFirstLesson(); }}
+                 whileHover={{ scale: 1.015 }}
+                 whileTap={{ scale: 0.98 }}
+diff --git a/horse-club-crm/landing/src/components/ReviewsSection.tsx b/horse-club-crm/landing/src/components/ReviewsSection.tsx
+new file mode 100644
+index 0000000..cfbe3c5
+--- /dev/null
++++ b/horse-club-crm/landing/src/components/ReviewsSection.tsx
+@@ -0,0 +1,18 @@
++import type { ReactElement } from 'react';
++
++export function ReviewsSection(): ReactElement {
++  return (
++    <section id="reviews" aria-labelledby="reviews-heading" className="bg-club-paper px-6 py-10 text-club-ink sm:px-10 md:py-16 lg:px-16">
++      <div className="mx-auto max-w-2xl text-center">
++        <h2 id="reviews-heading" className="font-serif text-2xl font-normal sm:text-3xl lg:text-4xl">Отзывы гостей клуба</h2>
++        <p className="mt-4 text-sm leading-relaxed text-club-secondary sm:text-base">
++          Гости делятся впечатлениями о занятиях и знакомстве с лошадьми в нашем сообществе ВКонтакте.
++        </p>
++        <a href="https://vk.ru/reviews-226780791" target="_blank" rel="noopener noreferrer"
++          className="mt-6 inline-flex min-h-12 items-center justify-center rounded-xl bg-club-action px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-club-deep active:bg-club-secondary">
++          Читать отзывы ВКонтакте
++        </a>
++      </div>
++    </section>
++  );
++}
+diff --git a/horse-club-crm/landing/src/components/ServicesSection.tsx b/horse-club-crm/landing/src/components/ServicesSection.tsx
+index 716d2f1..6c6eb96 100644
+--- a/horse-club-crm/landing/src/components/ServicesSection.tsx
++++ b/horse-club-crm/landing/src/components/ServicesSection.tsx
+@@ -7,7 +7,7 @@ export function ServicesSection({ services, onChoose }: { services: PublicServic
+   if (services.length === 0) return <></>;
+ 
+   return (
+-    <section id="services" aria-labelledby="services-heading" className="bg-club-deep px-6 py-10 text-white sm:px-10 md:py-16 lg:px-16">
++    <section aria-labelledby="services-heading" className="bg-club-deep px-6 py-10 text-white sm:px-10 md:py-16 lg:px-16">
+       <div className="mx-auto max-w-7xl">
+         <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center md:mb-8">
+           <h2 id="services-heading" className="font-serif text-2xl font-normal leading-tight tracking-tight text-club-sand sm:text-3xl lg:text-4xl">Услуги</h2>
+diff --git a/horse-club-crm/landing/src/style.css b/horse-club-crm/landing/src/style.css
+index cba5196..bedb0eb 100644
+--- a/horse-club-crm/landing/src/style.css
++++ b/horse-club-crm/landing/src/style.css
+@@ -64,6 +64,7 @@ html {
+   background: var(--color-club-paper);
+   overflow-x: hidden;
+   scroll-padding-top: 6rem;
++  scroll-behavior: smooth;
+ }
+ 
+ body {
+diff --git a/horse-club-crm/landing/tests/booking-cro.spec.ts b/horse-club-crm/landing/tests/booking-cro.spec.ts
+index 78086df..5ef80df 100644
+--- a/horse-club-crm/landing/tests/booking-cro.spec.ts
++++ b/horse-club-crm/landing/tests/booking-cro.spec.ts
+@@ -21,9 +21,9 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
+       'Фотосессия с лошадьми', 'Групповая экскурсия', 'Прогулка в лес',
+     ]);
+     await services.getByRole('button', { name: 'Прогулка в лес', exact: true }).click();
+-    for (const section of ['#hero', '#first-lesson']) {
++    for (const section of ['#hero', '#preparation']) {
+       const cta = page.locator(section).getByRole('link', { name: 'Записаться на первое занятие', exact: true });
+-      await expect(cta).toHaveAttribute('href', '#booking-form');
++      await expect(cta).toHaveAttribute('href', '#booking');
+       await cta.click();
+       await expect(page.locator('#booking-heading')).toBeFocused();
+       await expect(page.locator('#booking-form')).toContainText(`Выбранная услуга: ${firstLesson}`);
+diff --git a/horse-club-crm/landing/tests/carousel.spec.ts b/horse-club-crm/landing/tests/carousel.spec.ts
+index ca1a5ee..fe65336 100644
+--- a/horse-club-crm/landing/tests/carousel.spec.ts
++++ b/horse-club-crm/landing/tests/carousel.spec.ts
+@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
+ });
+ 
+ for (const width of [390, 768, 1440]) {
+-  test(`carousel layout, boundaries, keyboard and tab restoration at ${width}px`, async ({ page }) => {
++  test(`carousel layout, boundaries, keyboard and independent positions at ${width}px`, async ({ page }) => {
+     await page.setViewportSize({ width, height: 900 });
+     await page.goto('/');
+     const horses = page.getByRole('region', { name: 'Лошади клуба', exact: true });
+@@ -23,11 +23,9 @@ for (const width of [390, 768, 1440]) {
+     await expect(horses.getByRole('button', { name: 'Влево', exact: true })).toBeDisabled();
+     await horses.getByRole('button', { name: 'Вправо', exact: true }).click();
+     await expect(horses.locator('[aria-current="true"]')).toHaveAttribute('aria-label', 'К слайду 2');
+-    await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
+     const trainers = page.getByRole('region', { name: 'Тренеры', exact: true });
+     await expect(trainers).toBeVisible();
+     await trainers.getByRole('button', { name: 'Вправо', exact: true }).click();
+-    await page.getByRole('button', { name: 'Лошади клуба', exact: true }).click();
+     await expect(horses.locator('[aria-current="true"]')).toHaveAttribute('aria-label', 'К слайду 2');
+     await viewport.focus();
+     await page.keyboard.press('End');
+diff --git a/horse-club-crm/landing/tests/first-lesson.spec.ts b/horse-club-crm/landing/tests/first-lesson.spec.ts
+index 3a03666..23571fc 100644
+--- a/horse-club-crm/landing/tests/first-lesson.spec.ts
++++ b/horse-club-crm/landing/tests/first-lesson.spec.ts
+@@ -5,10 +5,10 @@ for (const width of [320, 768, 1440]) {
+     await page.setViewportSize({ width, height: 900 });
+     await page.route('**/api/public/content', route => route.fulfill({ json: { horses: [], trainers: [], services: [] } }));
+     await page.goto('/');
+-    const section = page.locator('#first-lesson');
++    const section = page.locator('#preparation');
+     await expect(section.locator('ol > li')).toHaveCount(4);
+     await expect(section.locator('dl > div')).toHaveCount(3);
+-    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('faq');
++    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('reviews');
+     await section.scrollIntoViewIfNeeded();
+     const bounds = await section.locator('ol').boundingBox();
+     expect(bounds).not.toBeNull();
+diff --git a/horse-club-crm/landing/tests/footer.spec.ts b/horse-club-crm/landing/tests/footer.spec.ts
+index ef3d120..ac7aa40 100644
+--- a/horse-club-crm/landing/tests/footer.spec.ts
++++ b/horse-club-crm/landing/tests/footer.spec.ts
+@@ -16,16 +16,16 @@ for (const [width, columns] of [[320, 1], [640, 2], [900, 3], [1440, 5]] as cons
+       expect(box.height).toBeGreaterThanOrEqual(44);
+     }
+     await expect(footer.getByRole('link', { name: 'MAX', exact: true })).toHaveAttribute('href', 'https://max.ru/join/Evl2Mp0moqVwQAeBIPaY5ozOrE6rs83dO45_5SrqAvo');
+-    await expect(footer.getByRole('link', { name: 'Отзывы', exact: true })).toHaveAttribute('href', 'https://vk.ru/reviews-226780791');
++    await expect(footer.getByRole('link', { name: 'Отзывы', exact: true })).toHaveAttribute('href', '#reviews');
+     const policy = footer.getByRole('link', { name: 'Политика конфиденциальности' });
+     await policy.click();
+     await expect(page.getByRole('dialog')).toContainText('152-ФЗ');
+     await page.keyboard.press('Escape');
+     await expect(policy).toBeFocused();
+     await footer.getByRole('link', { name: 'Тренеры', exact: true }).click();
+-    await expect(page.locator('#trainers')).toHaveAttribute('aria-pressed', 'true');
++    await expect(page.locator('#coaches')).toBeInViewport();
+     await footer.getByRole('link', { name: 'Лошади', exact: true }).click();
+-    await expect(page.locator('#horses')).toHaveAttribute('aria-pressed', 'true');
++    await expect(page.locator('#horses')).toBeInViewport();
+     await footer.scrollIntoViewIfNeeded();
+     await footer.screenshot({ path: test.info().outputPath(`footer-${width}.png`) });
+   });
+diff --git a/horse-club-crm/landing/tests/gift-certificates.spec.ts b/horse-club-crm/landing/tests/gift-certificates.spec.ts
+index 33ac57a..16d6e68 100644
+--- a/horse-club-crm/landing/tests/gift-certificates.spec.ts
++++ b/horse-club-crm/landing/tests/gift-certificates.spec.ts
+@@ -10,7 +10,7 @@ for (const width of [320, 768, 1440]) {
+     await expect(section).toContainText('На любую услугу или сумму');
+     await expect(section).toContainText('Бумажный или электронный');
+     await expect(section).toContainText('Срок действия — 6 месяцев');
+-    expect(await section.evaluate(element => element.nextElementSibling?.id)).toBe('first-lesson');
++    expect(await section.evaluate(element => element.parentElement?.id)).toBe('services');
+     await section.scrollIntoViewIfNeeded();
+     expect(await section.evaluate(element => Array.from(element.querySelectorAll('li, h2, h3, p, a')).every(child => {
+       const rect = child.getBoundingClientRect();
+diff --git a/horse-club-crm/landing/tests/polish.spec.ts b/horse-club-crm/landing/tests/polish.spec.ts
+index b38f45b..2c2c281 100644
+--- a/horse-club-crm/landing/tests/polish.spec.ts
++++ b/horse-club-crm/landing/tests/polish.spec.ts
+@@ -68,7 +68,6 @@ for (const width of [320, 390, 768, 1440]) {
+     expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations).toEqual([]);
+     await page.keyboard.press('Escape');
+     await expect(open).toBeFocused();
+-    await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
+     await expect(page.locator('#horses-trainers')).toContainText('КМС');
+     await expect(page.locator('#horses-trainers')).toContainText('Старший тренер');
+     await expect(page.locator('#horses-trainers')).not.toContainText('UNKNOWN_INTERNAL_CODE');
+@@ -102,8 +101,6 @@ test('card choices survive form errors, preserve the comment and reach the lead
+   await page.locator('#horses-trainers .club-carousel__slide > button').filter({ has: page.getByRole('heading', { name: 'Мирабель', exact: true }) }).click();
+   await page.getByRole('dialog').getByRole('link', { name: 'Записаться', exact: true }).click();
+   await expect(page.getByRole('dialog')).toHaveCount(0);
+-  await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
+-  // The original tabs crossfade: wait for the trainer card, not the exiting horse grid.
+   await page.locator('#horses-trainers .club-carousel__slide > button').filter({ has: page.getByRole('heading', { name: 'Екатерина', exact: true }) }).click();
+   await page.getByRole('dialog').getByRole('link', { name: 'Записаться', exact: true }).click();
+   await expect(page.getByRole('dialog')).toHaveCount(0);
+diff --git a/horse-club-crm/landing/tests/public-content.spec.ts b/horse-club-crm/landing/tests/public-content.spec.ts
+index f5600b9..9a55413 100644
+--- a/horse-club-crm/landing/tests/public-content.spec.ts
++++ b/horse-club-crm/landing/tests/public-content.spec.ts
+@@ -13,8 +13,7 @@ test('resolves uploaded photos against the API origin and displays them in all c
+   await page.goto('/');
+   await expect(page.locator('#services img').first()).toHaveAttribute('src', photo);
+   await expect(page.locator('#horses-trainers img').first()).toHaveAttribute('src', photo);
+-  await page.locator('#horses-trainers').getByRole('button', { name: 'Тренеры', exact: true }).click();
+-  await expect(page.locator('#horses-trainers img').first()).toHaveAttribute('src', photo);
++  await expect(page.locator('#coaches img').first()).toHaveAttribute('src', photo);
+   const urls = [resolveCatalogImage(photo, 'https://api.example.com/api'), resolveCatalogImage(photo, '/api'),
+     resolveCatalogImage('https://cdn.example.com/photo.jpg'), resolveCatalogImage('//evil.example/photo.jpg')];
+   expect(urls).toEqual([`https://api.example.com${photo}`, photo, 'https://cdn.example.com/photo.jpg', '/images/horse.jpg']);
+@@ -39,7 +38,6 @@ test('loads public records, updates service selection and opens real horse/train
+   await page.getByRole('button').filter({ has: page.getByRole('heading', { name: 'Лошадь из CRM' }) }).click();
+   await expect(page.getByRole('dialog')).toContainText('Описание лошади из базы');
+   await page.keyboard.press('Escape');
+-  await page.locator('#horses-trainers').getByRole('button', { name: 'Тренеры', exact: true }).click();
+   await page.getByRole('button').filter({ has: page.getByRole('heading', { name: 'Тренер из CRM' }) }).click();
+   await expect(page.getByRole('dialog')).toContainText('Биография из базы');
+   await expect(page.getByRole('dialog')).toContainText('КМС');
+diff --git a/horse-club-crm/landing/tests/section-order.spec.ts b/horse-club-crm/landing/tests/section-order.spec.ts
+new file mode 100644
+index 0000000..0acf063
+--- /dev/null
++++ b/horse-club-crm/landing/tests/section-order.spec.ts
+@@ -0,0 +1,30 @@
++import { expect, test } from '@playwright/test';
++
++for (const width of [375, 1440]) {
++  test(`section order and navigation targets at ${width}px`, async ({ page }) => {
++    await page.setViewportSize({ width, height: 900 });
++    await page.emulateMedia({ reducedMotion: 'reduce' });
++    await page.route('**/api/public/content', route => route.fulfill({ json: { horses: [], trainers: [], services: [] } }));
++    await page.goto('/');
++    const ids = ['hero', 'about', 'services', 'horses', 'coaches', 'preparation', 'reviews', 'faq', 'contacts'];
++    expect(await page.locator('main section[id]').evaluateAll(sections => sections.map(section => section.id)
++      .filter(id => !['gift-certificates'].includes(id)))).toEqual(ids);
++    for (const id of [...ids, 'booking']) {
++      await expect(page.locator(`[id="${id}"]`)).toHaveCount(1);
++    }
++    for (const id of ids.slice(1).concat('booking')) {
++      const link = page.locator(`footer a[href="#${id}"]`).first();
++      await link.click();
++      await expect(page.locator(`#${id}`)).toBeInViewport();
++    }
++    await expect(page.locator('#reviews a')).toHaveAttribute('href', 'https://vk.ru/reviews-226780791');
++    expect(await page.locator('nav a[href^="#"]').evaluateAll(links => links.every(link => {
++      const href = link.getAttribute('href');
++      return href !== null && document.getElementById(href.slice(1)) !== null;
++    }))).toBe(true);
++    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
++    await page.screenshot({ path: test.info().outputPath(`section-order-${width}.png`), fullPage: true });
++    await page.emulateMedia({ reducedMotion: 'no-preference' });
++    await expect(page.locator('html')).toHaveCSS('scroll-behavior', 'smooth');
++  });
++}
+diff --git a/horse-club-crm/landing/tests/stage-one.spec.ts b/horse-club-crm/landing/tests/stage-one.spec.ts
+index 01146c5..f876904 100644
+--- a/horse-club-crm/landing/tests/stage-one.spec.ts
++++ b/horse-club-crm/landing/tests/stage-one.spec.ts
+@@ -70,7 +70,6 @@ test('landing text meets AA contrast after reveals and in the booking form', asy
+   await page.emulateMedia({ reducedMotion: 'reduce' });
+   await page.route('**/api/public/content', route => route.fulfill({ json: {} }));
+   await page.goto('/');
+-  await page.getByRole('button', { name: 'Тренеры', exact: true }).click();
+   for (const id of ['services', 'horses-trainers', 'about', 'first-lesson', 'gift-certificates', 'contacts']) {
+     await page.locator(`#${id}`).scrollIntoViewIfNeeded();
+   }

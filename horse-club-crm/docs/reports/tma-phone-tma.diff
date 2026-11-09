@@ -1,0 +1,171 @@
+diff --git a/tma/UX-CONTRACT.md b/tma/UX-CONTRACT.md
+index e65b46c..f10e6f3 100644
+--- a/tma/UX-CONTRACT.md
++++ b/tma/UX-CONTRACT.md
+@@ -21,6 +21,6 @@
+ 
+ Права: TMA имеет только клиентские маршруты с TelegramAuthGuard и проверкой включённого SCHEDULE. Staff FULL/READ_ONLY/HIDDEN не выдаются посетителям и продолжают действовать на CRM. Все операции с записями ограничены clientId из подписи.
+ 
+-Телефон существующего клиента не доказывает владение его профилем. Автопривязка по введённому номеру запрещена, конфликт предлагает позвонить в клуб. Согласие хранится с версией и timestamp на Booking; юридические документы переиспользуются с действующего лендинга.
++По задаче владельца от 09.11.2026 при оформлении номер нормализуется; существующая карточка без Telegram ID привязывается к текущему Telegram-пользователю. Номер другого Telegram-аккаунта отклоняется. Нативная кнопка запрашивает контакт через SDK; отказ, отсутствие контакта или неподдерживаемая версия оставляют ручной ввод. Текст «Номер получен из Telegram» описывает источник заполнения, не серверную проверку владения. Согласие хранится с версией и timestamp на Booking; юридические документы переиспользуются с действующего лендинга.
+ 
+ Проверки: backend mock/HTTP security tests, browser suite `e2e/booking.spec.ts`, узкая ширина, тема Telegram, native MainButton/BackButton, retry/double click/empty/error. Нативные системные date/select остаются ответственностью ОС; проверка реального Telegram на устройстве нужна при выпуске.
+diff --git a/tma/e2e/booking.spec.ts b/tma/e2e/booking.spec.ts
+index 9d7a5a7..5971ab2 100644
+--- a/tma/e2e/booking.spec.ts
++++ b/tma/e2e/booking.spec.ts
+@@ -47,6 +47,39 @@ async function checkout(page: Page) {
+   await page.getByLabel('Тренер').selectOption(trainerId); await advance(page);
+   await expect(page.getByLabel('Ваше имя')).toHaveValue('Елена');
+ }
++
++test('contact request fills phone, prevents duplicates and retains manual fallback', async ({ page }) => {
++  await setup(page);
++  await page.addInitScript(() => {
++    const app = window.Telegram?.WebApp;
++    if (app) app.requestContact = callback => { setTimeout(() => callback(true, { responseUnsafe: { contact: { phone_number: '79991234567', first_name: 'Елена' } } }), 100); };
++  });
++  await checkout(page);
++  const button = page.getByRole('button', { name: '📱 Заполнить из Telegram' });
++  await button.focus(); await page.keyboard.press('Enter');
++  await expect(page.getByRole('button', { name: 'Ожидаем Telegram…' })).toBeDisabled();
++  await expect(page.getByLabel('Телефон', { exact: true })).toHaveValue('+79991234567');
++  await expect(page.getByRole('status')).toContainText('Номер получен из Telegram');
++  await page.getByLabel('Телефон', { exact: true }).fill('+79997654321');
++  await expect(page.getByText('Номер получен из Telegram.')).toHaveCount(0);
++  await page.evaluate(() => { const app = window.Telegram?.WebApp; if (app) app.requestContact = callback => callback(false); });
++  await button.click();
++  await expect(page.getByRole('status')).toContainText('Введите номер вручную');
++  await expect(page.getByLabel('Телефон', { exact: true })).toHaveValue('+79997654321');
++  await expect(page.getByLabel('Телефон', { exact: true })).toBeFocused();
++  await page.evaluate(() => { const app = window.Telegram?.WebApp; if (app) app.requestContact = () => { throw new Error('unsupported'); }; });
++  await button.click(); await expect(button).toBeEnabled();
++  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
++  await page.screenshot({ path: 'test-results/tma-phone-contact.png', fullPage: true });
++});
++
++test('SDK without requestContact leaves manual phone entry available', async ({ page }) => {
++  await setup(page); await checkout(page);
++  await expect(page.getByRole('button', { name: '📱 Заполнить из Telegram' })).toHaveCount(0);
++  await page.getByLabel('Телефон', { exact: true }).fill('+79991234567');
++  await page.getByRole('checkbox').check();
++  await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(true);
++});
+ test('native Telegram flow creates once, shows success and requests cancellation at narrow width', async ({ page }) => {
+   await setup(page); let writes = 0, cancellations = 0;
+   await page.route('**/api/tma/bookings', async route => {
+diff --git a/tma/src/App.tsx b/tma/src/App.tsx
+index afcbf6e..13677fe 100644
+--- a/tma/src/App.tsx
++++ b/tma/src/App.tsx
+@@ -1,8 +1,10 @@
+-import { useEffect, useRef, useState } from 'react';
++import React, { useEffect, useRef, useState } from 'react';
+ import { api, dateTime, money, moscowDate, requireUuid, time, upcoming, type Booking, type Service, type Slot } from './api';
+ import { applyTheme, haptic, telegram } from './telegram';
+ import { useTelegramNavigation } from './useTelegramNavigation';
+ 
++const _h = React.createElement;
++
+ const ADDRESS = 'Тамбов, ул. Бастионная, 22АС2';
+ const FORMATS = [
+   { label: 'Первое знакомство', pattern: /знаком|перв|начал|нович/i },
+@@ -26,6 +28,9 @@ export function App() {
+   const [slot, setSlot] = useState<Slot>();
+   const [trainerId, setTrainerId] = useState('');
+   const [phone, setPhone] = useState('');
++  const [contactPending, setContactPending] = useState(false);
++  const [contactNotice, setContactNotice] = useState('');
++  const contactRequest = useRef(false);
+   const [consent, setConsent] = useState(false);
+   const [booking, setBooking] = useState<Booking>();
+   const [loading, setLoading] = useState(false);
+@@ -82,11 +87,30 @@ export function App() {
+     else if (screen === 'checkout') void submit();
+   };
+   const text = screen === 'catalog' || screen === 'slots' ? 'Далее' : screen === 'checkout' ? 'Подтвердить запись' : undefined;
+-  const enabled = !loading && !busy && (screen === 'catalog' ? Boolean(service) : screen === 'slots' ? Boolean(slot) : validPhone && consent);
++  const enabled = !loading && !busy && !contactPending && (screen === 'catalog' ? Boolean(service) : screen === 'slots' ? Boolean(slot) : validPhone && consent);
+   useTelegramNavigation(text, enabled, busy, next, back);
+ 
++  function requestPhone(): void {
++    if (contactRequest.current || busy || !tg?.requestContact) return;
++    contactRequest.current = true; setContactPending(true); setContactNotice('');
++    const fallback = 'Введите номер вручную.';
++    try {
++      tg.requestContact((ok, response) => {
++        contactRequest.current = false; setContactPending(false);
++        const value = response?.responseUnsafe?.contact?.phone_number;
++        if (ok && typeof value === 'string' && value.trim()) {
++          setPhone(value.startsWith('+') ? value : `+${value}`);
++          setContactNotice('Номер получен из Telegram.');
++        } else { setContactNotice(fallback); phoneInput.current?.focus(); }
++      });
++    } catch {
++      contactRequest.current = false; setContactPending(false);
++      setContactNotice(fallback); phoneInput.current?.focus();
++    }
++  }
++
+   async function submit() {
+-    if (submitting.current || !service || !slot) return;
++    if (submitting.current || contactRequest.current || !service || !slot) return;
+     if (!validPhone || !consent) { setError('Укажите телефон +79991234567 и подтвердите согласие'); phoneInput.current?.focus(); return; }
+     submitting.current = true; setBusy(true); setError('');
+     try {
+@@ -145,7 +169,10 @@ export function App() {
+         <label className="field">Ваше имя<input readOnly value={[user?.first_name, user?.last_name].filter(Boolean).join(' ')} /></label>
+         {user?.username && <p className="hint mt-2">@{user.username}</p>}
+         <label className="field mt-4">Телефон<input ref={phoneInput} type="tel" inputMode="tel" autoComplete="tel" placeholder="+79991234567"
+-          disabled={busy} value={phone} onChange={event => setPhone(event.target.value)} aria-describedby="phone-help" aria-invalid={phone.length > 0 && !validPhone} /></label>
++          disabled={busy || contactPending} value={phone} onChange={event => { setPhone(event.target.value); setContactNotice(''); }} aria-describedby="phone-help" aria-invalid={phone.length > 0 && !validPhone} /></label>
++        {native && tg?.requestContact && (!tg.isVersionAtLeast || tg.isVersionAtLeast('6.9')) && <button type="button" className="quiet mt-2" disabled={busy || contactPending}
++          onClick={requestPhone}>{contactPending ? 'Ожидаем Telegram…' : '📱 Заполнить из Telegram'}</button>}
++        <p className="hint" role="status">{contactNotice}</p>
+         <p className="hint mt-2" id="phone-help">Для связи: +79991234567.</p>
+         <label className="consent mt-4"><input type="checkbox" checked={consent} disabled={busy} onChange={event => { setConsent(event.target.checked); haptic(); }} />
+           <span>Даю <a href="https://club.horseclub68.ru/#consent" target="_blank" rel="noreferrer">согласие на обработку персональных данных</a> для записи в клуб (152-ФЗ). <a href="https://club.horseclub68.ru/#privacy" target="_blank" rel="noreferrer">Политика обработки данных</a>.</span></label>
+diff --git a/tma/src/main.tsx b/tma/src/main.tsx
+index a099984..ad59a6a 100644
+--- a/tma/src/main.tsx
++++ b/tma/src/main.tsx
+@@ -3,4 +3,6 @@ import { render } from 'react-dom';
+ import { App } from './App';
+ import './styles.css';
+ 
++const _h = React.createElement;
++
+ render(<React.StrictMode><App /></React.StrictMode>, document.getElementById('root')!);
+diff --git a/tma/src/telegram.ts b/tma/src/telegram.ts
+index 2177ebb..f70c8da 100644
+--- a/tma/src/telegram.ts
++++ b/tma/src/telegram.ts
+@@ -1,4 +1,6 @@
+ export interface TelegramUser { id: number; first_name: string; last_name?: string; username?: string }
++export interface TelegramContact { phone_number: string; first_name: string; last_name?: string; user_id?: number }
++export interface TelegramContactResponse { responseUnsafe?: { contact?: TelegramContact } }
+ interface TelegramButton {
+   show(): void; hide(): void;
+   onClick(callback: () => void): void; offClick(callback: () => void): void;
+@@ -10,6 +12,8 @@ export interface TelegramWebApp {
+   MainButton: TelegramButton & { setParams(params: { text: string; is_active: boolean; is_visible: boolean }): void; showProgress(): void; hideProgress(): void };
+   BackButton: TelegramButton;
+   HapticFeedback?: { impactOccurred(style: 'light'): void };
++  isVersionAtLeast?(version: string): boolean;
++  requestContact?(callback: (ok: boolean, response?: TelegramContactResponse) => void): void;
+   ready(): void; expand(): void;
+   enableClosingConfirmation(): void; disableClosingConfirmation(): void;
+   onEvent(event: 'themeChanged', callback: () => void): void;
+diff --git a/tma/tsconfig.json b/tma/tsconfig.json
+index a6b21a1..4cef440 100644
+--- a/tma/tsconfig.json
++++ b/tma/tsconfig.json
+@@ -1,7 +1,7 @@
+ {
+   "compilerOptions": {
+     "target": "ES2023", "lib": ["ES2023", "DOM", "DOM.Iterable"],
+-    "module": "ESNext", "moduleResolution": "bundler", "jsx": "react-jsx",
++    "module": "ESNext", "moduleResolution": "bundler", "jsx": "react", "jsxFactory": "_h", "jsxFragmentFactory": "React.Fragment",
+     "strict": true, "noEmit": true, "skipLibCheck": true,
+     "noUnusedLocals": true, "noUnusedParameters": true,
+     "types": ["vite/client", "node"]

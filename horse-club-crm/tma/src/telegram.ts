@@ -1,4 +1,6 @@
 export interface TelegramUser { id: number; first_name: string; last_name?: string; username?: string }
+export interface TelegramContact { phone_number: string; first_name: string; last_name?: string; user_id?: number }
+export interface TelegramContactResponse { responseUnsafe?: { contact?: TelegramContact } }
 interface TelegramButton {
   show(): void; hide(): void;
   onClick(callback: () => void): void; offClick(callback: () => void): void;
@@ -10,6 +12,8 @@ export interface TelegramWebApp {
   MainButton: TelegramButton & { setParams(params: { text: string; is_active: boolean; is_visible: boolean }): void; showProgress(): void; hideProgress(): void };
   BackButton: TelegramButton;
   HapticFeedback?: { impactOccurred(style: 'light'): void };
+  isVersionAtLeast?(version: string): boolean;
+  requestContact?(callback: (ok: boolean, response?: TelegramContactResponse) => void): void;
   ready(): void; expand(): void;
   enableClosingConfirmation(): void; disableClosingConfirmation(): void;
   onEvent(event: 'themeChanged', callback: () => void): void;

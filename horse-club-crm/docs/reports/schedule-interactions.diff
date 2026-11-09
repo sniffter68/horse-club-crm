@@ -1,0 +1,784 @@
+diff --git a/horse-club-crm/UX-CONTRACT.md b/horse-club-crm/UX-CONTRACT.md
+index aec4db0..31279a3 100644
+--- a/horse-club-crm/UX-CONTRACT.md
++++ b/horse-club-crm/UX-CONTRACT.md
+@@ -1,5 +1,9 @@
+ # UX Contract
+ 
++## Быстрые действия расписания (2026-11-06)
++
++Источник: задача владельца, `bookings/booking-rules.service.ts` и `docs/schedule-interactions.md`. Сеткой ресурсов владеет ResourceSchedule, компактной формой — QuickSlotBooking (Ant Design Popover/Form/Select), поиском клиента — ClientSelectWithCreate. Слот задаёт московское время и ресурс; начальная длительность 60 минут. Расширенные параметры открывают TriadBookingModal с введёнными значениями. Перенос использует HTML5 drag-and-drop с шагом 15 минут, сохраняет длительность, проверяет полный интервал без фильтров, показывает ожидающий статус и откатывает карточку при отказе сервера. Недоступные мутации скрыты или выключены для READ_ONLY. Альтернатива перетаскиванию — редактирование бронирования или шторка «Перенос занятия» с выбором времени, тренера и манежа. Проверки: `schedule-interactions.spec.ts`, `reschedule.test.ts`, `booking-rules.test.cjs`.
++
+ ## VK тренера (2026-11-05)
+ 
+ Источник: задача владельца и `docs/trainer-vk-binding.md`. Формой владеет CatalogForm/EntryOverlay, полем «VK ID» — общий VkProfileField, привязкой в карточке — VkProfileLink. ADMIN/MANAGER с FULL SCHEDULE видят мутации. Ошибка сохраняет ввод и отображается в Alert; во время запроса повтор заблокирован. Переход к персоналу не нужен. Проверки: `backend/test/trainer-vk-binding.test.cjs`, `frontend/e2e/vk-link.spec.ts`.
+diff --git a/horse-club-crm/backend/src/bookings/bookings.controller.ts b/horse-club-crm/backend/src/bookings/bookings.controller.ts
+index a3c4851..b225a61 100644
+--- a/horse-club-crm/backend/src/bookings/bookings.controller.ts
++++ b/horse-club-crm/backend/src/bookings/bookings.controller.ts
+@@ -1,3 +1,4 @@
++import { UpdateBookingDto } from './dto/update-booking.dto';
+ import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
+ import { ReplaceHorseDto } from './dto/replace-horse.dto';
+ import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+@@ -55,7 +56,7 @@ export class BookingsController {
+   create(@Body() dto: CreateBookingDto) { return this.bookings.createBooking(dto); }
+   @Patch(':id')
+   @Roles(Role.ADMIN, Role.MANAGER)
+-  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: CreateBookingDto) { return this.bookings.updateBooking(id, dto); }
++  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateBookingDto) { return this.bookings.updateBooking(id, dto); }
+   @Get('availability')
+   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+   availability(@Query() query: BookingAvailabilityDto) { return this.bookings.availability(query); }
+diff --git a/horse-club-crm/backend/src/bookings/bookings.service.ts b/horse-club-crm/backend/src/bookings/bookings.service.ts
+index 4d429fa..473b63e 100644
+--- a/horse-club-crm/backend/src/bookings/bookings.service.ts
++++ b/horse-club-crm/backend/src/bookings/bookings.service.ts
+@@ -1,3 +1,4 @@
++import { UpdateBookingDto } from './dto/update-booking.dto';
+ import { canUseMembership } from '../memberships/membership-access';
+ import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+ import { BookingServiceType, Prisma } from '@prisma/client';
+@@ -121,15 +122,7 @@ export class BookingsService {
+     });
+   }
+ 
+-  async createBooking(dto: CreateBookingDto) {
+-    return this.save(dto);
+-  }
+-
+-  async updateBooking(id: string, dto: CreateBookingDto) {
+-    return this.save(dto, id);
+-  }
+-
+-  private async save(dto: CreateBookingDto, id?: string) {
++  private validateBookingValues(dto: CreateBookingDto) {
+     const start = new Date(dto.startTime), end = new Date(dto.endTime);
+     const zoned = /T.*(?:Z|[+-]\d{2}:\d{2})$/i;
+     if (!zoned.test(dto.startTime) || !zoned.test(dto.endTime) || !Number.isFinite(+start) || !Number.isFinite(+end) || start >= end) {
+@@ -138,13 +131,27 @@ export class BookingsService {
+     if (!Object.values(BookingServiceType).includes(dto.serviceType) || !Number.isFinite(dto.costAmount) || dto.costAmount < 0 || dto.costAmount > 999999999999.99 || new Prisma.Decimal(dto.costAmount).decimalPlaces() > 2) {
+       throw new BadRequestException('Некорректный тип услуги или стоимость');
+     }
++    return { start, end };
++  }
++
++  async createBooking(dto: CreateBookingDto) {
++    this.validateBookingValues(dto);
++    return this.save(dto);
++  }
++
++  async updateBooking(id: string, dto: UpdateBookingDto) {
++    return this.save(dto, id);
++  }
++
++  private async save(patch: CreateBookingDto | UpdateBookingDto, id?: string) {
+     for (let attempt = 0; attempt < 5; attempt++) {
+       try {
+         return await this.prisma.$transaction(async tx => {
+-          if (id) {
+-            const current = await tx.booking.findUnique({ where: { id } });
+-            if (!current || current.lessonId !== null || current.status !== 'scheduled') throw new BookingValidationError('BOOKING_NOT_EDITABLE', 'Редактировать можно только запланированное бронирование тройного ресурса');
+-          }
++          const current = id ? await tx.booking.findUnique({ where: { id } }) : null;
++          if (id && (!current || current.lessonId !== null || current.status !== 'scheduled')) throw new BookingValidationError('BOOKING_NOT_EDITABLE', 'Редактировать можно только запланированное бронирование тройного ресурса');
++          const defined = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
++          const dto = { ...(current ? { ...current, startTime: current.startTime?.toISOString(), endTime: current.endTime?.toISOString(), costAmount: Number(current.costAmount) } : {}), ...defined } as CreateBookingDto;
++          const { start, end } = this.validateBookingValues(dto);
+           await this.rules.validate(tx, { trainerId: dto.trainerId, arenaId: dto.arenaId, participants: [{ clientId: dto.clientId, horseId: dto.horseId }], start, end, excludeBookingId: id });
+           if (dto.membershipId) {
+             await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Membership" WHERE "id" = ${dto.membershipId}::uuid FOR UPDATE`);
+diff --git a/horse-club-crm/backend/src/bookings/dto/update-booking.dto.ts b/horse-club-crm/backend/src/bookings/dto/update-booking.dto.ts
+new file mode 100644
+index 0000000..b84c103
+--- /dev/null
++++ b/horse-club-crm/backend/src/bookings/dto/update-booking.dto.ts
+@@ -0,0 +1,14 @@
++import { PartialType } from '@nestjs/swagger';
++import { Transform } from 'class-transformer';
++import { BookingServiceType } from '@prisma/client';
++import { CreateBookingDto } from './create-booking.dto';
++
++const emptyToUndefined = ({ value }: { value: unknown }) => value === '' ? undefined : value;
++
++export class UpdateBookingDto extends PartialType(CreateBookingDto, { skipNullProperties: false }) {
++  @Transform(emptyToUndefined) declare clientId?: string;
++  @Transform(emptyToUndefined) declare trainerId?: string;
++  @Transform(emptyToUndefined) declare horseId?: string;
++  @Transform(emptyToUndefined) declare arenaId?: string;
++  @Transform(emptyToUndefined) declare serviceType?: BookingServiceType;
++}
+diff --git a/horse-club-crm/backend/src/lessons/dto/update-lesson.dto.ts b/horse-club-crm/backend/src/lessons/dto/update-lesson.dto.ts
+index 03b0f60..54906f3 100644
+--- a/horse-club-crm/backend/src/lessons/dto/update-lesson.dto.ts
++++ b/horse-club-crm/backend/src/lessons/dto/update-lesson.dto.ts
+@@ -1,14 +1,20 @@
+ import { CancelServiceDto } from '../../payments/dto/cancel-service.dto';
+ import { ApiProperty, PartialType, IntersectionType } from '@nestjs/swagger';
+ import { LessonStatus } from '@prisma/client';
+-import { IsIn, IsISO8601, IsInt, Min } from 'class-validator';
+-import { Type } from 'class-transformer';
++import { IsIn, IsISO8601, IsInt, Min, IsOptional, IsUUID } from 'class-validator';
++import { Transform, Type } from 'class-transformer';
+ import { CreateLessonDto } from './create-lesson.dto';
+ import { CompleteLessonDto } from './lesson-payment.dto';
+ 
+ export class UpdateLessonDto extends PartialType(CreateLessonDto) {}
+ 
+ export class RescheduleLessonDto {
++  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID()
++  trainerId?: string;
++
++  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID()
++  arenaId?: string;
++
+   @ApiProperty({ type: String, format: 'date-time' })
+   @IsISO8601({ strict: true })
+   startTime!: string;
+diff --git a/horse-club-crm/backend/src/lessons/lessons.controller.ts b/horse-club-crm/backend/src/lessons/lessons.controller.ts
+index 30f67dd..49f23f9 100644
+--- a/horse-club-crm/backend/src/lessons/lessons.controller.ts
++++ b/horse-club-crm/backend/src/lessons/lessons.controller.ts
+@@ -110,7 +110,7 @@ export class LessonsController {
+   @Patch(':id/reschedule')
+   @Roles(Role.ADMIN, Role.MANAGER)
+   reschedule(@Param('id', new ParseUUIDPipe()) lessonId: string, @Body() dto: RescheduleLessonDto): Promise<LessonDetails> {
+-    return this.lessonsService.rescheduleLesson(lessonId, dto.startTime, dto.durationMinutes);
++    return this.lessonsService.rescheduleLesson(lessonId, dto.startTime, dto.durationMinutes, dto.trainerId, dto.arenaId);
+   }
+ 
+   @Get(':id')
+diff --git a/horse-club-crm/backend/src/lessons/lessons.service.ts b/horse-club-crm/backend/src/lessons/lessons.service.ts
+index 8ac0b42..8a7cf5b 100644
+--- a/horse-club-crm/backend/src/lessons/lessons.service.ts
++++ b/horse-club-crm/backend/src/lessons/lessons.service.ts
+@@ -174,7 +174,7 @@ export class LessonsService {
+     });
+   }
+ 
+-  async rescheduleLesson(lessonId: string, startTime: string, durationMinutes: number): Promise<LessonDetails> {
++  async rescheduleLesson(lessonId: string, startTime: string, durationMinutes: number, trainerId?: string, arenaId?: string): Promise<LessonDetails> {
+     const eventId = randomUUID();
+     if (!Number.isSafeInteger(durationMinutes) || durationMinutes <= 0) throw new BadRequestException('Укажите положительную длительность занятия');
+     const start = this.parseDate(startTime, 'Некорректное время начала занятия');
+@@ -184,7 +184,7 @@ export class LessonsService {
+       const lesson = await tx.lesson.findUnique({ where: { id: lessonId }, ...lessonDetails });
+       if (!lesson) throw new NotFoundException('Занятие не найдено');
+       if (lesson.status !== LessonStatus.SCHEDULED) throw new ConflictException('Переносить можно только запланированные занятия');
+-      if (lesson.arena?.isUnavailable) throw new ConflictException('Манеж недоступен на новое время занятия');
++      if (!arenaId && lesson.arena?.isUnavailable) throw new ConflictException('Манеж недоступен на новое время занятия');
+       const schedule = await this.getClubSchedule(tx);
+       this.assertClubWorkingHours(start, end, schedule);
+       for (const booking of lesson.bookings) {
+@@ -193,13 +193,13 @@ export class LessonsService {
+         }
+       }
+       const horseIds = [...new Set(lesson.bookings.map(booking => booking.horseId).filter((id): id is string => Boolean(id)))];
+-      await this.bookingRules.validate(tx, { trainerId: lesson.trainerId, arenaId: lesson.arenaId, participants: lesson.bookings, start, end, excludeLessonId: lessonId });
+-      await this.validateNoConflictsWithClient(tx, lesson.trainerId, horseIds, start, end, lessonId, lesson.arenaId ?? undefined);
++      await this.bookingRules.validate(tx, { trainerId: trainerId ?? lesson.trainerId, arenaId: arenaId ?? lesson.arenaId, participants: lesson.bookings, start, end, excludeLessonId: lessonId });
++      await this.validateNoConflictsWithClient(tx, trainerId ?? lesson.trainerId, horseIds, start, end, lessonId, arenaId ?? lesson.arenaId ?? undefined);
+       for (const horseId of horseIds) {
+         await this.getHorseWorkloadWithClient(tx, horseId, this.getLocalDateParts(start), durationMinutes, lessonId);
+       }
+-      const updated = await tx.lesson.update({ where: { id: lessonId }, data: { startTime: start, endTime: end }, ...lessonDetails });
+-      if (lesson.startTime.getTime() !== start.getTime() || lesson.endTime.getTime() !== end.getTime()) {
++      const updated = await tx.lesson.update({ where: { id: lessonId }, data: { startTime: start, endTime: end, ...(trainerId ? { trainerId } : {}), ...(arenaId ? { arenaId } : {}) }, ...lessonDetails });
++      if (trainerId && trainerId !== lesson.trainerId || arenaId && arenaId !== lesson.arenaId || lesson.startTime.getTime() !== start.getTime() || lesson.endTime.getTime() !== end.getTime()) {
+         await this.notifyLesson(tx, updated, `rescheduled:${eventId}`, 'Тренировка перенесена', undefined, lesson.startTime);
+       }
+       return updated;
+diff --git a/horse-club-crm/backend/test/booking-rules.test.cjs b/horse-club-crm/backend/test/booking-rules.test.cjs
+index 34acfa5..2851679 100644
+--- a/horse-club-crm/backend/test/booking-rules.test.cjs
++++ b/horse-club-crm/backend/test/booking-rules.test.cjs
+@@ -200,6 +200,37 @@ test('invalid intervals and costs never start a transaction', async () => {
+   }
+ });
+ 
++test('partial reschedule merges current resources and preserves pricing inside the validated transaction', async () => {
++  const { tx, input } = fixture();
++  const current = { id: 'b', lessonId: null, status: 'scheduled', clientId: 'client', horseId: 'horse', trainerId: 'trainer', arenaId: 'arena', membershipId: null, startTime: at('08:00'), endTime: at('08:30'), serviceType: 'dressage', costAmount: new Prisma.Decimal('1234.56') };
++  tx.booking.findUnique = async () => current;
++  let saved, validated;
++  tx.booking.update = async ({ data }) => { saved = data; return { ...current, ...data }; };
++  const service = new BookingsService({ $transaction: async (work, options) => {
++    assert.equal(options.isolationLevel, 'Serializable'); return work(tx);
++  } }, { validate: async (client, values) => { assert.equal(client, tx); validated = values; } });
++  await service.updateBooking('b', { startTime: input.start.toISOString(), endTime: input.end.toISOString(), trainerId: 'new-trainer', arenaId: 'new-arena' });
++  assert.equal(validated.excludeBookingId, 'b');
++  assert.equal(validated.trainerId, 'new-trainer'); assert.equal(validated.arenaId, 'new-arena');
++  assert.deepEqual(validated.participants, input.participants);
++  assert.equal(saved.clientId, 'client'); assert.equal(saved.horseId, 'horse');
++  assert.equal(String(saved.costAmount), '1234.56'); assert.equal(saved.serviceType, 'dressage');
++  saved = undefined;
++  service.rules = { validate: async () => { throw new Error('conflict'); } };
++  await assert.rejects(service.updateBooking('b', { trainerId: 'busy-trainer' }), /conflict/);
++  assert.equal(saved, undefined);
++});
++
++test('partial booking DTO accepts resource/time patches and rejects invalid UUIDs, null times and unknown fields', async () => {
++  const { plainToInstance } = require('class-transformer');
++  const { validate } = require('class-validator');
++  const { UpdateBookingDto } = require('../dist/bookings/dto/update-booking.dto');
++  const check = body => validate(plainToInstance(UpdateBookingDto, body), { whitelist: true, forbidNonWhitelisted: true });
++  assert.equal((await check({ startTime: at('10:00').toISOString(), trainerId: '11111111-1111-4111-8111-111111111111' })).length, 0);
++  assert.equal((await check({ clientId: '', trainerId: '', horseId: '', arenaId: '', membershipId: '', serviceType: '' })).length, 0);
++  for (const body of [{ trainerId: 'bad' }, { startTime: null }, { allowOverlap: true }]) assert.ok((await check(body)).length > 0);
++});
++
+ test('horse replacement validates future scheduled booking and only writes horse and reason', async () => {
+   const f = fixture({ client: { weightKg: 75 } });
+   const startTime = new Date('2030-10-09T10:00:00Z'), endTime = new Date('2030-10-09T10:30:00Z');
+diff --git a/horse-club-crm/backend/test/horse-workload-display.test.cjs b/horse-club-crm/backend/test/horse-workload-display.test.cjs
+index 433b6fe..53d0e03 100644
+--- a/horse-club-crm/backend/test/horse-workload-display.test.cjs
++++ b/horse-club-crm/backend/test/horse-workload-display.test.cjs
+@@ -127,6 +127,9 @@ test('HTTP workload routing, DTO validation and transfer authorization match the
+     await request(app.getHttpServer()).patch(path).set('x-role', 'TRAINER').send(body).expect(403);
+     await request(app.getHttpServer()).patch(path).set('x-role', 'ADMIN').send({ ...body, allowOverload: true }).expect(400);
+     await request(app.getHttpServer()).patch(path).set('x-role', 'MANAGER').send(body).expect(200);
+-    assert.deepEqual(calls[1], [id, body.startTime, 60]);
++    assert.deepEqual(calls[1], [id, body.startTime, 60, undefined, undefined]);
++    await request(app.getHttpServer()).patch(path).set('x-role', 'MANAGER').send({ ...body, trainerId: id, arenaId: id }).expect(200);
++    assert.deepEqual(calls[2], [id, body.startTime, 60, id, id]);
++    await request(app.getHttpServer()).patch(path).set('x-role', 'ADMIN').send({ ...body, trainerId: 'bad' }).expect(400);
+   } finally { await app.close(); }
+ });
+diff --git a/horse-club-crm/docs/reports/schedule-interactions.md b/horse-club-crm/docs/reports/schedule-interactions.md
+new file mode 100644
+index 0000000..fe22cf0
+--- /dev/null
++++ b/horse-club-crm/docs/reports/schedule-interactions.md
+@@ -0,0 +1,20 @@
++# Проверка быстрых действий расписания — 2026-11-06
++
++Реализованы QuickSlotBooking, перенос HTML5 Drag and Drop с шагом 15 минут, смена тренера/манежа, проверка полного интервала без фильтров, оптимистичное обновление и откат после отказа сервера. Частичный PATCH бронирования объединяется с текущими полями внутри serializable-транзакции; перенос обычного занятия принимает trainerId/arenaId. Миграций БД и новых зависимостей нет.
++
++## Обязательные проверки
++
++- В backend и frontend выполнены `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd test`; все команды завершились успешно. Суффикс `.cmd` используется из-за запрета запуска npm.ps1 в локальном PowerShell.
++- Backend: 661 тест прошёл, 20 PostgreSQL-тестов пропущены, ошибок нет. Линтер возвращает три прежних предупреждения в audit-http-20261019.cjs, dashboard.test.cjs, vet-records.test.cjs.
++- Frontend: 20 файлов, 165 тестов прошли.
++- Playwright: `npx.cmd playwright test --project=mock schedule-interactions.spec.ts` — 8/8. Проверены поиск клиента, создание, передача значений в расширенную форму, 1280/375 px, сохранение ввода после 409, Escape/возврат фокуса, перенос тренера/манежа, обычные занятия и прямые бронирования, оптимистичное состояние до ответа, откат, занятость лошади, лимит тренера без фильтров, READ_ONLY. Скриншоты quick-slot-1280.png и quick-slot-375.png визуально проверены.
++- Дополнительная регрессия Playwright: `triad-booking.spec.ts -g "parallel trainer cards|trainer overlap|trainer capacity"` — 4/4.
++- `git diff --check` — без ошибок.
++
++## Дополнительные проверки и ограничения
++
++Общий запуск старых horse-workload.spec.ts и triad-booking.spec.ts остановлен после обнаружения несовпадений с прежними ожиданиями интерфейса. В частности, horse-workload ожидает диалог «Быстрое бронирование», которого уже нет в исходном SchedulePage, и отсутствующий текст «Доступно: 120 из 120 мин». Старый тест переноса также ожидает только время/длительность и устарел после добавления смены ресурсов. Полного зелёного прогона этих двух файлов нет; актуальные сценарии данной задачи проверены отдельно.
++
++Статический `audit_project.py . --mode strict --no-write` возвращает 214 замечаний по всему проекту. В QuickSlotBooking семь срабатываний ложные: аудитор распознаёт Ant Design Form.Item как отдельную HTML-форму без noValidate и Ant Design Select как нативный select. Реальная форма объявляет noValidate, выпадающие списки принадлежат Ant Design; их открытое состояние и клавиатурные действия проверены в браузере. Остальные замечания общего аудита не относятся к объёму этой задачи. Соответствие всему статическому аудиту не заявляется.
++
++Проверки выполнены с HTTP-моками; конкурентные PostgreSQL-сценарии требуют доступной тестовой БД. Развёртывание на сервере не выполнялось.
+diff --git a/horse-club-crm/docs/schedule-interactions.md b/horse-club-crm/docs/schedule-interactions.md
+new file mode 100644
+index 0000000..a33d9bd
+--- /dev/null
++++ b/horse-club-crm/docs/schedule-interactions.md
+@@ -0,0 +1,13 @@
++# Быстрые действия в расписании
++
++В группировках по тренерам, лошадям и локациям клик по свободной части сетки открывает компактную форму рядом со слотом. Время клуба — Europe/Moscow, шаг сетки — 15 минут, длительность новой записи — 60 минут. Последние слоты, в которых час не помещается до закрытия, выключены.
++
++Клиент выбирается через общий живой поиск по имени/телефону. Список лошадей учитывает здоровье, занятость, отдых и суточную нагрузку. Ресурс колонки фиксируется; недостающие тренер и манеж выбираются явно, единственный доступный ресурс подставляется автоматически. Быстрая запись использует выездку и стоимость 0 (это показано в форме); услуга, стоимость и абонемент настраиваются через «Расширенные параметры». Форма сохраняет введённые значения при ошибке.
++
++Карточки запланированных занятий и прямых бронирований перетаскиваются стандартным HTML5 Drag and Drop. Вертикальное движение меняет начало с округлением к 15 минутам и сохраняет длительность. Горизонтальное меняет тренера или манеж. В группировке лошадей можно менять время в своей колонке; назначение другой лошади остаётся в отдельном сценарии замены.
++
++Перед PATCH запрашиваются занятия и бронирования на весь новый интервал без пользовательских фильтров. Лошадь и лимит одновременных всадников проверяются до оптимистичного перемещения. Сервер повторно проверяет все правила (включая отдых, нагрузку, вес, клиента, манеж и абонемент) в serializable-транзакции. Отказ сервера возвращает карточку назад и показывает причину; затем расписание перечитывается. Повторное перетаскивание во время сохранения заблокировано.
++
++PATCH /api/bookings/:id принимает частичные поля. Текущее бронирование читается и объединяется с изменениями внутри той же транзакции, поэтому перенос сохраняет клиента, лошадь, услугу, стоимость и абонемент. PATCH /api/lessons/:id/reschedule дополнительно принимает необязательные trainerId и arenaId. Миграция Prisma не требуется.
++
++Клавиатурная альтернатива: открыть карточку и выбрать редактирование бронирования либо «Перенести занятие». Слот открывается Enter; Escape из панели возвращает фокус слоту. В READ_ONLY создание и перетаскивание выключены.
+diff --git a/horse-club-crm/frontend/e2e/schedule-interactions.spec.ts b/horse-club-crm/frontend/e2e/schedule-interactions.spec.ts
+new file mode 100644
+index 0000000..93cb79f
+--- /dev/null
++++ b/horse-club-crm/frontend/e2e/schedule-interactions.spec.ts
+@@ -0,0 +1,162 @@
++import { test, expect, type Page } from './fixtures'
++
++const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
++const trainer = { id: id(1), name: 'Мария', fullName: 'Мария Волкова', isActive: true, maxParallelLessons: 2 }
++const secondTrainer = { ...trainer, id: id(2), name: 'Олег', fullName: 'Олег Петров' }
++const horse = { id: id(3), name: 'Валдай', status: 'active', isUnavailable: false, maxRiderWeight: 85, requiredRestMinutes: 0, minRestMinutes: 0, maxDailyWorkloadMinutes: 240, maxDailyMinutes: 240 }
++const arena = { id: id(4), name: 'Крытый манеж', isActive: true, isUnavailable: false, capacity: 6, maxRidersCapacity: 6 }
++const client = { id: id(5), name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567', weightKg: 70, memberships: [] }
++const initialBooking = { id: id(6), clientId: client.id, horseId: horse.id, trainerId: trainer.id, arenaId: arena.id, membershipId: null, startTime: '2026-11-06T06:00:00Z', endTime: '2026-11-06T07:00:00Z', serviceType: 'dressage', costAmount: '1500', status: 'scheduled', client, horse, trainer, arena }
++
++test.beforeEach(async ({ page }) => {
++  await page.setViewportSize({ width: 1280, height: 1100 })
++  await page.clock.setFixedTime(new Date('2026-11-06T06:00:00Z'))
++  await page.addInitScript(() => { localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.role', 'ADMIN'); localStorage.setItem('horsecrm.email', 'qa@example.com') })
++  await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } }))
++  for (const [resource, rows] of Object.entries({ trainers: [trainer, secondTrainer], horses: [horse], arenas: [arena], clients: [client], services: [] })) {
++    await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } }))
++  }
++  await page.route(`**/api/clients/${client.id}`, route => route.fulfill({ json: client }))
++  await page.route('**/api/lessons?*', route => route.fulfill({ json: [] }))
++  await page.route('**/api/horses/workload?*', route => route.fulfill({ json: [] }))
++  await page.route('**/api/bookings?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
++  await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
++  await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { horseWorkloads: [{ horseId: horse.id, currentWorkloadMinutes: 0, maxDailyWorkloadMinutes: 240, status: 'AVAILABLE' }], arenaOccupancy: [] } }))
++})
++
++async function board(page: Page, label = 'По тренерам') {
++  await page.goto('/schedule')
++  const grouping = page.getByRole('combobox', { name: 'Группировка расписания' })
++  await grouping.focus(); await grouping.press('ArrowDown'); await page.getByTitle(label, { exact: true }).click()
++  await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0)
++  await expect(page.locator('.resource-lane').first()).toBeVisible()
++}
++
++for (const width of [1280, 375]) test(`quick slot booking and advanced form preserve the slot at ${width}px`, async ({ page }) => {
++  await page.setViewportSize({ width, height: 900 })
++  let payload: Record<string, unknown> | undefined
++  await page.route('**/api/bookings', async route => { payload = route.request().postDataJSON() as Record<string, unknown>; await route.fulfill({ json: { id: id(9) } }) })
++  await board(page)
++  const slot = page.getByRole('button', { name: 'Забронировать: Мария Волкова, 09:15', exact: true })
++  await expect(slot).toBeEnabled()
++  await slot.click()
++  const popup = page.locator('.ant-popover:visible')
++  await expect(popup).toContainText('09:15–10:15')
++  const input = popup.getByRole('combobox', { name: 'Клиент', exact: true })
++  await input.fill('7999')
++  await expect(page.locator('.ant-select-dropdown:visible').getByText('+79991234567')).toBeVisible()
++  await input.press('Enter')
++  const horses = popup.getByRole('combobox', { name: 'Лошадь', exact: true })
++  await horses.focus(); await horses.press('ArrowDown'); await page.locator('.ant-select-dropdown:visible').getByTitle('Валдай', { exact: true }).click()
++  await page.screenshot({ path: `test-results/quick-slot-${width}.png` })
++  await popup.getByRole('button', { name: 'Расширенные параметры' }).click()
++  const advanced = page.getByRole('dialog', { name: 'Бронирование тройного ресурса', exact: true })
++  await expect(advanced.getByLabel('Начало', { exact: true })).toHaveValue('06.11.2026 09:15')
++  await expect(advanced).toContainText('Анна Орлова')
++  await advanced.locator('.ant-modal-close').click()
++  await slot.click()
++  const clientSelect = popup.getByRole('combobox', { name: 'Клиент', exact: true })
++  await clientSelect.focus(); await clientSelect.press('ArrowDown'); await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click()
++  await horses.focus(); await horses.press('ArrowDown'); await page.locator('.ant-select-dropdown:visible').getByTitle('Валдай', { exact: true }).click()
++  await popup.getByRole('button', { name: 'Записать', exact: true }).click()
++  await expect(popup).toHaveCount(0)
++  expect(payload).toMatchObject({ trainerId: trainer.id, arenaId: arena.id, clientId: client.id, horseId: horse.id, startTime: '2026-11-06T06:15:00.000Z', endTime: '2026-11-06T07:15:00.000Z' })
++})
++
++for (const failure of [false, true]) test(`native drag reassigns trainer with optimistic update and ${failure ? 'rollback' : 'save'}`, async ({ page }) => {
++  let booking = { ...initialBooking }
++  await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
++  let patch: Record<string, unknown> | undefined
++  let release: (() => void) | undefined
++  const gate = new Promise<void>(resolve => { release = resolve })
++  await page.route(`**/api/bookings/${booking.id}`, async route => {
++    patch = route.request().postDataJSON() as Record<string, unknown>
++    await gate
++    if (failure) await route.fulfill({ status: 409, json: { code: 'HORSE_BUSY', message: 'Лошадь уже занята' } })
++    else { booking = { ...booking, ...patch, trainer: secondTrainer }; await route.fulfill({ json: booking }) }
++  })
++  await board(page)
++  const source = page.locator('.resource-booking')
++  await expect(source).toHaveAttribute('draggable', 'true')
++  const before = await page.locator('.resource-board').boundingBox()
++  const target = page.getByRole('button', { name: 'Забронировать: Олег Петров, 10:15', exact: true })
++  await source.scrollIntoViewIfNeeded()
++  await source.dragTo(target, { sourcePosition: { x: 10, y: 10 }, targetPosition: { x: 10, y: 10 } })
++  await expect.poll(() => patch).toBeTruthy()
++  expect(patch).toMatchObject({ trainerId: secondTrainer.id, startTime: '2026-11-06T07:15:00.000Z', endTime: '2026-11-06T08:15:00.000Z' })
++  await expect(page.locator('.resource-column').nth(1).locator('.resource-booking')).toHaveCount(1)
++  const after = await page.locator('.resource-board').boundingBox()
++  expect(after?.width).toBe(before?.width)
++  release?.()
++  if (failure) {
++    await expect(page.getByText('Лошадь уже занята в это время. Выберите другую лошадь или интервал.')).toBeVisible()
++    await expect(page.locator('.resource-column').first().locator('.resource-booking')).toHaveCount(1)
++  } else await expect(page.getByText('Занятие перенесено', { exact: true })).toBeVisible()
++})
++
++test('horse conflict is rejected before PATCH and read-only disables slot creation and dragging', async ({ page }) => {
++  const occupied = { ...initialBooking, id: id(7), startTime: '2026-11-06T07:15:00Z', endTime: '2026-11-06T08:15:00Z', trainerId: secondTrainer.id, trainer: secondTrainer }
++  await page.route('**/api/bookings?*', route => route.fulfill({ json: [initialBooking, occupied], headers: { 'x-total-count': '2' } }))
++  let writes = 0
++  await page.route(`**/api/bookings/${initialBooking.id}`, route => { writes++; return route.fulfill({ json: initialBooking }) })
++  await board(page)
++  await page.locator('.resource-column').first().locator('.resource-booking').dragTo(page.getByRole('button', { name: 'Забронировать: Мария Волкова, 10:15', exact: true }), { sourcePosition: { x: 10, y: 10 }, targetPosition: { x: 10, y: 10 } })
++  await expect(page.getByText('Лошадь уже занята в это время', { exact: true })).toBeVisible()
++  expect(writes).toBe(0)
++  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'MANAGER', modules: [{ module: 'SCHEDULE', isEnabled: true, accessLevel: 'READ_ONLY' }] } }))
++  await page.addInitScript(() => localStorage.setItem('horsecrm.role', 'MANAGER'))
++  await board(page)
++  await expect(page.locator('.resource-booking').first()).toHaveAttribute('draggable', 'false')
++  await expect(page.locator('.resource-slot').first()).toBeDisabled()
++})
++
++test('trainer capacity uses reservations outside the visible filters', async ({ page }) => {
++  const occupied = [7, 8].map(n => ({ ...initialBooking, id: id(n), horseId: id(n + 10), horse: { ...horse, id: id(n + 10) }, trainerId: secondTrainer.id, trainer: secondTrainer, startTime: '2026-11-06T07:15:00Z', endTime: '2026-11-06T08:15:00Z' }))
++  await page.route('**/api/bookings?*', route => {
++    const url = new URL(route.request().url())
++    const rows = url.searchParams.get('from')?.startsWith('2026-11-06T07:15') ? occupied : [initialBooking]
++    return route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } })
++  })
++  let writes = 0
++  await page.route(`**/api/bookings/${initialBooking.id}`, route => { writes++; return route.fulfill({ json: initialBooking }) })
++  await board(page)
++  await expect(page.locator('.resource-booking')).toHaveAttribute('draggable', 'true')
++  await page.locator('.resource-booking').dragTo(page.getByRole('button', { name: 'Забронировать: Олег Петров, 10:15', exact: true }), { sourcePosition: { x: 10, y: 10 }, targetPosition: { x: 10, y: 10 } })
++  await expect(page.getByText('У тренера достигнут максимум одновременных всадников (2)', { exact: true })).toBeVisible()
++  expect(writes).toBe(0)
++})
++
++test('legacy lesson moves vertically and between arenas through the lesson endpoint', async ({ page }) => {
++  const secondArena = { ...arena, id: id(20), name: 'Плац' }
++  const lesson = { id: id(21), startTime: initialBooking.startTime, endTime: initialBooking.endTime, status: 'SCHEDULED', trainer, arena,
++    service: { id: id(22), name: 'Выездка', title: 'Выездка', durationMinutes: 60, maxCapacity: 1, allowMembership: false }, bookings: [{ id: id(23), client, horse, membership: null }] }
++  await page.route('**/api/arenas?*', route => route.fulfill({ json: [arena, secondArena], headers: { 'x-total-count': '2' } }))
++  await page.route('**/api/lessons?*', route => route.fulfill({ json: [lesson] }))
++  let patch: Record<string, unknown> | undefined
++  await page.route(`**/api/lessons/${lesson.id}/reschedule`, route => { patch = route.request().postDataJSON() as Record<string, unknown>; return route.fulfill({ json: lesson }) })
++  await board(page, 'По локациям')
++  await expect(page.locator('.resource-booking')).toHaveAttribute('draggable', 'true')
++  await page.locator('.resource-booking').dragTo(page.getByRole('button', { name: 'Забронировать: Плац, 10:15', exact: true }), { sourcePosition: { x: 10, y: 10 }, targetPosition: { x: 10, y: 10 } })
++  await expect.poll(() => patch).toBeTruthy()
++  expect(patch).toEqual({ startTime: '2026-11-06T07:15:00.000Z', durationMinutes: 60, trainerId: trainer.id, arenaId: secondArena.id })
++})
++
++test('quick form keeps values after failure and Escape returns focus to its slot', async ({ page }) => {
++  await page.route('**/api/bookings', route => route.fulfill({ status: 409, json: { code: 'CLIENT_BUSY', message: 'Клиент занят' } }))
++  await board(page)
++  const slot = page.getByRole('button', { name: 'Забронировать: Мария Волкова, 09:15', exact: true })
++  await expect(slot).toBeEnabled(); await slot.focus(); await slot.press('Enter')
++  const popup = page.locator('.ant-popover:visible')
++  const select = popup.getByRole('combobox', { name: 'Клиент', exact: true })
++  await select.fill('Анна')
++  await expect(page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'Анна Орлова' })).toHaveCount(1)
++  await select.press('Enter')
++  const horses = popup.getByRole('combobox', { name: 'Лошадь', exact: true })
++  await horses.focus(); await horses.press('ArrowDown'); await page.locator('.ant-select-dropdown:visible').getByTitle('Валдай', { exact: true }).click()
++  await popup.getByRole('button', { name: 'Записать', exact: true }).click()
++  await expect(popup.getByRole('alert')).toContainText('Клиент уже записан')
++  await expect(popup).toContainText('Анна Орлова')
++  await popup.getByRole('button', { name: 'Расширенные параметры' }).focus()
++  await page.keyboard.press('Escape')
++  await expect(popup).toHaveCount(0); await expect(slot).toBeFocused()
++})
+diff --git a/horse-club-crm/frontend/playwright.config.ts b/horse-club-crm/frontend/playwright.config.ts
+index d4ae37b..3de1826 100644
+--- a/horse-club-crm/frontend/playwright.config.ts
++++ b/horse-club-crm/frontend/playwright.config.ts
+@@ -3,7 +3,7 @@ export default defineConfig({
+   projects: [
+     { name: 'live', testMatch: '**/*.live.spec.ts' },
+     { name: 'operational-reset', testMatch: '**/operational-reset.spec.ts' },
+-    { name: 'mock', testMatch: ['**/live-search.spec.ts', '**/table-columns.spec.ts', '**/staff-payroll-lock.spec.ts', '**/staff-lifecycle.spec.ts', '**/client-preferences.spec.ts', '**/entity-edit.spec.ts', '**/client-archive.spec.ts', '**/lead-notifications.spec.ts', '**/lesson-payments.spec.ts', '**/dashboard.spec.ts', '**/module-access.spec.ts', '**/stall-map.spec.ts', '**/s3-01.spec.ts', '**/clients-memberships.spec.ts', '**/horse-workload.spec.ts', '**/horse-replacement.spec.ts', '**/vet-log.spec.ts', '**/vet-records.spec.ts', '**/role-access.spec.ts', '**/vk-link.spec.ts', '**/vk-settings.spec.ts', '**/quick-boarding.spec.ts', '**/triad-booking.spec.ts', '**/cash-desk.spec.ts', '**/lead-conversion.spec.ts', '**/public-content.spec.ts'] },
++    { name: 'mock', testMatch: ['**/schedule-interactions.spec.ts', '**/live-search.spec.ts', '**/table-columns.spec.ts', '**/staff-payroll-lock.spec.ts', '**/staff-lifecycle.spec.ts', '**/client-preferences.spec.ts', '**/entity-edit.spec.ts', '**/client-archive.spec.ts', '**/lead-notifications.spec.ts', '**/lesson-payments.spec.ts', '**/dashboard.spec.ts', '**/module-access.spec.ts', '**/stall-map.spec.ts', '**/s3-01.spec.ts', '**/clients-memberships.spec.ts', '**/horse-workload.spec.ts', '**/horse-replacement.spec.ts', '**/vet-log.spec.ts', '**/vet-records.spec.ts', '**/role-access.spec.ts', '**/vk-link.spec.ts', '**/vk-settings.spec.ts', '**/quick-boarding.spec.ts', '**/triad-booking.spec.ts', '**/cash-desk.spec.ts', '**/lead-conversion.spec.ts', '**/public-content.spec.ts'] },
+   ],
+   testDir: './e2e', workers: 1, timeout: 20000,
+   reporter: [['list'], ['html', { open: 'never' }]],
+diff --git a/horse-club-crm/frontend/src/index.css b/horse-club-crm/frontend/src/index.css
+index 95034a8..7dfb0a8 100644
+--- a/horse-club-crm/frontend/src/index.css
++++ b/horse-club-crm/frontend/src/index.css
+@@ -427,6 +427,9 @@ html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); borde
+ .resource-rest span { display: block; padding: 5px 8px; font-size: 12px; color: var(--crm-saddle); }
+ .resource-booking { position: absolute; display: flex; flex-direction: column; gap: 3px; box-sizing: border-box; padding: 0; margin-left: 2px; text-align: start; background: var(--crm-saddle); color: #fff; border: 0; border-radius: 8px; overflow: hidden; cursor: pointer; font: inherit; font-size: 12px; line-height: 1.3; }
+ .resource-booking:hover { filter: brightness(1.08); }
++.resource-booking[draggable="true"] { cursor: grab; }
++.resource-booking[draggable="true"]:active { cursor: grabbing; }
++.resource-booking[aria-busy="true"] { cursor: progress; opacity: .75; }
+ .resource-booking--completed { background: #3e5f48; }
+ .resource-booking--cancelled { background: #8c6527; }
+ .resource-book-action { margin-top: 16px; }
+diff --git a/horse-club-crm/frontend/src/pages/schedule/QuickSlotBooking.tsx b/horse-club-crm/frontend/src/pages/schedule/QuickSlotBooking.tsx
+new file mode 100644
+index 0000000..66c3220
+--- /dev/null
++++ b/horse-club-crm/frontend/src/pages/schedule/QuickSlotBooking.tsx
+@@ -0,0 +1,59 @@
++import { useRef, useState } from 'react'
++import { Alert, App, Button, Form, Select, Space, Typography } from 'antd'
++import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
++import { API_URL, httpClient, toHttpError } from '../../httpClient'
++import { isUuid } from '../../uuid'
++import type { Arena, Horse, Trainer } from '../catalogs/types'
++import { bookingFailure, type TriadValues } from './triad'
++import { toInstant } from './time'
++import { useScheduleConflicts } from './useScheduleConflicts'
++import { useTriadAvailability } from './useTriadAvailability'
++
++export function QuickSlotBooking({ initial, horses, trainers, arenas, onAdvanced, onSaved, report }: {
++  initial: Partial<TriadValues>; horses: Horse[]; trainers: Trainer[]; arenas: Arena[];
++  onAdvanced: (values: Partial<TriadValues>) => void; onSaved: () => void; report: (cause: unknown) => void;
++}) {
++  const [form] = Form.useForm<TriadValues>()
++  const [busy, setBusy] = useState(false)
++  const [failure, setFailure] = useState<string>()
++  const lock = useRef(false)
++  const { message } = App.useApp()
++  const from = toInstant(initial.startTime!), to = toInstant(initial.endTime!)
++  const restWindow = Math.max(0, ...horses.map(h => h.requiredRestMinutes ?? h.minRestMinutes)) * 60000
++  const conflicts = useScheduleConflicts(new Date(+new Date(from) - restWindow).toISOString(), new Date(+new Date(to) + restWindow).toISOString())
++  const availability = useTriadAvailability(from, to, 0, report)
++  const minutes = (+new Date(to) - +new Date(from)) / 60000
++  const freeHorses = horses.filter(h => {
++    const load = availability.data?.horseWorkloads.find(w => w.horseId === h.id)
++    const rest = (h.requiredRestMinutes ?? h.minRestMinutes) * 60000
++    return !h.isUnavailable && (!h.status || h.status === 'active') && (!h.healthStatus || h.healthStatus === 'HEALTHY') && load && load.status !== 'UNAVAILABLE'
++      && load.currentWorkloadMinutes + minutes <= load.maxDailyWorkloadMinutes
++      && !conflicts.entries.some(e => e.horses.some(own => own.id === h.id) && +new Date(e.startTime) < +new Date(to) + rest && +new Date(e.endTime) + rest > +new Date(from))
++  })
++  const unavailable = conflicts.loading || availability.loading || Boolean(conflicts.error || availability.error)
++  async function save(values: TriadValues) {
++    if (lock.current || unavailable) return
++    if (![values.clientId, values.horseId, values.trainerId, values.arenaId].every(isUuid)) { setFailure('Выберите клиента и доступные ресурсы'); return }
++    if (!freeHorses.some(h => h.id === values.horseId)) { setFailure('Лошадь недоступна на выбранный интервал'); return }
++    lock.current = true; setBusy(true); setFailure(undefined)
++    try {
++      await httpClient.post(`${API_URL}/bookings`, { ...values, startTime: from, endTime: to })
++      void message.success('Бронирование создано'); onSaved()
++    } catch (cause) { setFailure(bookingFailure(toHttpError(cause)).message); if (toHttpError(cause).statusCode === 401) report(cause) }
++    finally { lock.current = false; setBusy(false) }
++  }
++  return <div style={{ width: 'min(300px, calc(100vw - 48px))', maxHeight: 'calc(100dvh - 64px)', overflowY: 'auto' }}>
++    <Typography.Paragraph>Быстрая запись · {initial.startTime?.slice(11)}–{initial.endTime?.slice(11)}</Typography.Paragraph>
++    {(failure || conflicts.error || availability.error) && <Alert type="error" showIcon message={failure || conflicts.error || availability.error} />}
++    <Form name="quick-slot" form={form} layout="vertical" noValidate disabled={busy} onFinish={save}
++      initialValues={{ serviceType: 'dressage', costAmount: 0, ...initial, trainerId: initial.trainerId ?? (trainers.length === 1 ? trainers[0].id : undefined), arenaId: initial.arenaId ?? (arenas.length === 1 ? arenas[0].id : undefined) }}>
++      <Form.Item name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}><ClientSelectWithCreate autoFocus /></Form.Item>
++      <Form.Item name="horseId" label="Лошадь" rules={[{ required: true, message: 'Выберите свободную лошадь' }]}><Select aria-label="Лошадь" allowClear showSearch optionFilterProp="label" loading={unavailable} options={freeHorses.map(h => ({ value: h.id, label: h.name }))} notFoundContent={unavailable ? 'Загрузка…' : 'Нет свободных лошадей'} /></Form.Item>
++      <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" options={trainers.map(t => ({ value: t.id, label: t.fullName || t.name }))} disabled={busy || Boolean(initial.trainerId)} /></Form.Item>
++      <Form.Item name="arenaId" label="Манеж" rules={[{ required: true, message: 'Выберите манеж' }]}><Select aria-label="Манеж" options={arenas.filter(a => !a.isUnavailable && a.isActive !== false).map(a => ({ value: a.id, label: a.name }))} disabled={busy || Boolean(initial.arenaId)} /></Form.Item>
++      <Form.Item name="serviceType" hidden><Select /></Form.Item><Form.Item name="costAmount" hidden><Select /></Form.Item>
++      <Typography.Paragraph type="secondary">Выездка · без оплаты. Услуга, стоимость и абонемент — в расширенных параметрах.</Typography.Paragraph>
++      <Space wrap><Button type="primary" htmlType="submit" loading={busy} disabled={unavailable}>Записать</Button><Button type="link" disabled={busy} onClick={() => onAdvanced({ ...initial, ...form.getFieldsValue() })}>Расширенные параметры</Button></Space>
++    </Form>
++  </div>
++}
+diff --git a/horse-club-crm/frontend/src/pages/schedule/ResourceSchedule.tsx b/horse-club-crm/frontend/src/pages/schedule/ResourceSchedule.tsx
+index 4b079ae..cf4a98a 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/ResourceSchedule.tsx
++++ b/horse-club-crm/frontend/src/pages/schedule/ResourceSchedule.tsx
+@@ -1,5 +1,7 @@
++import { useRef, useState, type ReactNode } from 'react'
++import type { ScheduleMove } from './reschedule'
+ import { parallelLayout } from './parallelLayout'
+-import { Button, Empty, Progress, Tooltip } from 'antd'
++import { Button, Empty, Progress, Tooltip, Popover } from 'antd'
+ import { DateTime } from 'luxon'
+ import type { Arena, Horse, Trainer } from '../catalogs/types'
+ import type { ClubSchedule, DailyHorseWorkload } from './types'
+@@ -9,17 +11,23 @@ import { eventSummary } from './scheduleEventPresentation'
+ import { peakOccupancy, type ScheduleEntry, type TriadValues } from './triad'
+ 
+ export type ResourceGrouping = 'calendar' | 'trainers' | 'horses' | 'arenas'
+-export function ResourceSchedule({ grouping, date, schedule, entries, trainers, horses, arenas, workloads, occupancy, canManage, onBook, onOpen }: {
++export function ResourceSchedule({ grouping, date, schedule, entries, trainers, horses, arenas, workloads, occupancy, canManage, onBook, onOpen, renderQuick, onMove, moving }: {
+   grouping: Exclude<ResourceGrouping, 'calendar'>; date: string; schedule: ClubSchedule; entries: ScheduleEntry[];
+   trainers: Trainer[]; horses: Horse[]; arenas: Arena[]; workloads: DailyHorseWorkload[];
+   occupancy?: { arenaId: string; occupied: number; maxRidersCapacity: number }[];
++  renderQuick: (values: Partial<TriadValues>, close: () => void) => ReactNode;
++  onMove: (entry: ScheduleEntry, move: ScheduleMove) => void; moving: boolean;
+   canManage: boolean; onBook: (values: Partial<TriadValues>) => void; onOpen: (entry: ScheduleEntry) => void;
+ }) {
++  const [quick, setQuick] = useState<string>()
++  const drag = useRef<{ entry: ScheduleEntry; offset: number } | null>(null)
++  const suppressClick = useRef(false)
++  const quickAnchor = useRef<HTMLButtonElement | null>(null)
+   const start = +new Date(toInstant(`${date}T${schedule.openTime}`)), end = +new Date(toInstant(`${date}T${schedule.closeTime}`))
+   const scale = 3 // px per minute; preserve the resource timeline scale.
+   const height = (end - start) / 60000 * scale
+   const resources = grouping === 'trainers' ? trainers.map(t => ({ id: t.id, name: t.fullName || t.name })) : grouping === 'horses' ? [...horses, { id: 'unassigned', name: 'Без лошади' }] : arenas
+-  const slots = Array.from({ length: Math.ceil((end - start) / 1800000) }, (_, i) => start + i * 1800000)
++  const slots = Array.from({ length: Math.ceil((end - start) / 900000) }, (_, i) => start + i * 900000)
+   if (!resources.length) return <Empty description="Нет ресурсов для выбранных фильтров" />
+   const isDayOff = schedule.daysOfWeekOff.includes(DateTime.fromISO(date, { zone: CLUB_TIME_ZONE }).weekday % 7)
+   return <div>
+@@ -48,18 +56,41 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers,
+               {grouping === 'horses' && resource.id !== 'unassigned' && (workload ? <><span className="resource-data">{Number(workload.currentWorkloadMinutes.toFixed(1))} / {workload.maxDailyWorkloadMinutes} мин</span><Progress size="small" percent={Math.min(100, workload.currentWorkloadMinutes / workload.maxDailyWorkloadMinutes * 100)} showInfo={false} strokeColor="var(--crm-saddle)" /></> : <span>Нагрузка недоступна</span>)}
+               {grouping === 'arenas' && <span className="resource-data">Пик за день: {occupancy?.find(a => a.arenaId === resource.id)?.occupied ?? peakOccupancy(rows, start, end)} / {arena?.maxRidersCapacity ?? arena?.capacity ?? '—'} всадников</span>}
+             </header>
+-            <div className="resource-lane" style={{ height }}>
+-              {slots.map(at => <button key={at} type="button" className="resource-slot" style={{ top: (at - start) / 60000 * scale, height: Math.min(30, (end - at) / 60000) * scale }}
+-                disabled={!canManage || isDayOff || rests.some(r => r.from < at + 1800000 && r.to > at)}
+-                aria-label={`Забронировать: ${resource.name}, ${DateTime.fromMillis(at, { zone: CLUB_TIME_ZONE }).toFormat('HH:mm')}`}
+-                onClick={() => onBook({ startTime: DateTime.fromMillis(at, { zone: CLUB_TIME_ZONE }).toFormat("yyyy-MM-dd'T'HH:mm"), endTime: DateTime.fromMillis(Math.min(at + 1800000, end), { zone: CLUB_TIME_ZONE }).toFormat("yyyy-MM-dd'T'HH:mm"),
+-                  ...(grouping === 'trainers' ? { trainerId: resource.id } : grouping === 'horses' ? resource.id === 'unassigned' ? {} : { horseId: resource.id } : { arenaId: resource.id }) })} />)}
++            <div className="resource-lane" style={{ height }}
++              onDragOver={event => { if (drag.current && canManage && !moving && !isDayOff) { event.preventDefault(); event.dataTransfer.dropEffect = 'move' } }}
++              onDrop={event => {
++                event.preventDefault()
++                const source = drag.current; drag.current = null
++                if (!source || !canManage || moving || isDayOff) return
++                if (grouping === 'horses' && !source.entry.horses.some(h => h.id === resource.id)) return
++                const minutes = Math.round(((event.clientY - event.currentTarget.getBoundingClientRect().top) / scale - source.offset) / 15) * 15
++                const at = start + minutes * 60000, until = at + (+new Date(source.entry.endTime) - +new Date(source.entry.startTime))
++                if (at < start || until > end) return
++                onMove(source.entry, { startTime: new Date(at).toISOString(), endTime: new Date(until).toISOString(), trainerId: grouping === 'trainers' ? resource.id : source.entry.trainerId, arenaId: grouping === 'arenas' ? resource.id : source.entry.arenaId })
++              }}>
++              {slots.map(at => {
++                const key = `${grouping}:${resource.id}:${at}`
++                const values: Partial<TriadValues> = { startTime: DateTime.fromMillis(at, { zone: CLUB_TIME_ZONE }).toFormat("yyyy-MM-dd'T'HH:mm"), endTime: DateTime.fromMillis(Math.min(at + 3600000, end), { zone: CLUB_TIME_ZONE }).toFormat("yyyy-MM-dd'T'HH:mm"),
++                  ...(grouping === 'trainers' ? { trainerId: resource.id } : grouping === 'horses' ? resource.id === 'unassigned' ? {} : { horseId: resource.id } : { arenaId: resource.id }) }
++                return <Popover key={key} trigger="click" open={quick === key} onOpenChange={open => { if (!open) setQuick(undefined) }} placement="bottom" arrow={false} autoAdjustOverflow destroyOnHidden
++                  content={quick === key ? <div onKeyDown={event => { if (event.key === 'Escape') { setQuick(undefined); quickAnchor.current?.focus() } }}>{renderQuick(values, () => setQuick(undefined))}</div> : null}>
++                  <button type="button" className="resource-slot" style={{ top: (at - start) / 60000 * scale, height: Math.min(15, (end - at) / 60000) * scale }}
++                    disabled={!canManage || moving || isDayOff || at + 3600000 > end || rests.some(r => r.from < at + 900000 && r.to > at)}
++                    onClick={event => { quickAnchor.current = event.currentTarget; setQuick(key) }} aria-label={`Забронировать: ${resource.name}, ${DateTime.fromMillis(at, { zone: CLUB_TIME_ZONE }).toFormat('HH:mm')}`} />
++                </Popover>
++              })}
+               {rests.map(rest => <div key={rest.id} className="resource-rest" style={{ top: (Math.max(start, rest.from) - start) / 60000 * scale, height: (Math.min(end, rest.to) - Math.max(start, rest.from)) / 60000 * scale }} title={`Отдых ${rest.rest} мин, до ${DateTime.fromMillis(rest.to, { zone: CLUB_TIME_ZONE }).toFormat('HH:mm')}`}><span>Отдых {rest.rest} мин</span></div>)}
+               {placed.map(({ entry, lane, lanes }) => {
+                 const text = eventSummary(entry)
+                 return <Tooltip key={entry.id} title={text} trigger={['hover', 'focus']}><button type="button" className={`resource-booking ${entry.completed ? 'resource-booking--completed' : !entry.active ? 'resource-booking--cancelled' : ''}`}
+                   style={{ top: (Math.max(start, +new Date(entry.startTime)) - start) / 60000 * scale + 2, height: Math.max(0, (Math.min(end, +new Date(entry.endTime)) - Math.max(start, +new Date(entry.startTime))) / 60000 * scale - 4), left: `${lane / lanes * 100}%`, width: `calc(${100 / lanes}% - 4px)` }}
+-                  aria-label={text} onClick={() => onOpen(entry)}>
++                  draggable={canManage && !moving && entry.active && !entry.completed}
++                  aria-busy={moving} onDragStart={event => {
++                    setQuick(undefined); suppressClick.current = true
++                    drag.current = { entry, offset: (event.clientY - event.currentTarget.getBoundingClientRect().top) / scale }
++                    event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', entry.id)
++                  }} onDragEnd={() => { drag.current = null; window.setTimeout(() => { suppressClick.current = false }, 0) }}
++                  aria-label={text} onClick={() => { if (!suppressClick.current) onOpen(entry) }}>
+                   <ScheduleEventContent entry={entry} />
+                 </button></Tooltip>
+               })}
+diff --git a/horse-club-crm/frontend/src/pages/schedule/index.tsx b/horse-club-crm/frontend/src/pages/schedule/index.tsx
+index 254f263..c8bef82 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/index.tsx
++++ b/horse-club-crm/frontend/src/pages/schedule/index.tsx
+@@ -1,3 +1,7 @@
++import { QuickSlotBooking } from './QuickSlotBooking'
++import { moveConflict, type ScheduleMove } from './reschedule'
++import { bookingFailure } from './triad'
++import { isUuid } from '../../uuid'
+ import { LessonDrawer, type LessonDrawerProps } from './LessonDrawer'
+ import { ScheduleConflictNotice } from './ScheduleConflictNotice'
+ import { scheduleConflicts } from './triad'
+@@ -50,6 +54,8 @@ export function SchedulePage() {
+     setError(failure.message)
+     if (failure.statusCode === 401) errorHandler.current(failure)
+   }, [])
++  const [moving, setMoving] = useState(false)
++  const moveLock = useRef(false)
+   const [schedule, setSchedule] = useState<ClubSchedule>()
+   const [clients, setClients] = useState<Client[]>([])
+   const [horses, setHorses] = useState<Horse[]>([])
+@@ -180,6 +186,41 @@ export function SchedulePage() {
+     setEditingTriad(booking); setTriadDetail(undefined)
+     setTriadSeed({ trainerId, horseId, arenaId, startTime, endTime: DateTime.fromISO(startTime, { zone: CLUB_TIME_ZONE }).plus({ minutes: 60 }).toFormat("yyyy-MM-dd'T'HH:mm"), ...values })
+   }
++  async function moveEntry(entry: ScheduleEntry, move: ScheduleMove) {
++    if (!canManage || !ready || moveLock.current || !entry.active || entry.completed) return
++    if (![entry.id, move.trainerId, ...(move.arenaId ? [move.arenaId] : [])].every(isUuid)) { void message.warning('Некорректный идентификатор ресурса'); return }
++    if (+new Date(move.startTime) === +new Date(entry.startTime) && move.trainerId === entry.trainerId && move.arenaId === entry.arenaId) return
++    moveLock.current = true; setMoving(true)
++    const oldLesson = lessons.find(row => row.id === entry.id)
++    const oldBooking = triadBookings.find(row => row.id === entry.id)
++    let optimistic = false
++    try {
++      // Validate against the complete interval, independently of visible filters.
++      const [lessonRows, bookings] = await Promise.all([
++        httpClient.get<Lesson[]>(`${API_URL}/lessons`, { params: { from: move.startTime, to: move.endTime } }),
++        catalog<TriadBooking>('bookings', new AbortController().signal, { from: move.startTime, to: move.endTime }),
++      ])
++      const reason = moveConflict(entry, move, scheduleEntries(lessonRows.data, bookings), trainers)
++      if (reason) { void message.warning(reason); return }
++      optimistic = true
++      const trainer = trainers.find(t => t.id === move.trainerId), arena = arenas.find(a => a.id === move.arenaId)
++      if (entry.source === 'booking') {
++        setTriadBookings(rows => rows.map(row => row.id === entry.id ? { ...row, ...move, arenaId: move.arenaId ?? row.arenaId, trainer: trainer ?? row.trainer, arena: arena ?? row.arena } : row))
++        await httpClient.patch(`${API_URL}/bookings/${entry.id}`, move)
++      } else {
++        setLessons(rows => rows.map(row => row.id === entry.id ? { ...row, startTime: move.startTime, endTime: move.endTime, trainer: trainer ?? row.trainer, arena: arena ?? row.arena } : row))
++        await httpClient.patch(`${API_URL}/lessons/${entry.id}/reschedule`, { startTime: move.startTime, durationMinutes: (+new Date(move.endTime) - +new Date(move.startTime)) / 60000, trainerId: move.trainerId, arenaId: move.arenaId })
++      }
++      void message.success('Занятие перенесено')
++    } catch (cause) {
++      if (optimistic) {
++        if (entry.source === 'lesson' && oldLesson) setLessons(rows => rows.map(row => row.id === entry.id ? oldLesson : row))
++        if (entry.source === 'booking' && oldBooking) setTriadBookings(rows => rows.map(row => row.id === entry.id ? oldBooking : row))
++      }
++      void message.warning(bookingFailure(toHttpError(cause)).message)
++      if (toHttpError(cause).statusCode === 401) report(cause)
++    } finally { moveLock.current = false; setMoving(false); setRevision(r => r + 1) }
++  }
+   function openEntry(entry: ScheduleEntry) {
+     if (entry.source === 'lesson') { setError(undefined); setDetail(lessons.find(l => l.id === entry.id)) }
+     else setTriadDetail(triadBookings.find(b => b.id === entry.id))
+@@ -203,7 +244,8 @@ export function SchedulePage() {
+     }
+     savingRef.current = true; setSaving(true); setError(undefined)
+     try {
+-      await httpClient.patch<Lesson>(`${API_URL}/lessons/${editingLesson.id}/reschedule`, { startTime: toInstant(values.startTime), durationMinutes: values.durationMinutes })
++      if (![editingLesson.id, values.trainerId, ...(values.arenaId ? [values.arenaId] : [])].every(isUuid)) throw new Error('Выберите доступные ресурсы')
++      await httpClient.patch<Lesson>(`${API_URL}/lessons/${editingLesson.id}/reschedule`, { startTime: toInstant(values.startTime), durationMinutes: values.durationMinutes, trainerId: values.trainerId, arenaId: values.arenaId })
+       setWorkloadDate(values.startTime.slice(0, 10))
+       setBookingOpen(false); setRevision(value => value + 1); void message.success(editingLesson ? 'Занятие перенесено' : 'Занятие создано')
+     } catch (cause) { report(cause) }
+@@ -267,7 +309,8 @@ export function SchedulePage() {
+     <Card className="schedule-calendar"><Spin spinning={loading || triadLoading || (!ready && !error)}>
+       {grouping !== 'calendar' && schedule && <ResourceSchedule grouping={grouping} date={workloadDate} schedule={schedule} entries={entries}
+         trainers={trainers.filter(t => !trainerId || t.id === trainerId)} horses={horses.filter(h => !horseId || h.id === horseId)} arenas={arenas.filter(a => !arenaId || a.id === arenaId)}
+-        workloads={triadAvailability.data?.horseWorkloads ?? []} occupancy={triadAvailability.data?.arenaOccupancy} canManage={canManage && ready} onBook={openBooking} onOpen={openEntry} />}
++        workloads={triadAvailability.data?.horseWorkloads ?? []} occupancy={triadAvailability.data?.arenaOccupancy} moving={moving} onMove={moveEntry} renderQuick={(values, close) => <QuickSlotBooking initial={{ trainerId, arenaId, ...values }} horses={horses} trainers={trainers} arenas={arenas} report={report}
++          onAdvanced={seed => { close(); openTriad(seed) }} onSaved={() => { close(); setRevision(r => r + 1) }} />} canManage={canManage && ready} onBook={openBooking} onOpen={openEntry} />}
+       <div hidden={grouping !== 'calendar'}>
+       {schedule && <FullCalendar ref={calendarRef} plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin, luxonPlugin]} locale={ruLocale}
+         timeZone={CLUB_TIME_ZONE} initialView={compactLayout ? 'timeGridDay' : 'timeGridWeek'}
+@@ -311,11 +354,11 @@ export function SchedulePage() {
+     <EntryOverlay variant="drawer" title="Перенос занятия" open={bookingOpen} onCancel={() => { if (!saving) setBookingOpen(false) }} footer={null} forceRender width={720} keyboard={!saving} maskClosable={!saving} closable={!saving}>
+       {failure}
+       <Form form={form} noValidate layout="vertical" onFinish={saveReschedule} disabled={saving}>
+-        {editingLesson && <><Typography.Paragraph type="secondary">Меняются только время и длительность. Переносимое занятие исключено из текущей нагрузки.</Typography.Paragraph><LessonGroupSummary lesson={editingLesson} /></>}
++        {editingLesson && <><Typography.Paragraph type="secondary">Можно изменить время, длительность, тренера и манеж. Переносимое занятие исключено из текущей нагрузки.</Typography.Paragraph><LessonGroupSummary lesson={editingLesson} /></>}
+         <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} /></Form.Item>
+         <ScheduleConflictNotice entries={conflicts.entries} trainerId={selectedTrainer} horseIds={selectedHorseIds} error={conflicts.error} />
+-        <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
+-        <Form.Item name="arenaId" label="Манеж" extra="Необязательно для выездного или теоретического занятия."><Select disabled={Boolean(editingLesson)} allowClear showSearch optionFilterProp="label" options={arenaOptions} /></Form.Item>
++        <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
++        <Form.Item name="arenaId" label="Манеж" extra="Необязательно для выездного или теоретического занятия."><Select showSearch optionFilterProp="label" options={arenaOptions} /></Form.Item>
+         <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><BookingDateTimeInput /></Form.Item>
+         <Form.Item name="durationMinutes" label="Длительность, мин" rules={[{ required: true }, { type: 'integer', min: 1 }]}><InputNumber min={1} precision={0} /></Form.Item>
+         {bookingWorkloads.error && <Alert type="error" showIcon message="Не удалось проверить нагрузку лошадей" description={bookingWorkloads.error}
+diff --git a/horse-club-crm/frontend/src/pages/schedule/reschedule.test.ts b/horse-club-crm/frontend/src/pages/schedule/reschedule.test.ts
+new file mode 100644
+index 0000000..3b14201
+--- /dev/null
++++ b/horse-club-crm/frontend/src/pages/schedule/reschedule.test.ts
+@@ -0,0 +1,21 @@
++import { describe, expect, it } from 'vitest'
++import { moveConflict } from './reschedule'
++import type { ScheduleEntry } from './triad'
++
++const entry: ScheduleEntry = { id: 'a', source: 'booking', startTime: '2026-11-06T06:00Z', endTime: '2026-11-06T07:00Z', trainerId: 't', trainerName: 'Тренер', horses: [{ id: 'h', name: 'Лошадь', restMinutes: 45 }], riders: ['Клиент'], discipline: 'Выездка', status: 'scheduled', active: true, completed: false }
++const move = { startTime: '2026-11-06T08:00Z', endTime: '2026-11-06T09:00Z', trainerId: 't' }
++describe('resource moves', () => {
++  it('excludes itself and cancelled entries', () => {
++    expect(moveConflict(entry, move, [entry, { ...entry, id: 'b', active: false, ...move }], [])).toBeUndefined()
++  })
++  it('rejects horse overlaps and insufficient rest', () => {
++    expect(moveConflict(entry, move, [{ ...entry, id: 'b', ...move }], [])).toContain('занята')
++    expect(moveConflict(entry, move, [{ ...entry, id: 'b', startTime: '2026-11-06T07:00Z', endTime: '2026-11-06T07:30Z' }], [])).toContain('отдых')
++  })
++  it('counts peak simultaneous riders and permits adjacent intervals', () => {
++    const others = Array.from({ length: 4 }, (_, i) => ({ ...entry, ...move, id: `b${i}`, horses: [] }))
++    expect(moveConflict(entry, move, others, [])).toContain('(4)')
++    expect(moveConflict(entry, move, others.slice(1), [])).toBeUndefined()
++    expect(moveConflict(entry, move, others.map(e => ({ ...e, startTime: move.endTime, endTime: '2026-11-06T10:00Z' })), [])).toBeUndefined()
++  })
++})
+diff --git a/horse-club-crm/frontend/src/pages/schedule/reschedule.ts b/horse-club-crm/frontend/src/pages/schedule/reschedule.ts
+new file mode 100644
+index 0000000..5419c75
+--- /dev/null
++++ b/horse-club-crm/frontend/src/pages/schedule/reschedule.ts
+@@ -0,0 +1,13 @@
++import type { Trainer } from '../catalogs/types'
++import { peakOccupancy, type ScheduleEntry } from './triad'
++
++export interface ScheduleMove { startTime: string; endTime: string; trainerId: string; arenaId?: string }
++
++export function moveConflict(entry: ScheduleEntry, move: ScheduleMove, entries: ScheduleEntry[], trainers: Trainer[]): string | undefined {
++  const from = +new Date(move.startTime), to = +new Date(move.endTime)
++  const others = entries.filter(e => !(e.id === entry.id && e.source === entry.source) && e.active)
++  if (others.some(e => +new Date(e.startTime) < to && +new Date(e.endTime) > from && e.horses.some(h => entry.horses.some(own => own.id === h.id)))) return 'Лошадь уже занята в это время'
++  if (others.some(e => e.horses.some(h => entry.horses.some(own => own.id === h.id && +new Date(e.startTime) < to + own.restMinutes * 60000 && +new Date(e.endTime) + own.restMinutes * 60000 > from)))) return 'Лошади нужен отдых между тренировками'
++  const limit = trainers.find(t => t.id === move.trainerId)?.maxParallelLessons ?? 4
++  if (peakOccupancy(others.filter(e => e.trainerId === move.trainerId), from, to) + Math.max(1, entry.riders.length) > limit) return `У тренера достигнут максимум одновременных всадников (${limit})`
++}

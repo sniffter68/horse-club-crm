@@ -1,0 +1,855 @@
+diff --git a/horse-club-crm/DESIGN.md b/horse-club-crm/DESIGN.md
+index 796118f..3dbb73d 100644
+--- a/horse-club-crm/DESIGN.md
++++ b/horse-club-crm/DESIGN.md
+@@ -51,7 +51,7 @@ components:
+ 
+ Создание занятия из дашборда, календаря и сеток ресурсов использует общий `schedule/LessonDrawer` и прежние визуальные токены. Слот задаёт московское время и выбранный ресурс, успех обновляет календарь без перехода со страницы. Контракт: `docs/unified-lesson-booking.md`.
+ 
+-Параллельные занятия используют существующие карточки расписания и Ant Design Alert: нейтральная подсказка при пересечении тренера, ошибка при занятой лошади. `parallelLayout` делит ширину колонки ресурса внутри блока пересечений. Колонка ресурса сохраняет минимум 132px на карточку; на узком экране доступна горизонтальная прокрутка сетки. Цвета и типографика сохраняются. Контракт: `docs/parallel-individual-lessons.md`.
++Параллельные занятия используют существующие карточки расписания и Ant Design Alert: нейтральная подсказка при пересечении тренера в пределах вместимости, ошибка при исчерпанном лимите или занятой лошади. Формы показывают «занято N/M» и свободные места через Ant Design Select/Typography; профиль тренера использует общий NumberField. `parallelLayout` делит ширину колонки ресурса внутри блока пересечений. Колонка ресурса сохраняет минимум 132px на карточку; на узком экране доступна горизонтальная прокрутка сетки. Цвета и типографика сохраняются. Контракты: `docs/parallel-individual-lessons.md`, `docs/trainer-concurrency.md`.
+ 
+ Совместный доступ к абонементу использует общий `SharedMembershipAccess` в карточках клиента и абонемента: поиск `ClientSelectWithCreate`, кнопки/Popconfirm/Alert из Ant Design, мягкий бейдж семейного абонемента. Визуальные токены сохраняются; поведение и проверки описаны в `docs/shared-family-memberships.md`.
+ 
+diff --git a/horse-club-crm/UX-CONTRACT.md b/horse-club-crm/UX-CONTRACT.md
+index 11c1ef6..bf021da 100644
+--- a/horse-club-crm/UX-CONTRACT.md
++++ b/horse-club-crm/UX-CONTRACT.md
+@@ -24,7 +24,7 @@
+ 
+ ## Параллельные индивидуальные занятия
+ 
+-Источник — задача владельца от 26.10.2026, `docs/parallel-individual-lessons.md`. Владельцы: `ScheduleEventContent` для карточек, `parallelLayout` для колонок ресурсов, `useScheduleConflicts` и `ScheduleConflictNotice` для подсказок обеих форм. Пересечение тренера не блокирует сохранение; пересечение лошади блокирует. Сервер также проверяет занятость клиента. Учитывается выбранный интервал независимо от фильтров, редактируемая запись исключается, устаревшие запросы отменяются. Визуальные токены не меняются. Проверки: `parallel-lessons.test.cjs`, `booking-rules.test.cjs`, `parallelLayout.test.ts`, `triad-booking.spec.ts`.
++Источник — задачи владельца от 26.10.2026 и 05.11.2026, `docs/parallel-individual-lessons.md`, `docs/trainer-concurrency.md`. Владельцы: `ScheduleEventContent` для карточек, `parallelLayout` для колонок ресурсов, `useScheduleConflicts` и `ScheduleConflictNotice` для подсказок. `LessonDrawer` и `TriadBookingModal` показывают пиковую занятость и свободные места на выбранный интервал; пересечение тренера допустимо в пределах его вместимости, исчерпанный лимит блокирует сохранение. Пересечение лошади блокирует; сервер также проверяет занятость клиента. Учитывается выбранный интервал независимо от фильтров, редактируемая запись исключается, устаревшие запросы отменяются. Ошибка загрузки не показывает ложный ноль занятых мест; сервер всегда повторно проверяет ресурсы. Визуальные токены не меняются. Проверки: `parallel-lessons.test.cjs`, `booking-rules.test.cjs`, `parallelLayout.test.ts`, `triad-booking.spec.ts`, `dashboard.spec.ts`.
+ 
+ ## Совместное использование абонементов
+ 
+diff --git a/horse-club-crm/backend/prisma/migrations/20261105120000_trainer_parallel_lessons/migration.sql b/horse-club-crm/backend/prisma/migrations/20261105120000_trainer_parallel_lessons/migration.sql
+new file mode 100644
+index 0000000..ea2004f
+--- /dev/null
++++ b/horse-club-crm/backend/prisma/migrations/20261105120000_trainer_parallel_lessons/migration.sql
+@@ -0,0 +1,2 @@
++ALTER TABLE "Trainer" ADD COLUMN "maxParallelLessons" INTEGER NOT NULL DEFAULT 4;
++ALTER TABLE "Trainer" ADD CONSTRAINT "Trainer_maxParallelLessons_check" CHECK ("maxParallelLessons" BETWEEN 1 AND 100);
+diff --git a/horse-club-crm/backend/prisma/schema.prisma b/horse-club-crm/backend/prisma/schema.prisma
+index 97d92da..9f3048f 100644
+--- a/horse-club-crm/backend/prisma/schema.prisma
++++ b/horse-club-crm/backend/prisma/schema.prisma
+@@ -269,6 +269,7 @@ model Trainer {
+   vkUserId      BigInt?  @unique
+   qualification String?
+   maxDailyLoad  Int      @default(480)
++  maxParallelLessons Int @default(4)
+   baseRate      Decimal  @default(0) @db.Decimal(12, 2)
+   lessons       Lesson[]
+ }
+diff --git a/horse-club-crm/backend/src/bookings/booking-rules.service.ts b/horse-club-crm/backend/src/bookings/booking-rules.service.ts
+index 9a7e4d7..022cc7d 100644
+--- a/horse-club-crm/backend/src/bookings/booking-rules.service.ts
++++ b/horse-club-crm/backend/src/bookings/booking-rules.service.ts
+@@ -4,7 +4,6 @@ import { DateTime } from 'luxon';
+ import { BookingValidationError } from './booking-validation.error';
+ 
+ export interface BookingRuleInput {
+-  requireFreeTrainer?: boolean;
+   /** Availability previews do not reserve resources. Writes always acquire locks. */
+   lockResources?: boolean;
+   requireRiderWeight?: boolean;
+@@ -84,8 +83,19 @@ export class BookingRulesService {
+     if (reservations.some(r => r.clientIds.some(id => clientIds.includes(id)) && overlaps(r.start, r.end, start, end))) {
+       throw new BookingValidationError('CLIENT_BUSY', 'Клиент уже записан на занятие в это время');
+     }
+-    if (input.requireFreeTrainer && reservations.some(r => r.trainerId === trainerId && overlaps(r.start, r.end, start, end))) {
+-      throw new BookingValidationError('TRAINER_BUSY', 'Тренер уже занят в это время');
++    const maxParallelLessons = trainer.maxParallelLessons ?? 4;
++    const trainerEvents = reservations.filter(r => r.trainerId === trainerId && overlaps(r.start, r.end, start, end)).flatMap(r => [
++      { at: Math.max(+start, +r.start), delta: Math.max(1, r.riders) },
++      { at: Math.min(+end, +r.end), delta: -Math.max(1, r.riders) },
++    ]).sort((a, b) => a.at - b.at || a.delta - b.delta);
++    let trainerRiders = Math.max(1, input.participants.length + (input.existingRiders ?? 0));
++    const assertTrainerCapacity = () => {
++      if (trainerRiders > maxParallelLessons) throw new BookingValidationError('TRAINER_BUSY', `У тренера достигнут максимум одновременных всадников (${maxParallelLessons})`, { trainerId, maxParallelLessons });
++    };
++    assertTrainerCapacity();
++    for (const event of trainerEvents) {
++      trainerRiders += event.delta;
++      assertTrainerCapacity();
+     }
+     for (const horse of horses) {
+       const work = reservations.filter(r => r.horseIds.includes(horse.id));
+diff --git a/horse-club-crm/backend/src/lessons/lessons.service.ts b/horse-club-crm/backend/src/lessons/lessons.service.ts
+index 1c59e05..82b7c80 100644
+--- a/horse-club-crm/backend/src/lessons/lessons.service.ts
++++ b/horse-club-crm/backend/src/lessons/lessons.service.ts
+@@ -193,7 +193,7 @@ export class LessonsService {
+         }
+       }
+       const horseIds = [...new Set(lesson.bookings.map(booking => booking.horseId).filter((id): id is string => Boolean(id)))];
+-      await this.bookingRules.validate(tx, { requireFreeTrainer: true, trainerId: lesson.trainerId, arenaId: lesson.arenaId, participants: lesson.bookings, start, end, excludeLessonId: lessonId });
++      await this.bookingRules.validate(tx, { trainerId: lesson.trainerId, arenaId: lesson.arenaId, participants: lesson.bookings, start, end, excludeLessonId: lessonId });
+       await this.validateNoConflictsWithClient(tx, lesson.trainerId, horseIds, start, end, lessonId, lesson.arenaId ?? undefined);
+       for (const horseId of horseIds) {
+         await this.getHorseWorkloadWithClient(tx, horseId, this.getLocalDateParts(start), durationMinutes, lessonId);
+@@ -300,7 +300,7 @@ export class LessonsService {
+       this.assertClubWorkingHours(start, end, schedule);
+       // Each create request owns its lesson, participants, status and payments.
+       // Group participants are supplied explicitly; never append to another lesson.
+-      await this.bookingRules.validate(tx, { requireFreeTrainer: true, trainerId: dto.trainerId, arenaId: dto.arenaId, participants, start, end });
++      await this.bookingRules.validate(tx, { trainerId: dto.trainerId, arenaId: dto.arenaId, participants, start, end });
+       await this.validateNoConflictsWithClient(
+         tx,
+         dto.trainerId,
+@@ -702,8 +702,7 @@ export class LessonsService {
+     if (conflicts.some((lesson) => lesson.bookings.some((booking) => booking.horseId && horseIds.includes(booking.horseId)))) {
+       throw new ConflictException('Лошадь уже забронирована на это время');
+     }
+-    if (conflicts.some(lesson => lesson.trainerId === trainerId)) throw new ConflictException('Тренер уже занят в это время');
+-    // Arena capacity and client occupancy are enforced by shared booking rules.
++    // Trainer/arena capacity and client occupancy are enforced by shared booking rules.
+   }
+ 
+   private async getHorseWorkloadWithClient(
+diff --git a/horse-club-crm/backend/src/trainers/dto/create-trainer.dto.ts b/horse-club-crm/backend/src/trainers/dto/create-trainer.dto.ts
+index 20fff27..38e3df5 100644
+--- a/horse-club-crm/backend/src/trainers/dto/create-trainer.dto.ts
++++ b/horse-club-crm/backend/src/trainers/dto/create-trainer.dto.ts
+@@ -1,8 +1,15 @@
+ import { PublicationDto } from '../../common/dto/publication.dto';
+ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+-import { IsBoolean, Matches, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
++import { IsBoolean, Matches, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
+ 
+ export class CreateTrainerDto extends PublicationDto {
++  @ApiPropertyOptional({ default: 4, description: 'Максимум одновременных всадников' })
++  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
++  @IsInt()
++  @Min(1)
++  @Max(100)
++  maxParallelLessons?: number;
++
+   @IsOptional() @Matches(/^#[0-9a-fA-F]{6}$/) scheduleColor?: string | null;
+ 
+   @ApiPropertyOptional({ default: true })
+diff --git a/horse-club-crm/backend/src/trainers/dto/update-trainer.dto.ts b/horse-club-crm/backend/src/trainers/dto/update-trainer.dto.ts
+index d074ed6..37299a3 100644
+--- a/horse-club-crm/backend/src/trainers/dto/update-trainer.dto.ts
++++ b/horse-club-crm/backend/src/trainers/dto/update-trainer.dto.ts
+@@ -1,4 +1,4 @@
+ import { PartialType } from '@nestjs/swagger';
+ import { CreateTrainerDto } from './create-trainer.dto';
+ 
+-export class UpdateTrainerDto extends PartialType(CreateTrainerDto) {}
++export class UpdateTrainerDto extends PartialType(CreateTrainerDto, { skipNullProperties: false }) {}
+diff --git a/horse-club-crm/backend/test/booking-rules.postgres.test.cjs b/horse-club-crm/backend/test/booking-rules.postgres.test.cjs
+index 4fd3185..8841add 100644
+--- a/horse-club-crm/backend/test/booking-rules.postgres.test.cjs
++++ b/horse-club-crm/backend/test/booking-rules.postgres.test.cjs
+@@ -67,8 +67,8 @@ test('PostgreSQL booking rules, rollback, HTTP contract and concurrent triad wri
+           ...(race === 'arena' ? { arenaId: entries[0].arenaId } : {}),
+           ...(race === 'daily-workload' ? { startTime: `2030-01-08T${String(6 + i * 2).padStart(2, '0')}:00Z`, endTime: `2030-01-08T${String(6 + i * 2).padStart(2, '0')}:30Z` } : {}),
+         })));
+-        assert.equal(results.filter(r => r.status === 'fulfilled').length, race === 'trainer' ? 5 : race === 'arena' ? 2 : 1);
+-        const expected = race === 'arena' ? 'ARENA_FULL' : race === 'horse' ? 'HORSE_BUSY' : 'HORSE_OVERLOADED';
++        assert.equal(results.filter(r => r.status === 'fulfilled').length, race === 'trainer' ? 4 : race === 'arena' ? 2 : 1);
++        const expected = race === 'trainer' ? 'TRAINER_BUSY' : race === 'arena' ? 'ARENA_FULL' : race === 'horse' ? 'HORSE_BUSY' : 'HORSE_OVERLOADED';
+         for (const result of results.filter(r => r.status === 'rejected')) assert.ok(hasCode(expected)(result.reason), String(result.reason));
+       });
+     }
+diff --git a/horse-club-crm/backend/test/booking-rules.test.cjs b/horse-club-crm/backend/test/booking-rules.test.cjs
+index 3cece7a..34acfa5 100644
+--- a/horse-club-crm/backend/test/booking-rules.test.cjs
++++ b/horse-club-crm/backend/test/booking-rules.test.cjs
+@@ -101,6 +101,62 @@ test('trainer overlap and adjacent intervals allow independent riders', async ()
+   }
+ });
+ 
++test('trainer capacity combines direct and group riders, accepting the exact limit', async () => {
++  for (const maxParallelLessons of [3, 4]) {
++    const f = fixture({ trainer: { maxParallelLessons }, bookings: [{ trainerId: 'trainer', clientId: 'other', horseId: 'other', startTime: at('10:00'), endTime: at('10:30') }],
++      lessons: [{ trainerId: 'trainer', arenaId: 'elsewhere', startTime: at('10:00'), endTime: at('10:30'), bookings: [{ clientId: 'a' }, { clientId: 'b' }] }] });
++    if (maxParallelLessons === 4) await rules.validate(f.tx, f.input);
++    else await assert.rejects(rules.validate(f.tx, f.input), error => failure('TRAINER_BUSY')(error)
++      && error.message === 'У тренера достигнут максимум одновременных всадников (3)'
++      && error.getResponse().details.maxParallelLessons === 3);
++  }
++});
++
++test('trainer uses peak occupancy and half-open boundaries instead of total intersections', async () => {
++  const base = { trainerId: 'trainer', clientId: 'other', horseId: 'other' };
++  const bookings = [
++    { ...base, startTime: at('09:00'), endTime: at('10:00') },
++    { ...base, startTime: at('10:00'), endTime: at('10:15') },
++    { ...base, startTime: at('10:15'), endTime: at('10:30') },
++    { ...base, startTime: at('10:30'), endTime: at('11:00') },
++  ];
++  const f = fixture({ trainer: { maxParallelLessons: 2 }, bookings });
++  await rules.validate(f.tx, f.input);
++  bookings.push({ ...base, startTime: at('10:14'), endTime: at('10:16') });
++  await assert.rejects(rules.validate(f.tx, f.input), failure('TRAINER_BUSY'));
++});
++
++test('new group and existing riders consume trainer places even without horses', async () => {
++  const f = fixture({ trainer: { maxParallelLessons: 2 } });
++  await rules.validate(f.tx, { ...f.input, participants: [{ clientId: 'client' }], existingRiders: 1 });
++  await assert.rejects(rules.validate(f.tx, { ...f.input, participants: [{ clientId: 'client' }], existingRiders: 2 }), failure('TRAINER_BUSY'));
++});
++
++test('rescheduling excludes own records and queries only active reservations without copied bookings', async () => {
++  const f = fixture();
++  f.tx.booking.findMany = async ({ where }) => {
++    assert.equal(where.lessonId, null);
++    assert.deepEqual(where.id, { not: 'own-booking' });
++    assert.deepEqual(where.status.in, ['scheduled', 'completed']);
++    return [];
++  };
++  f.tx.lesson.findMany = async ({ where }) => {
++    assert.equal(where.deletedAt, null);
++    assert.deepEqual(where.id, { not: 'own-lesson' });
++    assert.deepEqual(where.status.in, ['SCHEDULED', 'COMPLETED']);
++    return [];
++  };
++  await rules.validate(f.tx, { ...f.input, excludeBookingId: 'own-booking', excludeLessonId: 'own-lesson' });
++});
++
++test('trainer DTO validates integral capacity from one to one hundred', async () => {
++  const { plainToInstance } = require('class-transformer');
++  const { validate } = require('class-validator');
++  const { UpdateTrainerDto } = require('../dist/trainers/dto/update-trainer.dto');
++  for (const maxParallelLessons of [1, 4, 100]) assert.equal((await validate(plainToInstance(UpdateTrainerDto, { maxParallelLessons }))).length, 0);
++  for (const maxParallelLessons of [0, -1, 1.5, 101, '4', null]) assert.ok((await validate(plainToInstance(UpdateTrainerDto, { maxParallelLessons }))).length > 0);
++});
++
+ test('horse and client overlaps remain hard conflicts across direct and legacy records', async () => {
+   for (const legacy of [false, true]) {
+     for (const resource of ['horse', 'client']) {
+diff --git a/horse-club-crm/backend/test/lead-conversion-lesson.test.cjs b/horse-club-crm/backend/test/lead-conversion-lesson.test.cjs
+index 0c2c866..dd7ac6e 100644
+--- a/horse-club-crm/backend/test/lead-conversion-lesson.test.cjs
++++ b/horse-club-crm/backend/test/lead-conversion-lesson.test.cjs
+@@ -14,11 +14,11 @@ const ids = Object.fromEntries(['lead', 'client', 'trainer', 'horse', 'arena', '
+ const dto = () => ({ firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567', isRider: true, isPayer: false,
+   lesson: { trainerId: ids.trainer, horseId: ids.horse, arenaId: ids.arena, startTime: '2026-10-14T10:00:00Z', durationMinutes: 45 } });
+ 
+-function harness({ existing = false, collision, failLeadUpdate = false, missingService = false } = {}) {
++function harness({ existing = false, collision, failLeadUpdate = false, missingService = false, maxParallelLessons = 4 } = {}) {
+   let state = { lead: { id: ids.lead, status: 'PENDING', serviceId: missingService ? null : ids.service },
+     clients: existing ? [{ id: ids.client, phone: dto().phone, firstName: 'Старое имя', vkUserId: 42n }] : [], lessons: [], notifications: [] };
+   let transactionCount = 0, validateCount = 0;
+-  const trainer = { id: ids.trainer, isActive: true, name: 'Мария', vkUserId: 77n };
++  const trainer = { id: ids.trainer, isActive: true, maxParallelLessons, name: 'Мария', vkUserId: 77n };
+   const horse = { id: ids.horse, name: 'Валдай', status: 'active', isUnavailable: false,
+     requiredRestMinutes: 45, maxDailyWorkloadMinutes: 240, maxDailyMinutes: 240, maxRiderWeight: 85 };
+   const arena = { id: ids.arena, name: 'Манеж', isActive: true, isUnavailable: false, capacity: 6, maxRidersCapacity: 6 };
+@@ -95,9 +95,17 @@ test('existing client is reused by phone and receives the participant notificati
+   assert.equal(h.state().notifications.length, 2);
+ });
+ 
+-test('trainer overlap rejects a second lesson when converting a lead', async () => {
++test('trainer overlap permits converting a lead within capacity', async () => {
+   const h = harness({ collision: 'trainer' });
+-  await assert.rejects(h.service.accept(ids.lead, dto()), /Тренер уже занят/);
++  await h.service.accept(ids.lead, dto());
++  assert.equal(h.state().lessons.length, 1);
++});
++
++test('trainer capacity rejects a lead conversion and rolls back the new client', async () => {
++  const h = harness({ collision: 'trainer', maxParallelLessons: 1 });
++  await assert.rejects(h.service.accept(ids.lead, dto()), /У тренера достигнут максимум одновременных всадников \(1\)/);
++  assert.deepEqual(h.state().clients, []);
++  assert.equal(h.state().lead.status, 'PENDING');
+ });
+ 
+ for (const collision of ['horse']) test(`${collision} overlap rejects and rolls back client and lead`, async () => {
+diff --git a/horse-club-crm/backend/test/lesson-deferred-payment.test.cjs b/horse-club-crm/backend/test/lesson-deferred-payment.test.cjs
+index f45a9d6..6189b50 100644
+--- a/horse-club-crm/backend/test/lesson-deferred-payment.test.cjs
++++ b/horse-club-crm/backend/test/lesson-deferred-payment.test.cjs
+@@ -107,13 +107,13 @@ test('revenue failure rolls back debit, booking linkage and pending cancellation
+ test('shared lesson rules check trainer occupancy even without a horse', async () => {
+   const rules = new BookingRulesService();
+   const tx = {
+-    $queryRaw: async () => [], trainer: { findUnique: async () => ({ isActive: true }) },
++    $queryRaw: async () => [], trainer: { findUnique: async () => ({ isActive: true, maxParallelLessons: 1 }) },
+     horse: { findMany: async ({ where }) => { assert.deepEqual(where.id.in, []); return []; } },
+     client: { findMany: async () => [{ id: id(4) }] },
+     booking: { findMany: async () => [{ trainerId: id(5), clientId: id(99), startTime: new Date('2026-11-02T09:00Z'), endTime: new Date('2026-11-02T10:00Z') }] },
+     lesson: { findMany: async () => [] },
+   };
+-  await assert.rejects(rules.validate(tx, { requireFreeTrainer: true, trainerId: id(5), participants: [{ clientId: id(4) }],
++  await assert.rejects(rules.validate(tx, { trainerId: id(5), participants: [{ clientId: id(4) }],
+     start: new Date('2026-11-02T09:30Z'), end: new Date('2026-11-02T10:30Z') }), error => error.getResponse().code === 'TRAINER_BUSY');
+ });
+ 
+diff --git a/horse-club-crm/backend/test/lessons.test.cjs b/horse-club-crm/backend/test/lessons.test.cjs
+index 9ecdd6a..0357439 100644
+--- a/horse-club-crm/backend/test/lessons.test.cjs
++++ b/horse-club-crm/backend/test/lessons.test.cjs
+@@ -77,10 +77,10 @@ test('lesson history applies server pagination and relation filters', async () =
+   assert.equal(listArgs.where.OR.length, 6);
+ });
+ 
+-test('rejects overlapping individual lessons for the same trainer', async () => {
++test('legacy overlap check delegates trainer capacity to shared rules', async () => {
+   const service = new LessonsService(prismaWithLessons([scheduled]), unusedLedger);
+-  await assert.rejects(service.validateNoConflicts('trainer-1', 'horse-2',
+-    new Date('2026-09-07T10:30:00.000Z'), new Date('2026-09-07T11:30:00.000Z')), /Тренер уже занят/);
++  await service.validateNoConflicts('trainer-1', 'horse-2',
++    new Date('2026-09-07T10:30:00.000Z'), new Date('2026-09-07T11:30:00.000Z'));
+ });
+ 
+ test('blocks a mathematically overlapping horse interval', async () => {
+diff --git a/horse-club-crm/backend/test/parallel-lessons.test.cjs b/horse-club-crm/backend/test/parallel-lessons.test.cjs
+index e3b87c1..00dd65e 100644
+--- a/horse-club-crm/backend/test/parallel-lessons.test.cjs
++++ b/horse-club-crm/backend/test/parallel-lessons.test.cjs
+@@ -38,7 +38,7 @@ const dto = { trainerId: 'trainer', arenaId: 'arena', serviceId: 'individual', s
+ test('creates and lists two independent simultaneous lessons with separate prices', async () => {
+   const { service, rows } = fixture();
+   const first = await service.createLesson({ ...dto, cost: 1500 });
+-  const second = await service.createLesson({ ...dto, trainerId: 'trainer-2', clientId: 'client-2', horseId: 'horse-2', cost: 2200 });
++  const second = await service.createLesson({ ...dto, clientId: 'client-2', horseId: 'horse-2', cost: 2200 });
+   assert.notEqual(first.id, second.id);
+   assert.equal(rows.length, 2);
+   assert.deepEqual(rows.map(l => l.bookings.length), [1, 1]);
+@@ -50,7 +50,7 @@ test('creates and lists two independent simultaneous lessons with separate price
+ test('parallel riders retain their own memberships without merging bookings', async () => {
+   const { service, rows } = fixture();
+   await service.createLesson({ ...dto, membershipId: 'membership-1' });
+-  await service.createLesson({ ...dto, trainerId: 'trainer-2', clientId: 'client-2', horseId: 'horse-2', membershipId: 'membership-2' });
++  await service.createLesson({ ...dto, clientId: 'client-2', horseId: 'horse-2', membershipId: 'membership-2' });
+   assert.deepEqual(rows.map(l => l.bookings.map(b => b.membershipId)), [['membership-1'], ['membership-2']]);
+   assert.ok(rows.every(l => !l.bookings[0].payments));
+ });
+@@ -66,7 +66,7 @@ for (const resource of ['horse', 'client']) test(`creating overlapping ${resourc
+ for (const capacity of [1, 3]) test(`three overlapping lessons remain independent with service capacity ${capacity}`, async () => {
+   const { service, rows } = fixture(capacity);
+   for (let i = 1; i <= 3; i++) {
+-    await service.createLesson({ ...dto, trainerId: `trainer-${i}`, clientId: `client-${i}`, horseId: `horse-${i}`, cost: i * 1000 });
++    await service.createLesson({ ...dto, clientId: `client-${i}`, horseId: `horse-${i}`, cost: i * 1000 });
+   }
+   assert.equal(new Set(rows.map(row => row.id)).size, 3);
+   assert.deepEqual(rows.map(row => row.bookings.map(b => b.clientId)), [['client-1'], ['client-2'], ['client-3']]);
+@@ -74,3 +74,12 @@ for (const capacity of [1, 3]) test(`three overlapping lessons remain independen
+   assert.ok(rows.every(row => row.status === 'SCHEDULED' && row.paymentStatus === 'UNPAID'));
+   assert.deepEqual(rows.map(row => row.bookings[0].payments.create.clientId), ['client-1', 'client-2', 'client-3']);
+ });
++
++test('four riders share one trainer; a fifth is rejected before writing a lesson or payment', async () => {
++  const { service, rows } = fixture();
++  for (let i = 1; i <= 4; i++) await service.createLesson({ ...dto, clientId: `client-${i}`, horseId: `horse-${i}` });
++  await assert.rejects(service.createLesson({ ...dto, clientId: 'client-5', horseId: 'horse-5' }), error => error.getResponse().code === 'TRAINER_BUSY');
++  assert.equal(rows.length, 4);
++  assert.ok(rows.every(row => row.trainerId === dto.trainerId));
++  assert.equal(new Set(rows.map(row => row.bookings[0].payments.create.clientId)).size, 4);
++});
+diff --git a/horse-club-crm/docs/trainer-concurrency.md b/horse-club-crm/docs/trainer-concurrency.md
+new file mode 100644
+index 0000000..c4eeb72
+--- /dev/null
++++ b/horse-club-crm/docs/trainer-concurrency.md
+@@ -0,0 +1,24 @@
++# Одновременные занятия одного тренера
++
++Решение владельца от 05.11.2026: тренер может вести нескольких независимых всадников на разных лошадях. Профиль Trainer содержит `maxParallelLessons`: целое число от 1 до 100, по умолчанию 4. Поле редактируется в существующей форме тренера и доступно через POST/PATCH `/trainers` с прежними правами SCHEDULE. Установка 1 возвращает индивидуальную вместимость.
++
++`BookingRulesService` проверяет пиковое количество одновременных всадников на полуоткрытом интервале `[start, end)`. События окончания обрабатываются перед событиями начала. Прямое бронирование занимает одно место, Lesson — число его Booking-участников (пустой Lesson резервирует одно место). Копии Booking внутри Lesson не учитываются второй раз. Для замены лошади учитываются остальные участники исключённого Lesson. Отменённые записи и удалённые Lesson не занимают места. Проверка общая для создания, переноса, замены лошади и конвертации заявки. Ошибка 409 `TRAINER_BUSY`: «У тренера достигнут максимум одновременных всадников (N)» с `details.maxParallelLessons`.
++
++Пересечения клиента и лошади остаются строгими. Вместимость манежа проверяется по существующему `maxRidersCapacity` и пиковому числу всадников. Транзакции Serializable, блокировки ресурсов и повторные проверки при конкуренции сохраняются. Каждый Lesson и Booking остаётся отдельной записью со своим клиентом, абонементом, стоимостью и платежами; финансовые обработчики не меняются.
++
++Создание через общий LessonDrawer и редактирование через TriadBookingModal показывают занятость/свободные места тренера. При достижении лимита сохранение блокируется. Данные загружаются для выбранного интервала независимо от фильтров расписания; редактируемая запись исключается. При ошибке загрузки отображается предупреждение и неизвестная занятость, сервер повторно проверяет запрос. После 409 доступность обновляется. Карточки расписания сохраняют существующие отдельные колонки, а заголовок тренера показывает пик загрузки за день.
++
++## Развёртывание
++
++До запуска обновлённого backend применить на сервере `npx prisma migrate deploy`. Миграция `20261105120000_trainer_parallel_lessons` добавляет NOT NULL поле с default 4 и CHECK 1–100, сохраняя существующие занятия. Она не изменяет старые пересечения; для новых записей применяется новый лимит. Prisma Client сгенерирован локально командой `npx prisma generate`.
++
++## Проверки
++
++- Backend: `npm run typecheck`, `npm run lint`, `npm run build`, `npm test` — успешно; 648 тестов прошли, 20 PostgreSQL-тестов пропущены. Три существующих предупреждения Oxlint: неиспользуемый параметр в dashboard.test.cjs и GET с body в двух HTTP-тестах.
++- Frontend: `npm run typecheck`, `npm run lint`, `npm run build`, `npm test` — успешно; 159 тестов, 18 файлов.
++- `npx prisma generate` — успешно, Prisma Client 6.19.3.
++- Playwright: 11 целевых сценариев прошли: параллельные кликабельные карточки на 1280/375px; редактирование с исключением собственной записи, строгая занятость лошади, достижение лимита и изменение интервала; создание из слота и предпочтения клиента на 1440/390px; показ свободных мест, открытый Select и блокировка лишнего всадника на 1440/390px; ошибка сохранения, повтор и подтверждение закрытия. Начальные сбои селекторов с несколькими role=status/alert исправлены, повторные прогоны успешны.
++- Регрессионные backend-тесты проверяют четыре независимых Lesson у одного тренера и отказ пятому до создания занятия/платежа, отдельные абонементы клиентов, комбинированную загрузку Booking/группового Lesson, точный лимит, соседние интервалы, пиковый счётчик, исключение переносимой записи, валидацию DTO и откат конвертации заявки.
++- PostgreSQL-тест гонки пяти запросов обновлён: четыре успешных записи и один TRAINER_BUSY. Локально он пропущен вместе с остальными тестами, которым требуется отдельная PostgreSQL; реальная конкурентная запись в БД не проверена.
++- Дополнительный `audit_project.py --mode strict` завершился с 207 эвристическими замечаниями по всему проекту, включая ошибочное распознавание Ant Design Form.Item/Select как нативных контролов. Аудит не прошёл; общая переработка интерфейса не входит в эту задачу. JSON: `docs/reports/trainer-concurrency-premium-audit.json` (локальный игнорируемый артефакт).
++- `designmd lint DESIGN.md` не выполнен: запуск npx завершился EACCES при доступе к npm registry/cache. В DESIGN.md изменено только описание поведения, YAML-токены сохранены.
+diff --git a/horse-club-crm/frontend/e2e/dashboard.spec.ts b/horse-club-crm/frontend/e2e/dashboard.spec.ts
+index f5bb04b..815a2f9 100644
+--- a/horse-club-crm/frontend/e2e/dashboard.spec.ts
++++ b/horse-club-crm/frontend/e2e/dashboard.spec.ts
+@@ -19,7 +19,7 @@ for (const width of [1440, 390]) test(`schedule trainer slot opens shared drawer
+   const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
+   await expect(drawer).toBeVisible()
+   await expect(drawer.getByRole('textbox', { name: 'Выберите дату' })).toHaveValue('20.10.2026 11:00')
+-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Мария Волкова')
++  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Мария Волкова')
+   await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+   await expect(drawer.getByText('Заполните поле').first()).toBeVisible()
+   for (const [label, value] of [['Клиент', 'Анна Орлова'], ['Услуга', 'Выездка'], ['Лошадь', 'Валдай']]) await choose(page, drawer, label, value)
+@@ -34,7 +34,7 @@ for (const width of [1440, 390]) test(`schedule trainer slot opens shared drawer
+   })
+   await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+   await expect(drawer.getByText('Слот занят')).toBeVisible()
+-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Мария Волкова')
++  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Мария Волкова')
+   fail = false
+   const before = reads
+   await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+@@ -233,6 +233,42 @@ async function lesson(page: Page) {
+   return drawer
+ }
+ 
++for (const width of [1440, 390]) test(`shared booking shows trainer places and blocks the capacity limit at ${width}px`, async ({ page }) => {
++  const state = await setup(page)
++  await page.setViewportSize({ width, height: 900 })
++  let riders = 2
++  const trainerId = '00000003-1111-4111-8111-111111111111'
++  await page.route('**/api/trainers?*', route => route.fulfill({ json: [{ id: trainerId, name: 'Мария Волкова', isActive: true, maxParallelLessons: 3 }], headers: { 'x-total-count': '1' } }))
++  await page.route('**/api/bookings?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
++  await page.route('**/api/lessons?*', route => route.fulfill({ json: Array.from({ length: riders }, (_, i) => ({
++    id: `other-${i}`, trainer: { id: trainerId, name: 'Мария Волкова' }, service: { name: 'Выездка' },
++    startTime: '2026-10-20T09:00:00Z', endTime: '2026-10-20T10:00:00Z', status: 'SCHEDULED',
++    bookings: [{ client: { id: `other-client-${i}`, name: `Всадник ${i + 1}` }, horse: { id: `other-horse-${i}`, name: `Лошадь ${i + 1}` } }],
++  })) }))
++  await page.goto('/')
++  const drawer = await lesson(page)
++  const save = drawer.getByRole('button', { name: 'Записать на тренировку', exact: true })
++  await expect(drawer.getByRole('status')).toContainText('занято 2/3, свободно 1')
++  await expect(save).toBeEnabled()
++  const select = drawer.getByRole('combobox', { name: 'Тренер', exact: true })
++  await select.focus(); await select.press('ArrowDown')
++  await expect(page.locator('.ant-select-dropdown:visible')).toContainText('Мария Волкова (занято 2/3)')
++  await select.press('Escape')
++  await expect(drawer).toBeVisible()
++  riders = 3
++  await drawer.getByLabel('Длительность, мин', { exact: true }).fill('30')
++  await expect(drawer.getByRole('status')).toContainText('занято 3/3, свободно 0')
++  await expect(drawer.getByRole('alert').filter({ hasText: 'максимум одновременных всадников (3)' })).toBeVisible()
++  await expect(save).toBeDisabled()
++  await page.screenshot({ path: `test-results/trainer-capacity-${width}.png` })
++  riders = 2
++  await drawer.getByLabel('Длительность, мин', { exact: true }).fill('60')
++  await expect(drawer.getByRole('status')).toContainText('занято 2/3, свободно 1')
++  await save.click()
++  await expect(drawer).not.toBeVisible()
++  expect(state.calls).toBe(1)
++})
++
+ async function preferenceSetup(page: Page) {
+   await setup(page)
+   const trainers = [3, 8].map((n, i) => ({ id: `0000000${n}-1111-4111-8111-111111111111`, name: i ? 'Иван Петров' : 'Мария Волкова', isActive: true }))
+@@ -256,11 +292,11 @@ for (const width of [1440, 390]) test(`dashboard booking applies client defaults
+   await page.setViewportSize({ width, height: 900 })
+   const { drawer } = await preferenceSetup(page)
+   await choose(page, drawer, 'Клиент', 'Анна Орлова')
+-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Мария Волкова')
++  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Мария Волкова')
+   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Валдай')
+   await page.screenshot({ path: `test-results/dashboard-booking-defaults-${width}.png` })
+   await choose(page, drawer, 'Клиент', 'Ольга Соколова')
+-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
++  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
+   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
+   await choose(page, drawer, 'Клиент', 'Клиент без предпочтений')
+   for (const label of ['Тренер', 'Лошадь']) await expect(resourceSelection(drawer, label)).toHaveCount(0)
+@@ -269,10 +305,10 @@ for (const width of [1440, 390]) test(`dashboard booking applies client defaults
+   await choose(page, drawer, 'Тренер', 'Иван Петров')
+   await choose(page, drawer, 'Лошадь', 'Алмаз')
+   await choose(page, drawer, 'Клиент', 'Клиент без предпочтений')
+-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
++  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
+   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
+   await choose(page, drawer, 'Клиент', 'Анна Орлова')
+-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
++  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
+   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
+   await drawer.getByRole('combobox', { name: 'Тренер', exact: true }).focus()
+   await page.keyboard.press('ArrowDown')
+@@ -298,13 +334,13 @@ test('dashboard delayed preferences preserve manual resources', async ({ page })
+   const response = page.waitForResponse(`**/api/clients/${clients[0].id}`)
+   release()
+   await (await response).finished()
+-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
++  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
+   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
+   const horseSelect = drawer.getByRole('combobox', { name: 'Лошадь', exact: true }).locator('xpath=ancestor::div[contains(@class,"ant-select") and not(contains(@class,"ant-select-selector"))][1]')
+   await horseSelect.hover()
+   await horseSelect.locator('.ant-select-clear').click()
+   await choose(page, drawer, 'Клиент', 'Клиент без предпочтений')
+-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
++  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
+   await expect(resourceSelection(drawer, 'Лошадь')).toHaveCount(0)
+   await choose(page, drawer, 'Клиент', 'Ольга Соколова')
+   await expect(resourceSelection(drawer, 'Лошадь')).toHaveCount(0)
+@@ -319,11 +355,11 @@ test('dashboard ignores preferences from a previously selected client', async ({
+   await choose(page, drawer, 'Клиент', 'Анна Орлова')
+   await requested
+   await choose(page, drawer, 'Клиент', 'Ольга Соколова')
+-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
++  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
+   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
+   release()
+   await choose(page, drawer, 'Услуга', 'Выездка')
+-  await expect(resourceSelection(drawer, 'Тренер')).toHaveText('Иван Петров')
++  await expect(resourceSelection(drawer, 'Тренер')).toContainText('Иван Петров')
+   await expect(resourceSelection(drawer, 'Лошадь')).toHaveText('Алмаз')
+ })
+ 
+@@ -402,7 +438,7 @@ test('failed lesson save preserves the form, supports retry, and dirty close ask
+   const state = await setup(page); state.failure = true; await page.goto('/')
+   const drawer = await lesson(page)
+   await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+-  await expect(drawer.getByRole('alert')).toContainText('Тренер уже занят')
++  await expect(drawer.getByRole('alert').filter({ hasText: 'Тренер уже занят' })).toBeVisible()
+   await expect(drawer.getByRole('combobox', { name: 'Клиент', exact: true })).toHaveValue('')
+   await drawer.getByRole('button', { name: 'Закрыть', exact: true }).click()
+   const confirm = page.getByRole('dialog', { name: 'Закрыть без сохранения?' })
+diff --git a/horse-club-crm/frontend/e2e/triad-booking.spec.ts b/horse-club-crm/frontend/e2e/triad-booking.spec.ts
+index b3e775f..7e725b7 100644
+--- a/horse-club-crm/frontend/e2e/triad-booking.spec.ts
++++ b/horse-club-crm/frontend/e2e/triad-booking.spec.ts
+@@ -48,11 +48,12 @@ for (const width of [1280, 375]) test(`parallel trainer cards remain separate an
+ test('trainer overlap is informational while horse overlap disables save', async ({ page }) => {
+   let submitted = 0
+   const other = { ...booking, id: 'parallel', startTime: '2026-10-09T06:00:00Z', horseId: 'h2', clientId: 'c2', horse: { ...horse, id: 'h2', name: 'Буран' }, client: { ...client, id: 'c2', name: 'Борис', firstName: 'Борис', lastName: '' } }
+-  await page.route('**/api/bookings?*', route => route.fulfill({ json: [other], headers: { 'x-total-count': '1' } }))
+-  await page.route('**/api/bookings', route => { submitted++; return route.fulfill({ status: 201, json: booking }) })
+-  const modal = await openFilled(page)
+-  await expect(modal.getByText(/Занятие будет добавлено параллельно/)).toContainText('Борис / Буран')
+-  const save = modal.getByRole('button', { name: 'Создать бронирование', exact: true })
++  await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking, other], headers: { 'x-total-count': '2' } }))
++  await page.route('**/api/bookings/booking1', route => { submitted++; return route.fulfill({ json: booking }) })
++  const modal = await openExisting(page)
++  await expect(modal.getByText(/Параллельная запись доступна/)).toContainText('Борис / Буран')
++  await expect(modal.getByRole('status').filter({ hasText: 'Тренер:' })).toContainText('занято 1/4, свободно 3')
++  const save = modal.getByRole('button', { name: 'Сохранить бронирование', exact: true })
+   await expect(save).toBeEnabled()
+   await choose(page, modal, 'Лошадь', 'Буран')
+   await expect(modal.getByText('Лошадь Буран уже занята в это время', { exact: true })).toBeVisible()
+@@ -63,6 +64,23 @@ test('trainer overlap is informational while horse overlap disables save', async
+   await expect(modal).toHaveCount(0)
+   expect(submitted).toBe(1)
+ })
++
++test('trainer capacity blocks an extra rider and refreshes when the interval changes', async ({ page }) => {
++  await page.route('**/api/trainers?*', route => route.fulfill({ json: [{ ...trainer, maxParallelLessons: 2 }], headers: { 'x-total-count': '1' } }))
++  const others = [1, 2].map(i => ({ ...booking, id: `parallel-${i}`, trainerId: 't1', horseId: `other-horse-${i}`, clientId: `other-client-${i}`,
++    startTime: '2026-10-09T07:00:00Z', endTime: '2026-10-09T08:00:00Z' }))
++  await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking, ...others], headers: { 'x-total-count': '3' } }))
++  const modal = await openExisting(page)
++  await expect(modal.getByRole('status').filter({ hasText: 'Тренер:' })).toContainText('занято 2/2, свободно 0')
++  await expect(modal.getByRole('alert').filter({ hasText: 'У тренера достигнут максимум одновременных всадников (2)' })).toBeVisible()
++  await expect(modal.getByRole('button', { name: 'Сохранить бронирование', exact: true })).toBeDisabled()
++  const start = modal.getByLabel('Начало', { exact: true })
++  const end = modal.getByLabel('Окончание', { exact: true })
++  await end.fill('09.10.2026 12:00'); await end.press('Enter'); await end.press('Tab')
++  await start.fill('09.10.2026 11:00'); await start.press('Enter'); await start.press('Tab')
++  await expect(modal.getByRole('status').filter({ hasText: 'Тренер:' })).toContainText('занято 0/2, свободно 2')
++  await expect(modal.getByRole('button', { name: 'Сохранить бронирование', exact: true })).toBeEnabled()
++})
+ test.beforeEach(async ({ page }) => {
+   await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
+   await page.route('**/api/bookings/booking1/available-horses', route => route.fulfill({ json: [{ ...horse, id: 'h2', name: 'Буран', maxRiderWeight: 110 }] }))
+@@ -100,6 +118,12 @@ async function openFilled(page: Page) {
+   await choose(page, modal, 'Локация', 'Крытый манеж')
+   return modal
+ }
++async function openExisting(page: Page) {
++  await page.goto('/schedule')
++  await page.locator('.fc-event').filter({ hasText: 'Анна Орлова' }).first().click()
++  await page.getByRole('dialog', { name: 'Карточка бронирования', exact: true }).getByRole('button', { name: 'Редактировать бронирование', exact: true }).click()
++  return page.getByRole('dialog', { name: 'Редактирование бронирования', exact: true })
++}
+ 
+ test('family membership payment option names the owner and submits beneficiary booking', async ({ page }) => {
+   await page.route('**/api/clients/c*', route => route.fulfill({ json: { ...client, memberships: [{
+diff --git a/horse-club-crm/frontend/src/pages/catalogs/types.ts b/horse-club-crm/frontend/src/pages/catalogs/types.ts
+index 4be1bdc..f6e0fe3 100644
+--- a/horse-club-crm/frontend/src/pages/catalogs/types.ts
++++ b/horse-club-crm/frontend/src/pages/catalogs/types.ts
+@@ -49,7 +49,7 @@ export interface HorseDetails extends Horse {
+     client: { id: string; name: string; firstName: string; lastName: string } | null; stall: { id: string; name: string } | null; payments: RelationPayment[] }>;
+   bookings: Array<RelationBooking & { client: { id: string; name: string; firstName: string; lastName: string } }>;
+ }
+-export interface TrainerValues extends PublicationValues { name: string; phone?: string | null; scheduleColor?: string | null; qualification?: string; maxDailyLoad: number; baseRate?: number }
++export interface TrainerValues extends PublicationValues { name: string; phone?: string | null; scheduleColor?: string | null; qualification?: string; maxDailyLoad: number; maxParallelLessons?: number; baseRate?: number }
+ export interface Trainer extends Omit<TrainerValues, 'baseRate' | 'phone' | 'qualification'> {
+   fullName?: string; specializations?: string[]; isActive?: boolean;
+   vkUserId?: string | null;
+diff --git a/horse-club-crm/frontend/src/pages/schedule/LessonDrawer.tsx b/horse-club-crm/frontend/src/pages/schedule/LessonDrawer.tsx
+index a9ebf48..397656f 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/LessonDrawer.tsx
++++ b/horse-club-crm/frontend/src/pages/schedule/LessonDrawer.tsx
+@@ -12,6 +12,7 @@ import { API_URL, httpClient, toHttpError } from '../../httpClient'
+ import { StableEntryModal } from '../stable/shared'
+ import { useLeadLessonCatalogs } from '../dashboard/useLeadLessonCatalogs'
+ import { useTriadAvailability } from './useTriadAvailability'
++import { useScheduleConflicts } from './useScheduleConflicts'
+ import { useClientPreferences } from './useClientPreferences'
+ import { CLUB_TIME_ZONE, toInstant } from './time'
+ import type { ClientWithMemberships, MembershipSummary } from './types'
+@@ -34,6 +35,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
+   const invalidate = useInvalidate()
+   const [form] = Form.useForm<LessonValues>()
+   const [revision, retry] = useState(0)
++  const [resourceRevision, refreshResources] = useState(0)
+   const [failure, setFailure] = useState<string>()
+   const report = useCallback((cause: unknown) => setFailure(toHttpError(cause).message), [])
+   const catalogs = useLeadLessonCatalogs(true, revision, report)
+@@ -41,6 +43,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
+   const duration = Form.useWatch('durationMinutes', form) as number | undefined
+   const serviceId = Form.useWatch('serviceId', form) as string | undefined
+   const clientId = Form.useWatch('clientId', form) as string | undefined
++  const trainerId = Form.useWatch('trainerId', form) as string | undefined
+   const membershipId = Form.useWatch('membershipId', form) as string | undefined
+   const [memberships, setMemberships] = useState<MembershipSummary[]>([])
+   const [membershipsLoading, setMembershipsLoading] = useState(false)
+@@ -77,14 +80,18 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
+       to = new Date(+new Date(from) + duration * 60000).toISOString()
+     }
+   } catch { /* Invalid input is handled by the form. */ }
+-  const availability = useTriadAvailability(from, to, revision, report)
++  const availability = useTriadAvailability(from, to, revision + resourceRevision, report)
++  const conflicts = useScheduleConflicts(from, to, undefined, revision + resourceRevision)
++  const trainerLimit = catalogs.trainers.find(row => row.id === trainerId)?.maxParallelLessons ?? 4
++  const occupiedTrainerPlaces = trainerId ? conflicts.trainerOccupancy(trainerId) : undefined
++  const trainerFull = occupiedTrainerPlaces !== undefined && occupiedTrainerPlaces >= trainerLimit
+   const blockedHorse = (id: string) => {
+     const load = availability.data?.horseWorkloads.find(row => row.horseId === id)
+     const horse = catalogs.horses.find(row => row.id === id)
+     return !load || load.status !== 'AVAILABLE' || load.currentWorkloadMinutes + (duration ?? 0) > load.maxDailyWorkloadMinutes
+       || Boolean(horse?.healthStatus && horse.healthStatus !== 'HEALTHY')
+   }
+-  const unavailable = catalogs.loading || catalogs.error || availability.loading || availability.error || !availability.data || !from || (horseId && blockedHorse(horseId))
++  const unavailable = catalogs.loading || catalogs.error || availability.loading || availability.error || !availability.data || !from || (horseId && blockedHorse(horseId)) || conflicts.loading || trainerFull
+   const required = [{ required: true, message: 'Заполните поле' }]
+   return <StableEntryModal variant="drawer" title="Записать на тренировку" form={form} submitLabel="Записать на тренировку" submitDisabled={Boolean(unavailable)}
+     initialValues={{ startTime: dayjs(initialDateTime ? DateTime.fromISO(initialDateTime, { zone: CLUB_TIME_ZONE }).setZone(CLUB_TIME_ZONE).toFormat("yyyy-MM-dd'T'HH:mm") : DateTime.now().setZone(CLUB_TIME_ZONE).startOf('hour').plus({ hours: 1 }).toFormat("yyyy-MM-dd'T'HH:mm")), trainerId: initialTrainerId, arenaId: initialArenaId, horseId: initialHorseId, durationMinutes: initialDurationMinutes }}
+@@ -100,7 +107,12 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
+       if (unavailable) throw new Error('Проверьте доступность лошади и загрузку справочников')
+       if ([values.clientId, values.serviceId, values.trainerId, values.horseId, values.arenaId, values.membershipId].filter(Boolean).some(id => !isUuid(id!))) throw new Error('Выберите корректные записи из справочников')
+       if (values.membershipId) { delete values.cost; delete values.prepaymentAmount; delete values.prepaymentMethod }
+-      await httpClient.post(`${API_URL}/lessons`, { ...values, startTime: toInstant(values.startTime.format('YYYY-MM-DDTHH:mm')) })
++      try {
++        await httpClient.post(`${API_URL}/lessons`, { ...values, startTime: toInstant(values.startTime.format('YYYY-MM-DDTHH:mm')) })
++      } catch (cause) {
++        if (toHttpError(cause).statusCode === 409) refreshResources(n => n + 1)
++        throw cause
++      }
+     }}>
+     <Typography.Paragraph type="secondary">Время Москвы. Проверяем здоровье, дневную нагрузку и занятость ресурсов.</Typography.Paragraph>
+     {(failure || catalogs.error || availability.error) && <Alert type="error" showIcon message={failure || catalogs.error || availability.error || 'Не удалось загрузить клиентов'}
+@@ -113,11 +125,15 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
+       options={catalogs.services.map(row => ({ value: row.id, label: row.title || row.name }))}
+       onChange={id => form.setFieldsValue({ participantsCount: 1, pricePerPerson: isPerPersonService(catalogs.services.find(row => row.id === id)) ? Number(catalogs.services.find(row => row.id === id)?.price ?? 0) : undefined, durationMinutes: catalogs.services.find(row => row.id === id)?.durationMinutes ?? 60, cost: Number(catalogs.services.find(row => row.id === id)?.price ?? 0), prepaymentAmount: 0, prepaymentMethod: undefined })} /></Form.Item>
+     <Form.Item name="durationMinutes" label="Длительность, мин" rules={[...required, { type: 'number', min: 1, max: 480 }]}><InputNumber min={1} max={480} precision={0} /></Form.Item>
+-    <Form.Item name="trainerId" label="Тренер" rules={required}><Select onChange={preferences.trainerChanged} onInputKeyDown={stopPopupEscape} aria-label="Тренер" loading={catalogs.loading} showSearch optionFilterProp="label"
+-      options={catalogs.trainers.map(row => ({ value: row.id, label: row.fullName || row.name }))} /></Form.Item>
++    <Form.Item name="trainerId" label="Тренер" rules={required}><Select onChange={preferences.trainerChanged} onInputKeyDown={stopPopupEscape} aria-label="Тренер" loading={catalogs.loading || conflicts.loading} showSearch optionFilterProp="label"
++      options={catalogs.trainers.map(row => ({ value: row.id, label: `${row.fullName || row.name} (занято ${conflicts.trainerOccupancy(row.id) ?? '…'}/${row.maxParallelLessons ?? 4})` }))} /></Form.Item>
++    {occupiedTrainerPlaces !== undefined && <Typography.Paragraph role="status">Тренер: занято {occupiedTrainerPlaces}/{trainerLimit}, свободно {Math.max(0, trainerLimit - occupiedTrainerPlaces)} мест на выбранный интервал.</Typography.Paragraph>}
++    {trainerFull && <Alert type="error" showIcon message={`У тренера достигнут максимум одновременных всадников (${trainerLimit})`} />}
++    {conflicts.error && <Alert type="warning" showIcon message="Не удалось проверить свободные места тренера" description="При сохранении сервер повторно проверит вместимость."
++      action={<Button onClick={() => retry(n => n + 1)}>Повторить</Button>} />}
+     <Form.Item name="horseId" label="Лошадь" extra={perPerson ? 'Для экскурсий выбор лошади необязателен' : 'Можно назначить лошадь позже в карточке занятия'}><Select allowClear placeholder="Назначить позже / Не выбрана" onChange={preferences.horseChanged} onInputKeyDown={stopPopupEscape} aria-label="Лошадь" loading={catalogs.loading || availability.loading} showSearch optionFilterProp="label"
+       options={[{ value: '', label: 'Назначить позже / Не выбрана' }, ...catalogs.horses.map(row => ({ value: row.id, label: row.name, disabled: !from || availability.loading || blockedHorse(row.id) }))]} /></Form.Item>
+-    {horseId && blockedHorse(horseId) && <Alert type="warning" showIcon message="Лошадь недоступна или превышен дневной лимит. Выберите другую лошадь или время." />}
++    {horseId && !availability.loading && blockedHorse(horseId) && <Alert type="warning" showIcon message="Лошадь недоступна или превышен дневной лимит. Выберите другую лошадь или время." />}
+     <Form.Item name="arenaId" label="Манеж / локация"><Select onInputKeyDown={stopPopupEscape} allowClear showSearch optionFilterProp="label" loading={catalogs.loading}
+       options={catalogs.arenas.map(row => ({ value: row.id, label: row.name }))} /></Form.Item>
+     {allowMembership && <Form.Item name="membershipId" label="Абонемент" extra="Оставьте пустым для разового занятия.">
+diff --git a/horse-club-crm/frontend/src/pages/schedule/ResourceSchedule.tsx b/horse-club-crm/frontend/src/pages/schedule/ResourceSchedule.tsx
+index 81b5fcc..4b079ae 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/ResourceSchedule.tsx
++++ b/horse-club-crm/frontend/src/pages/schedule/ResourceSchedule.tsx
+@@ -34,6 +34,7 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers,
+           const placed = parallelLayout(rows)
+           const workload = workloads.find(w => w.horseId === resource.id)
+           const arena = arenas.find(a => a.id === resource.id)
++          const trainer = trainers.find(t => t.id === resource.id)
+           const rests = grouping === 'horses' ? entries.filter(e => e.active && e.horses.some(h => h.id === resource.id)).flatMap(e => {
+             const rest = e.horses.find(h => h.id === resource.id)!.restMinutes
+             const from = +new Date(e.endTime), to = from + rest * 60000
+@@ -43,6 +44,7 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers,
+           const parallelWidth = Math.max(0, ...placed.map(row => row.lanes)) * minCardWidth
+           return <section key={resource.id} className={`resource-column resource-column--${grouping}`} style={parallelWidth > 260 ? { minWidth: parallelWidth } : undefined} aria-label={resource.name}>
+             <header className="resource-header"><strong>{resource.name}</strong>
++              {grouping === 'trainers' && <span className="resource-data">Пик за день: {peakOccupancy(rows, start, end)} / {trainer?.maxParallelLessons ?? 4} всадников</span>}
+               {grouping === 'horses' && resource.id !== 'unassigned' && (workload ? <><span className="resource-data">{Number(workload.currentWorkloadMinutes.toFixed(1))} / {workload.maxDailyWorkloadMinutes} мин</span><Progress size="small" percent={Math.min(100, workload.currentWorkloadMinutes / workload.maxDailyWorkloadMinutes * 100)} showInfo={false} strokeColor="var(--crm-saddle)" /></> : <span>Нагрузка недоступна</span>)}
+               {grouping === 'arenas' && <span className="resource-data">Пик за день: {occupancy?.find(a => a.arenaId === resource.id)?.occupied ?? peakOccupancy(rows, start, end)} / {arena?.maxRidersCapacity ?? arena?.capacity ?? '—'} всадников</span>}
+             </header>
+diff --git a/horse-club-crm/frontend/src/pages/schedule/ScheduleConflictNotice.tsx b/horse-club-crm/frontend/src/pages/schedule/ScheduleConflictNotice.tsx
+index ff9b440..d008ca4 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/ScheduleConflictNotice.tsx
++++ b/horse-club-crm/frontend/src/pages/schedule/ScheduleConflictNotice.tsx
+@@ -5,7 +5,7 @@ export function ScheduleConflictNotice({ entries, trainerId, horseIds, error }:
+   const conflicts = scheduleConflicts(entries, trainerId, horseIds)
+   return <div className="triad-feedback" aria-live="polite">
+     {error && <Alert type="warning" showIcon message="Не удалось проверить пересечения занятий" description="При сохранении сервер повторно проверит занятость лошади и клиента." />}
+-    {conflicts.trainers.length > 0 && <Alert type="info" showIcon message={`У тренера уже запланировано занятие в это время: ${conflicts.trainers.map(e => `${e.riders.join(', ')} / ${e.horses.map(h => h.name).join(', ') || 'без лошади'}`).join('; ')}. Занятие будет добавлено параллельно`} />}
++    {conflicts.trainers.length > 0 && <Alert type="info" showIcon message={`У тренера уже запланировано занятие в это время: ${conflicts.trainers.map(e => `${e.riders.join(', ')} / ${e.horses.map(h => h.name).join(', ') || 'без лошади'}`).join('; ')}. Параллельная запись доступна в пределах вместимости тренера`} />}
+     {conflicts.horses.map(h => <Alert key={h.id} type="error" showIcon message={`Лошадь ${h.name} уже занята в это время`} />)}
+   </div>
+ }
+diff --git a/horse-club-crm/frontend/src/pages/schedule/TriadBookingModal.tsx b/horse-club-crm/frontend/src/pages/schedule/TriadBookingModal.tsx
+index 6f02ffb..f74a09b 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/TriadBookingModal.tsx
++++ b/horse-club-crm/frontend/src/pages/schedule/TriadBookingModal.tsx
+@@ -64,7 +64,12 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
+   }, [clientId, clientRevision, report])
+   let from: string | undefined, to: string | undefined
+   try { if (startTime && endTime) { from = toInstant(startTime); to = toInstant(endTime); if (from >= to) { from = undefined; to = undefined } } } catch { /* Inline date validation owns malformed intervals. */ }
+-  const conflicts = useScheduleConflicts(from, to, booking?.id)
++  const conflicts = useScheduleConflicts(from, to, booking?.id, revision)
++  const { trainerOccupancy } = conflicts
++  const selectedTrainer = trainers.find(t => t.id === trainerId)
++  const trainerLimit = selectedTrainer?.maxParallelLessons ?? 4
++  const occupiedTrainerPlaces = trainerId ? trainerOccupancy(trainerId) : undefined
++  const trainerFull = occupiedTrainerPlaces !== undefined && occupiedTrainerPlaces >= trainerLimit
+   const horseBusy = scheduleConflicts(conflicts.entries, trainerId, horseId ? [horseId] : []).horses.length > 0
+   const availability = useTriadAvailability(from, to, revision, report, booking?.id)
+   const client = loadedClient?.id === clientId ? loadedClient : clients.find(c => c.id === clientId)
+@@ -82,7 +87,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
+     modal.confirm({ title: 'Закрыть бронирование без сохранения?', content: 'Введённые изменения будут потеряны.', okText: 'Закрыть без сохранения', cancelText: 'Продолжить заполнение', onOk: onClose })
+   }
+   async function save(values: TriadValues) {
+-    if (lock.current || overweight || horseBusy || conflicts.loading) return
++    if (lock.current || overweight || horseBusy || trainerFull || conflicts.loading) return
+     lock.current = true; setBusy(true); setFailure(undefined)
+     try {
+       const payload = { ...values, membershipId: values.membershipId || undefined, startTime: toInstant(values.startTime), endTime: toInstant(values.endTime) }
+@@ -140,7 +145,9 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
+       {workload && <Typography.Paragraph className="triad-load" role="status">Нагрузка за {availability.data?.date?.split('-').reverse().join('.')}: {formatMinutes(workload.currentWorkloadMinutes)} / {workload.maxDailyWorkloadMinutes} мин</Typography.Paragraph>}
+       <ScheduleConflictNotice entries={conflicts.entries} trainerId={trainerId} horseIds={horseId ? [horseId] : []} error={conflicts.error} />
+       <Form.Item name="trainerId" label="Тренер" rules={[required]}><Select onInputKeyDown={stopPopupEscape} onChange={preferences.trainerChanged} id="triad_trainerId" aria-label="Тренер" showSearch allowClear optionFilterProp="label" placeholder="Выберите тренера"
+-        options={trainers.filter(t => t.isActive !== false).map(t => ({ value: t.id, label: `${t.fullName || t.name}${t.specializations?.length ? ` · ${t.specializations.join(', ')}` : t.qualification ? ` · ${t.qualification}` : ''}` }))} /></Form.Item>
++        loading={conflicts.loading} options={trainers.filter(t => t.isActive !== false).map(t => ({ value: t.id, label: `${t.fullName || t.name} (занято ${trainerOccupancy(t.id) ?? '…'}/${t.maxParallelLessons ?? 4})${t.specializations?.length ? ` · ${t.specializations.join(', ')}` : t.qualification ? ` · ${t.qualification}` : ''}` }))} /></Form.Item>
++      {occupiedTrainerPlaces !== undefined && <Typography.Paragraph role="status">Тренер: занято {occupiedTrainerPlaces}/{trainerLimit}, свободно {Math.max(0, trainerLimit - occupiedTrainerPlaces)} мест на выбранный интервал.</Typography.Paragraph>}
++      {trainerFull && <Alert className="triad-feedback" type="error" showIcon message={`У тренера достигнут максимум одновременных всадников (${trainerLimit})`} />}
+       <Form.Item name="arenaId" label="Локация" rules={[required]}><Select onInputKeyDown={stopPopupEscape} id="triad_arenaId" aria-label="Локация" showSearch allowClear optionFilterProp="label" placeholder="Манеж, плац или маршрут" loading={availability.loading}
+         options={arenas.filter(a => a.isActive !== false && !a.isUnavailable).map(a => {
+           const row = availability.data?.arenaOccupancy.find(o => o.arenaId === a.id)
+@@ -157,7 +164,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
+         <Select onInputKeyDown={stopPopupEscape} id="triad_membershipId" aria-label="Абонемент / депозит" allowClear showSearch optionFilterProp="label" disabled={!clientId || busy} loading={membershipState.loading} placeholder="Без абонемента"
+           options={suitableMemberships.map(m => ({ value: m.id, label: `${m.isShared ? `Семейный (${m.ownerName})` : m.title || m.pricingPlan?.name || 'Абонемент'} · ${membershipBalance(m).label}` }))} />
+       </Form.Item>
+-      <Space wrap className="triad-actions"><Button type="primary" htmlType="submit" loading={busy} aria-busy={busy} disabled={overweight || horseBusy || conflicts.loading || availability.loading || Boolean(availability.error)}>{booking ? 'Сохранить бронирование' : 'Создать бронирование'}</Button>
++      <Space wrap className="triad-actions"><Button type="primary" htmlType="submit" loading={busy} aria-busy={busy} disabled={overweight || horseBusy || trainerFull || conflicts.loading || availability.loading || Boolean(availability.error)}>{booking ? 'Сохранить бронирование' : 'Создать бронирование'}</Button>
+         <Button disabled={busy} onClick={close}>Отмена</Button></Space>
+     </Form>
+   </Modal>
+diff --git a/horse-club-crm/frontend/src/pages/schedule/parallelLayout.test.ts b/horse-club-crm/frontend/src/pages/schedule/parallelLayout.test.ts
+index 0641596..da697ec 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/parallelLayout.test.ts
++++ b/horse-club-crm/frontend/src/pages/schedule/parallelLayout.test.ts
+@@ -4,8 +4,8 @@ import type { ScheduleEntry } from './triad'
+ 
+ const entry = (id: string, start: number, end: number) => ({ id, startTime: new Date(start * 60000).toISOString(), endTime: new Date(end * 60000).toISOString() }) as ScheduleEntry
+ describe('parallel lesson lanes', () => {
+-  it('divides two and three simultaneous independent cards evenly', () => {
+-    for (const count of [2, 3]) {
++  it('divides up to four simultaneous independent cards evenly', () => {
++    for (const count of [2, 3, 4]) {
+       const rows = parallelLayout(Array.from({ length: count }, (_, i) => entry(String(i), 0, 60)))
+       expect(rows.map(r => r.lane)).toEqual(Array.from({ length: count }, (_, i) => i))
+       expect(rows.every(r => r.lanes === count)).toBe(true)
+diff --git a/horse-club-crm/frontend/src/pages/schedule/triad.test.ts b/horse-club-crm/frontend/src/pages/schedule/triad.test.ts
+index 53c1d5c..eaef3cc 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/triad.test.ts
++++ b/horse-club-crm/frontend/src/pages/schedule/triad.test.ts
+@@ -26,6 +26,10 @@ describe('triad schedule data', () => {
+     const deposit = membershipBalance({ id: 'deposit', type: 'deposit', totalLessons: 0, remainedLessons: 0, validUntil: '2020-01-01', validTo: '2099-01-01', remainingUnits: '1234.56', initialUnits: '2000' })
+     expect(deposit.remaining).toBe(1234.56); expect(deposit.active).toBe(true); expect(deposit.label).toContain('₽')
+   })
++  it('retains the configured trainer limit in the inline error', () => {
++    expect(bookingFailure(Object.assign(new Error('Conflict'), { statusCode: 409, code: 'TRAINER_BUSY', details: { maxParallelLessons: 3 } })))
++      .toEqual({ field: 'trainerId', message: 'У тренера достигнут максимум одновременных всадников (3)' })
++  })
+   it('counts peak simultaneous riders rather than every intersecting booking', () => {
+     const row = { active: true, riders: ['A'], startTime: '2026-10-09T07:00Z', endTime: '2026-10-09T07:30Z' } as ScheduleEntry
+     const next = { ...row, startTime: '2026-10-09T07:30Z', endTime: '2026-10-09T08:00Z' }
+diff --git a/horse-club-crm/frontend/src/pages/schedule/triad.ts b/horse-club-crm/frontend/src/pages/schedule/triad.ts
+index a257a2c..c3d63b6 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/triad.ts
++++ b/horse-club-crm/frontend/src/pages/schedule/triad.ts
+@@ -86,7 +86,7 @@ const reasons: Record<string, { field?: keyof TriadValues; message: string }> =
+   HORSE_OVERLOADED: { field: 'horseId', message: 'Превышен суточный лимит нагрузки лошади. Выберите другую лошадь или дату.' },
+   HORSE_REST_VIOLATION: { field: 'horseId', message: 'Лошади нужен отдых между тренировками. Измените время или выберите другую лошадь.' },
+   RIDER_WEIGHT_EXCEEDED: { field: 'horseId', message: 'Вес всадника превышает допустимый лимит для выбранной лошади.' },
+-  TRAINER_BUSY: { field: 'trainerId', message: 'Тренер занят в выбранное время. Выберите другого тренера или интервал.' },
++  TRAINER_BUSY: { field: 'trainerId', message: 'У тренера достигнут максимум одновременных всадников. Выберите другого тренера или интервал.' },
+   ARENA_FULL: { field: 'arenaId', message: 'Вместимость локации исчерпана. Выберите другую локацию или время.' },
+   HORSE_UNAVAILABLE: { field: 'horseId', message: 'Лошадь недоступна для тренировок.' },
+   TRAINER_UNAVAILABLE: { field: 'trainerId', message: 'Тренер недоступен для тренировок.' },
+@@ -95,5 +95,10 @@ const reasons: Record<string, { field?: keyof TriadValues; message: string }> =
+   BOOKING_NOT_EDITABLE: { message: 'Запись уже изменена. Обновите расписание перед редактированием.' },
+   BOOKING_CONTENTION: { message: 'Ресурсы изменились одновременно. Проверьте доступность и повторите сохранение.' },
+ }
+-export function bookingFailure(error: ApiError) { return reasons[error.code ?? ''] ?? { message: error.message } }
++export function bookingFailure(error: ApiError) {
++  if (error.code === 'TRAINER_BUSY' && typeof error.details?.maxParallelLessons === 'number') {
++    return { field: 'trainerId' as const, message: `У тренера достигнут максимум одновременных всадников (${error.details.maxParallelLessons})` }
++  }
++  return reasons[error.code ?? ''] ?? { message: error.message }
++}
+ export const isPenaltyCancellation = (start: string, now: number) => +new Date(start) - now < 12 * 3600000
+diff --git a/horse-club-crm/frontend/src/pages/schedule/useScheduleConflicts.ts b/horse-club-crm/frontend/src/pages/schedule/useScheduleConflicts.ts
+index 99c41ab..44300a4 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/useScheduleConflicts.ts
++++ b/horse-club-crm/frontend/src/pages/schedule/useScheduleConflicts.ts
+@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
+ import { API_URL, httpClient, toHttpError } from '../../httpClient'
+ import { catalog } from '../catalogs/loadCatalog'
+ import type { Lesson } from './types'
+-import { scheduleEntries, type ScheduleEntry, type TriadBooking } from './triad'
++import { peakOccupancy, scheduleEntries, type ScheduleEntry, type TriadBooking } from './triad'
+ 
+ // Fetch the interval independently of calendar filters and the visible date range.
+-export function useScheduleConflicts(from?: string, to?: string, excludeId?: string) {
+-  const key = `${from}|${to}|${excludeId}`
++export function useScheduleConflicts(from?: string, to?: string, excludeId?: string, revision = 0) {
++  const key = `${from}|${to}|${excludeId}|${revision}`
+   const enabled = Boolean(from && to && from < to)
+   const [state, setState] = useState<{ key: string; entries: ScheduleEntry[]; error?: string }>({ key: '', entries: [] })
+   useEffect(() => {
+@@ -24,5 +24,7 @@ export function useScheduleConflicts(from?: string, to?: string, excludeId?: str
+     }, 200)
+     return () => { window.clearTimeout(timer); controller.abort() }
+   }, [enabled, excludeId, from, key, to])
+-  return enabled && state.key === key ? { ...state, loading: false } : { entries: [], loading: enabled, error: undefined }
++  const result = enabled && state.key === key ? { ...state, loading: false } : { entries: [], loading: enabled, error: undefined }
++  return { ...result, trainerOccupancy: (trainerId: string) => enabled && !result.loading && !result.error
++    ? peakOccupancy(result.entries.filter(e => e.trainerId === trainerId), +new Date(from!), +new Date(to!)) : undefined }
+ }
+diff --git a/horse-club-crm/frontend/src/pages/trainers/form.tsx b/horse-club-crm/frontend/src/pages/trainers/form.tsx
+index 5847caf..7c9a275 100644
+--- a/horse-club-crm/frontend/src/pages/trainers/form.tsx
++++ b/horse-club-crm/frontend/src/pages/trainers/form.tsx
+@@ -12,13 +12,14 @@ export function TrainerForm({ action }: { action: 'create' | 'edit' }) {
+   const { canWrite } = usePermissions()
+   const editRate = canManage && canWrite('STAFF_PAYROLL')
+   return <CatalogForm<Trainer, TrainerValues> resource="trainers" action={action}
+-    title={action === 'create' ? 'Новый тренер' : 'Редактирование тренера'} defaults={{ isPublic: true, order: 0, maxDailyLoad: 480, baseRate: 0 }}
++    title={action === 'create' ? 'Новый тренер' : 'Редактирование тренера'} defaults={{ isPublic: true, order: 0, maxDailyLoad: 480, maxParallelLessons: 4, baseRate: 0 }}
+     toPayload={({ baseRate, ...values }) => ({ ...values, phone: phonePayload(values.phone), ...(editRate ? { baseRate: Number(baseRate) } : {}) })}>
+     <TextField name="name" label="ФИО" required />
+     <PhoneField />
+     <Form.Item name="scheduleColor" label="Цвет в расписании" rules={[{ pattern: /^#[0-9a-fA-F]{6}$/, message: 'Укажите цвет в формате #724C39' }]}><Input aria-label="Цвет в расписании" placeholder="#724C39" maxLength={7} /></Form.Item>
+     <TextField name="qualification" label="Роль / специализация" multiline max={1000} />
+     <NumberField name="maxDailyLoad" label="Дневная нагрузка, мин" min={1} />
++    <NumberField name="maxParallelLessons" label="Максимум одновременных всадников" min={1} max={100} />
+     {editRate && <NumberField name="baseRate" label="Базовая ставка, ₽" precision={2} max={9999999999.99} />}
+     <PublicationFields />
+   </CatalogForm>
+diff --git a/horse-club-crm/frontend/src/pages/trainers/list.tsx b/horse-club-crm/frontend/src/pages/trainers/list.tsx
+index 3760a43..5953950 100644
+--- a/horse-club-crm/frontend/src/pages/trainers/list.tsx
++++ b/horse-club-crm/frontend/src/pages/trainers/list.tsx
+@@ -30,6 +30,7 @@ export function TrainerList() {
+           { key: 'name', label: 'ФИО', children: trainer.name },
+           { key: 'phone', label: 'Телефон', children: trainer.phone || '—' },
+           { key: 'qualification', label: 'Специализация', children: trainer.qualification || '—' },
++          { key: 'maxParallelLessons', label: 'Максимум одновременных всадников', children: trainer.maxParallelLessons ?? 4 },
+           ...(canManage && canRead('STAFF_PAYROLL') ? [{ key: 'rate', label: 'Ставка', children: money(trainer.baseRate) }] : []),
+         ]} /></>}
+     </DetailsModal></>

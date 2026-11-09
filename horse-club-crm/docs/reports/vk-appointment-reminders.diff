@@ -1,0 +1,670 @@
+diff --git a/horse-club-crm/backend/package-lock.json b/horse-club-crm/backend/package-lock.json
+index 1c6bc6f..4b0c8ee 100644
+--- a/horse-club-crm/backend/package-lock.json
++++ b/horse-club-crm/backend/package-lock.json
+@@ -11,6 +11,7 @@
+         "@nestjs/jwt": "^12.0.1",
+         "@nestjs/passport": "^12.0.0",
+         "@nestjs/platform-express": "^12.0.1",
++        "@nestjs/schedule": "^12.0.3",
+         "@nestjs/swagger": "^12.0.1",
+         "@prisma/client": "6.19.3",
+         "bcrypt": "^6.0.0",
+@@ -200,6 +201,22 @@
+         "@nestjs/core": "^12.0.0"
+       }
+     },
++    "node_modules/@nestjs/schedule": {
++      "version": "12.0.3",
++      "resolved": "https://registry.npmjs.org/@nestjs/schedule/-/schedule-12.0.3.tgz",
++      "integrity": "sha512-7G0HMYKXirWFoD72zY6ieSwwwe+AruJgHDR4BJ0pg0FseA0iR2q+e1c1T0Sv10uHNXT2xiPAFFnPa0yO4lY5eQ==",
++      "license": "MIT",
++      "dependencies": {
++        "cron": "4.4.0"
++      },
++      "engines": {
++        "node": ">=20.19.0"
++      },
++      "peerDependencies": {
++        "@nestjs/common": "^11.0.0 || ^12.0.0",
++        "@nestjs/core": "^11.0.0 || ^12.0.0"
++      }
++    },
+     "node_modules/@nestjs/swagger": {
+       "version": "12.0.1",
+       "resolved": "https://registry.npmjs.org/@nestjs/swagger/-/swagger-12.0.1.tgz",
+@@ -487,7 +504,6 @@
+       "version": "3.7.5",
+       "resolved": "https://registry.npmjs.org/@types/luxon/-/luxon-3.7.5.tgz",
+       "integrity": "sha512-jJ41Q4z6ZVO260MNDdHfW7+7a5iMiX8Mr6ZJHcmgrvhZha6dz5704o/lF2kKl6URjH6ivEL97w9xS/MgpJEphg==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/@types/methods": {
+@@ -1336,6 +1352,23 @@
+         "url": "https://opencollective.com/express"
+       }
+     },
++    "node_modules/cron": {
++      "version": "4.4.0",
++      "resolved": "https://registry.npmjs.org/cron/-/cron-4.4.0.tgz",
++      "integrity": "sha512-fkdfq+b+AHI4cKdhZlppHveI/mgz2qpiYxcm+t5E5TsxX7QrLS1VE0+7GENEk9z0EeGPcpSciGv6ez24duWhwQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@types/luxon": "~3.7.0",
++        "luxon": "~3.7.0"
++      },
++      "engines": {
++        "node": ">=18.x"
++      },
++      "funding": {
++        "type": "ko-fi",
++        "url": "https://ko-fi.com/intcreator"
++      }
++    },
+     "node_modules/data-uri-to-buffer": {
+       "version": "4.0.1",
+       "resolved": "https://registry.npmjs.org/data-uri-to-buffer/-/data-uri-to-buffer-4.0.1.tgz",
+diff --git a/horse-club-crm/backend/package.json b/horse-club-crm/backend/package.json
+index 2e35039..07318ab 100644
+--- a/horse-club-crm/backend/package.json
++++ b/horse-club-crm/backend/package.json
+@@ -25,6 +25,7 @@
+     "@nestjs/jwt": "^12.0.1",
+     "@nestjs/passport": "^12.0.0",
+     "@nestjs/platform-express": "^12.0.1",
++    "@nestjs/schedule": "^12.0.3",
+     "@nestjs/swagger": "^12.0.1",
+     "@prisma/client": "6.19.3",
+     "prisma": "6.19.3",
+diff --git a/horse-club-crm/backend/src/app.module.ts b/horse-club-crm/backend/src/app.module.ts
+index babb67f..cdded7c 100644
+--- a/horse-club-crm/backend/src/app.module.ts
++++ b/horse-club-crm/backend/src/app.module.ts
+@@ -2,6 +2,7 @@ import { PublicModule } from './public/public.module';
+ import { StaffModule } from './staff/staff.module';
+ import { UploadModule } from './upload/upload.module';
+ import { Module } from '@nestjs/common';
++import { ScheduleModule } from '@nestjs/schedule';
+ import { BookingsModule } from './bookings/bookings.module';
+ import { BoardingModule } from './boarding/boarding.module';
+ import { LeadsModule } from './leads/leads.module';
+@@ -28,6 +29,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
+ 
+ @Module({
+   imports: [
++    ScheduleModule.forRoot(),
+     StaffModule,
+     UploadModule,
+     BookingsModule,
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-delivery.module.ts b/horse-club-crm/backend/src/vk-bot/vk-delivery.module.ts
+index 46e4f20..d35ab3c 100644
+--- a/horse-club-crm/backend/src/vk-bot/vk-delivery.module.ts
++++ b/horse-club-crm/backend/src/vk-bot/vk-delivery.module.ts
+@@ -5,7 +5,7 @@ import { VK } from 'vk-io';
+ import type { Prisma } from '@prisma/client';
+ import { PrismaModule } from '../prisma/prisma.module';
+ import { PrismaService } from '../prisma/prisma.service';
+-import { reminder24hKey } from './vk-reminder-key';
++import { reminderKey, reminderKind } from './vk-reminder-key';
+ 
+ // Persist alongside the business change; VK is contacted only after commit.
+ export async function queueVkNotification(tx: Prisma.TransactionClient, key: string, peerId: bigint, message: string): Promise<void> {
+@@ -54,14 +54,15 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
+   }
+   onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
+   private async discardStaleReminder(row: { id: string; key: string; peerId: bigint }): Promise<boolean> {
+-    if (!row.key.startsWith('reminder24h:')) return false;
++    const kind = reminderKind(row.key);
++    if (!kind) return false;
+     const booking = await this.prisma.booking.findUnique({
+       where: { id: row.key.split(':')[1] }, include: { lesson: true, client: true },
+     });
+     const start = booking?.lesson?.startTime || booking?.startTime;
+     if (booking && start && start > new Date() && booking.status === 'scheduled' && booking.attendanceStatus === 'PENDING'
+       && (!booking.lesson || booking.lesson.status === 'SCHEDULED') && booking.client.vkUserId === row.peerId
+-      && reminder24hKey(booking.id, start, row.peerId) === row.key) return false;
++      && reminderKey(kind, booking.id, start, row.peerId) === row.key) return false;
+     await this.prisma.vkNotification.deleteMany({ where: { id: row.id, sentAt: null } });
+     this.logger.warn({ event: 'vk_reminder_discarded', notificationId: row.id, key: row.key,
+       message: 'Напоминание снято: занятие или получатель изменились либо время занятия уже наступило' });
+@@ -71,10 +72,26 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
+     if (this.running || !this.vk) return;
+     this.running = true;
+     try {
+-      const rows = await this.prisma.vkNotification.findMany({ where: { sentAt: null, nextAttemptAt: { lte: new Date() } }, orderBy: { createdAt: 'asc' }, take: 20 });
++      const rows = await this.prisma.vkNotification.findMany({ where: {
++        sentAt: null, nextAttemptAt: { lte: new Date() },
++        OR: [
++          { NOT: { OR: [{ key: { startsWith: 'reminder24h:' } }, { key: { startsWith: 'reminder2h:' } }] } },
++          { attemptCount: 0 },
++        ],
++      }, orderBy: { createdAt: 'asc' }, take: 20 });
+       for (const row of rows) {
++        const isReminder = reminderKind(row.key) !== undefined;
+         try {
+           if (await this.discardStaleReminder(row)) continue;
++          if (isReminder) {
++            // Persist the attempt before contacting VK. Atomic claim prevents duplicate
++            // attempts across workers and restarts, including blocked private messages.
++            const claimed = await this.prisma.vkNotification.updateMany({
++              where: { id: row.id, sentAt: null, attemptCount: 0 },
++              data: { attemptCount: { increment: 1 } },
++            });
++            if (claimed.count === 0) continue;
++          }
+           await this.vk.api.messages.send({ peer_id: Number(row.peerId), message: row.message, random_id: createHash('sha256').update(row.id).digest().readInt32BE(0) || 1 });
+           await this.prisma.vkNotification.update({ where: { id: row.id }, data: { sentAt: new Date() } });
+           this.logger.log({ event: 'vk_notification_sent', notificationId: row.id, key: row.key, peerId: String(row.peerId) });
+@@ -82,9 +99,11 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
+           // Failed recipients must not occupy every slot in the next batch.
+           const delay = Math.min(3600000, 10000 * 2 ** Math.min(row.attemptCount, 9));
+           try {
+-            await this.prisma.vkNotification.update({ where: { id: row.id }, data: {
+-              attemptCount: { increment: 1 }, nextAttemptAt: new Date(Date.now() + delay),
+-            } });
++            if (!isReminder) {
++              await this.prisma.vkNotification.update({ where: { id: row.id }, data: {
++                attemptCount: { increment: 1 }, nextAttemptAt: new Date(Date.now() + delay),
++              } });
++            }
+           } catch { this.logger.warn('Не удалось обновить время повторной доставки VK'); }
+           this.logger.warn({
+             message: `Не удалось отправить VK-уведомление для userId: ${row.peerId}`,
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-reminder-key.ts b/horse-club-crm/backend/src/vk-bot/vk-reminder-key.ts
+index 0b99dd7..eec571a 100644
+--- a/horse-club-crm/backend/src/vk-bot/vk-reminder-key.ts
++++ b/horse-club-crm/backend/src/vk-bot/vk-reminder-key.ts
+@@ -1,2 +1,10 @@
++export type ReminderKind = '24h' | '2h';
++
++export const reminderKey = (kind: ReminderKind, bookingId: string, start: Date, peer: bigint) =>
++  `reminder${kind}:${bookingId}:${start.toISOString()}:${peer}`;
++
+ export const reminder24hKey = (bookingId: string, start: Date, peer: bigint) =>
+-  `reminder24h:${bookingId}:${start.toISOString()}:${peer}`;
++  reminderKey('24h', bookingId, start, peer);
++
++export const reminderKind = (key: string): ReminderKind | undefined =>
++  key.startsWith('reminder24h:') ? '24h' : key.startsWith('reminder2h:') ? '2h' : undefined;
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-reminder-message.ts b/horse-club-crm/backend/src/vk-bot/vk-reminder-message.ts
+new file mode 100644
+index 0000000..cbf3b7f
+--- /dev/null
++++ b/horse-club-crm/backend/src/vk-bot/vk-reminder-message.ts
+@@ -0,0 +1,24 @@
++import type { ReminderKind } from './vk-reminder-key';
++
++export function reminderWindow(now: Date, kind: ReminderKind): { gte: Date; lte: Date } {
++  const hour = 60 * 60 * 1000;
++  const center = +now + (kind === '24h' ? 24 : 2) * hour;
++  return { gte: new Date(center - hour / 2), lte: new Date(center + hour / 2) };
++}
++
++export function reminderMessage(kind: ReminderKind, start: Date, firstName: string, trainer: string, horse?: string | null): string {
++  const time = new Intl.DateTimeFormat('ru-RU', {
++    timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
++  }).format(start);
++  if (kind === '2h') {
++    return `Ждем вас на занятие через 2 часа (${time})!\n`
++      + 'Адрес: ул. Бастионная, 22АС2.\n'
++      + 'Телефон для связи: +7 (915) 672-00-30. До встречи!';
++  }
++  return `Здравствуйте, ${firstName}! Напоминаем о записи на тренировку завтра в ${time}.\n`
++    + `Тренер: ${trainer.trim() || 'пока не назначен'}\n`
++    + `Лошадь: ${horse?.trim() || 'пока не назначена'}\n`
++    + 'Ждем вас в КСК «СЛКС» (Тамбов, ул. Бастионная, 22АС2). '
++    + 'Пожалуйста, возьмите с собой удобную спортивную одежду. '
++    + 'Если планы изменятся — предупредите нас заранее.';
++}
+diff --git a/horse-club-crm/backend/src/vk-bot/vk-reminders.module.ts b/horse-club-crm/backend/src/vk-bot/vk-reminders.module.ts
+index 5a5ce26..cc43e4a 100644
+--- a/horse-club-crm/backend/src/vk-bot/vk-reminders.module.ts
++++ b/horse-club-crm/backend/src/vk-bot/vk-reminders.module.ts
+@@ -1,89 +1,77 @@
+-import { Injectable, Logger, Module, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
++import { Injectable, Logger, Module, type OnModuleInit } from '@nestjs/common';
++import { Cron, CronExpression } from '@nestjs/schedule';
+ import { PrismaModule } from '../prisma/prisma.module';
+ import { PrismaService } from '../prisma/prisma.service';
+ import { queueVkNotification } from './vk-delivery.module';
+-import { reminder24hKey } from './vk-reminder-key';
+-
+-export const REMINDER_INTERVAL_MS = 10 * 60 * 1000;
+-const DAY = 24 * 60 * 60 * 1000;
+-const WINDOW = 15 * 60 * 1000;
++import { reminderKey, type ReminderKind } from './vk-reminder-key';
++import { reminderMessage, reminderWindow } from './vk-reminder-message';
+ 
+ @Injectable()
+-export class VkReminders implements OnModuleInit, OnModuleDestroy {
++export class VkReminders implements OnModuleInit {
+   private readonly logger = new Logger(VkReminders.name);
+-  private timer?: NodeJS.Timeout;
+   private running = false;
+ 
+   constructor(private readonly prisma: PrismaService) {}
+ 
+   onModuleInit() {
+     void this.tick();
+-    this.timer = setInterval(() => { void this.tick(); }, REMINDER_INTERVAL_MS);
+-    this.timer.unref();
+   }
+ 
+-  onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
+-
++  @Cron(CronExpression.EVERY_10_MINUTES, { timeZone: 'Europe/Moscow', waitForCompletion: true })
+   async tick(now = new Date()): Promise<void> {
+     if (this.running) return;
+     this.running = true;
+     try {
+-      const startTime = { gte: new Date(+now + DAY - WINDOW), lte: new Date(+now + DAY + WINDOW) };
+-      // Lesson is authoritative for legacy participants; standalone bookings own their time.
+-      const bookings = await this.prisma.booking.findMany({
+-        where: {
+-          status: 'scheduled', attendanceStatus: 'PENDING',
+-          OR: [
+-            { lesson: { is: { status: 'SCHEDULED', startTime } } },
+-            { lessonId: null, startTime },
+-          ],
+-        },
+-        include: { client: true, horse: true, trainer: true, arena: true,
+-          lesson: { include: { trainer: true, arena: true } } },
+-      });
+-      const candidates = bookings.flatMap(booking => {
+-        const peer = booking.client.vkUserId;
+-        if (!peer || peer <= 0n || peer > BigInt(Number.MAX_SAFE_INTEGER)) {
+-          this.logger.warn({ event: 'vk_reminder_no_recipient', bookingId: booking.id, clientId: booking.clientId });
+-          return [];
+-        }
+-        const start = booking.lesson?.startTime || booking.startTime;
+-        // Persisted unique key is the audit flag, including pending/failed delivery.
+-        // A rescheduled training has a new key and can receive its own reminder.
+-        return [{ booking, peer, start, key: reminder24hKey(booking.id, start, peer) }];
+-      });
+-      if (!candidates.length) return;
+-      const existing = await this.prisma.vkNotification.findMany({
+-        where: { key: { in: candidates.map(row => row.key) } }, select: { key: true },
+-      });
+-      const queued = new Set(existing.map(row => row.key));
+-      const timeZone = process.env.CLUB_TIME_ZONE || 'Europe/Moscow';
+-      const date = new Intl.DateTimeFormat('ru-RU', { timeZone, day: '2-digit', month: '2-digit', year: 'numeric' });
+-      const time = new Intl.DateTimeFormat('ru-RU', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+-      for (const { booking, peer, start, key } of candidates) {
+-        if (queued.has(key)) continue;
+-        try {
+-          const firstName = booking.client.firstName.trim() || booking.client.name.trim().split(/\s+/)[0] || 'гость';
+-          const trainer = booking.lesson?.trainer || booking.trainer;
+-          const arena = booking.lesson ? booking.lesson.arena : booking.arena;
+-          const message = `Напоминание о тренировке 🐴\nЗдравствуйте, ${firstName}!\n`
+-            + `Завтра (${date.format(start)}) в ${time.format(start)} у вас запланировано занятие.\n`
+-            + `Тренер: ${trainer.name.trim() || 'пока не назначен'}\n`
+-            + `Лошадь: ${booking.horse?.name.trim() || 'пока не назначена'}\n`
+-            + `Локация: ${arena?.name.trim() || 'уточните у администратора'}\n\n`
+-            + 'Пожалуйста, приезжайте за 10–15 минут до начала. Если ваши планы изменились, предупредите клуб заранее.\n'
+-            + 'Связаться с администратором: отправьте «Позвать администратора» в этом диалоге.';
+-          // Unique upsert also protects against simultaneous ticks in multiple processes.
+-          await queueVkNotification(this.prisma, key, peer, message);
+-          this.logger.log({ event: 'vk_reminder_queued', bookingId: booking.id, key, peerId: String(peer) });
+-        } catch {
+-          this.logger.warn({ event: 'vk_reminder_queue_failed', bookingId: booking.id, peerId: String(peer) });
+-        }
+-      }
++      for (const kind of ['24h', '2h'] as const) await this.queueWindow(now, kind);
+     } catch {
+       this.logger.warn({ event: 'vk_reminders_unavailable', message: 'Не удалось проверить напоминания о тренировках' });
+     } finally { this.running = false; }
+   }
++
++  private async queueWindow(now: Date, kind: ReminderKind): Promise<void> {
++    const startTime = reminderWindow(now, kind);
++    // Lesson is authoritative for legacy participants; standalone bookings own their time.
++    const bookings = await this.prisma.booking.findMany({
++      where: {
++        status: 'scheduled', attendanceStatus: 'PENDING', client: { vkUserId: { not: null } },
++        OR: [
++          { lesson: { is: { status: 'SCHEDULED', startTime } } },
++          { lessonId: null, startTime },
++        ],
++      },
++      include: { client: true, horse: true, trainer: true,
++        lesson: { include: { trainer: true } } },
++    });
++    const candidates = bookings.flatMap(booking => {
++      const peer = booking.client.vkUserId;
++      if (!peer || peer <= 0n || peer > BigInt(Number.MAX_SAFE_INTEGER)) {
++        this.logger.warn({ event: 'vk_reminder_no_recipient', bookingId: booking.id, clientId: booking.clientId });
++        return [];
++      }
++      const start = booking.lesson?.startTime || booking.startTime;
++      // Persisted unique key is the audit flag, including pending/failed delivery.
++      // A rescheduled training has a new key and can receive its own reminder.
++      return [{ booking, peer, start, key: reminderKey(kind, booking.id, start, peer) }];
++    });
++    if (!candidates.length) return;
++    const existing = await this.prisma.vkNotification.findMany({
++      where: { key: { in: candidates.map(row => row.key) } }, select: { key: true },
++    });
++    const queued = new Set(existing.map(row => row.key));
++    for (const { booking, peer, start, key } of candidates) {
++      if (queued.has(key)) continue;
++      try {
++        const firstName = booking.client.firstName.trim() || booking.client.name.trim().split(/\s+/)[0] || 'гость';
++        const trainer = booking.lesson?.trainer || booking.trainer;
++        const message = reminderMessage(kind, start, firstName, trainer.name, booking.horse?.name);
++        // Unique upsert also protects against simultaneous ticks in multiple processes.
++        await queueVkNotification(this.prisma, key, peer, message);
++        this.logger.log({ event: 'vk_reminder_queued', bookingId: booking.id, key, peerId: String(peer) });
++      } catch {
++        this.logger.warn({ event: 'vk_reminder_queue_failed', bookingId: booking.id, peerId: String(peer) });
++      }
++    }
++  }
+ }
+ 
+ @Module({ imports: [PrismaModule], providers: [VkReminders] })
+diff --git a/horse-club-crm/backend/test/vk-reminders.test.cjs b/horse-club-crm/backend/test/vk-reminders.test.cjs
+index d991399..6733b0b 100644
+--- a/horse-club-crm/backend/test/vk-reminders.test.cjs
++++ b/horse-club-crm/backend/test/vk-reminders.test.cjs
+@@ -1,7 +1,9 @@
+ const assert = require('node:assert/strict');
+ const { test } = require('node:test');
+ require('reflect-metadata');
+-const { VkReminders, VkRemindersModule, REMINDER_INTERVAL_MS } = require('../dist/vk-bot/vk-reminders.module');
++const { VkReminders, VkRemindersModule } = require('../dist/vk-bot/vk-reminders.module');
++const { reminderMessage, reminderWindow } = require('../dist/vk-bot/vk-reminder-message');
++const { CronExpression } = require('@nestjs/schedule');
+ const { VkBotModule } = require('../dist/vk-bot/vk-bot.module');
+ const { VkNotifications } = require('../dist/vk-bot/vk-delivery.module');
+ 
+@@ -24,7 +26,7 @@ function harness(bookings = [booking()]) {
+       findMany: async query => {
+       queries.push(query);
+       const [legacy, standalone] = query.where.OR;
+-      return bookings.filter(row => row.status === query.where.status && row.attendanceStatus === query.where.attendanceStatus
++      return bookings.filter(row => row.client.vkUserId !== null && row.status === query.where.status && row.attendanceStatus === query.where.attendanceStatus
+         && (row.lesson
+           ? row.lesson.status === legacy.lesson.is.status && inRange(row.lesson.startTime, legacy.lesson.is.startTime)
+           : inRange(row.startTime, standalone.startTime)));
+@@ -45,10 +47,10 @@ function harness(bookings = [booking()]) {
+ 
+ test('24-hour window includes both boundaries and excludes cancelled, completed and attended bookings', async () => {
+   const h = harness([
+-    booking({ id: 'early', startTime: at(-15) }),
+-    booking({ id: 'late', startTime: at(15) }),
+-    booking({ id: 'too-early', startTime: new Date(+at(-15) - 1) }),
+-    booking({ id: 'too-late', startTime: new Date(+at(15) + 1) }),
++    booking({ id: 'early', startTime: at(-30) }),
++    booking({ id: 'late', startTime: at(30) }),
++    booking({ id: 'too-early', startTime: new Date(+at(-30) - 1) }),
++    booking({ id: 'too-late', startTime: new Date(+at(30) + 1) }),
+     ...['completed', 'no_show', 'cancelled_client', 'cancelled_club', 'penalty_cancellation']
+       .map(status => booking({ id: status, status })),
+     booking({ id: 'attended', attendanceStatus: 'ATTENDED' }),
+@@ -57,28 +59,28 @@ test('24-hour window includes both boundaries and excludes cancelled, completed
+   await h.service.tick(now);
+   assert.equal(h.rows.size, 2);
+   assert.deepEqual([...h.rows.keys()], [
+-    `reminder24h:early:${at(-15).toISOString()}:42`, `reminder24h:late:${at(15).toISOString()}:42`,
++    `reminder24h:early:${at(-30).toISOString()}:42`, `reminder24h:late:${at(30).toISOString()}:42`,
+   ]);
+   assert.equal(h.queries[0].where.status, 'scheduled');
+   const window = h.queries[0].where.OR[0].lesson.is.startTime;
+-  assert.equal(+window.gte - +now, (23 * 60 + 45) * 60000);
+-  assert.equal(+window.lte - +now, (24 * 60 + 15) * 60000);
++  assert.equal(+window.gte - +now, (23 * 60 + 30) * 60000);
++  assert.equal(+window.lte - +now, (24 * 60 + 30) * 60000);
+ });
+ 
+-test('group lesson uses its current time, trainer and location and sends private client reminders only', async () => {
++test('group lesson uses its current time and trainer and sends private client reminders only', async () => {
+   const lesson = { status: 'SCHEDULED', startTime: start, trainer: { name: 'Тренер группы' }, arena: { name: 'Манеж' } };
+   const h = harness([
+     booking({ lessonId: 'lesson', lesson, startTime: new Date('2020-01-01'), trainer: { name: 'Старый тренер' } }),
+     booking({ id: 'booking-2', lessonId: 'lesson', lesson,
+       client: { firstName: 'Мария', name: 'Мария', vkUserId: 43n }, horse: { name: 'Искра' } }),
+-    booking({ id: 'moved-out', lessonId: 'other', lesson: { ...lesson, startTime: at(16) } }),
++    booking({ id: 'moved-out', lessonId: 'other', lesson: { ...lesson, startTime: at(31) } }),
+   ]);
+   await h.service.tick(now);
+   assert.equal(h.rows.size, 2);
+   const [first, second] = [...h.rows.values()];
+   assert.equal(first.peerId, 42n); assert.equal(second.peerId, 43n);
+   assert.match(first.message, /Здравствуйте, Анна!/);
+-  assert.match(first.message, /Тренер: Тренер группы\nЛошадь: Гранит\nЛокация: Манеж/);
++  assert.match(first.message, /Тренер: Тренер группы\nЛошадь: Гранит/);
+   assert.doesNotMatch(first.message, /Мария|Искра|Старый тренер/);
+   assert.doesNotMatch(second.message, /Анна|Гранит/);
+ });
+@@ -92,11 +94,10 @@ test('message uses club timezone, personal first name and readable missing resou
+       trainer: { name: '' }, horse: null, arena: null })]);
+     await h.service.tick(new Date('2026-10-16T18:00:00Z'));
+     assert.equal([...h.rows.values()][0].message,
+-      'Напоминание о тренировке 🐴\nЗдравствуйте, Анна!\n'
+-      + 'Завтра (18.10.2026) в 04:00 у вас запланировано занятие.\n'
+-      + 'Тренер: пока не назначен\nЛошадь: пока не назначена\nЛокация: уточните у администратора\n\n'
+-      + 'Пожалуйста, приезжайте за 10–15 минут до начала. Если ваши планы изменились, предупредите клуб заранее.\n'
+-      + 'Связаться с администратором: отправьте «Позвать администратора» в этом диалоге.');
++      'Здравствуйте, Анна! Напоминаем о записи на тренировку завтра в 21:00.\n'
++      + 'Тренер: пока не назначен\nЛошадь: пока не назначена\n'
++      + 'Ждем вас в КСК «СЛКС» (Тамбов, ул. Бастионная, 22АС2). Пожалуйста, возьмите с собой удобную спортивную одежду. '
++      + 'Если планы изменятся — предупредите нас заранее.');
+   } finally {
+     if (original === undefined) delete process.env.CLUB_TIME_ZONE; else process.env.CLUB_TIME_ZONE = original;
+   }
+@@ -132,7 +133,7 @@ test('missing or invalid VK recipients log warnings while other clients are queu
+     booking({ id: `unlinked-${i}`, client: { firstName: 'Гость', name: '', vkUserId } }))]);
+   await assert.doesNotReject(h.service.tick(now));
+   assert.equal(h.rows.size, 1);
+-  assert.equal(h.warnings.filter(entry => entry.event === 'vk_reminder_no_recipient').length, 4);
++  assert.equal(h.warnings.filter(entry => entry.event === 'vk_reminder_no_recipient').length, 3);
+ });
+ 
+ test('one queue failure does not prevent the other client reminder and can be retried', async () => {
+@@ -164,20 +165,28 @@ test('database outage is contained and the running guard is released for the nex
+ test('overlapping checks do not start a second database scan', async () => {
+   const h = harness();
+   let finish, scans = 0;
+-  h.prisma.booking.findMany = () => { scans++; return new Promise(resolve => { finish = resolve; }); };
++  h.prisma.booking.findMany = () => {
++    scans++;
++    return scans === 1 ? new Promise(resolve => { finish = resolve; }) : Promise.resolve([]);
++  };
+   const first = h.service.tick(now);
+   await h.service.tick(now);
+   assert.equal(scans, 1);
+   finish([]); await first;
+ });
+ 
+-test('blocked VK delivery logs a warning, leaves the reminder unsent and sends the other reminder', async t => {
++test('blocked VK delivery records a single attempt, logs a warning and sends the other reminder', async t => {
+   t.mock.timers.enable({ apis: ['Date'], now: +now });
+   const h = harness([booking(), booking({ id: 'booking-2', client: { firstName: 'Мария', name: '', vkUserId: 43n } })]);
+   await h.service.tick(now);
+   const warnings = [], sent = [];
+   const delivery = new VkNotifications({ booking: h.prisma.booking, vkNotification: {
+-    findMany: async () => [...h.rows.values()],
++    findMany: async () => [...h.rows.values()].filter(row => !row.sentAt && row.attemptCount === 0),
++    updateMany: async ({ where }) => {
++      const row = h.rows.get(where.id);
++      if (row.attemptCount !== 0) return { count: 0 };
++      row.attemptCount++; return { count: 1 };
++    },
+     update: async ({ where, data }) => Object.assign(h.rows.get(where.id), data),
+   } });
+   delivery.logger.warn = entry => warnings.push(entry);
+@@ -188,21 +197,25 @@ test('blocked VK delivery logs a warning, leaves the reminder unsent and sends t
+   } } } };
+   await assert.doesNotReject(delivery.flush());
+   const [first, second] = [...h.rows.values()];
+-  assert.equal(first.sentAt, null); assert.ok(first.nextAttemptAt instanceof Date);
++  assert.equal(first.sentAt, null); assert.equal(first.attemptCount, 1);
+   assert.ok(second.sentAt instanceof Date);
+   assert.deepEqual(sent.map(row => row.peer_id), [43]);
+   assert.equal(warnings[0].errorCode, 901);
+   await h.service.tick(now);
++  await delivery.flush();
++  assert.deepEqual(sent.map(row => row.peer_id), [43]);
++  assert.equal(warnings.length, 1);
+   assert.equal(h.upserts.length, 2);
+ });
+ 
+-for (const change of ['cancelled', 'rescheduled', 'unlinked', 'started', 'deleted']) {
+-  test(`pending reminder is discarded without sending when training is ${change}`, async t => {
+-    t.mock.timers.enable({ apis: ['Date'], now: +now });
++for (const kind of ['24h', '2h']) for (const change of ['cancelled', 'rescheduled', 'unlinked', 'started', 'deleted']) {
++  test(`pending ${kind} reminder is discarded without sending when training is ${change}`, async t => {
++    const checkTime = kind === '24h' ? now : new Date(+start - 2 * 3600000);
++    t.mock.timers.enable({ apis: ['Date'], now: +checkTime });
+     const value = booking();
+     const bookings = [value];
+     const h = harness(bookings);
+-    await h.service.tick(now);
++    await h.service.tick(checkTime);
+     if (change === 'cancelled') value.status = 'cancelled_club';
+     if (change === 'rescheduled') value.startTime = at(60);
+     if (change === 'unlinked') value.client.vkUserId = null;
+@@ -223,17 +236,83 @@ for (const change of ['cancelled', 'rescheduled', 'unlinked', 'started', 'delete
+   });
+ }
+ 
+-test('reminders module is wired into the bot and schedules immediate and ten-minute checks with cleanup', t => {
++test('reminders module is wired into the bot and schedules immediate and ten-minute checks', t => {
+   assert.ok(Reflect.getMetadata('imports', VkBotModule).includes(VkRemindersModule));
+   const h = harness();
+-  let callback, delay, unref = false, cleared;
+-  const timer = { unref: () => { unref = true; } };
+-  t.mock.method(global, 'setInterval', (fn, ms) => { callback = fn; delay = ms; return timer; });
+-  t.mock.method(global, 'clearInterval', value => { cleared = value; });
+   const tick = t.mock.method(h.service, 'tick', async () => {});
+   h.service.onModuleInit();
+   assert.equal(tick.mock.callCount(), 1);
+-  assert.equal(delay, 10 * 60000); assert.equal(delay, REMINDER_INTERVAL_MS); assert.equal(unref, true);
+-  callback(); assert.equal(tick.mock.callCount(), 2);
+-  h.service.onModuleDestroy(); assert.equal(cleared, timer);
++  const options = Reflect.getMetadata('SCHEDULE_CRON_OPTIONS', VkReminders.prototype.tick);
++  assert.equal(options.cronTime, CronExpression.EVERY_10_MINUTES);
++  assert.equal(options.timeZone, 'Europe/Moscow');
++  assert.equal(options.waitForCompletion, true);
+ });
++
++for (const kind of ['24h', '2h']) {
++  test(`${kind} window includes half-hour boundaries and excludes adjacent milliseconds`, async () => {
++    const range = reminderWindow(now, kind);
++    const h = harness([
++      booking({ id: 'lower', startTime: range.gte }),
++      booking({ id: 'upper', startTime: range.lte }),
++      booking({ id: 'outside-lower', startTime: new Date(+range.gte - 1) }),
++      booking({ id: 'outside-upper', startTime: new Date(+range.lte + 1) }),
++    ]);
++    await h.service.tick(now);
++    assert.equal(h.rows.size, 2);
++    assert.ok([...h.rows.keys()].every(key => key.startsWith(`reminder${kind}:`)));
++    assert.equal(+range.lte - +range.gte, 3600000);
++    assert.equal((+range.gte + +range.lte) / 2 - +now, (kind === '24h' ? 24 : 2) * 3600000);
++  });
++}
++
++test('two-hour message uses Moscow time across UTC midnight', () => {
++  assert.equal(reminderMessage('2h', new Date('2026-11-08T21:05:00Z'), 'Анна', 'Иван'),
++    'Ждем вас на занятие через 2 часа (00:05)!\n'
++    + 'Адрес: ул. Бастионная, 22АС2.\n'
++    + 'Телефон для связи: +7 (915) 672-00-30. До встречи!');
++});
++
++test('24h and 2h reminders have independent durable keys for the same booking', async () => {
++  const h = harness();
++  await h.service.tick(now);
++  await h.service.tick(new Date(+start - 2 * 3600000));
++  await new VkReminders(h.prisma).tick(new Date(+start - 2 * 3600000));
++  assert.equal(h.rows.size, 2);
++  assert.deepEqual([...h.rows.keys()].map(key => key.split(':')[0]), ['reminder24h', 'reminder2h']);
++});
++
++for (const kind of ['24h', '2h']) {
++  test(`${kind} reminder is attempted once across concurrent workers and restart even when VK blocks it`, async t => {
++    const checkTime = kind === '24h' ? now : new Date(+start - 2 * 3600000);
++    t.mock.timers.enable({ apis: ['Date'], now: +checkTime });
++    const h = harness();
++    await h.service.tick(checkTime);
++    let sends = 0;
++    const prisma = { booking: h.prisma.booking, vkNotification: {
++      findMany: async query => {
++        assert.equal(query.where.OR[1].attemptCount, 0);
++        return [...h.rows.values()].filter(row => !row.sentAt && row.attemptCount === 0);
++      },
++      updateMany: async ({ where }) => {
++        const row = h.rows.get(where.id);
++        if (row.attemptCount !== 0) return { count: 0 };
++        row.attemptCount++; return { count: 1 };
++      },
++    } };
++    const worker = () => {
++      const delivery = new VkNotifications(prisma);
++      delivery.logger.warn = () => {};
++      delivery.vk = { api: { messages: { send: async () => {
++        sends++; throw Object.assign(new Error('Blocked'), { code: 901 });
++      } } } };
++      return delivery;
++    };
++    await Promise.all([worker().flush(), worker().flush()]);
++    await worker().flush();
++    await new VkReminders(h.prisma).tick(checkTime);
++    assert.equal(sends, 1);
++    assert.equal(h.rows.size, 1);
++    assert.equal([...h.rows.values()][0].attemptCount, 1);
++    assert.equal([...h.rows.values()][0].sentAt, null);
++  });
++}
+diff --git a/horse-club-crm/docs/reports/vk-appointment-reminders.md b/horse-club-crm/docs/reports/vk-appointment-reminders.md
+new file mode 100644
+index 0000000..b66daea
+--- /dev/null
++++ b/horse-club-crm/docs/reports/vk-appointment-reminders.md
+@@ -0,0 +1,45 @@
++# Автоматические VK-напоминания — 08.11.2026
++
++`VkReminders` проверяет записи при запуске и каждые 10 минут через
++`@Cron(CronExpression.EVERY_10_MINUTES)`. `ScheduleModule.forRoot()` подключён
++однократно в `AppModule`, таймзона планировщика и текста — `Europe/Moscow`.
++Подключение соответствует [документации NestJS](https://docs.nestjs.com/techniques/task-scheduling).
++
++Окна включают обе границы: 23,5–24,5 часа и 1,5–2,5 часа от текущего момента.
++В существующей Prisma-схеме подтверждённая запись имеет статус `scheduled`
++(статуса `CONFIRMED` нет). Выбираются только такие записи с `PENDING` и
++заполненным VK ID клиента; для групповых занятий учитываются текущее время,
++тренер и статус связанного `Lesson`.
++
++Используется существующая таблица `VkNotification`. Уникальный ключ включает
++тип напоминания, ID записи, время занятия и VK ID. Старые ключи `reminder24h`
++совместимы. Миграция и генерация Prisma Client не требуются.
++
++Отправка выполняется существующим `VkNotifications` через VK API: метода
++`VkBotService.sendMessage` в репозитории нет. Перед отправкой повторно
++проверяются отмена, перенос, начало занятия и привязка клиента.
++Атомарный `updateMany` фиксирует `attemptCount = 1` до обращения к VK:
++два обработчика не отправят одно напоминание повторно. Ошибка, включая VK 901,
++логируется через `Logger.warn`, другие получатели продолжают обрабатываться.
++Неудачные напоминания сохраняются с `sentAt = null` и не повторяются.
++Обычные уведомления сохраняют прежние повторные попытки.
++
++Это семантика одной попытки: при аварии процесса между фиксацией попытки и
++вызовом VK напоминание не будет автоматически отправлено повторно.
++Отправка реальным клиентам при проверках не выполнялась.
++
++## Проверки
++
++- Backend: `npm run lint` — без ошибок, 3 прежних предупреждения в других тестах.
++- Backend: `npm run typecheck`, `npm run build` — успешно.
++- Backend: `npm test` — 672 прошли, 20 пропущены, 0 ошибок.
++- Frontend: `npm run lint`, `npm run typecheck`, `npm run build` — успешно.
++- Frontend: `npm test` — 165 прошли (20 файлов).
++- Playwright: `npx playwright test --config=playwright.crm.config.ts --project=mock vk-settings.spec.ts vk-link.spec.ts` — 11 прошли.
++- Unit-тесты покрывают границы обоих окон, тексты, московскую полночь,
++  независимость ключей, перезапуск, параллельную отправку, закрытую личку,
++  отмену, перенос, отвязку и удаление записей для обоих типов.
++
++PowerShell блокирует `npm.ps1`, поэтому команды выполнены через `npm.cmd`.
++Первый браузерный запуск обнаружил отсутствие локального Vite-сервера;
++после запуска сервера сценарии запущены повторно.

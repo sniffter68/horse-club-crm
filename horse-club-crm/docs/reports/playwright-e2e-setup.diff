@@ -1,0 +1,273 @@
+diff --git a/.gitignore b/.gitignore
+--- a/.gitignore
++++ b/.gitignore
+@@ -16,3 +16,7 @@
+ __pycache__/
+ docs/deploy_history.log
+ .deploy/
++
++/frontend/test-results/
++/frontend/playwright-report/
++/frontend/.playwright/
+diff --git a/frontend/package.json b/frontend/package.json
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -4,12 +4,15 @@
+   "version": "0.0.0",
+   "type": "module",
+   "scripts": {
+-    "test:e2e": "playwright test --project=live",
+-    "test:e2e:mock": "playwright test --project=mock",
++    "test:e2e": "playwright test",
++    "test:e2e:ui": "playwright test --ui",
++    "test:e2e:report": "playwright show-report",
++    "test:e2e:live": "playwright test --config=playwright.crm.config.ts --project=live",
++    "test:e2e:mock": "playwright test --config=playwright.crm.config.ts --project=mock",
+     "test": "vitest run",
+     "dev": "vite",
+     "build": "tsc -b && vite build",
+-    "typecheck": "tsc -b --pretty false",
++    "typecheck": "tsc -b --pretty false && tsc -p tsconfig.playwright.json",
+     "lint": "oxlint",
+     "preview": "vite preview"
+   },
+diff --git a/frontend/playwright.config.ts b/frontend/playwright.config.ts
+--- a/frontend/playwright.config.ts
++++ b/frontend/playwright.config.ts
+@@ -1,11 +1,36 @@
+-import { defineConfig } from '@playwright/test'
++import { defineConfig, devices } from '@playwright/test'
++
+ export default defineConfig({
++  testDir: './e2e',
++  testMatch: '**/landing.spec.ts',
++  timeout: 30_000,
++  expect: { timeout: 5_000 },
++  fullyParallel: true,
++  retries: process.env.CI ? 2 : 0,
++  reporter: [['html', { open: 'never' }], ['list']],
++  use: {
++    baseURL: 'http://localhost:5173',
++    trace: 'on-first-retry',
++    screenshot: 'only-on-failure',
++    video: 'retain-on-failure',
++  },
++  webServer: [
++    {
++      command: 'npm run dev',
++      url: 'http://localhost:5173',
++      reuseExistingServer: !process.env.CI,
++      timeout: 120_000,
++    },
++    {
++      // The public landing is a separate Vite application in this repository.
++      command: 'npm --prefix ../landing run dev -- --host localhost',
++      url: 'http://localhost:5174',
++      reuseExistingServer: !process.env.CI,
++      timeout: 120_000,
++    },
++  ],
+   projects: [
+-    { name: 'live', testMatch: '**/*.live.spec.ts' },
+-    { name: 'operational-reset', testMatch: '**/operational-reset.spec.ts' },
+-    { name: 'mock', testMatch: ['**/schedule-interactions.spec.ts', '**/live-search.spec.ts', '**/table-columns.spec.ts', '**/staff-payroll-lock.spec.ts', '**/staff-lifecycle.spec.ts', '**/client-preferences.spec.ts', '**/entity-edit.spec.ts', '**/client-archive.spec.ts', '**/lead-notifications.spec.ts', '**/lesson-payments.spec.ts', '**/dashboard.spec.ts', '**/module-access.spec.ts', '**/stall-map.spec.ts', '**/s3-01.spec.ts', '**/clients-memberships.spec.ts', '**/horse-workload.spec.ts', '**/horse-replacement.spec.ts', '**/vet-log.spec.ts', '**/vet-records.spec.ts', '**/role-access.spec.ts', '**/vk-link.spec.ts', '**/vk-settings.spec.ts', '**/quick-boarding.spec.ts', '**/triad-booking.spec.ts', '**/cash-desk.spec.ts', '**/lead-conversion.spec.ts', '**/public-content.spec.ts'] },
++    { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
++    { name: 'mobile-chrome', use: { ...devices['Pixel 5'] } },
+   ],
+-  testDir: './e2e', workers: 1, timeout: 20000,
+-  reporter: [['list'], ['html', { open: 'never' }]],
+-  use: { baseURL: process.env.CRM_TEST_BASE_URL || 'http://localhost:5173', channel: 'msedge', headless: true, screenshot: 'only-on-failure' },
+ })
+diff --git a/frontend/playwright.crm.config.ts b/frontend/playwright.crm.config.ts
+--- /dev/null
++++ b/frontend/playwright.crm.config.ts
+@@ -0,0 +1,11 @@
++import { defineConfig } from '@playwright/test'
++export default defineConfig({
++  projects: [
++    { name: 'live', testMatch: '**/*.live.spec.ts' },
++    { name: 'operational-reset', testMatch: '**/operational-reset.spec.ts' },
++    { name: 'mock', testMatch: ['**/schedule-interactions.spec.ts', '**/live-search.spec.ts', '**/table-columns.spec.ts', '**/staff-payroll-lock.spec.ts', '**/staff-lifecycle.spec.ts', '**/client-preferences.spec.ts', '**/entity-edit.spec.ts', '**/client-archive.spec.ts', '**/lead-notifications.spec.ts', '**/lesson-payments.spec.ts', '**/dashboard.spec.ts', '**/module-access.spec.ts', '**/stall-map.spec.ts', '**/s3-01.spec.ts', '**/clients-memberships.spec.ts', '**/horse-workload.spec.ts', '**/horse-replacement.spec.ts', '**/vet-log.spec.ts', '**/vet-records.spec.ts', '**/role-access.spec.ts', '**/vk-link.spec.ts', '**/vk-settings.spec.ts', '**/quick-boarding.spec.ts', '**/triad-booking.spec.ts', '**/cash-desk.spec.ts', '**/lead-conversion.spec.ts', '**/public-content.spec.ts'] },
++  ],
++  testDir: './e2e', workers: 1, timeout: 20000,
++  reporter: [['list'], ['html', { open: 'never' }]],
++  use: { baseURL: process.env.CRM_TEST_BASE_URL || 'http://localhost:5173', channel: 'msedge', headless: true, screenshot: 'only-on-failure' },
++})
+diff --git a/frontend/tsconfig.playwright.json b/frontend/tsconfig.playwright.json
+--- /dev/null
++++ b/frontend/tsconfig.playwright.json
+@@ -0,0 +1,16 @@
++{
++  "compilerOptions": {
++    "target": "ES2023",
++    "lib": ["ES2023", "DOM"],
++    "module": "NodeNext",
++    "moduleResolution": "NodeNext",
++    "types": ["node"],
++    "strict": true,
++    "noEmit": true,
++    "skipLibCheck": true,
++    "noUnusedLocals": true,
++    "noUnusedParameters": true,
++    "verbatimModuleSyntax": true
++  },
++  "include": ["playwright.config.ts", "playwright.crm.config.ts", "e2e/landing.spec.ts"]
++}
+diff --git a/frontend/e2e/landing.spec.ts b/frontend/e2e/landing.spec.ts
+--- /dev/null
++++ b/frontend/e2e/landing.spec.ts
+@@ -0,0 +1,102 @@
++import { expect, test } from '@playwright/test'
++
++// CRM is served on 5173; the public landing has its own Vite server.
++test.use({ baseURL: 'http://localhost:5174' })
++
++test.beforeEach(async ({ page }) => {
++  await page.route('**/api/public/content', route => route.fulfill({
++    json: { horses: [], trainers: [], services: [] },
++  }))
++  await page.goto('/')
++})
++
++test('Загрузка и Hero', async ({ page }) => {
++  const hero = page.getByRole('region', { name: 'Ваш первый шаг к лошадям — без страха и суеты' })
++  await expect(hero.getByRole('heading', { level: 1 })).toHaveText('Ваш первый шаг к лошадям — без страха и суеты')
++  const photo = hero.getByRole('img', { name: 'Улыбающийся ребёнок гладит спокойную лошадь, тренер рядом держит повод' })
++  await expect(photo).toBeVisible()
++  await expect.poll(() => photo.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
++
++  const address = hero.getByRole('link', { name: 'Тамбов · ул. Бастионная, 22АС2' })
++  await expect(address).toHaveAttribute('href', /^https:\/\/yandex\.ru\/maps\//)
++  // Exercise the actual link without depending on the external Maps service.
++  await page.context().route('https://yandex.ru/maps/**', route => route.fulfill({ body: 'Maps' }))
++  const popupPromise = page.waitForEvent('popup')
++  await address.click()
++  const popup = await popupPromise
++  await expect(popup).toHaveURL(/^https:\/\/yandex\.ru\/maps\//)
++  await popup.close()
++  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
++})
++
++test('Карусель услуг и модалка записи', async ({ page }) => {
++  let submissions = 0
++  await page.route('**/api/leads', route => {
++    submissions += 1
++    return route.fulfill({ status: 201, json: { success: true } })
++  })
++  const services = page.getByRole('list', { name: 'Услуги клуба' })
++  await services.scrollIntoViewIfNeeded()
++  await expect(services).toBeVisible()
++  const firstCard = services.getByRole('listitem').first()
++  const serviceName = await firstCard.getByRole('heading').innerText()
++  await expect(firstCard).toBeInViewport()
++  await firstCard.getByRole('button', { name: `Записаться: ${serviceName}`, exact: true }).click()
++
++  const dialog = page.getByRole('dialog', { name: 'Быстрая запись', exact: true })
++  await expect(dialog).toBeVisible()
++  await expect(dialog.getByText(`Выбранная услуга: ${serviceName}`, { exact: true })).toBeVisible()
++  const consent = dialog.getByRole('checkbox', { name: /Я согласен на обработку персональных данных/ })
++  await expect(consent).not.toBeChecked()
++  await expect(dialog.getByLabel('Ваше имя')).toHaveValue('')
++  await expect(dialog.getByLabel(/^Телефон/)).toHaveValue('')
++  await dialog.getByRole('button', { name: 'Оставить заявку на первое занятие' }).click()
++  await expect(dialog.getByRole('alert')).toHaveText('Укажите имя')
++  await expect(dialog.getByLabel('Ваше имя')).toBeFocused()
++
++  await dialog.getByLabel('Ваше имя').fill('Анна')
++  await dialog.getByRole('button', { name: 'Оставить заявку на первое занятие' }).click()
++  await expect(dialog.getByLabel(/^Телефон/)).toBeFocused()
++  await expect(dialog.getByRole('alert')).toContainText('телефон')
++  await dialog.getByLabel(/^Телефон/).fill('89991234567')
++  await dialog.getByRole('button', { name: 'Оставить заявку на первое занятие' }).click()
++  await expect(dialog.getByRole('alert')).toHaveText('Подтвердите согласие, чтобы отправить заявку')
++  await expect(consent).toBeFocused()
++  await expect(consent).not.toBeChecked()
++  expect(submissions).toBe(0)
++})
++
++test('Кнопка «Наверх»', async ({ page }) => {
++  const scrollToTop = page.getByRole('button', { name: 'Вернуться наверх' })
++  await expect(scrollToTop).toHaveCount(0)
++  await page.evaluate(() => window.scrollTo({ top: 800, behavior: 'instant' }))
++  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(800)
++  await expect(scrollToTop).toBeVisible()
++  await scrollToTop.click()
++  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
++  await expect(scrollToTop).toHaveCount(0)
++})
++
++test('Пятиколоночный футер и социальные ссылки', async ({ page }, testInfo) => {
++  const footer = page.getByRole('contentinfo')
++  await footer.scrollIntoViewIfNeeded()
++  await expect(footer).toBeVisible()
++  await expect(footer.getByRole('link', { name: 'СЛКС Тамбов — на главную' })).toBeVisible()
++  await expect(footer.getByRole('navigation', { name: 'Навигация:' })).toBeVisible()
++  for (const name of ['Контакты:', 'Наш адрес:', 'Для клиентов:']) {
++    await expect(footer.getByRole('region', { name, exact: true })).toBeVisible()
++  }
++  // Verify rendered columns at desktop and their single-column mobile reflow.
++  const columns = await footer.evaluate(element => {
++    const grid = element.firstElementChild
++    return grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').length : 0
++  })
++  expect(columns).toBe(testInfo.project.use.isMobile ? 1 : 5)
++  const max = footer.getByRole('link', { name: 'MAX', exact: true })
++  await expect(max).toBeVisible()
++  await expect(max).toHaveAttribute('href', /^https:\/\/max\.ru\//)
++  await expect(footer.getByRole('link', { name: /Telegram|Телеграм/i })).toHaveCount(0)
++  const links = await footer.getByRole('link').evaluateAll(elements => elements.map(element => element.getAttribute('href') || ''))
++  expect(links.some(href => /(?:t\.me|telegram\.(?:me|org))/i.test(href))).toBe(false)
++  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
++})
+diff --git a/frontend/e2e/README.md b/frontend/e2e/README.md
+--- /dev/null
++++ b/frontend/e2e/README.md
+@@ -0,0 +1,48 @@
++# Playwright E2E
++
++Run from `frontend/`:
++
++```sh
++npm ci
++npm --prefix ../landing ci
++npx playwright install --with-deps chromium
++npm run test:e2e
++```
++
++The default suite runs four landing scenarios on desktop Chromium (1440 × 900)
++and mobile Chrome (Pixel 5). Playwright starts the CRM Vite server at
++`http://localhost:5173` and the separate `landing/` Vite application at
++`http://localhost:5174`. The landing spec overrides `baseURL` to use the latter.
++Local servers are reused; CI requires free ports. Backend and PostgreSQL are
++not required: public content and Maps are mocked, and invalid booking attempts
++must never submit a lead.
++
++The Hero assertion uses the current published copy:
++«Ваш первый шаг к лошадям — без страха и суеты».
++The footer must show five columns on desktop and reflow into one on mobile.
++
++```sh
++npm run test:e2e:ui
++npm run test:e2e:report
++npm run test:e2e -- --project=mobile-chrome
++npm run test:e2e -- --retries=1
++```
++
++Reports are saved in `playwright-report/`, failure screenshots and videos in
++`test-results/`. Traces are recorded on the first retry (CI retries twice;
++locally pass `--retries=1` when needed).
++
++Existing CRM suites retain their original configuration and requirements:
++
++```sh
++npm run test:e2e:mock
++npm run test:e2e:live
++npx playwright test --config=playwright.crm.config.ts --project=operational-reset
++```
++
++Start the CRM dev server separately for these legacy commands. They use Edge;
++live suites also require their existing backend/database setup. The operational
++reset suite is run explicitly because it resets operational data.
++
++`npm run typecheck` checks the new spec and both Playwright configurations with
++strict TypeScript in addition to the application.
