@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api, dateTime, money, moscowDate, requireUuid, time, upcoming, type Booking, type Service, type Slot } from './api';
-import { applyTheme, haptic, telegram } from './telegram';
+import { applyTheme, canRequestContact, haptic, telegram, withTelegram } from './telegram';
 import { useTelegramNavigation } from './useTelegramNavigation';
 
 const _h = React.createElement;
@@ -42,20 +42,24 @@ export function App() {
   const heading = useRef<HTMLHeadingElement>(null);
   const phoneInput = useRef<HTMLInputElement>(null);
   const tg = telegram();
-  const user = tg?.initDataUnsafe.user;
+  const user = tg?.initDataUnsafe?.user;
   const native = Boolean(tg?.initData);
   const validPhone = /^\+7\d{10}$/.test(phone.replace(/[\s()-]/g, ''));
   const slotServiceId = screen === 'slots' ? service?.id : undefined;
   const displayedServices = format ? services.filter(item => FORMATS.find(entry => entry.label === format)?.pattern.test(serviceTitle(item))) : services;
 
   useEffect(() => {
-    applyTheme(); tg?.ready(); tg?.expand();
-    tg?.onEvent('themeChanged', applyTheme);
-    return () => tg?.offEvent('themeChanged', applyTheme);
+    applyTheme();
+    withTelegram(app => app.ready());
+    withTelegram(app => app.expand());
+    withTelegram(app => app.onEvent('themeChanged', applyTheme));
+    return () => withTelegram(app => app.offEvent('themeChanged', applyTheme));
   }, [tg]);
 
   useEffect(() => {
-    if (screen === 'checkout') tg?.enableClosingConfirmation(); else tg?.disableClosingConfirmation();
+    withTelegram(app => {
+      if (screen === 'checkout') app.enableClosingConfirmation(); else app.disableClosingConfirmation();
+    });
     document.title = `${({ catalog: 'Выбор занятия', slots: 'Дата и время', checkout: 'Оформление записи', success: 'Запись создана', 'my-bookings': 'Мои записи' })[screen]} · КСК «СЛКС»`;
     heading.current?.focus();
   }, [screen, tg]);
@@ -95,7 +99,7 @@ export function App() {
   useTelegramNavigation(text, enabled, busy, next, back);
 
   function requestPhone(): void {
-    if (contactRequest.current || busy || !tg?.requestContact) return;
+    if (contactRequest.current || busy || typeof tg?.requestContact !== 'function') return;
     contactRequest.current = true; setContactPending(true); setContactNotice('');
     const fallback = 'Введите номер вручную.';
     try {
@@ -178,7 +182,7 @@ export function App() {
         {user?.username && <p className="hint mt-2">@{user.username}</p>}
         <label className="field mt-4">Телефон<input ref={phoneInput} type="tel" inputMode="tel" autoComplete="tel" placeholder="+79991234567"
           disabled={busy || contactPending} value={phone} onChange={event => { setPhone(event.target.value); setContactNotice(''); }} aria-describedby="phone-help" aria-invalid={phone.length > 0 && !validPhone} /></label>
-        {native && tg?.requestContact && (!tg.isVersionAtLeast || tg.isVersionAtLeast('6.9')) && <button type="button" className="quiet mt-2" disabled={busy || contactPending}
+        {native && canRequestContact(tg) && <button type="button" className="quiet mt-2" disabled={busy || contactPending}
           onClick={requestPhone}>{contactPending ? 'Ожидаем Telegram…' : '📱 Заполнить из Telegram'}</button>}
         <p className="hint" role="status">{contactNotice}</p>
         <p className="hint mt-2" id="phone-help">Для связи: +79991234567.</p>

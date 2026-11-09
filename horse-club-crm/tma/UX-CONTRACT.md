@@ -11,6 +11,7 @@
 | Form | `App.tsx` | noValidate, inline ошибки | Телефон +7 и согласие | `e2e/booking.spec.ts` |
 | Scrollbar | `styles.css` | Общий системный scrollbar | Нет | `e2e/booking.spec.ts` |
 | Toast | `App.tsx`, `MyBookings` | role=status/alert | Постоянный текст | `e2e/booking.spec.ts` |
+| Runtime error | `ErrorBoundary.tsx` | Корневой React Error Boundary | Сообщение, стек, перезагрузка | `e2e/booking.spec.ts` |
 | CRUD | `api.ts`, `MyBookings` | Клиентские маршруты | Создание, история, запрос отмены | `e2e/booking.spec.ts` |
 
 Каталог → дата/время → оформление → успех → мои записи. BackButton возвращает на предыдущий шаг, из истории/успеха — в каталог. В оформлении Telegram предупреждает перед закрытием WebView. Имя и username — из Telegram, доверенной идентичностью является только серверная проверка initData.

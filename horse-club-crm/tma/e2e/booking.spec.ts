@@ -48,6 +48,62 @@ async function checkout(page: Page) {
   await expect(page.getByLabel('Ваше имя')).toHaveValue('Елена');
 }
 
+test('render failure shows diagnostic boundary and reload recovers', async ({ page }) => {
+  await setup(page);
+  let broken = true;
+  await page.route('**/api/tma/services', route => route.fulfill({
+    json: { services: broken ? [null] : [service], consentVersion: '2026-09-19' },
+  }));
+  await page.goto('');
+  await expect(page.getByRole('heading', { name: 'Ошибка приложения' })).toBeVisible();
+  await expect(page.locator('[role="alert"] pre').first()).not.toBeEmpty();
+  await expect(page.locator('[role="alert"] pre').nth(1)).not.toBeEmpty();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/tma-error-boundary.png', fullPage: true });
+  broken = false;
+  await page.getByRole('button', { name: 'Перезагрузить' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: /Первое знакомство 30/ })).toBeVisible();
+});
+
+test('SDK without BackButton keeps rendering through navigation and cleanup', async ({ page }) => {
+  await setup(page);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => {
+    const app = window.Telegram?.WebApp;
+    if (app) delete app.BackButton;
+  });
+  await checkout(page);
+  await page.getByRole('button', { name: 'Мои записи', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Мои записи' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('throwing Telegram bridge methods do not crash rendering or event handlers', async ({ page }) => {
+  await setup(page);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => {
+    const app = window.Telegram?.WebApp;
+    if (!app) return;
+    const unsupported = () => { throw new Error('Unsupported Telegram bridge method'); };
+    app.ready = unsupported; app.expand = unsupported;
+    app.enableClosingConfirmation = unsupported; app.disableClosingConfirmation = unsupported;
+    app.onEvent = unsupported; app.offEvent = unsupported;
+    app.BackButton = { show: unsupported, hide: unsupported, onClick: unsupported, offClick: unsupported };
+    app.HapticFeedback = { impactOccurred: unsupported };
+    app.requestContact = () => {};
+    app.isVersionAtLeast = unsupported;
+  });
+  await checkout(page);
+  await expect(page.getByRole('button', { name: '📱 Заполнить из Telegram' })).toHaveCount(0);
+  await page.getByLabel('Телефон', { exact: true }).fill('+79991234567');
+  await page.getByRole('checkbox').check();
+  await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('contact request fills phone, prevents duplicates and retains manual fallback', async ({ page }) => {
   await setup(page);
   await page.addInitScript(() => {
