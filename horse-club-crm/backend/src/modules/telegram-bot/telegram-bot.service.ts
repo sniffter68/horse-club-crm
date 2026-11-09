@@ -20,8 +20,11 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     });
     this.bot = bot;
     bot.use(async (ctx, next) => {
-      if (ctx.chat?.type !== 'private' || !ctx.from) return;
-      try { await next(); }
+      try {
+        if (ctx.from) await this.links.bindUsername(String(ctx.from.id), ctx.from.username);
+        if (ctx.chat?.type !== 'private' || !ctx.from) return;
+        await next();
+      }
       catch (error: unknown) {
         if (!(error instanceof HttpException)) throw error;
         await ctx.reply(error.message);
@@ -34,22 +37,15 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       keyboard.text('Расписание на день', 'day').row().text('Расписание на неделю', 'week');
       return keyboard;
     };
-    const link = async (input: string, sender: string, username?: string) => {
-      const role = await this.links.consume(input, sender, username);
-      return role === 'client' ? 'Ваш Telegram успешно привязан к личному кабинету КСК «СЛКС»!'
-        : 'Ваш Telegram успешно привязан к профилю тренера/администратора КСК «СЛКС»! Меню управления активировано.';
-    };
     bot.command('start', async ctx => {
       const sender = String(ctx.from!.id);
-      const message = ctx.match ? await link(ctx.match.trim(), sender, ctx.from?.username)
-        : 'Добро пожаловать в КСК «СЛКС», Тамбов! 🐎\nВыберите занятие и удобное время. Ждём вас: ул. Бастионная, 22АС2.';
+      const message = 'Добро пожаловать в КСК «СЛКС», Тамбов! 🐎\nВыберите занятие и удобное время. Ждём вас: ул. Бастионная, 22АС2.';
       await ctx.reply(message, { reply_markup: await menu(sender) });
     });
-    bot.command('help', async ctx => { await ctx.reply('Для привязки отправьте код из CRM. Выберите нужный раздел:', { reply_markup: await menu(String(ctx.from!.id)) }); });
+    bot.command('help', async ctx => { await ctx.reply('Укажите ваш Telegram username или ID в CRM. Выберите нужный раздел:', { reply_markup: await menu(String(ctx.from!.id)) }); });
     bot.on('message:text', async ctx => {
       const sender = String(ctx.from!.id);
-      if (/^\d{4,6}$/.test(ctx.message.text.trim())) await ctx.reply(await link(ctx.message.text.trim(), sender, ctx.from?.username), { reply_markup: await menu(sender) });
-      else await ctx.reply('Отправьте код привязки из CRM или выберите раздел:', { reply_markup: await menu(sender) });
+      await ctx.reply('Выберите раздел:', { reply_markup: await menu(sender) });
     });
     bot.callbackQuery(['my_bookings', 'my_balance'], async ctx => {
       await ctx.answerCallbackQuery();

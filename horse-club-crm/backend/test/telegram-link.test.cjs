@@ -13,7 +13,11 @@ function fixture() {
   const users = [{ id, role: 'TRAINER', telegramUserId: null, telegramUsername: null, trainerId: id, trainer: { isActive: true }, staffProfile: { isActive: true } }];
   const grants = [];
   const options = [];
+  const matches = (row, where) => Object.entries(where).every(([key, value]) => value && typeof value === 'object' && 'not' in value ? row[key] !== value.not : row[key] === value);
   const delegate = rows => ({
+    findFirst: async ({ where }) => rows.find(row => matches(row, where)) ?? null,
+    findMany: async ({ where, take }) => rows.filter(row => matches(row, where)).slice(0, take),
+    updateMany: async ({ where, data }) => { const found = rows.filter(row => matches(row, where)); found.forEach(row => Object.assign(row, data)); return { count: found.length }; },
     findUnique: async ({ where }) => rows.find(row => Object.entries(where).every(([key, value]) => row[key] === value)) ?? null,
     update: async ({ where, data }) => Object.assign(rows.find(row => row.id === where.id), data),
   });
@@ -30,61 +34,63 @@ function fixture() {
   return { service: new TelegramLinkService(prisma), prisma, tx, clients, users, grants, options };
 }
 
-test('client grant stores only hashes, has a 15-minute TTL, Telegram-compatible link and one-use code', async () => {
-  const f = fixture(); const before = Date.now();
-  const grant = await f.service.issue('client', id, actor);
-  assert.match(grant.code, /^\d{6}$/);
-  assert.ok(grant.expiresAt.getTime() >= before + 899000 && grant.expiresAt.getTime() <= Date.now() + 900000);
-  const start = new URL(grant.deepLink).searchParams.get('start');
-  assert.ok(start.length <= 64); assert.match(start, /^link_client_/);
-  assert.equal(f.grants[0].code, undefined); assert.notEqual(f.grants[0].codeHash, grant.code);
-  assert.equal(f.grants[0].createdById, actor.id);
-  assert.equal(await f.service.consume(grant.code, '123456789012', 'anna'), 'client');
-  assert.equal(f.clients[0].telegramUserId, '123456789012'); assert.equal(f.clients[0].telegramUsername, 'anna');
-  await assert.rejects(f.service.consume(start, '999'), status(400));
-  assert.ok(f.options.every(row => row.isolationLevel === 'Serializable'));
+test('direct save normalizes usernames, links numeric IDs and clears both fields on unlink', async () => {
+  for (const kind of ['client', 'user']) {
+    const f = fixture(), row = kind === 'client' ? f.clients[0] : f.users[0];
+    for (const input of [' @Anna_User ', ' HTTPS://T.ME/Anna_User/ ', 't.me/Anna_User', 'Anna_User']) {
+      await f.service.save(kind, id, actor, input);
+      assert.equal(row.telegramUsername, 'anna_user'); assert.equal(row.telegramUserId, null);
+    }
+    await f.service.save(kind, id, actor, '123456789012');
+    assert.equal(row.telegramUsername, null); assert.equal(row.telegramUserId, '123456789012');
+    await f.service.unlink(kind, id, actor);
+    assert.equal(row.telegramUsername, null); assert.equal(row.telegramUserId, null);
+    for (const invalid of ['', ' ', '@bad/name', 'https://evil.test/name', '-42', '0', '123456789012345678901'])
+      await assert.rejects(f.service.save(kind, id, actor, invalid), status(400));
+    assert.ok(f.options.every(row => row.isolationLevel === 'Serializable'));
+  }
 });
 
-test('deep links bind users with server-owned roles; role spoofing and manager binding admin are forbidden', async () => {
+test('save rejects duplicate usernames/IDs, archived clients, inactive staff and manager changes to admins', async () => {
   const f = fixture();
-  await assert.rejects(f.service.issue('user', id, actor, 'admin'), status(400));
-  const grant = await f.service.issue('user', id, actor, 'trainer');
-  const start = new URL(grant.deepLink).searchParams.get('start');
-  await assert.rejects(f.service.consume(start.replace(id, '22222222-2222-4222-8222-222222222222'), '42'), status(400));
-  assert.equal(await f.service.consume(start, '42'), 'trainer');
-  assert.equal(f.users[0].telegramUserId, '42');
-  await f.service.unlink('user', id, actor);
-  f.users[0].role = 'ADMIN';
-  await assert.rejects(f.service.issue('user', id, { ...actor, role: 'MANAGER' }), status(403));
-  await assert.rejects(f.service.unlink('user', id, { ...actor, role: 'MANAGER' }), status(403));
-  assert.equal((await f.service.issue('user', id, actor, 'admin')).role, 'admin');
-});
-
-test('expired, superseded, archived, inactive and already-linked targets reject redemption', async () => {
-  const f = fixture();
-  const first = await f.service.issue('client', id, actor);
-  const second = await f.service.issue('client', id, actor);
-  await assert.rejects(f.service.consume(first.code, '42'), status(400));
-  f.grants[0].expiresAt = new Date(0);
-  await assert.rejects(f.service.consume(second.code, '42'), status(400));
-  const third = await f.service.issue('client', id, actor);
+  f.clients.push({ id: 'other', telegramUsername: 'anna_user', telegramUserId: '42' });
+  await assert.rejects(f.service.save('client', id, actor, '@anna_user'), status(409));
+  await assert.rejects(f.service.save('client', id, actor, '42'), status(409));
   f.clients[0].deletedAt = new Date();
-  await assert.rejects(f.service.consume(third.code, '42'), status(404));
-  f.clients[0].deletedAt = null;
-  f.clients.push({ id: 'other', telegramUserId: '42' });
-  await assert.rejects(f.service.consume(third.code, '42'), status(409));
-  assert.equal(f.clients[0].telegramUserId, null);
+  await assert.rejects(f.service.save('client', id, actor, '43'), status(404));
   f.users[0].staffProfile.isActive = false;
-  await assert.rejects(f.service.issue('user', id, actor), status(404));
+  await assert.rejects(f.service.save('user', id, actor, '43'), status(404));
+  f.users[0].staffProfile.isActive = true; f.users[0].role = 'ADMIN';
+  await assert.rejects(f.service.save('user', id, { ...actor, role: 'MANAGER' }, '43'), status(403));
+  await assert.rejects(f.service.unlink('user', id, { ...actor, role: 'MANAGER' }), status(403));
 });
 
-test('unlink clears username and invalidates pending codes; failed attempts are bounded', async () => {
-  const f = fixture(); const grant = await f.service.issue('client', id, actor);
+test('automatic binding is case insensitive, idempotent, supports both entity types and never replaces IDs', async () => {
+  const f = fixture();
+  await f.service.save('client', id, actor, '@anna_user');
+  await f.service.save('user', id, actor, '@anna_user');
+  await f.service.bindUsername('42', 'ANNA_USER');
+  assert.equal(f.clients[0].telegramUserId, '42'); assert.equal(f.users[0].telegramUserId, '42');
+  await f.service.bindUsername('42', 'anna_user');
+  await f.service.bindUsername('99', 'anna_user');
+  assert.equal(f.clients[0].telegramUserId, '42'); assert.equal(f.users[0].telegramUserId, '42');
   await f.service.unlink('client', id, actor);
-  assert.equal(f.grants.length, 0);
-  await assert.rejects(f.service.consume(grant.code, '42'), status(400));
-  for (let i = 0; i < 4; i++) await assert.rejects(f.service.consume('000000', '42'), status(400));
-  await assert.rejects(f.service.consume('000000', '42'), /Слишком много попыток/);
+  await f.service.bindUsername('42', 'anna_user');
+  assert.equal(f.clients[0].telegramUserId, null);
+});
+
+test('automatic binding skips absent usernames, duplicates, archived clients, inactive staff and IDs already owned', async () => {
+  const f = fixture();
+  f.clients[0].telegramUsername = f.users[0].telegramUsername = 'anna_user';
+  await f.service.bindUsername('42'); assert.equal(f.options.length, 0);
+  f.clients[0].deletedAt = new Date(); f.users[0].staffProfile.isActive = false;
+  await f.service.bindUsername('42', 'anna_user');
+  assert.equal(f.clients[0].telegramUserId, null); assert.equal(f.users[0].telegramUserId, null);
+  f.clients[0].deletedAt = null;
+  f.clients.push({ id: 'other', telegramUsername: 'anna_user', telegramUserId: null, deletedAt: null });
+  await f.service.bindUsername('42', 'anna_user'); assert.equal(f.clients[0].telegramUserId, null);
+  f.clients[1].telegramUserId = '42';
+  await f.service.bindUsername('42', 'anna_user'); assert.equal(f.clients[0].telegramUserId, null);
 });
 
 test('staff actions recheck active identity and module rights and pass signed scope to existing financial service', async () => {
@@ -120,22 +126,22 @@ test('HTTP endpoints enforce UUID, roles, READ_ONLY and HIDDEN independently of 
   let accessLevel = 'FULL', role = 'ADMIN', writes = 0;
   const module = await Test.createTestingModule({ controllers: [ClientTelegramLinkController, UserTelegramLinkController], providers: [RolesGuard, ModuleAccessGuard,
     { provide: ModuleAccessService, useValue: { forRole: async () => ['SCHEDULE', 'STAFF_PAYROLL'].map(module => ({ module, accessLevel, isEnabled: true })) } },
-    { provide: TelegramLinkService, useValue: { issue: async () => { writes++; return { code: '123456' }; }, unlink: async () => { writes++; return {}; }, status: async () => ({}) } },
+    { provide: TelegramLinkService, useValue: { save: async () => { writes++; return {}; }, unlink: async () => { writes++; return {}; }, status: async () => ({}) } },
   ] }).overrideGuard(JwtAuthGuard).useValue({ canActivate: ctx => { ctx.switchToHttp().getRequest().user = { ...actor, role }; return true; } }).compile();
   const app = module.createNestApplication(); app.setGlobalPrefix('api'); app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true })); await app.init();
   try {
     const http = request(app.getHttpServer());
     for (const resource of ['clients', 'users']) {
-      await http.post(`/api/${resource}/${id}/telegram-link`).send({}).expect(201);
+      await http.patch(`/api/${resource}/${id}/telegram`).send({ username: '@anna_user' }).expect(200);
       await http.delete(`/api/${resource}/${id}/telegram`).expect(200);
-      await http.post(`/api/${resource}/bad/telegram-link`).send({}).expect(400);
+      await http.patch(`/api/${resource}/bad/telegram`).send({ username: '@anna_user' }).expect(400);
       for (const level of ['READ_ONLY', 'HIDDEN']) { accessLevel = level;
-        await http.post(`/api/${resource}/${id}/telegram-link`).send({}).expect(403);
+        await http.patch(`/api/${resource}/${id}/telegram`).send({ username: '@anna_user' }).expect(403);
         await http.delete(`/api/${resource}/${id}/telegram`).expect(403);
       }
-      accessLevel = 'FULL'; role = 'TRAINER'; await http.post(`/api/${resource}/${id}/telegram-link`).send({}).expect(403); role = 'ADMIN';
+      accessLevel = 'FULL'; role = 'TRAINER'; await http.patch(`/api/${resource}/${id}/telegram`).send({ username: '@anna_user' }).expect(403); role = 'ADMIN';
     }
-    await http.post(`/api/users/${id}/telegram-link`).send({ role: 'ADMIN' }).expect(400);
+    await http.patch(`/api/users/${id}/telegram`).send({ role: 'ADMIN' }).expect(400);
     assert.equal(writes, 4);
   } finally { await app.close(); }
 });
@@ -163,7 +169,7 @@ test('financial status service rejects forged lesson ownership and revoked write
   await assert.rejects(service.updateLessonStatus(id, 'COMPLETED', {}, trainer, {}, '42'), status(403));
 });
 
-test('real bot dispatch handles private start links, short codes, role menus, personal queries and explicit status confirmation', async t => {
+test('real bot dispatch handles username binding, role menus, personal queries and explicit status confirmation', async t => {
   const { Bot } = require('grammy');
   const { TelegramBotService } = require('../dist/modules/telegram-bot/telegram-bot.service');
   const previous = process.env.TELEGRAM_BOT_TOKEN;
@@ -181,7 +187,7 @@ test('real bot dispatch handles private start links, short codes, role menus, pe
   const personal = { identity: async sender => sender === '1' ? 'client' : sender === '2' ? 'trainer' : 'admin',
     bookings: async sender => { viewed.push(sender); return 'Мои записи'; }, balance: async () => 'Остаток: 5', user: async () => ({}),
     schedule: async () => [{ id, text: 'Моё занятие', actionable: true }], status: async (...args) => changed.push(args) };
-  const service = new TelegramBotService({ consume: async (...args) => { consumed.push(args); return args[1] === '1' ? 'client' : 'trainer'; } }, personal);
+  const service = new TelegramBotService({ bindUsername: async (...args) => { consumed.push(args); } }, personal);
   const message = (sender, text, type = 'private') => bot.handleUpdate({ update_id: updateId++, message: { message_id: 1, date: 0, chat: { id: Number(sender), type },
     from: { id: Number(sender), is_bot: false, first_name: 'Test', username: 'test_user' }, text,
     ...(text.startsWith('/start') ? { entities: [{ type: 'bot_command', offset: 0, length: 6 }] } : {}) } });
@@ -190,11 +196,11 @@ test('real bot dispatch handles private start links, short codes, role menus, pe
   try {
     process.env.TELEGRAM_BOT_TOKEN = '123:test'; service.onModuleInit();
     await message('1', '/start link_client_test');
-    assert.deepEqual(consumed[0], ['link_client_test', '1', 'test_user']);
-    assert.match(sent.at(-1).text, /личному кабинету/);
+    assert.deepEqual(consumed[0], ['1', 'test_user']);
+    assert.match(sent.at(-1).text, /Добро пожаловать/);
     assert.ok(sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.web_app));
-    await message('2', '123456'); assert.equal(consumed.at(-1)[1], '2');
-    assert.match(sent.at(-1).text, /Меню управления/);
+    await message('2', '123456'); assert.equal(consumed.at(-1)[0], '2');
+    assert.match(sent.at(-1).text, /Выберите раздел/);
     assert.ok(!sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.web_app));
     await message('3', '/start'); assert.ok(sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.callback_data === 'day'));
     await callback('1', 'my_bookings'); assert.deepEqual(viewed, ['1']);
@@ -202,6 +208,6 @@ test('real bot dispatch handles private start links, short codes, role menus, pe
     await callback('2', `done:${id}`); assert.equal(changed.length, 0);
     await callback('2', `confirm_done:${id}`); assert.deepEqual(changed[0], ['2', id, 'COMPLETED', false]);
     await callback('2', `confirm_refund:${id}`); assert.deepEqual(changed[1], ['2', id, 'CANCELLED', true]);
-    const before = consumed.length; await message('1', '123456', 'group'); assert.equal(consumed.length, before);
+    const before = consumed.length; await message('1', '123456', 'group'); assert.equal(consumed.length, before + 1);
   } finally { await service.onModuleDestroy(); if (previous === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = previous; }
 });

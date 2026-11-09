@@ -1,5 +1,6 @@
 import { ForbiddenException, HttpException, Injectable, ServiceUnavailableException, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
+import { TelegramLinkService } from './telegram-link.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { validateTelegramInitData, type TelegramIdentity } from './telegram-init-data';
 
@@ -10,7 +11,7 @@ export interface TelegramRequest extends Request {
 @Injectable()
 export class TelegramAuthGuard implements CanActivate {
   private readonly buckets = new Map<string, { count: number; until: number }>();
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly links: TelegramLinkService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
@@ -31,9 +32,10 @@ export class TelegramAuthGuard implements CanActivate {
     // never manufacture an ADMIN/JWT identity or grant access to CRM endpoints.
     const settings = await this.prisma.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
     if (settings && !settings.isEnabled) throw new ForbiddenException('Онлайн-запись временно отключена');
+    await this.links.bindUsername(identity.telegramUserId, identity.username);
     const client = await this.prisma.client.upsert({
       where: { telegramUserId: identity.telegramUserId },
-      create: { telegramUserId: identity.telegramUserId, telegramUsername: identity.username,
+      create: { telegramUserId: identity.telegramUserId, telegramUsername: identity.username?.toLowerCase(),
         firstName: identity.firstName, lastName: identity.lastName,
         name: [identity.firstName, identity.lastName].filter(Boolean).join(' ') },
       update: {}, select: { id: true, deletedAt: true },

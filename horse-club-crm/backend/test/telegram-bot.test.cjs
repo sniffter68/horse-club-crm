@@ -4,6 +4,7 @@ const { createHmac } = require('node:crypto');
 require('reflect-metadata');
 const { validateTelegramInitData } = require('../dist/modules/telegram-bot/telegram-init-data');
 const { TelegramAuthGuard } = require('../dist/modules/telegram-bot/telegram-auth.guard');
+const { TelegramLinkService } = require('../dist/modules/telegram-bot/telegram-link.service');
 const { TmaBookingService } = require('../dist/modules/telegram-bot/tma-booking.service');
 const { TelegramBotService } = require('../dist/modules/telegram-bot/telegram-bot.service');
 const { DEFAULT_LEAD_CONSENT_VERSION } = require('../dist/common/lead-consent');
@@ -37,13 +38,14 @@ test('guard derives signed identity and lets archived profiles access only the b
   const previous = process.env.TELEGRAM_BOT_TOKEN; process.env.TELEGRAM_BOT_TOKEN = token;
   try {
     let archived = false, disabled = false, upserts = 0;
+    const bindings = [];
     const guard = new TelegramAuthGuard({
       clubModuleSettings: { findUnique: async () => ({ isEnabled: !disabled }) },
       client: { upsert: async input => { upserts++; assert.equal(input.where.telegramUserId, '123456789012'); return { id: clientId, deletedAt: archived ? new Date() : null }; } },
-    });
+    }, { bindUsername: async (...args) => bindings.push(args) });
     const request = { get: name => name === 'X-Telegram-Init-Data' ? sign() : undefined };
     const context = { switchToHttp: () => ({ getRequest: () => request }) };
-    assert.equal(await guard.canActivate(context), true); assert.equal(request.telegram.clientId, clientId);
+    assert.equal(await guard.canActivate(context), true); assert.equal(request.telegram.clientId, clientId); assert.deepEqual(bindings, [['123456789012', 'anna']]);
     disabled = true; await assert.rejects(guard.canActivate(context), status(403)); assert.equal(upserts, 1);
     disabled = false; archived = true; await assert.rejects(guard.canActivate(context), status(403));
     for (const [method, path] of [['GET', '/api/tma/services'], ['GET', '/api/tma/slots'], ['POST', '/api/tma/bookings']]) {
@@ -54,6 +56,36 @@ test('guard derives signed identity and lets archived profiles access only the b
     await assert.rejects(guard.canActivate(context), status(403));
     request.method = 'POST'; request.path = '/api/tma/bookings/id/cancel-request';
     await assert.rejects(guard.canActivate(context), status(403));
+  } finally { if (previous === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = previous; }
+});
+
+test('signed TMA binds the pending CRM profile before upsert and rejects forged data before linking', async () => {
+  const previous = process.env.TELEGRAM_BOT_TOKEN; process.env.TELEGRAM_BOT_TOKEN = token;
+  const client = { id: clientId, telegramUsername: 'anna', telegramUserId: null, deletedAt: null };
+  let upserts = 0, bindings = 0;
+  const prisma = {
+    clubModuleSettings: { findUnique: async () => null },
+    client: {
+      findUnique: async ({ where }) => client.telegramUserId === where.telegramUserId ? client : null,
+      findMany: async ({ where }) => client.telegramUsername === where.telegramUsername && client.telegramUserId === null ? [client] : [],
+      updateMany: async ({ where, data }) => { assert.equal(where.id, clientId); bindings++; Object.assign(client, data); return { count: 1 }; },
+      upsert: async ({ where }) => { upserts++; assert.equal(client.telegramUserId, where.telegramUserId); return client; },
+    },
+    user: { findUnique: async () => null, findMany: async () => [] },
+    $transaction: async operation => operation(prisma),
+  };
+  const guard = new TelegramAuthGuard(prisma, new TelegramLinkService(prisma));
+  let raw = sign().replace('anna', 'evil');
+  const request = { method: 'GET', path: '/api/tma/services', get: name => name === 'X-Telegram-Init-Data' ? raw : undefined };
+  const context = { switchToHttp: () => ({ getRequest: () => request }) };
+  try {
+    await assert.rejects(guard.canActivate(context), status(401));
+    assert.equal(bindings, 0); assert.equal(upserts, 0);
+    raw = sign();
+    await guard.canActivate(context);
+    assert.equal(bindings, 1); assert.equal(request.telegram.clientId, clientId);
+    await guard.canActivate(context);
+    assert.equal(bindings, 1); assert.equal(upserts, 2);
   } finally { if (previous === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = previous; }
 });
 
@@ -229,6 +261,7 @@ test('HTTP routes require signed Telegram auth, reject invalid UUIDs, staff fiel
   const service = { services: async () => ({ services: [] }), create: async (owner, dto) => ({ owner, requestId: dto.requestId }), cancelRequest: async () => ({}),
     myBookings: async (owner, query) => { assert.equal(owner, clientId); assert.equal(query.offset, 0); assert.equal(query.limit, 20); return { bookings: [], hasMore: false }; } };
   const module = await Test.createTestingModule({ controllers: [TelegramBotController], providers: [TelegramAuthGuard,
+    { provide: TelegramLinkService, useValue: { bindUsername: async () => {} } },
     { provide: TmaBookingService, useValue: service }, { provide: PrismaService, useValue: {
       clubModuleSettings: { findUnique: async () => null }, client: { upsert: async () => ({ id: clientId }) },
     } }] }).compile();
