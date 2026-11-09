@@ -62,7 +62,7 @@ export class StaffService {
         isActive: query.activity ? query.activity === 'active' : undefined,
         ...(query.duty ? { shifts: query.duty === 'on' ? { some: this.dutyWhere() } : { none: this.dutyWhere() } } : {}) };
 
-      return { data: await tx.staffProfile.findMany({ where, include: { user: { select: { vkId: true, role: true, email: true, trainerId: true, crmAccess: true } }, shifts: { where: this.dutyWhere(), select: { id: true } } }, orderBy: [{ fullName: 'asc' }, { id: 'asc' }], skip: ((query.page ?? 1) - 1) * (query.pageSize ?? 20), take: query.pageSize ?? 20 }), total: await tx.staffProfile.count({ where }) };
+      return { data: await tx.staffProfile.findMany({ where, include: { user: { select: { telegramUserId: true, telegramUsername: true, vkId: true, role: true, email: true, trainerId: true, crmAccess: true } }, shifts: { where: this.dutyWhere(), select: { id: true } } }, orderBy: [{ fullName: 'asc' }, { id: 'asc' }], skip: ((query.page ?? 1) - 1) * (query.pageSize ?? 20), take: query.pageSize ?? 20 }), total: await tx.staffProfile.count({ where }) };
     });
   }
   candidates(user: AuthUser) {

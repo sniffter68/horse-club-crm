@@ -9,6 +9,7 @@ function fixture(owner) {
   const client = { id: 'telegram-profile', telegramUserId: '123', telegramUsername: 'anna', deletedAt: null };
   const start = DateTime.now().setZone('Europe/Moscow').plus({ days: 2 }).set({ hour: 12, minute: 0, second: 0, millisecond: 0 });
   const tx = {
+    user: { findMany: async () => [] },
     client: { findUnique: async ({ where }) => {
       if (where.phone) { assert.equal(where.phone, '+79991234567'); return owner; }
       return client;

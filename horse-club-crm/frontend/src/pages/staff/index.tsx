@@ -200,7 +200,7 @@ export function StaffPage() {
         <Pagination className="staff-pagination" current={page} pageSize={10} total={total} showSizeChanger={false} showTotal={count => `${tab === 'statements' ? 'Ведомостей' : 'Сотрудников'}: ${count}`} onChange={next => update({ page: String(next) })} />
       </>}
     </Card>
-    {profileModal && <ProfileModal staff={profileModal === 'new' ? undefined : profileModal} onClose={() => setProfileModal(undefined)} onSaved={changed} />}
+    {profileModal && <ProfileModal staff={profileModal === 'new' ? undefined : profileModal} onClose={() => setProfileModal(undefined)} onSaved={changed} onTelegramChanged={() => refresh(value => value + 1)} />}
     {shiftModal && <ShiftModal variant="drawer" staff={staff} shift={shiftModal === 'new' ? undefined : shiftModal} selectedDate={month.slice(0, 7) === now.toFormat('yyyy-MM') ? now.toISODate()! : month} onClose={() => setShiftModal(undefined)} onSaved={changed} onDelete={role === 'ADMIN' ? remove : undefined} />}
     {adjustment && <AdjustmentModal row={adjustment} from={from} to={to} onClose={() => setAdjustment(undefined)} onSaved={changed} />}
     {payout && <PayoutModal row={payout} from={from} to={to} onClose={() => setPayout(undefined)} onSaved={changed} />}

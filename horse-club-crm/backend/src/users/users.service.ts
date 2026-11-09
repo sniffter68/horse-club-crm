@@ -8,8 +8,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BCRYPT_ROUNDS } from '../auth/auth.config';
 import type { CreateUserDto } from './dto/create-user.dto';
 
-export type PublicUser = { id: string; email: string; role: Role; trainerId: string | null; vkUserId: bigint | null; vkId: string | null; createdAt: Date; updatedAt: Date };
-const publicUserSelect = { id: true, email: true, role: true, trainerId: true, vkUserId: true, vkId: true, createdAt: true, updatedAt: true } satisfies Prisma.UserSelect;
+export type PublicUser = { telegramUserId?: string | null; telegramUsername?: string | null; id: string; email: string; role: Role; trainerId: string | null; vkUserId: bigint | null; vkId: string | null; createdAt: Date; updatedAt: Date };
+const publicUserSelect = { telegramUserId: true, telegramUsername: true, id: true, email: true, role: true, trainerId: true, vkUserId: true, vkId: true, createdAt: true, updatedAt: true } satisfies Prisma.UserSelect;
 
 @Injectable()
 export class UsersService {

@@ -317,3 +317,7 @@ Canonical toast owner: Ant Design App message. Runtime verification:
 ## Полный сброс финансовых и операционных данных
 
 Источник — задача владельца от 28.10.2026, `docs/operational-reset.md`. Владелец — `settings/OperationalReset`, общие Ant Design Modal/Input/Alert и App message. Только ADMIN; точное текстовое подтверждение, первоначальный фокус на отмене, блокировка повторов и закрытия во время запроса. Ошибка сохраняет ввод и ключ идемпотентности; успех инвалидирует весь кэш и переводит на дашборд. Проверки: `operational-reset.spec.ts`, backend `operational-reset.test.cjs` и `operational-reset.postgres.test.cjs`. Визуальные токены сохраняются.
+
+## Привязка Telegram
+
+Источник — задача владельца от 09.11.2026, `docs/telegram-profile-linking.md`; владелец — общий `TelegramProfileLink`. Клиент, пользователь и сотрудник используют одинаковые статусы, выдачу кода с TTL, открытие бота и подтверждение отвязки. READ_ONLY скрывает мутации. Ошибка выдачи/отвязки остаётся в текущем диалоге с возможностью повтора. Подтверждение в боте обновляет карточку; Escape и закрытие возвращают фокус к кнопке вызова. Новые визуальные токены не вводятся. Проверки: `frontend/e2e/telegram-link.spec.ts`, `backend/test/telegram-link.test.cjs`.

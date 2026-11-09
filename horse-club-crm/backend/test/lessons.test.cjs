@@ -458,7 +458,7 @@ function createStatusHarness(newStatus, operations = [], options = {}) {
   const refundCalls = [];
   const bookingUpdates = [];
   const paymentUpdates = [];
-  const tx = { cashAuditLog: { create: async () => ({}) },
+  const tx = { user: { findMany: async () => [] }, cashAuditLog: { create: async () => ({}) },
     payment: { findMany: async () => [], count: async () => options.paid ? 1 : 0, updateMany: async args => { paymentUpdates.push(args); return { count: 1 }; } },
     lesson: {
       findUnique: async () => ({

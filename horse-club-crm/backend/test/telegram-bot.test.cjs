@@ -63,6 +63,7 @@ function fixture() {
     clientCancellationRequested: false, lesson: null };
   const writes = [], options = [];
   const tx = {
+    user: { findMany: async () => [] },
     service: { findFirst: async () => ({ id: serviceId, isPublic: true, durationMinutes: 60 }) },
     clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] }) },
     trainer: { findFirst: async () => ({ id: trainerId }), findMany: async () => [{ id: trainerId, name: 'Тренер' }] },

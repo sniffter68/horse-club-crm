@@ -6,6 +6,7 @@ import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { StableEntryModal } from '../stable/shared'
 import { currency } from '../cash-desk/shared'
 import { paidPeriodFor, shiftStatuses, type PaidPeriod, type Payroll, type Shift, type ShiftStatus, type Staff } from './types'
+import { TelegramProfileLink } from '../../components/TelegramProfileLink'
 import { VkProfileField, VkProfileLink } from '../../components/VkProfileLink'
 import { PhoneField } from '../../components/PhoneField'
 import { phonePayload } from '../../components/formatPhone'
@@ -17,7 +18,7 @@ import { isUuid } from '../../uuid'
 const required = [{ required: true, message: 'Заполните поле' }]
 const moneyProps = { min: 0, max: 9999999999.99, precision: 2, style: { width: '100%' } }
 
-export function ProfileModal({ staff, onClose, onSaved }: { staff?: Staff; onClose: () => void; onSaved: () => void }) {
+export function ProfileModal({ staff, onClose, onSaved, onTelegramChanged }: { staff?: Staff; onClose: () => void; onSaved: () => void; onTelegramChanged?: () => void }) {
   const [form] = Form.useForm()
   const { data: role } = usePermissions<Role>({})
   const access = Form.useWatch('createCrmAccess', form)
@@ -51,6 +52,7 @@ export function ProfileModal({ staff, onClose, onSaved }: { staff?: Staff; onClo
       if (trainer) form.setFieldValue('fullName', trainer.fullName || trainer.name)
     }} /></Form.Item>}
     {staff && <VkProfileLink id={staff.userId} name={staff.fullName} vkId={staff.user?.vkId} kind="STAFF" readOnly />}
+    {staff && <TelegramProfileLink id={staff.userId} name={staff.fullName} kind="user" role={staff.user?.role === 'ADMIN' ? 'admin' : staff.user?.role === 'TRAINER' ? 'trainer' : 'staff'} telegramUserId={staff.user?.telegramUserId} telegramUsername={staff.user?.telegramUsername} readOnly={staff.user?.role === 'ADMIN' && role !== 'ADMIN'} onChanged={onTelegramChanged} />}
     <VkProfileField initialValue={staff?.user?.vkId} />
     <Form.Item name="fullName" label="ФИО" initialValue={staff?.fullName} rules={required}><Input aria-label="ФИО" maxLength={150} /></Form.Item>
     <Form.Item name="role" label="Роль" initialValue={staff?.user?.role ?? 'OTHER'} rules={required}><Select aria-label="Роль" options={Object.entries(staffRoles).filter(([value]) => role === 'ADMIN' || value !== 'ADMIN').map(([value, label]) => ({ value, label }))} /></Form.Item>

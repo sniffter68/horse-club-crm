@@ -6,9 +6,10 @@ import { Button, Form, Tag } from 'antd'
 import { Link } from 'react-router-dom'
 import type { Role } from '../../authStorage'
 import { ConfigurableTable } from '../../components/ConfigurableTable'
+import { TelegramProfileLink } from '../../components/TelegramProfileLink'
 import { VkAdminRecipient } from '../../components/VkProfileLink'
 
-type User = { id: string; email: string; role: Role; createdAt: string; vkId?: string | null; vkUserId?: string | null }
+type User = { telegramUserId?: string | null; telegramUsername?: string | null; id: string; email: string; role: Role; createdAt: string; vkId?: string | null; vkUserId?: string | null }
 const roleColor: Record<Role, string> = { ADMIN: 'red', MANAGER: 'blue', TRAINER: 'green', GROOM: 'orange', VET: 'purple', OTHER: 'default', STABLE_WORKER: 'orange' }
 
 export function UserList() {
@@ -23,6 +24,7 @@ export function UserList() {
     <ConfigurableTable<User> storageKey="horse_crm_users_columns_v1" {...tableProps} rowKey="id" columns={[
       { key: 'email', fixed: 'left', width: 230, dataIndex: 'email', title: 'Email', sorter: true },
       { key: 'role', align: 'center', width: 130, dataIndex: 'role', title: 'Роль', sorter: true, render: (value: Role) => <Tag color={roleColor[value]}>{value}</Tag> },
+      { key: 'telegram', width: 240, title: 'Telegram', render: (_: unknown, row: User) => <TelegramProfileLink id={row.id} name={row.email} kind="user" role={row.role === 'ADMIN' ? 'admin' : row.role === 'TRAINER' ? 'trainer' : 'staff'} telegramUserId={row.telegramUserId} telegramUsername={row.telegramUsername} readOnly={role !== 'ADMIN'} /> },
       { key: 'createdAt', width: 160, dataIndex: 'createdAt', title: 'Дата создания', sorter: true, render: (value: string) => new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) },
       ...(role === 'ADMIN' ? [{ key: 'actions', fixed: 'right' as const, width: 230, title: 'Действия', render: (_: unknown, row: User) => <VkAdminRecipient id={row.id} name={row.email} vkId={row.vkId} vkUserId={row.vkUserId} /> }] : []),
     ]} />

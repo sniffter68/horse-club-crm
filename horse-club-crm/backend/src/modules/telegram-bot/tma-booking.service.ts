@@ -7,6 +7,7 @@ import { isSerializationFailure } from '../../common/serialization-failure';
 import { LessonsService } from '../../lessons/lessons.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizePhone } from '../../vk-bot/vk-link.service';
+import { queueTelegramAdmins } from './telegram-delivery';
 import type { TmaBookingsQuery, TmaCreateBookingDto, TmaSlotsQuery } from './telegram-bot.dto';
 
 const ZONE = 'Europe/Moscow';
@@ -158,6 +159,7 @@ export class TmaBookingService {
       if (phoneOwner?.deletedAt) restoredClientId = phoneOwner.id;
       const lesson = await this.lessons.createLesson({ serviceId: service.id, trainerId: trainer.id,
         startTime: start.toISO()!, participants: [{ clientId: bookingClientId }] }, tx);
+      await queueTelegramAdmins(tx, `admin:tma:${dto.requestId}`, `Новая онлайн-запись из TMA\n${start.toFormat('dd.MM.yyyy HH:mm')} (Москва)\n${client.name || client.firstName}, ${phone}\n${service.title || service.name}`);
       return tx.booking.update({ where: { id: lesson.bookings[0].id }, data: { telegramRequestId: dto.requestId,
         telegramConsentVersion: dto.consentVersion, telegramConsentedAt: new Date() }, select: bookingView });
     });
@@ -178,6 +180,7 @@ export class TmaBookingService {
       const start = booking.lesson?.startTime ?? booking.startTime;
       if (booking.status !== 'scheduled' || (booking.lesson && (booking.lesson.deletedAt || booking.lesson.status !== 'SCHEDULED')) || start <= new Date()) throw new ConflictException('Запросить отмену можно только для предстоящего занятия');
       // Preserve the reservation and finances until an administrator handles it in CRM.
+      if (!booking.clientCancellationRequested) await queueTelegramAdmins(tx, `admin:cancel-request:${id}`, `Запрос отмены записи из TMA\n${id}\n${DateTime.fromJSDate(start).setZone(ZONE).toFormat('dd.MM.yyyy HH:mm')} (Москва)`);
       return tx.booking.update({ where: { id }, data: { clientCancellationRequested: true, clientConfirmed: false }, select: bookingView });
     });
   }

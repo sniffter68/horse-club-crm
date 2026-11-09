@@ -34,6 +34,7 @@ function fixture({ debited = false, refunded = false, paid = false, failDelete =
   };
   const matches = (row, where) => Object.entries(where).every(([key, value]) => (row[key] ?? null) === value);
   const tx = {
+    user: { findMany: async () => [] },
     $queryRaw: async () => [],
     lesson: {
       findUnique: async ({ where }) => state.lesson?.id === where.id ? { ...state.lesson, bookings: state.bookings,

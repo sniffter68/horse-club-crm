@@ -9,9 +9,12 @@ import { BookingRulesService } from '../bookings/booking-rules.service';
 import { randomUUID } from 'node:crypto';
 import { queueVkNotification } from '../vk-bot/vk-delivery.module';
 import { queueTrainingConfirmation } from '../vk-bot/vk-training-notifications';
+import { queueTelegram, queueTelegramAdmins } from '../modules/telegram-bot/telegram-delivery';
+import { defaultModuleAccess } from '../settings/module-access.service';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -487,6 +490,7 @@ export class LessonsService {
     payment: CompleteLessonDto = {},
     actor?: AuthUser,
     cancellation?: Partial<CancelServiceDto>,
+    telegramSender?: string,
   ): Promise<LessonDetails> {
     if (!ALLOWED_FINAL_STATUSES.has(newStatus)) {
       throw new BadRequestException('Недопустимый статус занятия');
@@ -496,7 +500,7 @@ export class LessonsService {
       const lesson = await tx.lesson.findUnique({
         where: { id: lessonId },
         select: {
-          status: true, cancelledAt: true, cost: true, prepaymentAmount: true, finalPaymentAmount: true, startTime: true, serviceId: true,
+          trainerId: true, status: true, cancelledAt: true, cost: true, prepaymentAmount: true, finalPaymentAmount: true, startTime: true, serviceId: true,
           service: { select: { allowMembership: true } },
           bookings: { select: { id: true, clientId: true, membership: { select: { clientId: true } }, membershipId: true, costAmount: true, prepaymentAmount: true, finalPaymentAmount: true, isPaid: true, client: { select: { name: true } }, payments: { where: { status: 'PAID' }, select: { amount: true } } } },
           operations: {
@@ -509,6 +513,15 @@ export class LessonsService {
       });
       if (!lesson) {
         throw new NotFoundException('Занятие не найдено');
+      }
+      if (telegramSender) {
+        const user = await tx.user.findUnique({ where: { telegramUserId: telegramSender }, include: { trainer: true, staffProfile: true } });
+        if (!user || user.id !== actor?.id || user.role !== actor.role || user.trainerId !== lesson.trainerId || user.trainer?.isActive === false || user.staffProfile?.isActive === false)
+          throw new ForbiddenException('Можно менять только свои занятия');
+        const module = await tx.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
+        const permission = await tx.roleModulePermission.findUnique({ where: { role_module: { role: user.role, module: 'SCHEDULE' } } });
+        if (module?.isEnabled === false || user.role !== 'ADMIN' && (permission?.accessLevel ?? defaultModuleAccess(user.role, 'SCHEDULE')) !== 'FULL')
+          throw new ForbiddenException('Недостаточно прав для изменения занятия');
       }
       if (newStatus === LessonStatus.CANCELLED) await refundService(tx, 'lessons', lessonId, cancellation, actor);
       if (lesson.status === newStatus && (newStatus !== LessonStatus.CANCELLED || lesson.cancelledAt)) {
@@ -633,6 +646,7 @@ export class LessonsService {
         ...lessonDetails,
       });
       if (newStatus === LessonStatus.CANCELLED) await this.notifyLesson(tx, updated, 'cancelled', 'Тренировка отменена');
+      if (newStatus === LessonStatus.COMPLETED) await this.notifyTelegramLesson(tx, updated, 'completed', 'Тренировка состоялась');
       return updated;
     });
   }
@@ -650,6 +664,7 @@ export class LessonsService {
 
   private async notifyLesson(tx: TransactionClient, lesson: LessonDetails, event: string, title: string,
     clientIds?: string[], previousStart?: Date): Promise<void> {
+    await this.notifyTelegramLesson(tx, lesson, event, title, clientIds);
     const participants = (lesson.bookings ?? []).filter(row => !clientIds || clientIds.includes(row.clientId));
     if (!lesson.trainer?.vkId && !participants.some(row => row.client?.vkUserId)) return;
     if (event === 'created' || event.startsWith('booking:')) {
@@ -670,6 +685,15 @@ export class LessonsService {
     const message = `${title}: ${lesson.service.title || lesson.service.name}\n${format(lesson.startTime)} — ${format(lesson.endTime)} (${CLUB_TIME_ZONE})`
       + (previousStart ? `\nРанее: ${format(previousStart)}` : '') + `\nТренер: ${lesson.trainer.name}`;
     for (const peer of recipients) await queueVkNotification(tx, `lesson:${lesson.id}:${event}:${peer}`, peer, message);
+  }
+
+  private async notifyTelegramLesson(tx: TransactionClient, lesson: LessonDetails, event: string, title: string, clientIds?: string[]) {
+    if (event === 'cancelled') await queueTelegramAdmins(tx, `admin:cancel:${lesson.id}`, `${title}\nЗанятие: ${lesson.id}`);
+    if (!(lesson.bookings ?? []).some(row => row.client?.telegramUserId && (!clientIds || clientIds.includes(row.clientId)))) return;
+    const when = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Moscow' }).format(lesson.startTime);
+    const message = `${title}: ${lesson.service.title || lesson.service.name}\n${when} (Москва)`;
+    for (const row of lesson.bookings ?? []) if ((!clientIds || clientIds.includes(row.clientId)) && row.client?.telegramUserId)
+      await queueTelegram(tx, `client:${row.clientId}:lesson:${lesson.id}:${event}`, row.client.telegramUserId, message);
   }
 
   private async validateNoConflictsWithClient(

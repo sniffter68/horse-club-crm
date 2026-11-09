@@ -1,0 +1,17 @@
+npm.cmd : npm notice run frontend@0.0.0 test
+строка:2 знак:1
++ npm.cmd --prefix frontend run test *> docs/reports/telegram-roles-fro ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm notice run frontend@0.0.0 test:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm notice run vitest run
+
+ RUN  v5.0.0 C:/Users/Валерий/Desktop/HorseCRM2026/horse-club-crm/frontend
+
+
+ Test Files  20 passed (20)
+      Tests  165 passed (165)
+   Start at  21:53:30
+   Duration  4.90s (import 72%, transform 22%, tests 3%, worker 2%)
+

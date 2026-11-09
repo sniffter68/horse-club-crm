@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { LeadRequestStatus, Prisma } from '@prisma/client';
 import { queueVkAdministratorNotification, queueVkAdminChatNotification } from '../vk-bot/vk-delivery.module';
+import { queueTelegramAdmins } from '../modules/telegram-bot/telegram-delivery';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AcceptLeadDto } from './accept-lead.dto';
 import type { CreateLeadDto } from './create-lead.dto';
@@ -74,6 +75,15 @@ export class LeadsService {
           message: 'Не удалось поставить уведомление VK в очередь. Заявка сохранена; повторная отправка восстановит уведомление.',
           errorType: error instanceof Error ? error.name : 'UnknownError',
           errorCode: typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined });
+      }
+      if (consentSource === 'LANDING') {
+        try {
+          await this.retrySerializable(tx => queueTelegramAdmins(tx, `admin:lead:${result.lead.id}`,
+            `Новая заявка с сайта: ${notificationDto.firstName}, ${notificationDto.phone}\n${notificationDto.direction || 'Услуга указана в CRM'}`));
+        } catch {
+          this.logger.warn({ event: 'lead_telegram_notification_queue_failed', leadId: result.lead.id,
+            message: 'Заявка сохранена. Повторная отправка восстановит Telegram-уведомление.' });
+        }
       }
     }
     return { success: true, leadId: '', message: 'Заявка успешно принята' };

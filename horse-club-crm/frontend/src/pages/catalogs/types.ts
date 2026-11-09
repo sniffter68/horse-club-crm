@@ -1,5 +1,6 @@
 export interface PublicationValues { isPublic?: boolean; imageUrl?: string | null; description?: string | null; role?: string | null; order?: number }
 export interface ClientValues {
+  telegramUserId?: string | null; telegramUsername?: string | null;
   vkId?: string | null; vkScreenName?: string | null;
   preferredTrainerId?: string | null; preferredHorseId?: string | null;
   birthDate?: string | null;

@@ -201,6 +201,8 @@ enum LeadRequestStatus {
 }
 
 model User {
+  telegramUserId String? @unique
+  telegramUsername String?
   membershipsSold Membership[] @relation("MembershipSeller")
   staffProfile StaffProfile?
   workShiftsCreated WorkShift[] @relation("ShiftAuthor")
@@ -223,6 +225,28 @@ model User {
   role         Role
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+}
+
+model TelegramLinkToken {
+  tokenHash String @id
+  codeHash String @unique
+  entityType String
+  entityId String @db.Uuid
+  createdById String @db.Uuid
+  expiresAt DateTime @db.Timestamptz(6)
+  @@unique([entityType, entityId])
+  @@index([expiresAt])
+}
+
+model TelegramNotification {
+  key String @id
+  peerId String
+  message String
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  sentAt DateTime? @db.Timestamptz(6)
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now()) @db.Timestamptz(6)
+  @@index([sentAt, nextAttemptAt])
 }
 
 model Service {

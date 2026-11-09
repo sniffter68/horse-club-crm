@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { ClientColumnSettings } from './columnSettings'
 import { useClientColumns } from './useClientColumns'
 import type { TableColumnsType } from 'antd'
+import { TelegramProfileLink } from '../../components/TelegramProfileLink'
 import { VkProfileLink } from '../../components/VkProfileLink'
 import { useInvalidate, useOne, type HttpError } from '@refinedev/core'
 import { Alert, App, Button, Descriptions, Empty, List, Modal, Popover, Progress, Skeleton, Space, Tag, Typography } from 'antd'
@@ -137,6 +138,7 @@ export function ClientList() {
         <ProfileSection title="Контакты и соцсети"><ProfileFields items={[
           { label: 'Телефон', value: client.phone ? <a className="data-mono" href={`tel:${client.phone}`}>{client.phone}</a> : 'Не указан' },
           { label: 'Email', value: client.email ? <a href={`mailto:${client.email}`}>{client.email}</a> : 'Не указан' },
+          { label: 'Telegram', value: <TelegramProfileLink id={client.id} name={client.name || client.firstName} kind="client" telegramUserId={client.telegramUserId} telegramUsername={client.telegramUsername} readOnly={!canManage || Boolean(client.deletedAt)} /> },
           { label: 'VK', value: <VkProfileLink id={client.id} name={client.name || client.firstName} kind="CLIENT" vkId={client.vkId} vkUserId={client.vkUserId} readOnly={!canManage} /> },
           { label: 'Дата рождения', value: client.birthDate ? dateOnly(client.birthDate) : 'Не указана' },
           { label: 'Возраст', value: client.birthDate ? (() => {

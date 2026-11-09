@@ -164,7 +164,7 @@ test('new lead targets only ADMIN VK recipients, deduplicates delivery and names
 function notificationLessons() {
   let lesson;
   const queued = new Map();
-  const tx = { payment: { findMany: async () => [], updateMany: async () => ({}) }, cashAuditLog: { create: async () => ({}) },
+  const tx = { user: { findMany: async () => [] }, payment: { findMany: async () => [], updateMany: async () => ({}) }, cashAuditLog: { create: async () => ({}) },
     service: { findUnique: async () => ({ durationMinutes: 60, price: 0, title: 'Выездка', maxCapacity: 4, allowMembership: false }) },
     clubSchedule: { findUnique: async () => ({ openTime: '08:00', closeTime: '22:00', daysOfWeekOff: [] }) },
     lesson: {
