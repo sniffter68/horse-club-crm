@@ -4,6 +4,7 @@ import { LessonStatus } from '@prisma/client';
 import { LessonsService } from '../../lessons/lessons.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ModuleAccessService } from '../../settings/module-access.service';
+import { activeTelegramMembership } from './telegram-membership';
 
 export const telegramDate = (date: Date) => DateTime.fromJSDate(date).setZone('Europe/Moscow').toFormat('dd.MM HH:mm');
 
@@ -62,8 +63,10 @@ export class TelegramPersonalService {
 
   async balance(sender: string) {
     const client = await this.client(sender);
-    const rows = await this.prisma.membership.findMany({ where: { deletedAt: null, status: 'active', validTo: { gte: new Date() },
-      OR: [{ clientId: client.id }, { members: { some: { clientId: client.id } } }] }, take: 20 });
-    return rows.map(row => `${row.title || row.serviceTitle || 'Абонемент'}: ${row.type === 'fixed_lessons' ? row.remainedLessons : row.remainingUnits} ${row.type === 'deposit' ? '₽' : 'занятий'}`).join('\n') || 'Активных абонементов нет';
+    const membership = await activeTelegramMembership(this.prisma, client.id);
+    if (!membership) return 'У вас нет активного абонемента. Для оформления обратитесь к администратору клуба.';
+    const title = membership.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const until = DateTime.fromISO(membership.validUntil).setZone('Europe/Moscow').toFormat('dd.MM.yyyy');
+    return `🎫 Ваш абонемент: <b>${title}</b>\nОстаток занятий: <b>${membership.remainingLessons} из ${membership.totalLessons}</b>\nДействует до: <b>${until}</b>`;
   }
 }

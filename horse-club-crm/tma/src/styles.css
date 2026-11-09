@@ -53,6 +53,7 @@ a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .primary { min-height: 50px; border-radius: .75rem; border: 0; background: var(--tma-button); color: var(--tma-button-text); font-weight: 650; padding: .8rem 1rem; }
 .summary { border-radius: 1rem; padding: 1.25rem; overflow-wrap: anywhere; }
 .summary p { margin-top: .4rem; }
+.membership { border-color: var(--tma-button); }
 .badge { display: inline-block; border-radius: 999px; color: var(--tma-success); background: var(--tma-success-bg); font-size: .75rem; padding: .35rem .7rem; }
 .notice { border-left: 3px solid var(--tma-button); padding: .75rem 1rem; margin: 1rem 0; font-size: .85rem; }
 .consent { display: flex; gap: .75rem; align-items: flex-start; font-size: .85rem; line-height: 1.55; cursor: pointer; }

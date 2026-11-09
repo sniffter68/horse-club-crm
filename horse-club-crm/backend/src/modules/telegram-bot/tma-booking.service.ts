@@ -8,6 +8,7 @@ import { LessonsService } from '../../lessons/lessons.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizePhone } from '../../vk-bot/vk-link.service';
 import { queueTelegramAdmins } from './telegram-delivery';
+import { activeTelegramMembership } from './telegram-membership';
 import type { TmaBookingsQuery, TmaCreateBookingDto, TmaSlotsQuery } from './telegram-bot.dto';
 
 const ZONE = 'Europe/Moscow';
@@ -170,7 +171,8 @@ export class TmaBookingService {
   async myBookings(clientId: string, query: TmaBookingsQuery) {
     const rows = await this.prisma.booking.findMany({ where: { clientId, OR: [{ lesson: null }, { lesson: { deletedAt: null } }] }, select: bookingView,
       orderBy: [{ startTime: 'desc' }, { id: 'desc' }], skip: query.offset, take: query.limit + 1 });
-    return { bookings: rows.slice(0, query.limit), hasMore: rows.length > query.limit };
+    const membership = await activeTelegramMembership(this.prisma, clientId);
+    return { bookings: rows.slice(0, query.limit), hasMore: rows.length > query.limit, membership };
   }
 
   async cancelRequest(clientId: string, id: string) {

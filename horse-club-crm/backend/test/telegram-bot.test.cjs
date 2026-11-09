@@ -286,8 +286,8 @@ test('HTTP routes require signed Telegram auth, reject invalid UUIDs, staff fiel
 test('my bookings are scoped to the signed client, exclude archived lessons and retain legacy bookings with pagination', async () => {
   let captured;
   const rows = [{ id: 'latest' }, { id: 'older' }, { id: 'next-page' }];
-  const service = new TmaBookingService({ booking: { findMany: async input => { captured = input; return rows; } } }, {}, {});
-  assert.deepEqual(await service.myBookings(clientId, { offset: 0, limit: 2 }), { bookings: rows.slice(0, 2), hasMore: true });
+  const service = new TmaBookingService({ membership: { findFirst: async () => null }, booking: { findMany: async input => { captured = input; return rows; } } }, {}, {});
+  assert.deepEqual(await service.myBookings(clientId, { offset: 0, limit: 2 }), { bookings: rows.slice(0, 2), hasMore: true, membership: null });
   assert.deepEqual(captured.where, { clientId, OR: [{ lesson: null }, { lesson: { deletedAt: null } }] });
   assert.deepEqual(captured.orderBy, [{ startTime: 'desc' }, { id: 'desc' }]);
   assert.equal(captured.take, 3);

@@ -190,7 +190,7 @@ test('real bot dispatch handles username binding, role menus, personal queries a
   const service = new TelegramBotService({ bindUsername: async (...args) => { consumed.push(args); } }, personal);
   const message = (sender, text, type = 'private') => bot.handleUpdate({ update_id: updateId++, message: { message_id: 1, date: 0, chat: { id: Number(sender), type },
     from: { id: Number(sender), is_bot: false, first_name: 'Test', username: 'test_user' }, text,
-    ...(text.startsWith('/start') ? { entities: [{ type: 'bot_command', offset: 0, length: 6 }] } : {}) } });
+    ...(text.startsWith('/') ? { entities: [{ type: 'bot_command', offset: 0, length: text.split(' ')[0].length }] } : {}) } });
   const callback = (sender, data) => bot.handleUpdate({ update_id: updateId++, callback_query: { id: 'callback', from: { id: Number(sender), is_bot: false, first_name: 'Test' },
     chat_instance: 'private', data, message: { message_id: 1, date: 0, chat: { id: Number(sender), type: 'private' }, text: 'Menu' } } });
   try {
@@ -199,6 +199,9 @@ test('real bot dispatch handles username binding, role menus, personal queries a
     assert.deepEqual(consumed[0], ['1', 'test_user']);
     assert.match(sent.at(-1).text, /Добро пожаловать/);
     assert.ok(sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.web_app));
+    assert.ok(sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.text === 'Мой абонемент'));
+    await message('1', '/balance'); assert.equal(sent.at(-1).text, 'Остаток: 5'); assert.equal(sent.at(-1).parse_mode, 'HTML');
+    await callback('1', 'my_balance'); assert.equal(sent.at(-1).text, 'Остаток: 5'); assert.equal(sent.at(-1).parse_mode, 'HTML');
     await message('2', '123456'); assert.equal(consumed.at(-1)[0], '2');
     assert.match(sent.at(-1).text, /Выберите раздел/);
     assert.ok(!sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.web_app));

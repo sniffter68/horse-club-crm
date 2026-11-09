@@ -39,6 +39,73 @@ async function advance(page: Page) {
   await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(true);
   await page.evaluate(() => window.__tmaTest.main());
 }
+
+test('membership appears above bookings with Moscow date and expiry warning, including empty booking history', async ({ page }) => {
+  await setup(page);
+  await page.route('**/api/tma/my-bookings?**', route => route.fulfill({ json: {
+    bookings: [], hasMore: false, membership: { id: serviceId, title: 'Семейный абонемент на занятия в манеже',
+      remainingLessons: 1, totalLessons: 8, validUntil: '2026-12-09T21:30:00Z', isExpiringSoon: true },
+  } }));
+  await page.goto('');
+  await page.getByRole('button', { name: 'Мои записи', exact: true }).click();
+  const card = page.getByRole('region', { name: 'Мой абонемент', exact: true });
+  await expect(card.getByRole('heading')).toHaveText('Семейный абонемент на занятия в манеже');
+  await expect(card).toContainText('Осталось: 1 из 8');
+  await expect(card).toContainText('10.12.2026');
+  await expect(card).toContainText('Абонемент скоро закончится');
+  await expect(page.getByText('У вас пока нет активных записей')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/tma-membership-dark.png', fullPage: true });
+  await page.evaluate(() => {
+    const app = window.Telegram!.WebApp;
+    Object.assign(app.themeParams, { bg_color: '#f7f4f0', text_color: '#3a2f2b', button_color: '#234d3c', button_text_color: '#ffffff', hint_color: '#6c655f', secondary_bg_color: '#ffffff' });
+    window.__tmaTest.theme();
+  });
+  await page.screenshot({ path: 'test-results/tma-membership-light.png', fullPage: true });
+});
+
+test('membership loading and error do not claim no subscription; keyboard retry recovers to empty state', async ({ page }) => {
+  await setup(page);
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  let fail = true;
+  await page.route('**/api/tma/my-bookings?**', async route => {
+    await pending;
+    await route.fulfill(fail ? { status: 503, json: { message: 'Повторите запрос позже' } }
+      : { json: { bookings: [booking], hasMore: false, membership: null } });
+  });
+  await page.goto('');
+  await page.getByRole('button', { name: 'Мои записи', exact: true }).click();
+  await expect(page.getByText('Загружаем ваши записи…')).toBeVisible();
+  await expect(page.getByText(/У вас нет активного абонемента/)).toHaveCount(0);
+  release();
+  await expect(page.getByRole('alert')).toContainText('Повторите запрос позже');
+  await expect(page.getByText(/У вас нет активного абонемента/)).toHaveCount(0);
+  fail = false;
+  await page.getByRole('button', { name: 'Обновить записи' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText(/У вас нет активного абонемента/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Предстоящие тренировки' })).toBeVisible();
+});
+
+test('regular membership has no warning and stays above booking list after pagination', async ({ page }) => {
+  await setup(page);
+  await page.route('**/api/tma/my-bookings?**', route => {
+    const secondPage = new URL(route.request().url()).searchParams.get('offset') !== '0';
+    return route.fulfill({ json: { bookings: secondPage ? [] : [booking], hasMore: !secondPage,
+      membership: { id: serviceId, title: 'Манеж', remainingLessons: 5, totalLessons: 8, validUntil: '2027-01-01T12:00:00Z', isExpiringSoon: false } } });
+  });
+  await page.goto('');
+  await page.getByRole('button', { name: 'Мои записи', exact: true }).click();
+  const card = page.getByRole('region', { name: 'Мой абонемент', exact: true });
+  await expect(card).toContainText('Осталось: 5 из 8');
+  await expect(page.getByText('Абонемент скоро закончится')).toHaveCount(0);
+  const list = page.getByRole('region', { name: 'Предстоящие тренировки', exact: true });
+  expect((await card.boundingBox())!.y).toBeLessThan((await list.boundingBox())!.y);
+  await page.getByRole('button', { name: 'Загрузить ещё' }).click();
+  await expect(page.getByRole('button', { name: 'Загрузить ещё' })).toHaveCount(0);
+  await expect(card).toContainText('Осталось: 5 из 8');
+});
 async function checkout(page: Page) {
   await page.goto('');
   await page.getByRole('button', { name: /Первое знакомство 30/ }).click(); await advance(page);

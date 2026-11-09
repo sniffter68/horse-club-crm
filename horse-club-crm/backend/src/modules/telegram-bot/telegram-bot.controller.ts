@@ -15,7 +15,7 @@ export class TelegramBotController {
   slots(@Req() req: TelegramRequest, @Query() query: TmaSlotsQuery) { return this.service.slots(req.telegram.clientId, query); }
   @Post('bookings')
   create(@Req() req: TelegramRequest, @Body() dto: TmaCreateBookingDto) { return this.service.create(req.telegram.clientId, dto); }
-  @Get('my-bookings')
+  @Get('my-bookings') @Header('Cache-Control', 'no-store')
   bookings(@Req() req: TelegramRequest, @Query() query: TmaBookingsQuery) { return this.service.myBookings(req.telegram.clientId, query); }
   @Post('bookings/:id/cancel-request')
   cancel(@Req() req: TelegramRequest, @Param('id', new ParseUUIDPipe()) id: string) { return this.service.cancelRequest(req.telegram.clientId, id); }

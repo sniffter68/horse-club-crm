@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { api, dateTime, money, moscowDate, requireUuid, time, upcoming, type Booking, type Service, type Slot } from './api';
+import { api, dateTime, money, moscowDate, requireUuid, time, upcoming, type Booking, type Membership, type MyBookingsResponse, type Service, type Slot } from './api';
 import { applyTheme, canRequestContact, haptic, telegram, withTelegram } from './telegram';
 import { useTelegramNavigation } from './useTelegramNavigation';
 
@@ -211,6 +211,7 @@ export function App() {
 
 export function MyBookings({ onBook }: { onBook: () => void }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [membership, setMembership] = useState<Membership | null | undefined>(undefined);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
@@ -224,8 +225,8 @@ export function MyBookings({ onBook }: { onBook: () => void }) {
   async function load(offset: number, signal?: AbortSignal) {
     setLoading(true); setError('');
     try {
-      const result = await api<{ bookings: Booking[]; hasMore: boolean }>(`my-bookings?offset=${offset}&limit=20`, { signal });
-      if (active.current && !signal?.aborted) { setBookings(previous => offset ? [...previous, ...result.bookings] : result.bookings); setHasMore(result.hasMore); }
+      const result = await api<MyBookingsResponse>(`my-bookings?offset=${offset}&limit=20`, { signal });
+      if (active.current && !signal?.aborted) { setBookings(previous => offset ? [...previous, ...result.bookings] : result.bookings); setHasMore(result.hasMore); setMembership(result.membership ?? null); }
     } catch (failure: unknown) { if (active.current && !signal?.aborted) setError(errorText(failure)); }
     finally { if (active.current && !signal?.aborted) setLoading(false); }
   }
@@ -254,6 +255,14 @@ export function MyBookings({ onBook }: { onBook: () => void }) {
     { title: 'Прошедшие тренировки', rows: bookings.filter(booking => !isFuture(booking)) },
   ];
   return <section className="stack mt-4" aria-label="Список записей">
+    {membership !== undefined && <section className="summary membership" aria-label="Мой абонемент">
+      {membership ? <>
+        <h2>{membership.title}</h2>
+        <p>Осталось: {membership.remainingLessons} из {membership.totalLessons}</p>
+        <p>Действует до: <time dateTime={membership.validUntil}>{dateTime(membership.validUntil, true)}</time></p>
+        {membership.isExpiringSoon && <p className="badge">Абонемент скоро закончится</p>}
+      </> : <p>У вас нет активного абонемента. Оформите его у администратора.</p>}
+    </section>}
     {groups.filter(group => group.rows.length > 0).map(group => <section className="stack" key={group.title} aria-label={group.title}>
       <h2>{group.title}</h2>
       {group.rows.map(booking => {

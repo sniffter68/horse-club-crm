@@ -33,7 +33,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const menu = async (sender: string) => {
       const role = await this.personal.identity(sender);
       const keyboard = new InlineKeyboard();
-      if (role === 'client') return keyboard.webApp('Записаться на занятие', url.href).row().text('Мои записи', 'my_bookings').text('Баланс абонемента', 'my_balance');
+      if (role === 'client') return keyboard.webApp('Записаться на занятие', url.href).row().text('Мои записи', 'my_bookings').text('Мой абонемент', 'my_balance');
       keyboard.text('Расписание на день', 'day').row().text('Расписание на неделю', 'week');
       return keyboard;
     };
@@ -43,6 +43,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       await ctx.reply(message, { reply_markup: await menu(sender) });
     });
     bot.command('help', async ctx => { await ctx.reply('Укажите ваш Telegram username или ID в CRM. Выберите нужный раздел:', { reply_markup: await menu(String(ctx.from!.id)) }); });
+    bot.command('balance', async ctx => {
+      await ctx.reply(await this.personal.balance(String(ctx.from!.id)), { parse_mode: 'HTML' });
+    });
     bot.on('message:text', async ctx => {
       const sender = String(ctx.from!.id);
       await ctx.reply('Выберите раздел:', { reply_markup: await menu(sender) });
@@ -50,7 +53,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     bot.callbackQuery(['my_bookings', 'my_balance'], async ctx => {
       await ctx.answerCallbackQuery();
       const sender = String(ctx.from!.id);
-      await ctx.reply(ctx.callbackQuery.data === 'my_balance' ? await this.personal.balance(sender) : await this.personal.bookings(sender));
+      if (ctx.callbackQuery.data === 'my_balance') await ctx.reply(await this.personal.balance(sender), { parse_mode: 'HTML' });
+      else await ctx.reply(await this.personal.bookings(sender));
     });
     bot.callbackQuery(['day', 'week'], async ctx => {
       await ctx.answerCallbackQuery();

@@ -1,7 +1,14 @@
 import { telegram } from './telegram';
 
+const ZONE = 'Europe/Moscow';
+
 export interface Service { id: string; title: string; name: string; description: string | null; price: string; durationMinutes: number }
 export interface Slot { startTime: string; endTime: string; trainers: { id: string; name: string }[] }
+export interface Membership {
+  id: string; title: string; totalLessons: number; remainingLessons: number;
+  validUntil: string; isExpiringSoon: boolean;
+}
+export interface MyBookingsResponse { bookings: Booking[]; hasMore: boolean; membership: Membership | null }
 export interface Booking {
   id: string; startTime: string; endTime: string; status: string; clientConfirmed: boolean;
   clientCancellationRequested: boolean; costAmount: string; trainer?: { name?: string } | null;
@@ -26,15 +33,15 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   return response.json() as Promise<T>;
 }
 export const money = (value: string): string => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(Number(value));
-export const dateTime = (value?: string): string => {
+export const dateTime = (value?: string, dateOnly = false): string => {
   const date = value ? new Date(value) : undefined;
   return date && Number.isFinite(date.getTime())
-    ? new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date)
+    ? new Intl.DateTimeFormat('ru-RU', { timeZone: ZONE, dateStyle: dateOnly ? 'short' : 'long', timeStyle: dateOnly ? undefined : 'short' }).format(date)
     : 'Дату и время уточнит администратор';
 };
-export const time = (value: string): string => new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+export const time = (value: string): string => new Intl.DateTimeFormat('ru-RU', { timeZone: ZONE, hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 export const moscowDate = (offset = 0): string => {
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   const date = new Date(`${today}T12:00:00+03:00`);
   date.setUTCDate(date.getUTCDate() + offset);
   return date.toISOString().slice(0, 10);
