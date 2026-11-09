@@ -4,8 +4,8 @@ export interface Service { id: string; title: string; name: string; description:
 export interface Slot { startTime: string; endTime: string; trainers: { id: string; name: string }[] }
 export interface Booking {
   id: string; startTime: string; endTime: string; status: string; clientConfirmed: boolean;
-  clientCancellationRequested: boolean; costAmount: string; trainer: { name: string };
-  lesson: { status: string; deletedAt: string | null; startTime: string; endTime: string; service: { title: string; name: string } } | null;
+  clientCancellationRequested: boolean; costAmount: string; trainer?: { name?: string } | null;
+  lesson?: { status: string; deletedAt: string | null; startTime: string; endTime: string; service?: { title?: string; name?: string } | null } | null;
 }
 export const isUuid = (value: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 export function requireUuid(value: string): string {
@@ -16,7 +16,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   const initData = telegram()?.initData;
   if (!initData) throw new Error('Откройте запись через Telegram-бота');
   const response = await fetch(`/api/tma/${path}`, { ...options, credentials: 'omit',
-    headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData, ...options.headers } });
+    headers: { 'Content-Type': 'application/json', Authorization: `tma ${initData}`, 'X-Telegram-Init-Data': initData, ...options.headers } });
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
     const message = body && typeof body === 'object' && 'message' in body ? body.message : undefined;
@@ -26,7 +26,12 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   return response.json() as Promise<T>;
 }
 export const money = (value: string): string => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(Number(value));
-export const dateTime = (value: string): string => new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+export const dateTime = (value?: string): string => {
+  const date = value ? new Date(value) : undefined;
+  return date && Number.isFinite(date.getTime())
+    ? new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date)
+    : 'Дату и время уточнит администратор';
+};
 export const time = (value: string): string => new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 export const moscowDate = (offset = 0): string => {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());

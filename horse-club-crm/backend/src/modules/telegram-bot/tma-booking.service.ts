@@ -166,7 +166,7 @@ export class TmaBookingService {
   }
 
   async myBookings(clientId: string, query: TmaBookingsQuery) {
-    const rows = await this.prisma.booking.findMany({ where: { clientId }, select: bookingView,
+    const rows = await this.prisma.booking.findMany({ where: { clientId, OR: [{ lesson: null }, { lesson: { deletedAt: null } }] }, select: bookingView,
       orderBy: [{ startTime: 'desc' }, { id: 'desc' }], skip: query.offset, take: query.limit + 1 });
     return { bookings: rows.slice(0, query.limit), hasMore: rows.length > query.limit };
   }

@@ -16,7 +16,10 @@ export class TelegramAuthGuard implements CanActivate {
     const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
     if (!token) throw new ServiceUnavailableException('Онлайн-запись через Telegram пока недоступна');
     const request = context.switchToHttp().getRequest<TelegramRequest>();
-    const identity = validateTelegramInitData(request.get('X-Telegram-Init-Data') ?? '', token);
+    const authorization = request.get('Authorization');
+    const initData = authorization !== undefined ? /^tma (.+)$/i.exec(authorization)?.[1] ?? ''
+      : request.get('X-Telegram-Init-Data') ?? '';
+    const identity = validateTelegramInitData(initData, token);
     const now = Date.now();
     for (const [key, bucket] of this.buckets) if (bucket.until <= now) this.buckets.delete(key);
     const slots = request.path?.endsWith('/slots');

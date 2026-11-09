@@ -41,7 +41,7 @@ test('guard derives signed identity and lets archived profiles access only the b
       clubModuleSettings: { findUnique: async () => ({ isEnabled: !disabled }) },
       client: { upsert: async input => { upserts++; assert.equal(input.where.telegramUserId, '123456789012'); return { id: clientId, deletedAt: archived ? new Date() : null }; } },
     });
-    const request = { get: () => sign() };
+    const request = { get: name => name === 'X-Telegram-Init-Data' ? sign() : undefined };
     const context = { switchToHttp: () => ({ getRequest: () => request }) };
     assert.equal(await guard.canActivate(context), true); assert.equal(request.telegram.clientId, clientId);
     disabled = true; await assert.rejects(guard.canActivate(context), status(403)); assert.equal(upserts, 1);
@@ -225,7 +225,8 @@ test('HTTP routes require signed Telegram auth, reject invalid UUIDs, staff fiel
   const { PrismaService } = require('../dist/prisma/prisma.service');
   const previous = process.env.TELEGRAM_BOT_TOKEN; process.env.TELEGRAM_BOT_TOKEN = token;
   const f = fixture();
-  const service = { services: async () => ({ services: [] }), create: async (owner, dto) => ({ owner, requestId: dto.requestId }), cancelRequest: async () => ({}) };
+  const service = { services: async () => ({ services: [] }), create: async (owner, dto) => ({ owner, requestId: dto.requestId }), cancelRequest: async () => ({}),
+    myBookings: async (owner, query) => { assert.equal(owner, clientId); assert.equal(query.offset, 0); assert.equal(query.limit, 20); return { bookings: [], hasMore: false }; } };
   const module = await Test.createTestingModule({ controllers: [TelegramBotController], providers: [TelegramAuthGuard,
     { provide: TmaBookingService, useValue: service }, { provide: PrismaService, useValue: {
       clubModuleSettings: { findUnique: async () => null }, client: { upsert: async () => ({ id: clientId }) },
@@ -236,10 +237,25 @@ test('HTTP routes require signed Telegram auth, reject invalid UUIDs, staff fiel
   try {
     await request(app.getHttpServer()).get('/api/tma/services').expect(401);
     await request(app.getHttpServer()).get('/api/tma/services').set('X-Telegram-Init-Data', sign()).expect(200);
+    await request(app.getHttpServer()).get('/api/tma/my-bookings?offset=0&limit=20').set('Authorization', `tma ${sign()}`).expect(200);
+    await request(app.getHttpServer()).get('/api/tma/my-bookings').set('Authorization', `tma ${sign().replace('anna', 'evil')}`).expect(401);
+    await request(app.getHttpServer()).get('/api/tma/my-bookings').set('Authorization', 'Bearer invalid').set('X-Telegram-Init-Data', sign()).expect(401);
     await request(app.getHttpServer()).post('/api/tma/bookings/bad/cancel-request').set('X-Telegram-Init-Data', sign()).expect(400);
     await request(app.getHttpServer()).post('/api/tma/bookings').set('X-Telegram-Init-Data', sign()).send({ ...f.dto, clientId: 'victim', costAmount: 0 }).expect(400);
     const result = await request(app.getHttpServer()).post('/api/tma/bookings').set('X-Telegram-Init-Data', sign()).send(f.dto).expect(201);
     assert.equal(result.body.owner, clientId);
     await request(app.getHttpServer()).post('/api/tma/bookings').set('X-Telegram-Init-Data', sign()).send({ ...f.dto, consentAccepted: 'false' }).expect(400);
   } finally { await app.close(); if (previous === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = previous; }
+});
+
+// Booking has no deletedAt: archival belongs to its optional Lesson.
+test('my bookings are scoped to the signed client, exclude archived lessons and retain legacy bookings with pagination', async () => {
+  let captured;
+  const rows = [{ id: 'latest' }, { id: 'older' }, { id: 'next-page' }];
+  const service = new TmaBookingService({ booking: { findMany: async input => { captured = input; return rows; } } }, {}, {});
+  assert.deepEqual(await service.myBookings(clientId, { offset: 0, limit: 2 }), { bookings: rows.slice(0, 2), hasMore: true });
+  assert.deepEqual(captured.where, { clientId, OR: [{ lesson: null }, { lesson: { deletedAt: null } }] });
+  assert.deepEqual(captured.orderBy, [{ startTime: 'desc' }, { id: 'desc' }]);
+  assert.equal(captured.take, 3);
+  assert.equal(captured.skip, 0);
 });

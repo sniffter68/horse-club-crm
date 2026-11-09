@@ -12,10 +12,10 @@ const FORMATS = [
   { label: 'Прогулка', pattern: /прогул/i },
   { label: 'Индивидуальная тренировка', pattern: /индивиду|трениров|конкур|выезд/i },
 ];
-type Screen = 'catalog' | 'slots' | 'checkout' | 'success' | 'bookings';
+type Screen = 'catalog' | 'slots' | 'checkout' | 'success' | 'my-bookings';
 const errorText = (error: unknown): string => error instanceof Error ? error.message : 'Не удалось загрузить. Повторите попытку';
 const serviceTitle = (service: Service): string => service.title || service.name;
-const bookingTitle = (booking: Booking): string => booking.lesson?.service.title || booking.lesson?.service.name || 'Занятие в клубе';
+const bookingTitle = (booking: Booking): string => booking.lesson?.service?.title || booking.lesson?.service?.name || 'Занятие в клубе';
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('catalog');
@@ -56,7 +56,7 @@ export function App() {
 
   useEffect(() => {
     if (screen === 'checkout') tg?.enableClosingConfirmation(); else tg?.disableClosingConfirmation();
-    document.title = `${({ catalog: 'Выбор занятия', slots: 'Дата и время', checkout: 'Оформление записи', success: 'Запись создана', bookings: 'Мои записи' })[screen]} · КСК «СЛКС»`;
+    document.title = `${({ catalog: 'Выбор занятия', slots: 'Дата и время', checkout: 'Оформление записи', success: 'Запись создана', 'my-bookings': 'Мои записи' })[screen]} · КСК «СЛКС»`;
     heading.current?.focus();
   }, [screen, tg]);
 
@@ -80,6 +80,10 @@ export function App() {
   }, [screen, day, slotServiceId, retry]);
 
   const navigate = (next: Screen) => { if (!submitting.current) { haptic(); setError(''); setScreen(next); } };
+  const newBooking = () => {
+    setBooking(undefined); setService(undefined); setSlot(undefined); setTrainerId(''); setConsent(false);
+    requestId.current = ''; navigate('catalog');
+  };
   const back = screen === 'catalog' ? undefined : () => navigate(screen === 'checkout' ? 'slots' : 'catalog');
   const next = () => {
     if (screen === 'catalog' && service) navigate('slots');
@@ -118,16 +122,20 @@ export function App() {
         serviceId: requireUuid(service.id), trainerId: requireUuid(trainerId || slot.trainers[0].id),
         startTime: slot.startTime, phone, consentAccepted: true, consentVersion, requestId: requestId.current,
       }) });
-      setBooking(result); setScreen('success');
+      setBooking({ ...result, startTime: result?.startTime ?? slot.startTime,
+        trainer: result?.trainer ?? slot.trainers.find(trainer => trainer.id === trainerId) ?? slot.trainers[0],
+        lesson: result?.lesson ? { ...result.lesson, service: result.lesson.service ?? service } : {
+          status: 'SCHEDULED', deletedAt: null, startTime: slot.startTime, endTime: slot.endTime, service,
+        } }); setScreen('success');
     } catch (failure: unknown) { setError(errorText(failure)); }
     finally { submitting.current = false; setBusy(false); }
   }
 
-  const titles: Record<Screen, string> = { catalog: 'Время для лошадей', slots: 'Когда приедете?', checkout: 'Всё готово к записи', success: 'Ждём вас в клубе', bookings: 'Мои записи' };
+  const titles: Record<Screen, string> = { catalog: 'Время для лошадей', slots: 'Когда приедете?', checkout: 'Всё готово к записи', success: 'Ждём вас в клубе', 'my-bookings': 'Мои записи' };
   return <main className="mx-auto max-w-xl px-5">
     <header className="mb-6 flex items-center justify-between gap-3">
       <span className="club-mark" aria-label="КСК СЛКС">СЛКС<span>КОННЫЙ КЛУБ · ТАМБОВ</span></span>
-      <button className="quiet" disabled={busy || screen === 'bookings'} onClick={() => navigate('bookings')}>Мои записи</button>
+      <button className="quiet" disabled={busy || screen === 'my-bookings'} onClick={() => navigate('my-bookings')}>Мои записи</button>
     </header>
     {!native && <p className="notice">Откройте запись через Telegram-бота клуба.</p>}
     {back && !native && <button className="quiet mb-4" disabled={busy} onClick={back}>← Назад</button>}
@@ -179,13 +187,16 @@ export function App() {
       </form>
       <p className="notice">Лошадь подберёт администратор. Детали уточнит клуб.</p>
     </>}
-    {screen === 'success' && booking && <section className="summary my-5" aria-label="Информация о записи">
-      <span className="badge">Запись создана</span><h2 className="mt-4">{bookingTitle(booking)}</h2>
-      <p>{dateTime(booking.lesson?.startTime ?? booking.startTime)}</p><p>Тренер: {booking.trainer.name}</p><p>{ADDRESS}</p>
-      <p className="hint mt-4">Запись сохранена. Детали уточнит администратор.</p>
-      <button className="primary mt-4 w-full" onClick={() => navigate('bookings')}>Перейти в мои записи</button>
+    {screen === 'success' && <section className="summary my-5" aria-label="Информация о записи">
+      <span className="badge">Заявка принята</span><h2 className="mt-4">{booking ? bookingTitle(booking) : 'Занятие в клубе'}</h2>
+      <p>{dateTime(booking?.lesson?.startTime ?? booking?.startTime)}</p><p>Тренер: {booking?.trainer?.name || 'Уточнит администратор'}</p><p>{ADDRESS}</p>
+      <p className="hint mt-4" role="status">Заявка принята, администратор свяжется с вами</p>
+      <div className="stack mt-4">
+        <button className="primary w-full" onClick={() => navigate('my-bookings')}>Мои записи</button>
+        <button className="quiet w-full" onClick={newBooking}>Новая запись</button>
+      </div>
     </section>}
-    {screen === 'bookings' && <MyBookings />}
+    {screen === 'my-bookings' && <MyBookings onBook={newBooking} />}
     <div className="feedback" aria-live="polite">{loading && <p role="status">Проверяем свободные места…</p>}
       {error && <div role="alert"><p>{error}</p>{screen !== 'checkout' && <button className="quiet mt-2" onClick={() => setRetry(value => value + 1)}>Повторить загрузку</button>}</div>}
     </div>
@@ -194,7 +205,7 @@ export function App() {
   </main>;
 }
 
-export function MyBookings() {
+export function MyBookings({ onBook }: { onBook: () => void }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -232,23 +243,31 @@ export function MyBookings() {
     } catch (failure: unknown) { if (active.current) setError(errorText(failure)); }
     finally { pending.current = false; if (active.current) setBusy(''); }
   }
+  const now = Date.now();
+  const isFuture = (booking: Booking) => new Date(booking.lesson?.startTime ?? booking.startTime).getTime() >= now;
+  const groups = [
+    { title: 'Предстоящие тренировки', rows: bookings.filter(isFuture) },
+    { title: 'Прошедшие тренировки', rows: bookings.filter(booking => !isFuture(booking)) },
+  ];
   return <section className="stack mt-4" aria-label="Список записей">
-    {bookings.map(booking => {
+    {groups.filter(group => group.rows.length > 0).map(group => <section className="stack" key={group.title} aria-label={group.title}>
+      <h2>{group.title}</h2>
+      {group.rows.map(booking => {
       const cancelled = booking.status === 'cancelled' || booking.lesson?.status === 'CANCELLED' || Boolean(booking.lesson?.deletedAt);
-      const status = cancelled ? 'Отменено' : booking.status === 'completed' || booking.lesson?.status === 'COMPLETED' ? 'Завершено'
-        : booking.clientCancellationRequested ? 'Запрошена отмена' : booking.clientConfirmed ? 'Подтверждено' : 'Ожидает';
+      const status = cancelled ? 'Отменена' : booking.status === 'completed' || booking.lesson?.status === 'COMPLETED' ? 'Завершено'
+        : booking.clientCancellationRequested ? 'Запрошена отмена' : booking.clientConfirmed ? 'Подтверждена' : 'Ожидает';
       return <article className="summary" key={booking.id}><span className="badge">{status}</span>
         <h2 className="mt-3">{bookingTitle(booking)}</h2><p>{dateTime(booking.lesson?.startTime ?? booking.startTime)}</p>
-        <p>Тренер: {booking.trainer.name}</p><p className="hint">{ADDRESS}</p>
+        <p>Тренер: {booking.trainer?.name || 'Уточнит администратор'}</p><p className="hint">{ADDRESS}</p>
         {upcoming(booking) && !booking.clientCancellationRequested && (confirmId === booking.id
           ? <div className="mt-4"><p>Запросить отмену? Запись сохранится до решения администратора.</p>
               <div className="mt-3 flex flex-wrap gap-3"><button disabled={Boolean(busy)} className="quiet" onClick={() => setConfirmId('')}>Оставить запись</button>
               <button disabled={Boolean(busy)} className="quiet danger" onClick={() => void cancel(booking)}>{busy === booking.id ? 'Отправляем…' : 'Запросить отмену'}</button></div></div>
           : <button className="quiet mt-4" disabled={Boolean(busy)} onClick={() => { haptic(); setConfirmId(booking.id); }}>Отменить занятие</button>)}
       </article>;
-    })}
+    })}</section>)}
     {loading && <p role="status">Загружаем ваши записи…</p>}
-    {!loading && !error && bookings.length === 0 && <p className="notice">Записей пока нет. Выберите занятие в каталоге.</p>}
+    {!loading && !error && bookings.length === 0 && <div className="notice"><p>У вас пока нет активных записей</p><button className="primary mt-3 w-full" onClick={onBook}>Записаться</button></div>}
     {error && <div role="alert"><p>{error}</p><button className="quiet mt-2" onClick={() => setRetry(value => value + 1)}>Обновить записи</button></div>}
     <p role="status">{notice}</p>
     {hasMore && <button className="quiet w-full" disabled={loading} onClick={() => void load(bookings.length)}>Загрузить ещё</button>}

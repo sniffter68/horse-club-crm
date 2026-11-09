@@ -94,7 +94,7 @@ test('native Telegram flow creates once, shows success and requests cancellation
   await page.getByLabel('Телефон', { exact: true }).fill('+79991234567'); await page.getByRole('checkbox').check();
   await advance(page); await page.evaluate(() => window.__tmaTest.main());
   await expect(page.getByRole('heading', { name: 'Ждём вас в клубе' })).toBeVisible(); expect(writes).toBe(1);
-  await page.getByRole('button', { name: 'Перейти в мои записи' }).click();
+  await page.getByRole('region', { name: 'Информация о записи' }).getByRole('button', { name: 'Мои записи', exact: true }).click();
   await expect(page.getByText('Ожидает', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Отменить занятие' }).click();
   await page.getByRole('button', { name: 'Запросить отмену' }).click();
@@ -135,4 +135,68 @@ test('outside Telegram shows clear entry guidance and makes no unauthenticated A
   await page.route('https://telegram.org/**', route => route.fulfill({ body: '', contentType: 'text/javascript' }));
   await page.route('**/api/tma/**', route => { calls++; return route.abort(); });
   await page.goto(''); await expect(page.getByRole('alert')).toContainText('Откройте запись'); expect(calls).toBe(0);
+});
+
+test('success tolerates missing relations, uses selected details and starts a fresh booking', async ({ page }) => {
+  await setup(page);
+  const crashes: string[] = [];
+  page.on('pageerror', error => crashes.push(error.message));
+  await page.route('**/api/tma/bookings', route => route.fulfill({ status: 201, json: { id: bookingId, startTime: start } }));
+  await checkout(page);
+  await page.getByLabel('Телефон', { exact: true }).fill('+79991234567');
+  await page.getByRole('checkbox').check(); await advance(page);
+  const summary = page.getByRole('region', { name: 'Информация о записи' });
+  await expect(summary.getByRole('heading', { name: service.title })).toBeVisible();
+  await expect(summary).toContainText('12:00');
+  await expect(summary).toContainText('Анна');
+  await expect(summary.getByRole('status')).toContainText('Заявка принята, администратор свяжется с вами');
+  await page.screenshot({ path: 'test-results/tma-success-safe.png', fullPage: true });
+  await summary.getByRole('button', { name: 'Новая запись' }).click();
+  await expect(page.getByRole('heading', { name: 'Время для лошадей' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(false);
+  expect(crashes).toEqual([]);
+});
+
+test('my bookings sends TMA authorization and renders missing relations, statuses and both date groups', async ({ page }) => {
+  await setup(page);
+  await page.route('**/api/tma/my-bookings?**', async route => {
+    expect(route.request().headers().authorization).toBe('tma signed-data-test');
+    await new Promise(resolve => setTimeout(resolve, 150));
+    await route.fulfill({ json: { bookings: [
+      { ...booking, trainer: null, lesson: { ...booking.lesson, service: null } },
+      { ...booking, id: 'confirmed', clientConfirmed: true, lesson: null },
+      { ...booking, id: 'cancelled', status: 'cancelled', trainer: null, lesson: null, startTime: '2020-01-01T12:00:00+03:00' },
+      { id: 'no-date', status: 'completed' },
+    ], hasMore: false } });
+  });
+  const crashes: string[] = [];
+  page.on('pageerror', error => crashes.push(error.message));
+  await page.goto('');
+  await page.getByRole('button', { name: 'Мои записи', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('status').filter({ hasText: 'Загружаем ваши записи' })).toBeVisible();
+  const future = page.getByRole('region', { name: 'Предстоящие тренировки' });
+  await expect(future.getByText('Ожидает', { exact: true })).toBeVisible();
+  await expect(future.getByText('Подтверждена', { exact: true })).toBeVisible();
+  await expect(future.getByText('Тренер: Уточнит администратор')).toBeVisible();
+  const past = page.getByRole('region', { name: 'Прошедшие тренировки' });
+  await expect(past.getByText('Отменена', { exact: true })).toBeVisible();
+  await expect(past.getByText('Дату и время уточнит администратор')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(crashes).toEqual([]);
+});
+
+test('my bookings shows errors with retry, empty state and a working booking action', async ({ page }) => {
+  await setup(page); let calls = 0;
+  await page.route('**/api/tma/my-bookings?**', route => {
+    calls++;
+    return route.fulfill(calls === 1 ? { status: 503, json: { message: 'Нет соединения' } } : { json: { bookings: [], hasMore: false } });
+  });
+  await page.goto(''); await page.getByRole('button', { name: 'Мои записи', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Нет соединения');
+  await page.getByRole('button', { name: 'Обновить записи' }).click();
+  await expect(page.getByText('У вас пока нет активных записей')).toBeVisible();
+  await page.getByRole('button', { name: 'Записаться', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Время для лошадей' })).toBeVisible();
+  expect(calls).toBe(2);
 });
