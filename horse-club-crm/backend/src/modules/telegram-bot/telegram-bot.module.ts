@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module, type OnModuleInit } from '@nestjs/common';
 import { BookingsModule } from '../../bookings/bookings.module';
 import { LessonsModule } from '../../lessons/lessons.module';
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -15,4 +15,10 @@ import { TelegramDeliveryModule } from './telegram-delivery';
 
 @Module({ imports: [PrismaModule, BookingsModule, LessonsModule, AuthModule, TelegramDeliveryModule], controllers: [TelegramBotController, ClientTelegramLinkController, UserTelegramLinkController],
   providers: [TelegramBotService, TelegramAuthGuard, TmaBookingService, TelegramLinkService, TelegramPersonalService, TelegramScheduleService] })
-export class TelegramBotModule {}
+export class TelegramBotModule implements OnModuleInit {
+  private readonly logger = new Logger(TelegramBotModule.name);
+
+  onModuleInit(): void {
+    this.logger.log('Telegram bot module initialized');
+  }
+}

@@ -135,3 +135,56 @@ test('legacy unspecified receipts remain in revenue without being classified as 
   assert.equal(sum.totalRevenue.toString(), '1500');
   assert.equal(sum.totalCash.toString(), '0'); assert.equal(sum.totalCard.toString(), '0');
 });
+
+for (const method of ['CASH', 'CARD_TERMINAL', 'TRANSFER']) test(`unpaid zero-cost completed lesson settles at revised price via ${method}`, async () => {
+  const booking = { id: 'b1', clientId: 'c1', lessonId: 'l1', membershipId: null, isPaid: false, status: 'completed',
+    costAmount: new Prisma.Decimal(0), prepaymentAmount: new Prisma.Decimal(0), finalPaymentAmount: new Prisma.Decimal(0), payments: [], transactions: [] };
+  const calls = []; let receipt; let audit; let lessonData;
+  const tx = {
+    $queryRaw: async () => [], client: { findUnique: async () => ({ id: 'c1' }) },
+    user: { findUniqueOrThrow: async () => ({ role: 'ADMIN', email: 'admin' }) },
+    cashAuditLog: { create: async ({ data }) => { audit = data; }, findUnique: async () => audit },
+    cashShift: { findFirst: async () => null },
+    booking: { findUnique: async () => booking, findMany: async () => [booking], update: async ({ data }) => { calls.push(data); Object.assign(booking, data); } },
+    lesson: { findUnique: async () => ({ status: 'COMPLETED', _count: { bookings: 1 } }), update: async ({ data }) => { lessonData = data; } },
+    payment: { findUnique: async () => receipt, findFirst: async () => ({ id: 'pending' }),
+      create: async ({ data }) => { receipt = { id: 'receipt', ...data }; booking.payments.push(receipt); return receipt; },
+      updateMany: async args => { calls.push(args); } },
+    ledgerTransaction: { create: async args => { calls.push(args); } },
+  };
+  const service = new CashDeskService({ $transaction: async (work, options) => { assert.equal(options.isolationLevel, 'Serializable'); return work(tx); } });
+  const request = { clientId: 'c1', bookingId: 'b1', requestId: 'r1', amount: 1750.5, lessonCost: 1750.5, method };
+  const result = await service.pay(request, 'u1');
+  assert.equal(result.amount.toString(), '1750.5'); assert.equal(booking.costAmount.toString(), '1750.5');
+  assert.equal(booking.isPaid, true); assert.equal(lessonData.paymentStatus, 'PAID'); assert.equal(lessonData.cost.toString(), '1750.5');
+  assert.equal(audit.details.previousCost, '0'); assert.equal(audit.actorId, 'u1');
+  assert.ok(calls.some(call => call.data?.status === 'CANCELLED'));
+  const count = calls.length;
+  assert.equal((await service.pay(request, 'u1')).id, 'receipt'); assert.equal(calls.length, count);
+  await assert.rejects(service.pay({ ...request, lessonCost: 1800 }, 'u1'), error => error.status === 409);
+});
+
+test('price changes require a lesson and complete payment', async () => {
+  await assert.rejects(fixture().service.pay({ ...dto, lessonCost: 1000 }, 'u1'), error => error.status === 400);
+  await assert.rejects(fixture({ booking: { id: 'b1', clientId: 'c1', transactions: [] } }).service.pay({ ...dto, bookingId: 'b1', lessonCost: 1000 }, 'u1'), error => error.status === 400);
+});
+
+test('one-off price changes reject read-only schedule access, prepayments and partial collection', async () => {
+  for (const scenario of ['read-only', 'prepaid', 'partial', 'cancelled', 'group']) {
+    let writes = 0;
+    const tx = {
+      $queryRaw: async () => [], payment: { findUnique: async () => null }, client: { findUnique: async () => ({ id: 'c1' }) },
+      booking: { findUnique: async () => ({ id: 'b1', clientId: 'c1', lessonId: 'l1', membershipId: null,
+        costAmount: new Prisma.Decimal(1500), prepaymentAmount: new Prisma.Decimal(scenario === 'prepaid' ? 100 : 0),
+        finalPaymentAmount: new Prisma.Decimal(0), payments: [], transactions: [], status: 'completed' }), update: async () => { writes++; } },
+      user: { findUniqueOrThrow: async () => ({ role: scenario === 'read-only' ? 'MANAGER' : 'ADMIN', email: 'admin' }) },
+      roleModulePermission: { findUnique: async () => ({ accessLevel: 'READ_ONLY' }) },
+      lesson: { findUnique: async () => ({ status: scenario === 'cancelled' ? 'CANCELLED' : 'COMPLETED', _count: { bookings: scenario === 'group' ? 2 : 1 } }) },
+      cashAuditLog: { create: async () => { writes++; } },
+    };
+    const service = new CashDeskService({ $transaction: async work => work(tx) });
+    await assert.rejects(service.pay({ clientId: 'c1', bookingId: 'b1', lessonCost: 1500, amount: scenario === 'partial' ? 1000 : 1500, method: 'TRANSFER' }, 'u1'),
+      error => [400, 403, 409].includes(error.status));
+    assert.equal(writes, 0, scenario);
+  }
+});

@@ -41,6 +41,7 @@ services:
       target: runtime
     restart: unless-stopped
     init: true
+    stop_grace_period: 40s
     environment:
       NODE_ENV: production
       PORT: '3000'

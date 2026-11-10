@@ -170,7 +170,9 @@ test('financial status service rejects forged lesson ownership and revoked write
 });
 
 test('real bot dispatch handles username binding, role menus, personal queries and explicit status confirmation', async t => {
-  const { Bot } = require('grammy');
+  const { Api, Bot } = require('grammy');
+  t.mock.method(Api.prototype, 'deleteWebhook', async () => true);
+  t.mock.method(Bot.prototype, 'init', async () => {});
   const { TelegramBotService } = require('../dist/modules/telegram-bot/telegram-bot.service');
   const previous = process.env.TELEGRAM_BOT_TOKEN;
   let bot, updateId = 1;
@@ -195,6 +197,7 @@ test('real bot dispatch handles username binding, role menus, personal queries a
     chat_instance: 'private', data, message: { message_id: 1, date: 0, chat: { id: Number(sender), type: 'private' }, text: 'Menu' } } });
   try {
     process.env.TELEGRAM_BOT_TOKEN = '123:test'; service.onModuleInit();
+    await new Promise(resolve => setImmediate(resolve));
     await message('1', '/start link_client_test');
     assert.deepEqual(consumed[0], ['1', 'test_user']);
     assert.match(sent.at(-1).text, /Добро пожаловать/);

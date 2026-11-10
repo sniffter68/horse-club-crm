@@ -189,6 +189,11 @@ test('bot routes getMe through TELEGRAM_API_ROOT without waiting for the network
   const received = new Promise(resolve => { receivedRequest = resolve; });
   const server = createServer((req, res) => {
     requests.push(req.url);
+    if (req.url.endsWith('/deleteWebhook')) {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ ok: true, result: true }));
+      return;
+    }
     finishResponse = () => {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ ok: true, result: { id: 123, is_bot: true, first_name: 'Test', username: 'test_bot' } }));
@@ -196,10 +201,11 @@ test('bot routes getMe through TELEGRAM_API_ROOT without waiting for the network
     receivedRequest();
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  let probe;
+  let started;
+  const probe = new Promise(resolve => { started = resolve; });
   t.mock.method(Bot.prototype, 'start', function () {
-    probe = this.api.getMe();
-    return probe.then(() => undefined);
+    started(this.botInfo);
+    return Promise.resolve();
   });
   try {
     process.env.TELEGRAM_BOT_TOKEN = token;
@@ -211,7 +217,7 @@ test('bot routes getMe through TELEGRAM_API_ROOT without waiting for the network
     // The proxy is still holding getMe open while Nest initialization has returned.
     finishResponse();
     assert.equal((await probe).username, 'test_bot');
-    assert.deepEqual(requests, [`/telegram/bot${token}/getMe`]);
+    assert.deepEqual(requests, [`/telegram/bot${token}/deleteWebhook`, `/telegram/bot${token}/getMe`]);
     await service.onModuleDestroy();
   } finally {
     for (const [name, value] of Object.entries(previous)) {
@@ -223,10 +229,12 @@ test('bot routes getMe through TELEGRAM_API_ROOT without waiting for the network
 });
 
 test('empty API root keeps the Telegram default and polling failure is handled without leaking credentials', async t => {
-  const { Bot } = require('grammy');
+  const { Api, Bot } = require('grammy');
   const { Logger } = require('@nestjs/common');
   const previous = Object.fromEntries(['TELEGRAM_BOT_TOKEN', 'TELEGRAM_API_ROOT', 'TELEGRAM_WEBAPP_URL'].map(name => [name, process.env[name]]));
   const messages = [];
+  t.mock.method(Api.prototype, 'deleteWebhook', async () => true);
+  t.mock.method(Bot.prototype, 'init', async () => {});
   t.mock.method(Logger.prototype, 'error', message => messages.push(message));
   t.mock.method(Bot.prototype, 'start', function () {
     assert.equal(this.api.options.apiRoot, undefined);

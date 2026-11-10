@@ -55,6 +55,33 @@ test('completed debt opens cash desk with the current client and lesson selected
   expect(payment).toMatchObject({ clientId: client.id, bookingId: id(5), amount: 1500 })
 })
 
+for (const width of [1440, 390]) test(`completed zero-cost debt converts to one-off transfer at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 1000 })
+  const state = await setup(page, 0)
+  state.lesson = { ...state.lesson!, status: 'COMPLETED', cost: 0, paymentStatus: 'UNPAID' }
+  await page.route(`**/api/payments/cash-desk/options/${client.id}`, route => route.fulfill({ json: { memberships: [], bookings: [{ id: id(5), startTime: state.lesson!.startTime, remainingAmount: 0, lesson: { service } }] } }))
+  await page.route(`**/api/lessons/${id(4)}`, route => route.fulfill({ json: state.lesson }))
+  let payment: Record<string, unknown> | undefined
+  await page.route('**/api/payments/cash-desk', async route => {
+    payment = route.request().postDataJSON()
+    state.lesson = { ...state.lesson!, cost: 1750.5, paymentStatus: 'PAID', finalPaymentAmount: 1750.5 }
+    await route.fulfill({ status: 201, json: { id: id(45), method: 'TRANSFER' } })
+  })
+  await page.goto('/schedule'); await page.locator('.fc-event').first().click()
+  const detail = page.getByRole('dialog', { name: 'Карточка занятия', exact: true })
+  await choose(page, detail, 'Режим оплаты занятия', 'Разовое занятие')
+  const cash = page.getByRole('dialog', { name: 'Принять оплату / Касса' })
+  await expect(cash.getByRole('spinbutton', { name: 'Сумма чека, ₽', exact: true })).toHaveValue('1500.00')
+  await cash.getByRole('spinbutton', { name: 'Сумма чека, ₽', exact: true }).fill('1750.50')
+  await cash.getByText('Безнал', { exact: true }).click()
+  await choose(page, cash, 'Вид безналичной оплаты', 'Перевод')
+  await cash.getByRole('button', { name: 'Провести платёж', exact: true }).click()
+  await expect(cash).not.toBeVisible()
+  expect(payment).toMatchObject({ amount: 1750.5, lessonCost: 1750.5, bookingId: id(5), method: 'TRANSFER' })
+  await expect(detail.getByRole('button', { name: 'Принять оплату в кассу' })).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
 for (const sell of [false, true]) test(`completed unpaid lesson uses ${sell ? 'newly sold' : 'existing'} membership with retry`, async ({ page }) => {
   await page.setViewportSize({ width: sell ? 390 : 1440, height: 1000 })
   const state = await setup(page, 0)
@@ -101,6 +128,23 @@ const id = (n: number) => `${String(n).padStart(8, '0')}-1111-4111-8111-11111111
 const client = { id: id(1), name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567' }
 const trainer = { id: id(2), name: 'Мария' }
 const service = { id: id(3), title: 'Разовая тренировка', name: 'Разовая тренировка', price: '1500', durationMinutes: 60, maxCapacity: 1, allowMembership: false }
+
+test('client preferred trainer remains editable and manual trainer reaches lesson payload', async ({ page }) => {
+  const state = await setup(page)
+  const other = { id: id(22), name: 'Другой тренер', isActive: true }
+  await page.route('**/api/trainers?*', route => route.fulfill({ json: [trainer, other], headers: { 'x-total-count': '2' } }))
+  await page.route(`**/api/clients/${client.id}`, route => route.fulfill({ json: { ...client, preferredTrainerId: trainer.id, memberships: [] } }))
+  await page.goto('/schedule')
+  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
+  await choose(page, drawer, 'Клиент', client.name)
+  await choose(page, drawer, 'Услуга', service.name)
+  await expect(drawer.getByRole('combobox', { name: 'Тренер', exact: true })).toBeEnabled()
+  await choose(page, drawer, 'Тренер', other.name)
+  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await expect(drawer).not.toBeVisible()
+  expect(state.posts[0].trainerId).toBe(other.id)
+})
 
 for (const width of [1440, 390]) for (const count of [2, 3]) test(`independent lessons split into ${count} lanes at ${width}px`, async ({ page }) => {
   test.setTimeout(60000)
@@ -200,8 +244,9 @@ async function setup(page: Page, prepaid?: number, group = false) {
 }
 
 async function choose(page: Page, form: Locator, label: string, text: string) {
-  await form.getByRole('combobox', { name: new RegExp(`${label}$`) }).click()
-  await page.locator('.ant-select-dropdown:visible').getByText(text, { exact: true }).click()
+  const select = form.getByRole('combobox', { name: new RegExp(`${label}$`) })
+  await select.locator('xpath=ancestor::div[contains(@class,"ant-select-selector")]').click()
+  await page.locator('.ant-select-dropdown:visible').getByText(text, { exact: false }).click()
 }
 
 for (const width of [1440, 390]) test(`excursion for 20 guests calculates total and posts prepayment at ${width}px`, async ({ page }) => {

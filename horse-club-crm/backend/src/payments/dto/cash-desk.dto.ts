@@ -9,6 +9,7 @@ export class CashDeskPaymentDto {
   @IsOptional() @IsUUID() serviceId?: string;
   @IsOptional() @IsString() @MaxLength(150) serviceType?: string;
   @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(9999999999.99) amount!: number;
+  @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(9999999999.99) lessonCost?: number;
   @IsIn(['CASH', 'CARD_TERMINAL', 'SBP', 'TRANSFER']) method!: 'CASH' | 'CARD_TERMINAL' | 'SBP' | 'TRANSFER';
   @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(9999999999.99) cashGiven?: number;
   @IsOptional() @IsString() @MaxLength(500) notes?: string;

@@ -95,7 +95,9 @@ test('over 30 lessons and oversized paragraphs are delivered losslessly within 4
 });
 
 test('real bot dispatch covers schedule commands, menus, refresh, relative navigation and denied access', async t => {
-  const { Bot } = require('grammy');
+  const { Api, Bot } = require('grammy');
+  t.mock.method(Api.prototype, 'deleteWebhook', async () => true);
+  t.mock.method(Bot.prototype, 'init', async () => {});
   const { TelegramBotService } = require('../dist/modules/telegram-bot/telegram-bot.service');
   const previous = process.env.TELEGRAM_BOT_TOKEN;
   const sent = [], viewed = [];
@@ -121,6 +123,7 @@ test('real bot dispatch covers schedule commands, menus, refresh, relative navig
     message: { message_id: 1, date: 0, chat: { id: sender, type: 'private' }, text: 'Menu' } } });
   try {
     process.env.TELEGRAM_BOT_TOKEN = '123:test'; service.onModuleInit();
+    await new Promise(resolve => setImmediate(resolve));
     for (const sender of [2, 3]) {
       await message(sender, '/start');
       assert.ok(sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.text === '📅 Расписание на сегодня'));

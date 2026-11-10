@@ -6,11 +6,12 @@ import { useInvalidate, usePermissions } from '@refinedev/core'
 import { Alert, App, Button, Form, Input, InputNumber, Segmented, Select, Space, Statistic } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
+import { isUuid } from '../../uuid'
 import { currency, cashTime } from './shared'
 
 
 type Choice = { value: string; label: string; price: number; bookingId?: string; membershipId?: string; serviceId?: string; serviceType?: string }
-type Values = { clientId: string; choice: string; amount: number; cashGiven?: number; method: string; nonCash: string; notes?: string }
+type Values = { clientId: string; choice: string; amount: number; lessonCost?: number; cashGiven?: number; method: string; nonCash: string; notes?: string }
 const CashDeskContext = createContext<() => void>(() => {})
 export function CashDeskButton() {
   const open = useContext(CashDeskContext)
@@ -26,7 +27,7 @@ export function CashDeskProvider({ children }: { children: ReactNode }) {
     {open && <CashDeskPaymentModal key={revision} onClose={() => setOpen(false)} />}
   </CashDeskContext.Provider>
 }
-export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClientId, initialBookingId, onPaid }: { onClose: () => void; variant?: 'modal' | 'drawer'; initialClientId?: string; initialBookingId?: string; onPaid?: () => void }) {
+export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClientId, initialBookingId, oneOffPrice, onPaid }: { onClose: () => void; variant?: 'modal' | 'drawer'; initialClientId?: string; initialBookingId?: string; oneOffPrice?: number; onPaid?: () => void }) {
   const [form] = Form.useForm<Values>()
   const { message, modal } = App.useApp()
   const invalidate = useInvalidate()
@@ -57,14 +58,15 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClient
       for (const row of linked.data.memberships) if ((row.type !== 'fixed_lessons' || !row.payments.some((p: { status: string }) => p.status === 'PAID')) && row.status !== 'frozen') options.push({ value: `membership:${row.id}`, label: `Абонемент · ${row.title || row.pricingPlan?.name || row.type}`, price: Number(row.payments.find((p: { status: string }) => p.status === 'PENDING')?.amount || row.pricingPlan?.price || 0), membershipId: row.id })
       options.push({ value: 'manual', label: 'Другая услуга — указать сумму', price: 0, serviceType: 'Другая услуга' })
       setChoices(options)
+      if (oneOffPrice != null && initialBookingId && !options.some(row => row.bookingId === initialBookingId)) options.unshift({ value: `booking:${initialBookingId}`, label: 'Разовое занятие', price: oneOffPrice, bookingId: initialBookingId })
       if (initialBookingId && clientId === initialClientId && !form.isFieldTouched('choice')) {
         const selected = options.find(row => row.bookingId === initialBookingId)
-        if (selected) form.setFieldsValue({ choice: selected.value, amount: selected.price })
+        if (selected) form.setFieldsValue({ choice: selected.value, amount: oneOffPrice ?? selected.price })
       }
     }).catch(cause => { if (!controller.signal.aborted) setError(toHttpError(cause).message) })
       .finally(() => { if (!controller.signal.aborted) setOptionsLoading(false) })
     return () => controller.abort()
-  }, [clientId, form, initialBookingId, initialClientId])
+  }, [clientId, form, initialBookingId, initialClientId, oneOffPrice])
   const close = () => {
     if (pending.current) return
     if (form.isFieldsTouched()) modal.confirm({ title: 'Закрыть кассу?', content: 'Введённые данные платежа будут потеряны.', okText: 'Закрыть', cancelText: 'Продолжить', onOk: onClose })
@@ -74,6 +76,7 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClient
     if (pending.current) return
     const selected = choices.find(row => row.value === values.choice)
     if (!selected) return
+    if ([values.clientId, selected.bookingId, selected.membershipId, selected.serviceId].filter((id): id is string => Boolean(id)).some(id => !isUuid(id))) { setError('Выберите корректные записи из справочников'); return }
     if (values.method === 'CASH' && change < 0) return
     // Keep the operation key and payload after an uncertain network outcome.
     const payload = submitted.current ?? values
@@ -83,6 +86,7 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClient
     pending.current = true; setBusy(true); setError(undefined)
     try {
       const { data } = await httpClient.post(`${API_URL}/payments/cash-desk`, {
+        ...(oneOffPrice != null && source.bookingId === initialBookingId ? { lessonCost: payload.amount } : {}),
         requestId: requestId.current, clientId: payload.clientId, amount: payload.amount,
         method: payload.method === 'CASH' ? 'CASH' : payload.nonCash,
         ...(payload.method === 'CASH' ? { cashGiven: payload.cashGiven } : {}), notes: payload.notes,
@@ -104,14 +108,14 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClient
     {error && <Alert role="alert" type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
     <Form form={form} layout="vertical" noValidate initialValues={{ clientId: initialClientId, method: 'CASH', nonCash: 'CARD_TERMINAL' }} onFinish={pay} disabled={busy || locked} scrollToFirstError>
       <Form.Item name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}>
-        <ClientSelectWithCreate onChange={value => {
+        <ClientSelectWithCreate disabled={oneOffPrice != null} onChange={value => {
           const selected = choices.find(row => row.value === form.getFieldValue('choice'))
           if (selected?.bookingId || selected?.membershipId) form.setFieldValue('choice', undefined)
           setChoices([]); setOptionsLoading(Boolean(value))
         }} />
       </Form.Item>
       <Form.Item name="choice" label="Услуга / занятие / абонемент" rules={[{ required: true, message: 'Выберите услугу' }]}>
-        <Select aria-label="Услуга / занятие / абонемент" showSearch optionFilterProp="label" loading={optionsLoading} disabled={!clientId || optionsLoading || busy || locked} options={choices} placeholder="Выберите основание платежа" onChange={value => form.setFieldValue('amount', choices.find(row => row.value === value)?.price)} />
+        <Select aria-label="Услуга / занятие / абонемент" showSearch optionFilterProp="label" loading={optionsLoading} disabled={oneOffPrice != null || !clientId || optionsLoading || busy || locked} options={choices} placeholder="Выберите основание платежа" onChange={value => form.setFieldValue('amount', choices.find(row => row.value === value)?.price)} />
       </Form.Item>
       <Form.Item name="amount" label="Сумма чека, ₽" rules={[{ required: true, type: 'number', min: 0.01, message: 'Введите сумму больше нуля' }]}><InputNumber aria-label="Сумма чека, ₽" min={0.01} max={9999999999.99} precision={2} style={{ width: '100%' }} /></Form.Item>
       <Form.Item name="method" label="Способ оплаты"><Segmented options={[{ label: 'Наличные', value: 'CASH' }, { label: 'Безнал', value: 'NON_CASH' }]} block /></Form.Item>

@@ -1,0 +1,439 @@
+diff --git a/horse-club-crm/backend/src/payments/cash-desk.service.ts b/horse-club-crm/backend/src/payments/cash-desk.service.ts
+index 21f9ea5..6451adc 100644
+--- a/horse-club-crm/backend/src/payments/cash-desk.service.ts
++++ b/horse-club-crm/backend/src/payments/cash-desk.service.ts
+@@ -1,11 +1,12 @@
+ import { randomUUID } from 'node:crypto';
+-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
++import { BadRequestException, ConflictException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+ import { Prisma } from '@prisma/client';
+ import { PrismaService } from '../prisma/prisma.service';
+ import { isSerializationFailure } from '../common/serialization-failure';
+ import { CashDeskPaymentDto, CashSummaryQueryDto, OpenCashShiftDto } from './dto/cash-desk.dto';
+ import { aggregatePaymentMethods, calculateCashChange } from './cash-desk.math';
+-import { paymentStatus } from '../lessons/lesson-finance';
++import { defaultModuleAccess } from '../settings/module-access.service';
++import { money, paymentStatus } from '../lessons/lesson-finance';
+ 
+ const include = {
+   client: { select: { id: true, name: true, firstName: true, lastName: true, phone: true } },
+@@ -29,6 +30,7 @@ export class CashDeskService {
+     dto = { ...dto, cashGiven: dto.cashGiven ?? undefined };
+     if (dto.bookingId && dto.membershipId) throw new BadRequestException('Выберите занятие или абонемент');
+     if (dto.method !== 'CASH' && dto.cashGiven !== undefined) throw new BadRequestException('Внесённые наличные доступны только при оплате наличными');
++    if (dto.lessonCost != null && !dto.bookingId) throw new BadRequestException('Стоимость можно изменить только для занятия');
+     const requestId = dto.requestId ?? randomUUID();
+     const change = calculateCashChange(dto.amount, dto.cashGiven);
+     return this.atomic(async tx => {
+@@ -43,6 +45,11 @@ export class CashDeskService {
+           || (previous.cashGiven?.toString() ?? null) !== (dto.cashGiven === undefined ? null : new Prisma.Decimal(dto.cashGiven).toString())) {
+           throw new ConflictException('Этот ключ операции уже использован для другого платежа');
+         }
++        if (dto.lessonCost != null) {
++          const audit = await tx.cashAuditLog.findUnique({ where: { requestId } });
++          if (!audit || typeof audit.details !== 'object' || Array.isArray(audit.details) || audit.details === null
++            || audit.details.lessonCost !== String(dto.lessonCost)) throw new ConflictException('Этот ключ операции уже использован с другой стоимостью');
++        }
+         return previous;
+       }
+       if (!await tx.client.findUnique({ where: { id: dto.clientId } })) throw new NotFoundException('Клиент не найден');
+@@ -52,11 +59,30 @@ export class CashDeskService {
+       if (dto.bookingId) {
+         const booking = await tx.booking.findUnique({ where: { id: dto.bookingId }, include: { transactions: true, payments: { where: { status: 'PAID' } } } });
+         if (!booking || booking.clientId !== dto.clientId) throw new BadRequestException('Занятие не принадлежит клиенту');
++        if (dto.lessonCost != null && !booking.lessonId) throw new BadRequestException('Изменение стоимости доступно только для занятия расписания');
+         if (booking.isPaid || (!booking.lessonId && await tx.payment.count({ where: { bookingId: booking.id, status: 'PAID' } }))) throw new ConflictException('Занятие уже оплачено');
+         if (booking.lessonId) {
+           if (booking.membershipId) throw new ConflictException('Занятие оплачивается абонементом');
+           const paid = Prisma.Decimal.max(new Prisma.Decimal(booking.prepaymentAmount).plus(booking.finalPaymentAmount),
+             booking.payments.reduce((sum, payment) => sum.plus(payment.amount), new Prisma.Decimal(0)));
++          if (dto.lessonCost != null) {
++            const user = await tx.user.findUniqueOrThrow({ where: { id: cashierId }, select: { role: true, email: true } });
++            if (user.role !== 'ADMIN') {
++              const permission = await tx.roleModulePermission.findUnique({ where: { role_module: { role: user.role, module: 'SCHEDULE' } } });
++              if ((permission?.accessLevel ?? defaultModuleAccess(user.role, 'SCHEDULE')) !== 'FULL') throw new ForbiddenException('Для изменения стоимости нужен полный доступ к расписанию');
++            }
++            const lesson = await tx.lesson.findUnique({ where: { id: booking.lessonId }, select: { status: true, deletedAt: true, cancelledAt: true, _count: { select: { bookings: true } } } });
++            if (!lesson || lesson.deletedAt || lesson.cancelledAt || lesson.status === 'CANCELLED') throw new ConflictException('Занятие отменено');
++            if (lesson._count.bookings !== 1) throw new ConflictException('Изменение стоимости доступно для занятия с одним плательщиком');
++            const cost = money(dto.lessonCost);
++            if (paid.gt(0) || booking.payments.length) throw new ConflictException('Стоимость можно изменить только до приёма оплаты');
++            if (!cost.equals(dto.amount)) throw new BadRequestException('Разовое занятие нужно оплатить полностью на указанную стоимость');
++            await tx.cashAuditLog.create({ data: { requestId, action: 'LESSON_ONE_OFF_PAYMENT', actorId: cashierId, actorName: user.email,
++              details: { bookingId: booking.id, lessonId: booking.lessonId, previousCost: booking.costAmount.toString(), lessonCost: String(dto.lessonCost) } } });
++            // The database trigger appends the revenue adjustment for completed lessons.
++            await tx.booking.update({ where: { id: booking.id }, data: { costAmount: cost, financialActorId: cashierId } });
++            booking.costAmount = cost;
++          }
+           const remaining = booking.costAmount.minus(paid);
+           if (remaining.lte(0)) throw new ConflictException('Занятие уже оплачено');
+           if (new Prisma.Decimal(dto.amount).gt(remaining)) throw new BadRequestException('Сумма превышает остаток за занятие');
+diff --git a/horse-club-crm/backend/src/payments/dto/cash-desk.dto.ts b/horse-club-crm/backend/src/payments/dto/cash-desk.dto.ts
+index d73cb71..ad79e3f 100644
+--- a/horse-club-crm/backend/src/payments/dto/cash-desk.dto.ts
++++ b/horse-club-crm/backend/src/payments/dto/cash-desk.dto.ts
+@@ -9,6 +9,7 @@ export class CashDeskPaymentDto {
+   @IsOptional() @IsUUID() serviceId?: string;
+   @IsOptional() @IsString() @MaxLength(150) serviceType?: string;
+   @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(9999999999.99) amount!: number;
++  @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(9999999999.99) lessonCost?: number;
+   @IsIn(['CASH', 'CARD_TERMINAL', 'SBP', 'TRANSFER']) method!: 'CASH' | 'CARD_TERMINAL' | 'SBP' | 'TRANSFER';
+   @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(9999999999.99) cashGiven?: number;
+   @IsOptional() @IsString() @MaxLength(500) notes?: string;
+diff --git a/horse-club-crm/backend/test/cash-desk.test.cjs b/horse-club-crm/backend/test/cash-desk.test.cjs
+index 02dd6eb..0f32e94 100644
+--- a/horse-club-crm/backend/test/cash-desk.test.cjs
++++ b/horse-club-crm/backend/test/cash-desk.test.cjs
+@@ -135,3 +135,56 @@ test('legacy unspecified receipts remain in revenue without being classified as
+   assert.equal(sum.totalRevenue.toString(), '1500');
+   assert.equal(sum.totalCash.toString(), '0'); assert.equal(sum.totalCard.toString(), '0');
+ });
++
++for (const method of ['CASH', 'CARD_TERMINAL', 'TRANSFER']) test(`unpaid zero-cost completed lesson settles at revised price via ${method}`, async () => {
++  const booking = { id: 'b1', clientId: 'c1', lessonId: 'l1', membershipId: null, isPaid: false, status: 'completed',
++    costAmount: new Prisma.Decimal(0), prepaymentAmount: new Prisma.Decimal(0), finalPaymentAmount: new Prisma.Decimal(0), payments: [], transactions: [] };
++  const calls = []; let receipt; let audit; let lessonData;
++  const tx = {
++    $queryRaw: async () => [], client: { findUnique: async () => ({ id: 'c1' }) },
++    user: { findUniqueOrThrow: async () => ({ role: 'ADMIN', email: 'admin' }) },
++    cashAuditLog: { create: async ({ data }) => { audit = data; }, findUnique: async () => audit },
++    cashShift: { findFirst: async () => null },
++    booking: { findUnique: async () => booking, findMany: async () => [booking], update: async ({ data }) => { calls.push(data); Object.assign(booking, data); } },
++    lesson: { findUnique: async () => ({ status: 'COMPLETED', _count: { bookings: 1 } }), update: async ({ data }) => { lessonData = data; } },
++    payment: { findUnique: async () => receipt, findFirst: async () => ({ id: 'pending' }),
++      create: async ({ data }) => { receipt = { id: 'receipt', ...data }; booking.payments.push(receipt); return receipt; },
++      updateMany: async args => { calls.push(args); } },
++    ledgerTransaction: { create: async args => { calls.push(args); } },
++  };
++  const service = new CashDeskService({ $transaction: async (work, options) => { assert.equal(options.isolationLevel, 'Serializable'); return work(tx); } });
++  const request = { clientId: 'c1', bookingId: 'b1', requestId: 'r1', amount: 1750.5, lessonCost: 1750.5, method };
++  const result = await service.pay(request, 'u1');
++  assert.equal(result.amount.toString(), '1750.5'); assert.equal(booking.costAmount.toString(), '1750.5');
++  assert.equal(booking.isPaid, true); assert.equal(lessonData.paymentStatus, 'PAID'); assert.equal(lessonData.cost.toString(), '1750.5');
++  assert.equal(audit.details.previousCost, '0'); assert.equal(audit.actorId, 'u1');
++  assert.ok(calls.some(call => call.data?.status === 'CANCELLED'));
++  const count = calls.length;
++  assert.equal((await service.pay(request, 'u1')).id, 'receipt'); assert.equal(calls.length, count);
++  await assert.rejects(service.pay({ ...request, lessonCost: 1800 }, 'u1'), error => error.status === 409);
++});
++
++test('price changes require a lesson and complete payment', async () => {
++  await assert.rejects(fixture().service.pay({ ...dto, lessonCost: 1000 }, 'u1'), error => error.status === 400);
++  await assert.rejects(fixture({ booking: { id: 'b1', clientId: 'c1', transactions: [] } }).service.pay({ ...dto, bookingId: 'b1', lessonCost: 1000 }, 'u1'), error => error.status === 400);
++});
++
++test('one-off price changes reject read-only schedule access, prepayments and partial collection', async () => {
++  for (const scenario of ['read-only', 'prepaid', 'partial', 'cancelled', 'group']) {
++    let writes = 0;
++    const tx = {
++      $queryRaw: async () => [], payment: { findUnique: async () => null }, client: { findUnique: async () => ({ id: 'c1' }) },
++      booking: { findUnique: async () => ({ id: 'b1', clientId: 'c1', lessonId: 'l1', membershipId: null,
++        costAmount: new Prisma.Decimal(1500), prepaymentAmount: new Prisma.Decimal(scenario === 'prepaid' ? 100 : 0),
++        finalPaymentAmount: new Prisma.Decimal(0), payments: [], transactions: [], status: 'completed' }), update: async () => { writes++; } },
++      user: { findUniqueOrThrow: async () => ({ role: scenario === 'read-only' ? 'MANAGER' : 'ADMIN', email: 'admin' }) },
++      roleModulePermission: { findUnique: async () => ({ accessLevel: 'READ_ONLY' }) },
++      lesson: { findUnique: async () => ({ status: scenario === 'cancelled' ? 'CANCELLED' : 'COMPLETED', _count: { bookings: scenario === 'group' ? 2 : 1 } }) },
++      cashAuditLog: { create: async () => { writes++; } },
++    };
++    const service = new CashDeskService({ $transaction: async work => work(tx) });
++    await assert.rejects(service.pay({ clientId: 'c1', bookingId: 'b1', lessonCost: 1500, amount: scenario === 'partial' ? 1000 : 1500, method: 'TRANSFER' }, 'u1'),
++      error => [400, 403, 409].includes(error.status));
++    assert.equal(writes, 0, scenario);
++  }
++});
+diff --git a/horse-club-crm/backend/test/lesson-membership.postgres.test.cjs b/horse-club-crm/backend/test/lesson-membership.postgres.test.cjs
+index b0ea8cf..f693fbd 100644
+--- a/horse-club-crm/backend/test/lesson-membership.postgres.test.cjs
++++ b/horse-club-crm/backend/test/lesson-membership.postgres.test.cjs
+@@ -6,6 +6,45 @@ const { PrismaClient } = require('@prisma/client');
+ const { MembershipsService } = require('../dist/memberships/memberships.service');
+ const { MembershipLedgerService } = require('../dist/memberships/membership-ledger.service');
+ const { LessonsService } = require('../dist/lessons/lessons.service');
++const { CashDeskService } = require('../dist/payments/cash-desk.service');
++
++test('PostgreSQL one-off settlement preserves revenue history and cancellation reverses revised price', {
++  skip: process.env.RUN_MEMBERSHIP_SALE_TESTS !== '1', timeout: 60000,
++}, async () => {
++  const url = new URL(process.env.DATABASE_URL);
++  assert.ok(['localhost', '127.0.0.1'].includes(url.hostname));
++  assert.match(url.searchParams.get('schema'), /^membership_sale_check_\d+$/);
++  const p = new PrismaClient();
++  try {
++    const actor = await p.user.create({ data: { email: `${randomUUID()}@oneoff.test`, passwordHash: 'test', role: 'ADMIN' } });
++    const client = await p.client.create({ data: { name: 'One off payer' } });
++    const trainer = await p.trainer.create({ data: { name: 'One off trainer' } });
++    const service = await p.service.create({ data: { name: 'One off training', durationMinutes: 60, price: 1500 } });
++    for (const originalCost of [0, 1500]) {
++      const startTime = new Date(`2031-05-${originalCost ? '06' : '05'}T09:00Z`), endTime = new Date(+startTime + 3600000);
++      const lesson = await p.lesson.create({ data: { trainerId: trainer.id, serviceId: service.id, startTime, endTime, cost: originalCost,
++        bookings: { create: { trainerId: trainer.id, clientId: client.id, startTime, endTime, costAmount: originalCost, legacyLessonBinding: true } } }, include: { bookings: true } });
++      await p.lesson.update({ where: { id: lesson.id }, data: { status: 'COMPLETED', financialActorId: actor.id } });
++      const bookingId = lesson.bookings[0].id;
++      await p.payment.create({ data: { clientId: client.id, bookingId, amount: originalCost, method: 'UNSPECIFIED', status: 'PENDING' } });
++      const request = { clientId: client.id, bookingId, requestId: randomUUID(), amount: 1750.5, lessonCost: 1750.5, method: 'TRANSFER' };
++      const cash = new CashDeskService(p);
++      const receipt = await cash.pay(request, actor.id);
++      assert.equal((await cash.pay(request, actor.id)).id, receipt.id);
++      assert.equal(await p.payment.count({ where: { bookingId, status: 'PAID' } }), 1);
++      assert.equal(await p.payment.count({ where: { bookingId, status: 'PENDING' } }), 0);
++      const updated = await p.lesson.findUniqueOrThrow({ where: { id: lesson.id } });
++      assert.equal(updated.paymentStatus, 'PAID'); assert.equal(updated.cost.toString(), '1750.5');
++      const journal = await p.revenueRecognition.findMany({ where: { bookingId } });
++      assert.equal(journal.find(row => row.type === 'REVENUE_RECOGNITION').amount.toString(), String(originalCost));
++      assert.equal(journal.reduce((sum, row) => sum + Number(row.amount), 0), 1750.5);
++      const lessons = new LessonsService(p, new MembershipLedgerService(p));
++      await lessons.updateLessonStatus(lesson.id, 'CANCELLED', {}, actor, { refund: false, reason: 'Settlement cancellation test' });
++      const reversed = await p.revenueRecognition.aggregate({ where: { bookingId }, _sum: { amount: true } });
++      assert.equal(reversed._sum.amount.toString(), '0');
++    }
++  } finally { await p.$disconnect(); }
++});
+ 
+ test('PostgreSQL late membership payment reclassifies revenue, rejects duplicates and cancels without double debit', {
+   skip: process.env.RUN_MEMBERSHIP_SALE_TESTS !== '1', timeout: 60000,
+diff --git a/horse-club-crm/frontend/e2e/lesson-payments.spec.ts b/horse-club-crm/frontend/e2e/lesson-payments.spec.ts
+index 8a6ca33..f803eca 100644
+--- a/horse-club-crm/frontend/e2e/lesson-payments.spec.ts
++++ b/horse-club-crm/frontend/e2e/lesson-payments.spec.ts
+@@ -55,6 +55,33 @@ test('completed debt opens cash desk with the current client and lesson selected
+   expect(payment).toMatchObject({ clientId: client.id, bookingId: id(5), amount: 1500 })
+ })
+ 
++for (const width of [1440, 390]) test(`completed zero-cost debt converts to one-off transfer at ${width}px`, async ({ page }) => {
++  await page.setViewportSize({ width, height: 1000 })
++  const state = await setup(page, 0)
++  state.lesson = { ...state.lesson!, status: 'COMPLETED', cost: 0, paymentStatus: 'UNPAID' }
++  await page.route(`**/api/payments/cash-desk/options/${client.id}`, route => route.fulfill({ json: { memberships: [], bookings: [{ id: id(5), startTime: state.lesson!.startTime, remainingAmount: 0, lesson: { service } }] } }))
++  await page.route(`**/api/lessons/${id(4)}`, route => route.fulfill({ json: state.lesson }))
++  let payment: Record<string, unknown> | undefined
++  await page.route('**/api/payments/cash-desk', async route => {
++    payment = route.request().postDataJSON()
++    state.lesson = { ...state.lesson!, cost: 1750.5, paymentStatus: 'PAID', finalPaymentAmount: 1750.5 }
++    await route.fulfill({ status: 201, json: { id: id(45), method: 'TRANSFER' } })
++  })
++  await page.goto('/schedule'); await page.locator('.fc-event').first().click()
++  const detail = page.getByRole('dialog', { name: 'Карточка занятия', exact: true })
++  await choose(page, detail, 'Режим оплаты занятия', 'Разовое занятие')
++  const cash = page.getByRole('dialog', { name: 'Принять оплату / Касса' })
++  await expect(cash.getByRole('spinbutton', { name: 'Сумма чека, ₽', exact: true })).toHaveValue('1500.00')
++  await cash.getByRole('spinbutton', { name: 'Сумма чека, ₽', exact: true }).fill('1750.50')
++  await cash.getByText('Безнал', { exact: true }).click()
++  await choose(page, cash, 'Вид безналичной оплаты', 'Перевод')
++  await cash.getByRole('button', { name: 'Провести платёж', exact: true }).click()
++  await expect(cash).not.toBeVisible()
++  expect(payment).toMatchObject({ amount: 1750.5, lessonCost: 1750.5, bookingId: id(5), method: 'TRANSFER' })
++  await expect(detail.getByRole('button', { name: 'Принять оплату в кассу' })).toHaveCount(0)
++  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
++})
++
+ for (const sell of [false, true]) test(`completed unpaid lesson uses ${sell ? 'newly sold' : 'existing'} membership with retry`, async ({ page }) => {
+   await page.setViewportSize({ width: sell ? 390 : 1440, height: 1000 })
+   const state = await setup(page, 0)
+@@ -102,6 +129,23 @@ const client = { id: id(1), name: 'Анна Орлова', firstName: 'Анна'
+ const trainer = { id: id(2), name: 'Мария' }
+ const service = { id: id(3), title: 'Разовая тренировка', name: 'Разовая тренировка', price: '1500', durationMinutes: 60, maxCapacity: 1, allowMembership: false }
+ 
++test('client preferred trainer remains editable and manual trainer reaches lesson payload', async ({ page }) => {
++  const state = await setup(page)
++  const other = { id: id(22), name: 'Другой тренер', isActive: true }
++  await page.route('**/api/trainers?*', route => route.fulfill({ json: [trainer, other], headers: { 'x-total-count': '2' } }))
++  await page.route(`**/api/clients/${client.id}`, route => route.fulfill({ json: { ...client, preferredTrainerId: trainer.id, memberships: [] } }))
++  await page.goto('/schedule')
++  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
++  const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
++  await choose(page, drawer, 'Клиент', client.name)
++  await choose(page, drawer, 'Услуга', service.name)
++  await expect(drawer.getByRole('combobox', { name: 'Тренер', exact: true })).toBeEnabled()
++  await choose(page, drawer, 'Тренер', other.name)
++  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
++  await expect(drawer).not.toBeVisible()
++  expect(state.posts[0].trainerId).toBe(other.id)
++})
++
+ for (const width of [1440, 390]) for (const count of [2, 3]) test(`independent lessons split into ${count} lanes at ${width}px`, async ({ page }) => {
+   test.setTimeout(60000)
+   await page.setViewportSize({ width, height: 1000 })
+@@ -200,8 +244,9 @@ async function setup(page: Page, prepaid?: number, group = false) {
+ }
+ 
+ async function choose(page: Page, form: Locator, label: string, text: string) {
+-  await form.getByRole('combobox', { name: new RegExp(`${label}$`) }).click()
+-  await page.locator('.ant-select-dropdown:visible').getByText(text, { exact: true }).click()
++  const select = form.getByRole('combobox', { name: new RegExp(`${label}$`) })
++  await select.locator('xpath=ancestor::div[contains(@class,"ant-select-selector")]').click()
++  await page.locator('.ant-select-dropdown:visible').getByText(text, { exact: false }).click()
+ }
+ 
+ for (const width of [1440, 390]) test(`excursion for 20 guests calculates total and posts prepayment at ${width}px`, async ({ page }) => {
+diff --git a/horse-club-crm/frontend/src/pages/cash-desk/CashDeskPaymentModal.tsx b/horse-club-crm/frontend/src/pages/cash-desk/CashDeskPaymentModal.tsx
+index b2c0714..bc4d603 100644
+--- a/horse-club-crm/frontend/src/pages/cash-desk/CashDeskPaymentModal.tsx
++++ b/horse-club-crm/frontend/src/pages/cash-desk/CashDeskPaymentModal.tsx
+@@ -6,11 +6,12 @@ import { useInvalidate, usePermissions } from '@refinedev/core'
+ import { Alert, App, Button, Form, Input, InputNumber, Segmented, Select, Space, Statistic } from 'antd'
+ import { PlusOutlined } from '@ant-design/icons'
+ import { API_URL, httpClient, toHttpError } from '../../httpClient'
++import { isUuid } from '../../uuid'
+ import { currency, cashTime } from './shared'
+ 
+ 
+ type Choice = { value: string; label: string; price: number; bookingId?: string; membershipId?: string; serviceId?: string; serviceType?: string }
+-type Values = { clientId: string; choice: string; amount: number; cashGiven?: number; method: string; nonCash: string; notes?: string }
++type Values = { clientId: string; choice: string; amount: number; lessonCost?: number; cashGiven?: number; method: string; nonCash: string; notes?: string }
+ const CashDeskContext = createContext<() => void>(() => {})
+ export function CashDeskButton() {
+   const open = useContext(CashDeskContext)
+@@ -26,7 +27,7 @@ export function CashDeskProvider({ children }: { children: ReactNode }) {
+     {open && <CashDeskPaymentModal key={revision} onClose={() => setOpen(false)} />}
+   </CashDeskContext.Provider>
+ }
+-export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClientId, initialBookingId, onPaid }: { onClose: () => void; variant?: 'modal' | 'drawer'; initialClientId?: string; initialBookingId?: string; onPaid?: () => void }) {
++export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClientId, initialBookingId, oneOffPrice, onPaid }: { onClose: () => void; variant?: 'modal' | 'drawer'; initialClientId?: string; initialBookingId?: string; oneOffPrice?: number; onPaid?: () => void }) {
+   const [form] = Form.useForm<Values>()
+   const { message, modal } = App.useApp()
+   const invalidate = useInvalidate()
+@@ -57,14 +58,15 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClient
+       for (const row of linked.data.memberships) if ((row.type !== 'fixed_lessons' || !row.payments.some((p: { status: string }) => p.status === 'PAID')) && row.status !== 'frozen') options.push({ value: `membership:${row.id}`, label: `Абонемент · ${row.title || row.pricingPlan?.name || row.type}`, price: Number(row.payments.find((p: { status: string }) => p.status === 'PENDING')?.amount || row.pricingPlan?.price || 0), membershipId: row.id })
+       options.push({ value: 'manual', label: 'Другая услуга — указать сумму', price: 0, serviceType: 'Другая услуга' })
+       setChoices(options)
++      if (oneOffPrice != null && initialBookingId && !options.some(row => row.bookingId === initialBookingId)) options.unshift({ value: `booking:${initialBookingId}`, label: 'Разовое занятие', price: oneOffPrice, bookingId: initialBookingId })
+       if (initialBookingId && clientId === initialClientId && !form.isFieldTouched('choice')) {
+         const selected = options.find(row => row.bookingId === initialBookingId)
+-        if (selected) form.setFieldsValue({ choice: selected.value, amount: selected.price })
++        if (selected) form.setFieldsValue({ choice: selected.value, amount: oneOffPrice ?? selected.price })
+       }
+     }).catch(cause => { if (!controller.signal.aborted) setError(toHttpError(cause).message) })
+       .finally(() => { if (!controller.signal.aborted) setOptionsLoading(false) })
+     return () => controller.abort()
+-  }, [clientId, form, initialBookingId, initialClientId])
++  }, [clientId, form, initialBookingId, initialClientId, oneOffPrice])
+   const close = () => {
+     if (pending.current) return
+     if (form.isFieldsTouched()) modal.confirm({ title: 'Закрыть кассу?', content: 'Введённые данные платежа будут потеряны.', okText: 'Закрыть', cancelText: 'Продолжить', onOk: onClose })
+@@ -74,6 +76,7 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClient
+     if (pending.current) return
+     const selected = choices.find(row => row.value === values.choice)
+     if (!selected) return
++    if ([values.clientId, selected.bookingId, selected.membershipId, selected.serviceId].filter((id): id is string => Boolean(id)).some(id => !isUuid(id))) { setError('Выберите корректные записи из справочников'); return }
+     if (values.method === 'CASH' && change < 0) return
+     // Keep the operation key and payload after an uncertain network outcome.
+     const payload = submitted.current ?? values
+@@ -83,6 +86,7 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClient
+     pending.current = true; setBusy(true); setError(undefined)
+     try {
+       const { data } = await httpClient.post(`${API_URL}/payments/cash-desk`, {
++        ...(oneOffPrice != null && source.bookingId === initialBookingId ? { lessonCost: payload.amount } : {}),
+         requestId: requestId.current, clientId: payload.clientId, amount: payload.amount,
+         method: payload.method === 'CASH' ? 'CASH' : payload.nonCash,
+         ...(payload.method === 'CASH' ? { cashGiven: payload.cashGiven } : {}), notes: payload.notes,
+@@ -104,14 +108,14 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClient
+     {error && <Alert role="alert" type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
+     <Form form={form} layout="vertical" noValidate initialValues={{ clientId: initialClientId, method: 'CASH', nonCash: 'CARD_TERMINAL' }} onFinish={pay} disabled={busy || locked} scrollToFirstError>
+       <Form.Item name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}>
+-        <ClientSelectWithCreate onChange={value => {
++        <ClientSelectWithCreate disabled={oneOffPrice != null} onChange={value => {
+           const selected = choices.find(row => row.value === form.getFieldValue('choice'))
+           if (selected?.bookingId || selected?.membershipId) form.setFieldValue('choice', undefined)
+           setChoices([]); setOptionsLoading(Boolean(value))
+         }} />
+       </Form.Item>
+       <Form.Item name="choice" label="Услуга / занятие / абонемент" rules={[{ required: true, message: 'Выберите услугу' }]}>
+-        <Select aria-label="Услуга / занятие / абонемент" showSearch optionFilterProp="label" loading={optionsLoading} disabled={!clientId || optionsLoading || busy || locked} options={choices} placeholder="Выберите основание платежа" onChange={value => form.setFieldValue('amount', choices.find(row => row.value === value)?.price)} />
++        <Select aria-label="Услуга / занятие / абонемент" showSearch optionFilterProp="label" loading={optionsLoading} disabled={oneOffPrice != null || !clientId || optionsLoading || busy || locked} options={choices} placeholder="Выберите основание платежа" onChange={value => form.setFieldValue('amount', choices.find(row => row.value === value)?.price)} />
+       </Form.Item>
+       <Form.Item name="amount" label="Сумма чека, ₽" rules={[{ required: true, type: 'number', min: 0.01, message: 'Введите сумму больше нуля' }]}><InputNumber aria-label="Сумма чека, ₽" min={0.01} max={9999999999.99} precision={2} style={{ width: '100%' }} /></Form.Item>
+       <Form.Item name="method" label="Способ оплаты"><Segmented options={[{ label: 'Наличные', value: 'CASH' }, { label: 'Безнал', value: 'NON_CASH' }]} block /></Form.Item>
+diff --git a/horse-club-crm/frontend/src/pages/schedule/LessonDeferredPayment.tsx b/horse-club-crm/frontend/src/pages/schedule/LessonDeferredPayment.tsx
+index e665ba7..549ec7d 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/LessonDeferredPayment.tsx
++++ b/horse-club-crm/frontend/src/pages/schedule/LessonDeferredPayment.tsx
+@@ -23,8 +23,10 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
+   useEffect(() => () => onBusyChange(false), [onBusyChange])
+   const booking = lesson.bookings[0]
+   const eligible = lesson.paymentStatus === 'UNPAID' && lesson.bookings.length === 1 && lesson.service.allowMembership && lesson.pricePerPerson == null
++  const canRevisePrice = lesson.bookings.length === 1 && !booking?.membership && lesson.paymentStatus === 'UNPAID' && Number(lesson.prepaymentAmount ?? 0) === 0 && Number(lesson.finalPaymentAmount ?? 0) === 0 && !booking?.payments?.some(payment => payment.status === 'PAID')
++  const oneOffPrice = canRevisePrice ? Number(lesson.cost) > 0 ? Number(lesson.cost) : Number(lesson.service.price ?? 0) : undefined
+   const canSell = !access.isEnabled('CASHBOX') || access.canWrite('CASHBOX')
+-  if (!access.canWrite('SCHEDULE') || lesson.status === 'CANCELLED' || !booking || lessonBalance(lesson).remaining <= 0 || lesson.paymentStatus === 'PAID_BY_MEMBERSHIP') return null
++  if (!access.canWrite('SCHEDULE') || lesson.status === 'CANCELLED' || !booking || (lessonBalance(lesson).remaining <= 0 && lesson.paymentStatus !== 'UNPAID') || lesson.paymentStatus === 'PAID_BY_MEMBERSHIP') return null
+ 
+   async function refresh() {
+     try {
+@@ -60,6 +62,16 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
+   return <Space direction="vertical" style={{ width: '100%' }}>
+     <Alert type="warning" showIcon message="Занятие не оплачено" description="Примите оплату или спишите занятие с абонемента." />
+     {error && <Alert role="alert" type="error" showIcon message={error} />}
++    <Select aria-label="Режим оплаты занятия" style={{ width: '100%' }} value={cashOpen ? 'ONE_OFF' : choosing ? 'MEMBERSHIP' : 'FUTURE'} disabled={busy}
++      options={[
++        { value: 'FUTURE', label: 'В счет будущего абонемента / оплатить позже' },
++        { value: 'ONE_OFF', label: 'Разовое занятие', disabled: !access.canWrite('CASHBOX') },
++        { value: 'MEMBERSHIP', label: 'Списание с активного абонемента', disabled: !eligible },
++      ]} onChange={value => {
++        if (value === 'ONE_OFF') { setChoosing(false); setCashOpen(true) }
++        else if (value === 'MEMBERSHIP') void chooseMembership()
++        else setChoosing(false)
++      }} />
+     <Space wrap>
+       {access.canWrite('CASHBOX') && <Button disabled={busy} onClick={() => setCashOpen(true)}>Принять оплату в кассу</Button>}
+       {eligible && <Button loading={busy} onClick={() => void chooseMembership()}>Списать с абонемента</Button>}
+@@ -71,7 +83,7 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
+         options={memberships.map(m => ({ value: m.id, label: `${m.title || m.pricingPlan?.name || 'Абонемент'} · Осталось: ${m.remainedLessons}` }))} onChange={setSelected} />
+       <Button type="primary" loading={busy} disabled={!selected} onClick={() => { if (selected) void attach(selected) }}>Списать занятие</Button>
+     </Space>}
+-    {cashOpen && <CashDeskPaymentModal initialClientId={booking.client.id} initialBookingId={booking.id} onClose={() => setCashOpen(false)} onPaid={() => void refresh()} />}
++    {cashOpen && <CashDeskPaymentModal oneOffPrice={oneOffPrice} initialClientId={booking.client.id} initialBookingId={booking.id} onClose={() => setCashOpen(false)} onPaid={() => void refresh()} />}
+     {saleOpen && <MembershipCreate initialClientId={booking.client.id} initialServiceId={lesson.service.id} onClose={() => setSaleOpen(false)} onSold={membership => {
+       setSaleOpen(false); setChoosing(true)
+       setMemberships([membership])
+diff --git a/horse-club-crm/frontend/src/pages/schedule/QuickSlotBooking.tsx b/horse-club-crm/frontend/src/pages/schedule/QuickSlotBooking.tsx
+index 66c3220..8f17c66 100644
+--- a/horse-club-crm/frontend/src/pages/schedule/QuickSlotBooking.tsx
++++ b/horse-club-crm/frontend/src/pages/schedule/QuickSlotBooking.tsx
+@@ -49,7 +49,7 @@ export function QuickSlotBooking({ initial, horses, trainers, arenas, onAdvanced
+       initialValues={{ serviceType: 'dressage', costAmount: 0, ...initial, trainerId: initial.trainerId ?? (trainers.length === 1 ? trainers[0].id : undefined), arenaId: initial.arenaId ?? (arenas.length === 1 ? arenas[0].id : undefined) }}>
+       <Form.Item name="clientId" label="Клиент" rules={[{ required: true, message: 'Выберите клиента' }]}><ClientSelectWithCreate autoFocus /></Form.Item>
+       <Form.Item name="horseId" label="Лошадь" rules={[{ required: true, message: 'Выберите свободную лошадь' }]}><Select aria-label="Лошадь" allowClear showSearch optionFilterProp="label" loading={unavailable} options={freeHorses.map(h => ({ value: h.id, label: h.name }))} notFoundContent={unavailable ? 'Загрузка…' : 'Нет свободных лошадей'} /></Form.Item>
+-      <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" options={trainers.map(t => ({ value: t.id, label: t.fullName || t.name }))} disabled={busy || Boolean(initial.trainerId)} /></Form.Item>
++      <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" options={trainers.map(t => ({ value: t.id, label: t.fullName || t.name }))} disabled={busy} /></Form.Item>
+       <Form.Item name="arenaId" label="Манеж" rules={[{ required: true, message: 'Выберите манеж' }]}><Select aria-label="Манеж" options={arenas.filter(a => !a.isUnavailable && a.isActive !== false).map(a => ({ value: a.id, label: a.name }))} disabled={busy || Boolean(initial.arenaId)} /></Form.Item>
+       <Form.Item name="serviceType" hidden><Select /></Form.Item><Form.Item name="costAmount" hidden><Select /></Form.Item>
+       <Typography.Paragraph type="secondary">Выездка · без оплаты. Услуга, стоимость и абонемент — в расширенных параметрах.</Typography.Paragraph>
+--- /dev/null
++++ b/backend/prisma/migrations/20261111120000_lesson_one_off_settlement/migration.sql
+@@ -0,0 +1,36 @@
++-- Preserve recognized revenue when an unpaid lesson is settled at a revised price.
++CREATE FUNCTION adjust_one_off_booking_revenue() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++  IF NEW."costAmount" IS NOT DISTINCT FROM OLD."costAmount" OR NEW."membershipId" IS NOT NULL THEN RETURN NEW; END IF;
++  IF NEW.status = 'completed' OR EXISTS (SELECT 1 FROM "Lesson" WHERE id = NEW."lessonId" AND status = 'COMPLETED') THEN
++    PERFORM assert_financial_period_open(NEW."startTime");
++    INSERT INTO "RevenueRecognition" ("bookingId", type, amount, "recognizedAt", "createdById")
++      SELECT NEW.id, 'ONE_OFF_PRICE_ADJUSTMENT', NEW."costAmount" - COALESCE(SUM(amount), 0), NEW."startTime", NEW."financialActorId"
++      FROM "RevenueRecognition" WHERE "bookingId" = NEW.id;
++  END IF;
++  RETURN NEW;
++END $$;
++CREATE TRIGGER "Booking_one_off_price_adjustment" AFTER UPDATE OF "costAmount" ON "Booking"
++  FOR EACH ROW EXECUTE FUNCTION adjust_one_off_booking_revenue();
++
++CREATE OR REPLACE FUNCTION reverse_booking_revenue(booking_id uuid) RETURNS void LANGUAGE plpgsql AS $$
++DECLARE original "RevenueRecognition";
++BEGIN
++  SELECT * INTO original FROM "RevenueRecognition" WHERE "bookingId" = booking_id AND type = 'REVENUE_RECOGNITION';
++  IF NOT FOUND THEN RETURN; END IF;
++  PERFORM assert_financial_period_open(original."recognizedAt");
++  INSERT INTO "RevenueRecognition" ("bookingId", "membershipId", type, amount, "recognizedAt", "createdById")
++    VALUES (booking_id, original."membershipId", 'REVENUE_REVERSAL', -original.amount, original."recognizedAt", original."createdById")
++    ON CONFLICT ("bookingId", type) DO NOTHING;
++  -- Reversals preserve the original one-off recognition and both transfer entries.
++  INSERT INTO "RevenueRecognition" ("bookingId", "membershipId", type, amount, "recognizedAt", "createdById")
++    SELECT "bookingId", "membershipId", CASE type
++      WHEN 'ONE_OFF_PRICE_ADJUSTMENT' THEN 'ONE_OFF_PRICE_ADJUSTMENT_REVERSAL'
++      WHEN 'ONE_OFF_REVENUE_TRANSFER' THEN 'ONE_OFF_REVENUE_TRANSFER_REVERSAL'
++      ELSE 'MEMBERSHIP_REVENUE_REVERSAL' END, -amount, "recognizedAt", "createdById"
++    FROM "RevenueRecognition" WHERE "bookingId" = booking_id
++      AND type IN ('ONE_OFF_REVENUE_TRANSFER', 'MEMBERSHIP_REVENUE_RECOGNITION', 'ONE_OFF_PRICE_ADJUSTMENT')
++    ON CONFLICT ("bookingId", type) DO NOTHING;
++END $$;
++
++

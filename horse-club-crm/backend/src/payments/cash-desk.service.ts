@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { isSerializationFailure } from '../common/serialization-failure';
 import { CashDeskPaymentDto, CashSummaryQueryDto, OpenCashShiftDto } from './dto/cash-desk.dto';
 import { aggregatePaymentMethods, calculateCashChange } from './cash-desk.math';
-import { paymentStatus } from '../lessons/lesson-finance';
+import { defaultModuleAccess } from '../settings/module-access.service';
+import { money, paymentStatus } from '../lessons/lesson-finance';
 
 const include = {
   client: { select: { id: true, name: true, firstName: true, lastName: true, phone: true } },
@@ -29,6 +30,7 @@ export class CashDeskService {
     dto = { ...dto, cashGiven: dto.cashGiven ?? undefined };
     if (dto.bookingId && dto.membershipId) throw new BadRequestException('Выберите занятие или абонемент');
     if (dto.method !== 'CASH' && dto.cashGiven !== undefined) throw new BadRequestException('Внесённые наличные доступны только при оплате наличными');
+    if (dto.lessonCost != null && !dto.bookingId) throw new BadRequestException('Стоимость можно изменить только для занятия');
     const requestId = dto.requestId ?? randomUUID();
     const change = calculateCashChange(dto.amount, dto.cashGiven);
     return this.atomic(async tx => {
@@ -43,6 +45,11 @@ export class CashDeskService {
           || (previous.cashGiven?.toString() ?? null) !== (dto.cashGiven === undefined ? null : new Prisma.Decimal(dto.cashGiven).toString())) {
           throw new ConflictException('Этот ключ операции уже использован для другого платежа');
         }
+        if (dto.lessonCost != null) {
+          const audit = await tx.cashAuditLog.findUnique({ where: { requestId } });
+          if (!audit || typeof audit.details !== 'object' || Array.isArray(audit.details) || audit.details === null
+            || audit.details.lessonCost !== String(dto.lessonCost)) throw new ConflictException('Этот ключ операции уже использован с другой стоимостью');
+        }
         return previous;
       }
       if (!await tx.client.findUnique({ where: { id: dto.clientId } })) throw new NotFoundException('Клиент не найден');
@@ -52,11 +59,30 @@ export class CashDeskService {
       if (dto.bookingId) {
         const booking = await tx.booking.findUnique({ where: { id: dto.bookingId }, include: { transactions: true, payments: { where: { status: 'PAID' } } } });
         if (!booking || booking.clientId !== dto.clientId) throw new BadRequestException('Занятие не принадлежит клиенту');
+        if (dto.lessonCost != null && !booking.lessonId) throw new BadRequestException('Изменение стоимости доступно только для занятия расписания');
         if (booking.isPaid || (!booking.lessonId && await tx.payment.count({ where: { bookingId: booking.id, status: 'PAID' } }))) throw new ConflictException('Занятие уже оплачено');
         if (booking.lessonId) {
           if (booking.membershipId) throw new ConflictException('Занятие оплачивается абонементом');
           const paid = Prisma.Decimal.max(new Prisma.Decimal(booking.prepaymentAmount).plus(booking.finalPaymentAmount),
             booking.payments.reduce((sum, payment) => sum.plus(payment.amount), new Prisma.Decimal(0)));
+          if (dto.lessonCost != null) {
+            const user = await tx.user.findUniqueOrThrow({ where: { id: cashierId }, select: { role: true, email: true } });
+            if (user.role !== 'ADMIN') {
+              const permission = await tx.roleModulePermission.findUnique({ where: { role_module: { role: user.role, module: 'SCHEDULE' } } });
+              if ((permission?.accessLevel ?? defaultModuleAccess(user.role, 'SCHEDULE')) !== 'FULL') throw new ForbiddenException('Для изменения стоимости нужен полный доступ к расписанию');
+            }
+            const lesson = await tx.lesson.findUnique({ where: { id: booking.lessonId }, select: { status: true, deletedAt: true, cancelledAt: true, _count: { select: { bookings: true } } } });
+            if (!lesson || lesson.deletedAt || lesson.cancelledAt || lesson.status === 'CANCELLED') throw new ConflictException('Занятие отменено');
+            if (lesson._count.bookings !== 1) throw new ConflictException('Изменение стоимости доступно для занятия с одним плательщиком');
+            const cost = money(dto.lessonCost);
+            if (paid.gt(0) || booking.payments.length) throw new ConflictException('Стоимость можно изменить только до приёма оплаты');
+            if (!cost.equals(dto.amount)) throw new BadRequestException('Разовое занятие нужно оплатить полностью на указанную стоимость');
+            await tx.cashAuditLog.create({ data: { requestId, action: 'LESSON_ONE_OFF_PAYMENT', actorId: cashierId, actorName: user.email,
+              details: { bookingId: booking.id, lessonId: booking.lessonId, previousCost: booking.costAmount.toString(), lessonCost: String(dto.lessonCost) } } });
+            // The database trigger appends the revenue adjustment for completed lessons.
+            await tx.booking.update({ where: { id: booking.id }, data: { costAmount: cost, financialActorId: cashierId } });
+            booking.costAmount = cost;
+          }
           const remaining = booking.costAmount.minus(paid);
           if (remaining.lte(0)) throw new ConflictException('Занятие уже оплачено');
           if (new Prisma.Decimal(dto.amount).gt(remaining)) throw new BadRequestException('Сумма превышает остаток за занятие');

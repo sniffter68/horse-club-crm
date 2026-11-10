@@ -23,8 +23,10 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
   useEffect(() => () => onBusyChange(false), [onBusyChange])
   const booking = lesson.bookings[0]
   const eligible = lesson.paymentStatus === 'UNPAID' && lesson.bookings.length === 1 && lesson.service.allowMembership && lesson.pricePerPerson == null
+  const canRevisePrice = lesson.bookings.length === 1 && !booking?.membership && lesson.paymentStatus === 'UNPAID' && Number(lesson.prepaymentAmount ?? 0) === 0 && Number(lesson.finalPaymentAmount ?? 0) === 0 && !booking?.payments?.some(payment => payment.status === 'PAID')
+  const oneOffPrice = canRevisePrice ? Number(lesson.cost) > 0 ? Number(lesson.cost) : Number(lesson.service.price ?? 0) : undefined
   const canSell = !access.isEnabled('CASHBOX') || access.canWrite('CASHBOX')
-  if (!access.canWrite('SCHEDULE') || lesson.status === 'CANCELLED' || !booking || lessonBalance(lesson).remaining <= 0 || lesson.paymentStatus === 'PAID_BY_MEMBERSHIP') return null
+  if (!access.canWrite('SCHEDULE') || lesson.status === 'CANCELLED' || !booking || (lessonBalance(lesson).remaining <= 0 && lesson.paymentStatus !== 'UNPAID') || lesson.paymentStatus === 'PAID_BY_MEMBERSHIP') return null
 
   async function refresh() {
     try {
@@ -60,6 +62,16 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
   return <Space direction="vertical" style={{ width: '100%' }}>
     <Alert type="warning" showIcon message="Занятие не оплачено" description="Примите оплату или спишите занятие с абонемента." />
     {error && <Alert role="alert" type="error" showIcon message={error} />}
+    <Select aria-label="Режим оплаты занятия" style={{ width: '100%' }} value={cashOpen ? 'ONE_OFF' : choosing ? 'MEMBERSHIP' : 'FUTURE'} disabled={busy}
+      options={[
+        { value: 'FUTURE', label: 'В счет будущего абонемента / оплатить позже' },
+        { value: 'ONE_OFF', label: 'Разовое занятие', disabled: !access.canWrite('CASHBOX') },
+        { value: 'MEMBERSHIP', label: 'Списание с активного абонемента', disabled: !eligible },
+      ]} onChange={value => {
+        if (value === 'ONE_OFF') { setChoosing(false); setCashOpen(true) }
+        else if (value === 'MEMBERSHIP') void chooseMembership()
+        else setChoosing(false)
+      }} />
     <Space wrap>
       {access.canWrite('CASHBOX') && <Button disabled={busy} onClick={() => setCashOpen(true)}>Принять оплату в кассу</Button>}
       {eligible && <Button loading={busy} onClick={() => void chooseMembership()}>Списать с абонемента</Button>}
@@ -71,7 +83,7 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
         options={memberships.map(m => ({ value: m.id, label: `${m.title || m.pricingPlan?.name || 'Абонемент'} · Осталось: ${m.remainedLessons}` }))} onChange={setSelected} />
       <Button type="primary" loading={busy} disabled={!selected} onClick={() => { if (selected) void attach(selected) }}>Списать занятие</Button>
     </Space>}
-    {cashOpen && <CashDeskPaymentModal initialClientId={booking.client.id} initialBookingId={booking.id} onClose={() => setCashOpen(false)} onPaid={() => void refresh()} />}
+    {cashOpen && <CashDeskPaymentModal oneOffPrice={oneOffPrice} initialClientId={booking.client.id} initialBookingId={booking.id} onClose={() => setCashOpen(false)} onPaid={() => void refresh()} />}
     {saleOpen && <MembershipCreate initialClientId={booking.client.id} initialServiceId={lesson.service.id} onClose={() => setSaleOpen(false)} onSold={membership => {
       setSaleOpen(false); setChoosing(true)
       setMemberships([membership])
