@@ -4,6 +4,7 @@ export interface TrainerLesson {
   startTime: string
   endTime: string
   status: LessonStatus
+  trainerName?: string
   serviceName: string
   clientName: string
   horseId: string | null
@@ -12,6 +13,7 @@ export interface TrainerLesson {
   participants: { bookingId: string; clientName: string; horseId: string | null; horseName: string | null }[]
 }
 export interface TrainerSession {
+  role?: 'ADMIN' | 'TRAINER'
   authenticated: true
   access_token: string
   trainer: { trainerId: string; name: string }
@@ -37,3 +39,7 @@ export async function tmaRequest<T>(path: string, token: string | null, options:
   }
   return response.json() as Promise<T>
 }
+
+export type TmaBootstrapResponse =
+  | { role: 'CLIENT'; token: null; user: { telegramId: string; firstName: string } }
+  | { role: 'TRAINER' | 'ADMIN'; token: string; trainerId: string | null; user: { id: string; name: string }; accessLevel: 'FULL' | 'READ_ONLY' }

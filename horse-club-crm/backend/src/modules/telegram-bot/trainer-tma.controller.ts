@@ -21,6 +21,8 @@ export class TrainerTmaGuard implements CanActivate {
 @Controller('tma')
 export class TrainerTmaAuthController {
   constructor(private readonly service: TrainerTmaService) {}
+  @Post('bootstrap') @Header('Cache-Control', 'no-store')
+  bootstrap(@Body() dto: TrainerTmaAuthDto) { return this.service.bootstrap(dto.initData); }
   @Post('auth') @Header('Cache-Control', 'no-store')
   auth(@Body() dto: TrainerTmaAuthDto) { return this.service.authenticate(dto.initData); }
 }
@@ -32,6 +34,8 @@ export class TrainerTmaController {
   constructor(private readonly service: TrainerTmaService) {}
   @Get('schedule') @Header('Cache-Control', 'no-store')
   schedule(@Req() req: TrainerTmaRequest, @Query() query: TrainerTmaScheduleQuery) { return this.service.schedule(req.user, query.date); }
+  @Get('admin/schedule') @Header('Cache-Control', 'no-store')
+  adminSchedule(@Req() req: TrainerTmaRequest, @Query() query: TrainerTmaScheduleQuery) { return this.service.schedule(req.user, query.date, true); }
   @Patch('lessons/:id/status')
   status(@Req() req: TrainerTmaRequest, @Param('id', new ParseUUIDPipe()) id: string, @Body() dto: TrainerTmaStatusDto) { return this.service.status(req.user, id, dto); }
   @Patch('lessons/:id/horse')

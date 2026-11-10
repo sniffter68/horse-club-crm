@@ -35,7 +35,7 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
   const lesson = { id, trainerId, status: 'SCHEDULED', deletedAt: null, startTime: new Date('2026-11-11T07:00:00Z'), endTime: new Date('2026-11-11T07:45:00Z'),
     service: { title: 'Занятие 45 мин', name: 'Занятие' }, bookings: [{ id: bookingId, cancellationReason: null,
       client: { name: 'Всадник', firstName: 'Анна', lastName: 'Тест' }, horse: { id: horseId, name: 'Гром' } }] };
-  const prisma = { user: { findUnique: async () => linked ? user : null },
+  const prisma = { user: { findUnique: async () => linked ? user : null, findFirst: async () => null },
     lesson: { findMany: async query => { scheduleQuery = query; return [lesson]; }, findUnique: async () => ({ ...lesson, trainerId: owner }) },
     horse: { findMany: async query => { assert.deepEqual(query.where, { status: 'active', healthStatus: 'HEALTHY', isUnavailable: false }); return [{ id: horseId, name: 'Гром' }]; } } };
   const access = { forRole: async () => [{ module: 'SCHEDULE', isEnabled: enabled, accessLevel: level }] };
@@ -52,6 +52,40 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
   await app.init();
   const api = request(app.getHttpServer());
   let session;
+  await t.test('bootstrap selects client, trainer, admin without trainer, and legacy trainer bindings', async () => {
+    const bootstrap = () => api.post('/api/tma/bootstrap').send({ initData: signed() });
+    for (const initData of ['bad', signed() + '&user=forged', signed({ auth_date: '1' })])
+      await api.post('/api/tma/bootstrap').send({ initData }).expect(401);
+    await api.post('/api/tma/bootstrap').send({ initData: 42 }).expect(400);
+    await api.post('/api/tma/bootstrap').send({ initData: signed(), role: 'ADMIN' }).expect(400);
+    linked = false;
+    let result = await bootstrap().expect(201);
+    assert.equal(result.body.role, 'CLIENT'); assert.equal(result.body.token, null);
+    assert.equal(result.body.user.telegramId, '12345');
+    linked = true;
+    result = await bootstrap().expect(201);
+    assert.equal(result.body.role, 'TRAINER'); assert.equal(result.body.trainerId, trainerId);
+    assert.equal(result.headers['cache-control'], 'no-store');
+    await api.get('/api/tma/admin/schedule?date=2026-11-11').auth(result.body.token, { type: 'bearer' }).expect(403);
+    level = 'HIDDEN'; await bootstrap().expect(403); level = 'FULL';
+    user.crmAccess = false; await bootstrap().expect(403); user.crmAccess = true;
+    const trainer = user.trainer;
+    user.role = 'ADMIN'; user.trainer = null; user.trainerId = null;
+    result = await bootstrap().expect(201);
+    assert.equal(result.body.role, 'ADMIN'); assert.equal(result.body.trainerId, null);
+    await api.get('/api/tma/admin/schedule?date=2026-11-11').auth(result.body.token, { type: 'bearer' }).expect(200);
+    assert.equal(scheduleQuery.where.trainerId, undefined);
+    await api.get('/api/tma/schedule?date=2026-11-11').auth(result.body.token, { type: 'bearer' }).expect(403);
+    const payload = jwt.decode(result.body.token);
+    await assert.rejects(JwtStrategy.prototype.validate.call({ prisma }, payload), error => error.getStatus() === 401);
+    user.role = 'TRAINER'; user.trainer = trainer; user.trainerId = trainerId;
+    linked = false; prisma.user.findFirst = async () => user;
+    result = await bootstrap().expect(201); assert.equal(result.body.role, 'TRAINER');
+    await api.get('/api/tma/schedule?date=2026-11-11').auth(result.body.token, { type: 'bearer' }).expect(200);
+    prisma.user.findFirst = async () => null;
+    await api.get('/api/tma/schedule?date=2026-11-11').auth(result.body.token, { type: 'bearer' }).expect(401);
+    linked = true;
+  });
   try {
     await t.test('auth rejects forged, expired, duplicate and invalid payloads before lookup', async () => {
       for (const initData of ['bad', signed() + '&user=forged', signed({ auth_date: '1' }), signed({ auth_date: String(Math.floor(Date.now() / 1000) + 100) })])

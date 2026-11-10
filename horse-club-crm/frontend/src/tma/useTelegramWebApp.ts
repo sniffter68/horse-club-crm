@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { tmaRequest, type TrainerAuthResponse, type TrainerSession } from './api'
+import { tmaRequest, type TmaBootstrapResponse, type TrainerSession } from './api'
 
 export interface TelegramWebApp {
   initData: string
@@ -35,7 +35,7 @@ export function useTelegramWebApp() {
   const [attempt, setAttempt] = useState(0)
   const [dark, setDark] = useState(false)
   useEffect(() => {
-    document.title = 'Расписание тренера · Horse Club'
+    document.title = 'Кабинет клуба · Horse Club'
     const controller = new AbortController()
     let disposeTheme: (() => void) | undefined
     void (async () => {
@@ -67,9 +67,17 @@ export function useTelegramWebApp() {
           else delete root.dataset.theme
           for (const key of ['bg', 'text', 'surface', 'hint', 'button', 'button-text']) root.style.removeProperty(`--trainer-${key}`)
         }
-        const result = await tmaRequest<TrainerAuthResponse>('auth', null, { method: 'POST',
-          body: JSON.stringify({ initData: app.initData }), signal: controller.signal })
-        if (!controller.signal.aborted) setState(result.authenticated ? { kind: 'ready', session: result } : { kind: 'not-linked' })
+        const result = await tmaRequest<TmaBootstrapResponse>('bootstrap', null, { method: 'POST',
+          body: JSON.stringify({ initData: app.initData }), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]) })
+        if (controller.signal.aborted) return
+        if (result.role === 'CLIENT') {
+          if (/^\/tma\/trainer\/?$/.test(window.location.pathname)) { setState({ kind: 'not-linked' }); return }
+          // Preserve Telegram's signed launch parameters across the separate client bundle.
+          window.location.replace(`/tma/client${window.location.search}${window.location.hash}`)
+          return
+        }
+        setState({ kind: 'ready', session: { authenticated: true, role: result.role, access_token: result.token,
+          accessLevel: result.accessLevel, trainer: { trainerId: result.trainerId ?? '', name: result.user.name } } })
       } catch (error: unknown) {
         if (!controller.signal.aborted) setState({ kind: 'error', message: error instanceof Error ? error.message : 'Не удалось войти' })
       }

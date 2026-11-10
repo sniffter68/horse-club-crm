@@ -96,6 +96,7 @@ test('over 30 lessons and oversized paragraphs are delivered losslessly within 4
 
 test('real bot dispatch covers schedule commands, menus, refresh, relative navigation and denied access', async t => {
   const { Api, Bot } = require('grammy');
+  t.mock.method(Api.prototype, 'setChatMenuButton', async () => true);
   t.mock.method(Api.prototype, 'deleteWebhook', async () => true);
   t.mock.method(Bot.prototype, 'init', async () => {});
   const { TelegramBotService } = require('../dist/modules/telegram-bot/telegram-bot.service');

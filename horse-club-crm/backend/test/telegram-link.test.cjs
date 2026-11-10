@@ -171,6 +171,7 @@ test('financial status service rejects forged lesson ownership and revoked write
 
 test('real bot dispatch handles username binding, role menus, personal queries and explicit status confirmation', async t => {
   const { Api, Bot } = require('grammy');
+  t.mock.method(Api.prototype, 'setChatMenuButton', async () => true);
   t.mock.method(Api.prototype, 'deleteWebhook', async () => true);
   t.mock.method(Bot.prototype, 'init', async () => {});
   const { TelegramBotService } = require('../dist/modules/telegram-bot/telegram-bot.service');
@@ -207,8 +208,8 @@ test('real bot dispatch handles username binding, role menus, personal queries a
     await callback('1', 'my_balance'); assert.equal(sent.at(-1).text, 'Остаток: 5'); assert.equal(sent.at(-1).parse_mode, 'HTML');
     await message('2', '123456'); assert.equal(consumed.at(-1)[0], '2');
     assert.match(sent.at(-1).text, /Выберите раздел/);
-    assert.ok(sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.web_app?.url.endsWith('/tma/trainer')));
-    assert.ok(!sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.web_app && !button.web_app.url.endsWith('/tma/trainer')));
+    assert.ok(sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.web_app?.url.endsWith('/tma')));
+    assert.ok(!sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.web_app && !button.web_app.url.endsWith('/tma')));
     await message('3', '/start'); assert.ok(sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.callback_data === 'day'));
     await callback('1', 'my_bookings'); assert.deepEqual(viewed, ['1']);
     await callback('2', 'day'); assert.match(sent.at(-1).text, /Моё занятие/);

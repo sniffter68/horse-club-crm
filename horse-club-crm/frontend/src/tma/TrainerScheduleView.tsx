@@ -20,10 +20,13 @@ export function TrainerScheduleView() {
   return <ConfigProvider locale={ruRU} theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm,
     token: { colorPrimary: window.Telegram?.WebApp?.themeParams.button_color ?? '#724C39', borderRadius: 12, controlHeight: 44 } }}>
     <App><main className="trainer-tma">
-      {state.kind === 'ready' ? <TrainerSchedule session={state.session} onExpired={expire} /> : <section className="trainer-gate">
-        <p className="trainer-eyebrow">HORSE CLUB · ТРЕНЕР</p>
-        <h1>Моё расписание</h1>
-        {state.kind === 'loading' ? <Spin aria-label="Вход через Telegram" /> : <>
+      {state.kind === 'ready' ? state.session.role === 'ADMIN'
+        ? <AdminTmaView session={state.session} onExpired={expire} />
+        : <TrainerSchedule session={state.session} onExpired={expire} /> : <section className="trainer-gate">
+        <img src="/horse-crm.svg" alt="КСК «СЛКС»" width={64} height={64} />
+        <p className="trainer-eyebrow">HORSE CLUB · КСК «СЛКС»</p>
+        <h1>Кабинет клуба</h1>
+        {state.kind === 'loading' ? <div role="status"><Spin aria-label="Вход через Telegram" /><p>Проверяем доступ…</p></div> : <>
           <Alert showIcon type={state.kind === 'error' ? 'error' : 'info'} message={state.kind === 'not-linked'
             ? 'Telegram пока не привязан' : state.kind === 'outside' ? 'Откройте приложение в Telegram' : 'Не удалось войти'}
           description={state.kind === 'not-linked' ? 'Попросите администратора привязать ваш Telegram к учётной записи сотрудника и карточке тренера.'
@@ -35,7 +38,18 @@ export function TrainerScheduleView() {
   </ConfigProvider>
 }
 
-function TrainerSchedule({ session, onExpired }: { session: TrainerSession; onExpired: () => void }) {
+export function AdminTmaView({ session, onExpired }: { session: TrainerSession; onExpired: () => void }) {
+  const [view, setView] = useState<'admin' | 'trainer'>(() => /^\/tma\/trainer\/?$/.test(window.location.pathname) && session.trainer.trainerId ? 'trainer' : 'admin')
+  return <>
+    {session.trainer.trainerId && <nav className="trainer-heading-row" aria-label="Режим кабинета">
+      <Button type={view === 'admin' ? 'primary' : 'default'} aria-pressed={view === 'admin'} onClick={() => setView('admin')}>Вид администратора</Button>
+      <Button type={view === 'trainer' ? 'primary' : 'default'} aria-pressed={view === 'trainer'} onClick={() => setView('trainer')}>Вид тренера</Button>
+    </nav>}
+    <TrainerSchedule key={view} session={session} onExpired={onExpired} all={view === 'admin'} />
+  </>
+}
+
+function TrainerSchedule({ session, onExpired, all = false }: { session: TrainerSession; onExpired: () => void; all?: boolean }) {
   const { message } = App.useApp()
   const [date, setDate] = useState(tmaDay)
   const [weekData, setWeekData] = useState<{ key: string; days: Record<string, DayResult> }>({ key: '', days: {} })
@@ -61,7 +75,7 @@ function TrainerSchedule({ session, onExpired }: { session: TrainerSession; onEx
     const controller = new AbortController()
     for (const day of tmaWeek(weekStart)) {
       const key = day.toISODate()!
-      void tmaRequest<TrainerLesson[]>(`schedule?date=${key}`, session.access_token, { signal: controller.signal })
+      void tmaRequest<TrainerLesson[]>(`${all ? 'admin/schedule' : 'schedule'}?date=${key}`, session.access_token, { signal: controller.signal })
         .then(lessons => { if (!controller.signal.aborted) setWeekData(current => ({ key: requestKey, days: { ...(current.key === requestKey ? current.days : {}), [key]: { lessons } } })) })
         .catch((failure: unknown) => {
           if (controller.signal.aborted) return
@@ -70,7 +84,7 @@ function TrainerSchedule({ session, onExpired }: { session: TrainerSession; onEx
         })
     }
     return () => controller.abort()
-  }, [weekStart, requestKey, session.access_token, onExpired])
+  }, [weekStart, requestKey, session.access_token, onExpired, all])
 
   useEffect(() => {
     if (!sheetOpen || sheet?.kind !== 'horse') return
@@ -123,9 +137,9 @@ function TrainerSchedule({ session, onExpired }: { session: TrainerSession; onEx
   const title = DateTime.fromISO(date).setLocale('ru').toFormat('d MMMM, cccc')
   return <>
     <header className="trainer-header">
-      <p className="trainer-eyebrow">HORSE CLUB · ТРЕНЕР</p>
+      <p className="trainer-eyebrow">HORSE CLUB · {all ? 'АДМИНИСТРАТОР' : 'ТРЕНЕР'}</p>
       <h1>{session.trainer.name}</h1>
-      <div className="trainer-heading-row"><h2>Моё расписание</h2><Button disabled={busy} onClick={() => setDate(tmaDay())}>Сегодня</Button></div>
+      <div className="trainer-heading-row"><h2>{all ? 'Расписание клуба' : 'Моё расписание'}</h2><Button disabled={busy} onClick={() => setDate(tmaDay())}>Сегодня</Button></div>
       <div className="trainer-week-nav"><Button disabled={busy} aria-label="Предыдущая неделя" onClick={() => setDate(DateTime.fromISO(date).minus({ weeks: 1 }).toISODate()!)}>←</Button>
         <span>{tmaWeek(date)[0].setLocale('ru').toFormat('d MMM')} — {tmaWeek(date)[6].setLocale('ru').toFormat('d MMM')}</span>
         <Button disabled={busy} aria-label="Следующая неделя" onClick={() => setDate(DateTime.fromISO(date).plus({ weeks: 1 }).toISODate()!)}>→</Button></div>
@@ -148,6 +162,7 @@ function TrainerSchedule({ session, onExpired }: { session: TrainerSession; onEx
           <div className="trainer-heading-row"><strong className="trainer-time">{tmaTime(lesson.startTime)} – {tmaTime(lesson.endTime)}</strong>
             <Tag color={statuses[lesson.status].color}>{statuses[lesson.status].label}</Tag></div>
           <h3>{lesson.clientName || 'Участники не назначены'}</h3><p>{lesson.serviceName}</p>
+          {all && lesson.trainerName && <p>Тренер: {lesson.trainerName}</p>}
           <div className="trainer-horse"><span><span aria-hidden="true">♞ </span>{lesson.horseName || 'Лошадь не назначена'}</span>
             {full && lesson.status === 'SCHEDULED' && <Button disabled={busy} onClick={event => openSheet('horse', lesson, event.currentTarget)}>Сменить лошадь</Button>}</div>
           {lesson.notes && <p className="trainer-muted">{lesson.notes}</p>}

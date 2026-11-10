@@ -24,19 +24,19 @@ async function telegram(page: Page) {
   })
 }
 
-async function mock(page: Page, options: { readOnly?: boolean; unlinked?: boolean; authFailure?: boolean; scheduleFailure?: boolean; empty?: boolean } = {}) {
+async function mock(page: Page, options: { admin?: boolean; noTrainer?: boolean; readOnly?: boolean; unlinked?: boolean; authFailure?: boolean; scheduleFailure?: boolean; empty?: boolean } = {}) {
   let status: TrainerLesson['status'] = 'SCHEDULED', horse = 'Гром', failMutation = false, mutations = 0, expire = false
   const bodies: unknown[] = []
   const lesson = (): TrainerLesson => ({ id: lessonId, startTime: `${today}T07:00:00Z`, endTime: `${today}T07:45:00Z`,
-    status, serviceName: 'Занятие 45 мин', clientName: 'Анна Всадник', horseId: null, horseName: horse, notes: null,
+    status, trainerName: 'Мария Тренер', serviceName: 'Занятие 45 мин', clientName: 'Анна Всадник', horseId: null, horseName: horse, notes: null,
     participants: [{ bookingId, clientName: 'Анна Всадник', horseId: null, horseName: horse }] })
   await page.route('**/api/tma/**', async route => {
     const path = new URL(route.request().url()).pathname
-    if (path.endsWith('/auth')) {
+    if (path.endsWith('/bootstrap')) {
       expect(route.request().postDataJSON()).toEqual({ initData: 'signed-test-init-data' })
       if (options.authFailure) return route.fulfill({ status: 401, json: { message: 'Подпись недействительна' } })
-      return route.fulfill({ json: options.unlinked ? { authenticated: false, reason: 'NOT_LINKED' } : {
-        authenticated: true, access_token: 'trainer-memory-session', accessLevel: options.readOnly ? 'READ_ONLY' : 'FULL',
+      return route.fulfill({ json: options.unlinked ? { role: 'CLIENT', token: null, user: { telegramId: '123', firstName: 'Анна' } } : {
+        role: options.admin ? 'ADMIN' : 'TRAINER', token: 'trainer-memory-session', trainerId: options.noTrainer ? null : bookingId, user: { id: lessonId, name: 'Мария Тренер' }, accessLevel: options.readOnly ? 'READ_ONLY' : 'FULL',
         trainer: { trainerId: bookingId, name: 'Мария Тренер' },
       } })
     }
@@ -170,4 +170,53 @@ test('session expiry locks screen and never redirects into CRM login', async ({ 
   await page.getByRole('button', { name: 'Обновить расписание' }).click()
   await expect(page.getByText('Сессия истекла. Откройте приложение заново через бота')).toBeVisible()
   await expect(page).toHaveURL(/\/tma\/trainer$/)
+})
+
+for (const noTrainer of [false, true]) test(`root gateway opens admin schedule; trainer binding absent=${noTrainer}`, async ({ page }) => {
+  await telegram(page)
+  const paths: string[] = []
+  page.on('request', request => { if (request.url().includes('/api/tma/')) paths.push(new URL(request.url()).pathname) })
+  await mock(page, { admin: true, noTrainer })
+  await page.goto('/tma')
+  await expect(page.getByRole('heading', { name: 'Расписание клуба' })).toBeVisible()
+  expect(paths).toContain('/api/tma/admin/schedule')
+  await page.screenshot({ path: `../test-results/gateway-admin-${noTrainer ? 'standalone' : 'trainer'}.png`, fullPage: true })
+  await expect(page.locator('.ant-layout-sider')).toHaveCount(0)
+  if (noTrainer) await expect(page.getByRole('button', { name: 'Вид тренера', exact: true })).toHaveCount(0)
+  else {
+    await page.getByRole('button', { name: 'Вид тренера', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Моё расписание' })).toBeVisible()
+    expect(paths).toContain('/api/tma/schedule')
+    await page.getByRole('button', { name: 'Вид администратора', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Расписание клуба' })).toBeVisible()
+  }
+})
+
+test('root gateway shows loading before mounting a trainer and recovers from bootstrap failure', async ({ page }) => {
+  await telegram(page)
+  let release: () => void = () => {}
+  const pending = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/api/tma/bootstrap', async route => {
+    await pending
+    await route.fulfill({ status: 503, json: { message: 'Нет соединения с сервером' } })
+  })
+  await page.goto('/tma')
+  await expect(page.getByRole('status').getByText('Проверяем доступ…')).toBeVisible()
+  await expect(page.locator('.ant-layout-sider')).toHaveCount(0)
+  release()
+  await expect(page.getByText('Нет соединения с сервером', { exact: true })).toBeVisible()
+  await page.unroute('**/api/tma/bootstrap')
+  await mock(page)
+  await page.getByRole('button', { name: 'Повторить вход' }).click()
+  await expect(page.getByRole('heading', { name: 'Моё расписание' })).toBeVisible()
+})
+
+test('root gateway sends clients to the isolated client entry preserving Telegram launch parameters', async ({ page }) => {
+  await telegram(page)
+  await mock(page, { unlinked: true })
+  await page.route('**/tma/client?**', route => route.fulfill({ contentType: 'text/html', body: '<html lang="ru"><head><meta charset="utf-8"></head><body><h1>Запись в клуб</h1></body></html>' }))
+  await page.goto('/tma?tgWebAppVersion=8.0#tgWebAppData=signed-launch')
+  await expect(page).toHaveURL(/\/tma\/client\?tgWebAppVersion=8.0#tgWebAppData=signed-launch$/)
+  await expect(page.getByRole('heading', { name: 'Запись в клуб' })).toBeVisible()
+  expect(await page.evaluate(() => localStorage.getItem('horsecrm.access_token'))).toBe('crm-untouched')
 })

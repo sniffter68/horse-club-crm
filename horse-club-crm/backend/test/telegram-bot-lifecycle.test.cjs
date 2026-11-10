@@ -17,6 +17,11 @@ function fixture(t) {
   for (const level of ['log', 'warn', 'error']) {
     t.mock.method(Logger.prototype, level, message => messages.push([level, message]));
   }
+  t.mock.method(Api.prototype, 'setChatMenuButton', async options => {
+    assert.equal(options.menu_button.type, 'web_app');
+    assert.equal(options.menu_button.web_app.url, 'https://example.test/tma');
+    return true;
+  });
   const service = new TelegramBotService();
   t.after(async () => {
     await service.onModuleDestroy();

@@ -189,7 +189,7 @@ test('bot routes getMe through TELEGRAM_API_ROOT without waiting for the network
   const received = new Promise(resolve => { receivedRequest = resolve; });
   const server = createServer((req, res) => {
     requests.push(req.url);
-    if (req.url.endsWith('/deleteWebhook')) {
+    if (req.url.endsWith('/deleteWebhook') || req.url.endsWith('/setChatMenuButton')) {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ ok: true, result: true }));
       return;
@@ -217,7 +217,7 @@ test('bot routes getMe through TELEGRAM_API_ROOT without waiting for the network
     // The proxy is still holding getMe open while Nest initialization has returned.
     finishResponse();
     assert.equal((await probe).username, 'test_bot');
-    assert.deepEqual(requests, [`/telegram/bot${token}/deleteWebhook`, `/telegram/bot${token}/getMe`]);
+    assert.deepEqual(requests, [`/telegram/bot${token}/deleteWebhook`, `/telegram/bot${token}/getMe`, `/telegram/bot${token}/setChatMenuButton`]);
     await service.onModuleDestroy();
   } finally {
     for (const [name, value] of Object.entries(previous)) {
@@ -233,6 +233,7 @@ test('empty API root keeps the Telegram default and polling failure is handled w
   const { Logger } = require('@nestjs/common');
   const previous = Object.fromEntries(['TELEGRAM_BOT_TOKEN', 'TELEGRAM_API_ROOT', 'TELEGRAM_WEBAPP_URL'].map(name => [name, process.env[name]]));
   const messages = [];
+  t.mock.method(Api.prototype, 'setChatMenuButton', async () => true);
   t.mock.method(Api.prototype, 'deleteWebhook', async () => true);
   t.mock.method(Bot.prototype, 'init', async () => {});
   t.mock.method(Logger.prototype, 'error', message => messages.push(message));

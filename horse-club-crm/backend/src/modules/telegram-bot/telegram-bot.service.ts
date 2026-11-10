@@ -23,7 +23,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     if (this.bot || this.stopping) return;
-    const url = new URL(process.env.TELEGRAM_WEBAPP_URL?.trim() || 'https://crm.horseclub68.ru/tma');
+    const url = new URL('/tma', process.env.TELEGRAM_WEBAPP_URL?.trim() || 'https://crm.horseclub68.ru');
     if (url.protocol !== 'https:' || url.username || url.password) throw new Error('TELEGRAM_WEBAPP_URL must be an HTTPS URL');
     const apiRoot = process.env.TELEGRAM_API_ROOT?.trim();
     const bot = new Bot(token, {
@@ -49,7 +49,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const role = await this.personal.identity(sender);
       const keyboard = new InlineKeyboard();
       if (role === 'client') return keyboard.webApp('Записаться на занятие', url.href).row().text('Мои записи', 'my_bookings').text('Мой абонемент', 'my_balance');
-      if (role === 'trainer' || role === 'admin') keyboard.webApp('Открыть расписание тренера', new URL('/tma/trainer', url).href).row()
+      if (role === 'trainer' || role === 'admin') keyboard.webApp('Открыть расписание тренера', new URL('/tma', url).href).row()
         .text('📅 Расписание на сегодня', 'club_schedule:today').row().text('🗓 Расписание на завтра', 'club_schedule:tomorrow').row();
       keyboard.text('Расписание на день', 'day').row().text('Расписание на неделю', 'week');
       return keyboard;
@@ -144,6 +144,13 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     this.logger.log('Telegram bot initializing getMe');
     // Explicit init also makes getMe cancellable during shutdown.
     await this.withStartupTimeout(signal => bot.init(signal), 30_000);
+    if (this.stopping) return;
+    try {
+      await this.withStartupTimeout(signal => bot.api.setChatMenuButton({ menu_button: { type: 'web_app',
+        text: 'Открыть клуб', web_app: { url: new URL('/tma', process.env.TELEGRAM_WEBAPP_URL?.trim() || 'https://crm.horseclub68.ru').href } } }, signal), 10_000);
+    } catch {
+      this.logger.warn('Telegram menu button setup failed; configure /tma in BotFather or restart the bot');
+    }
     if (this.stopping) return;
     this.logger.log('Telegram bot starting polling');
     await bot.start({

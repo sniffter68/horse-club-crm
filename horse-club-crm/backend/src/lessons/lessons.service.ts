@@ -1,3 +1,4 @@
+import { telegramCancellation } from '../modules/telegram-bot/telegram-cancellation';
 import { refundService, serviceRefundQuote } from '../payments/service-refund';
 import type { CancelServiceDto } from '../payments/dto/cancel-service.dto';
 import { canUseMembership, membershipAccessWhere } from '../memberships/membership-access';
@@ -515,8 +516,9 @@ export class LessonsService {
         throw new NotFoundException('Занятие не найдено');
       }
       if (telegramSender) {
-        const user = await tx.user.findUnique({ where: { telegramUserId: telegramSender }, include: { trainer: true, staffProfile: true } });
-        if (!user || !user.crmAccess || user.id !== actor?.id || user.role !== actor.role || (user.role !== 'ADMIN' && user.trainerId !== lesson.trainerId) || user.trainer?.isActive === false || user.staffProfile?.isActive === false)
+        const user = await tx.user.findUnique({ where: { telegramUserId: telegramSender }, include: { trainer: true, staffProfile: true } })
+          ?? await tx.user.findFirst({ where: { telegramUserId: null, trainer: { telegramId: telegramSender } }, include: { trainer: true, staffProfile: true } });
+        if (!user || !user.crmAccess || user.id !== actor?.id || user.role !== actor.role || (user.role !== 'ADMIN' && user.trainerId !== lesson.trainerId) || (user.role !== 'ADMIN' && user.trainer?.isActive === false) || user.staffProfile?.isActive === false)
           throw new ForbiddenException('Можно менять только свои занятия');
         const module = await tx.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
         const permission = await tx.roleModulePermission.findUnique({ where: { role_module: { role: user.role, module: 'SCHEDULE' } } });
@@ -690,12 +692,12 @@ export class LessonsService {
   }
 
   private async notifyTelegramLesson(tx: TransactionClient, lesson: LessonDetails, event: string, title: string, clientIds?: string[]) {
-    if (event === 'cancelled') await queueTelegramAdmins(tx, `admin:cancel:${lesson.id}`, `${title}\nЗанятие: ${lesson.id}`);
+    if (event === 'cancelled') await queueTelegramAdmins(tx, `admin:cancel:${lesson.id}`, telegramCancellation(lesson.startTime, lesson.endTime, lesson.bookings ?? []));
     if (!(lesson.bookings ?? []).some(row => row.client?.telegramUserId && (!clientIds || clientIds.includes(row.clientId)))) return;
     const when = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Moscow' }).format(lesson.startTime);
     const message = `${title}: ${lesson.service.title || lesson.service.name}\n${when} (Москва)`;
     for (const row of lesson.bookings ?? []) if ((!clientIds || clientIds.includes(row.clientId)) && row.client?.telegramUserId)
-      await queueTelegram(tx, `client:${row.clientId}:lesson:${lesson.id}:${event}`, row.client.telegramUserId, message);
+      await queueTelegram(tx, `client:${row.clientId}:lesson:${lesson.id}:${event}`, row.client.telegramUserId, event === 'cancelled' ? telegramCancellation(lesson.startTime, lesson.endTime, [row]) : message);
   }
 
   private async validateNoConflictsWithClient(

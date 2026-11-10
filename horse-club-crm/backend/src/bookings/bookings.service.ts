@@ -100,9 +100,10 @@ export class BookingsService {
         return await this.prisma.$transaction(async tx => {
           const previous = await tx.booking.findUnique({ where: { id } });
           if (telegramSender) {
-            const user = await tx.user.findUnique({ where: { telegramUserId: telegramSender }, include: { trainer: true, staffProfile: true } });
+            const user = await tx.user.findUnique({ where: { telegramUserId: telegramSender }, include: { trainer: true, staffProfile: true } })
+              ?? await tx.user.findFirst({ where: { telegramUserId: null, trainer: { telegramId: telegramSender } }, include: { trainer: true, staffProfile: true } });
             const lesson = previous?.lessonId ? await tx.lesson.findUnique({ where: { id: previous.lessonId } }) : null;
-            if (!user || !user.crmAccess || user.id !== actor.id || user.role !== actor.role || !user.trainer?.isActive
+            if (!user || !user.crmAccess || user.id !== actor.id || user.role !== actor.role || (user.role !== 'ADMIN' && !user.trainer?.isActive)
               || user.staffProfile?.isActive === false || (user.role !== 'ADMIN' && user.trainerId !== (lesson?.trainerId ?? previous?.trainerId)))
               throw new ForbiddenException('Можно менять только свои занятия');
             const module = await tx.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
