@@ -194,6 +194,8 @@ for (const noTrainer of [false, true]) test(`root gateway opens admin schedule; 
 
 test('root gateway shows loading before mounting a trainer and recovers from bootstrap failure', async ({ page }) => {
   await telegram(page)
+  const paths: string[] = []
+  page.on('request', request => { if (request.url().includes('/api/tma/')) paths.push(new URL(request.url()).pathname) })
   let release: () => void = () => {}
   const pending = new Promise<void>(resolve => { release = resolve })
   await page.route('**/api/tma/bootstrap', async route => {
@@ -209,6 +211,9 @@ test('root gateway shows loading before mounting a trainer and recovers from boo
   await mock(page)
   await page.getByRole('button', { name: 'Повторить вход' }).click()
   await expect(page.getByRole('heading', { name: 'Моё расписание' })).toBeVisible()
+  expect(paths).not.toContain('/api/tma/services')
+  expect(paths).not.toContain('/api/tma/dashboard')
+  await expect(page).toHaveURL(/\/tma$/)
 })
 
 test('root gateway sends clients to the isolated client entry preserving Telegram launch parameters', async ({ page }) => {

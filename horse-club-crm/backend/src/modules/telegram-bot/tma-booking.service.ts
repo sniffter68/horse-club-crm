@@ -168,6 +168,25 @@ export class TmaBookingService {
     return booking;
   }
 
+  async dashboard(clientId: string) {
+    const now = new Date();
+    const [client, membership, nextBooking] = await Promise.all([
+      this.prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: {
+        phone: true, email: true, birthDate: true, riderLevel: true, preferences: true,
+        preferredTrainerId: true, preferredHorseId: true,
+        _count: { select: { bookings: true, memberships: true, sharedMemberships: true, boardingContracts: true } },
+      } }),
+      activeTelegramMembership(this.prisma, clientId, now),
+      this.prisma.booking.findFirst({ where: { clientId, status: 'scheduled', OR: [
+        { lesson: null, startTime: { gt: now } },
+        { lesson: { deletedAt: null, status: 'SCHEDULED', startTime: { gt: now } } },
+      ] }, select: bookingView, orderBy: [{ startTime: 'asc' }, { id: 'asc' }] }),
+    ]);
+    const hasProfile = Boolean(client.phone || client.email || client.birthDate || client.riderLevel || client.preferences
+      || client.preferredTrainerId || client.preferredHorseId);
+    return { isEstablished: hasProfile || Object.values(client._count).some(count => count > 0) || Boolean(membership), membership, nextBooking };
+  }
+
   async myBookings(clientId: string, query: TmaBookingsQuery) {
     const rows = await this.prisma.booking.findMany({ where: { clientId, OR: [{ lesson: null }, { lesson: { deletedAt: null } }] }, select: bookingView,
       orderBy: [{ startTime: 'desc' }, { id: 'desc' }], skip: query.offset, take: query.limit + 1 });

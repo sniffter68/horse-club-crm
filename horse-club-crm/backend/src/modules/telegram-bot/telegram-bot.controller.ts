@@ -9,6 +9,8 @@ import { TmaBookingService } from './tma-booking.service';
 @UseGuards(TelegramAuthGuard)
 export class TelegramBotController {
   constructor(private readonly service: TmaBookingService) {}
+  @Get('dashboard') @Header('Cache-Control', 'no-store')
+  dashboard(@Req() req: TelegramRequest) { return this.service.dashboard(req.telegram.clientId); }
   @Get('services') @Header('Cache-Control', 'no-store')
   services() { return this.service.services(); }
   @Get('slots')
