@@ -535,6 +535,10 @@ html[data-theme='dark'] .dashboard-quick-actions .ant-btn-default { color: var(-
 .table-column-settings > .ant-space-item { width: 100%; }
 .table-column-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
 .crm-entity-table { width: 100%; min-width: 0; }
+.table-sort-button { display: inline-flex; align-items: center; justify-content: inherit; gap: 4px; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; cursor: pointer; user-select: none; }
+.table-sort-button svg { flex: 0 0 12px; }
+.table-sort-button:hover, .table-sort-button--active { color: var(--crm-saddle); }
+.table-sort-button:focus-visible { outline: 2px solid var(--crm-saddle); outline-offset: 3px; border-radius: 2px; }
 .crm-entity-table .ant-table { font-size: 13px; }
 .crm-entity-table .ant-table-thead > tr > th,
 .crm-entity-table .ant-table-tbody > tr > td { padding: 8px; vertical-align: top; overflow-wrap: anywhere; }

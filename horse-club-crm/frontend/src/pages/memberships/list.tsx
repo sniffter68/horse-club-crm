@@ -2,8 +2,11 @@ import { LiveSearch } from '../../components/LiveSearch'
 import { recordSuggestion } from '../../components/searchText'
 import { SharedMembershipAccess, type SharedMember } from './SharedMembershipAccess'
 import { deferredBalance } from './deferredBalance'
+import { membershipServiceTitle, nextMembershipSort, sortMemberships, type SortConfig, type SortField } from './sorting'
+import { TableSortButton } from '../../components/TableSortButton'
+import type { ConfigurableColumn } from '../../hooks/useTableColumns'
 import { ArchiveAction } from '../clients/ArchiveAction'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CreateButton, List as RefineList, useTable } from '@refinedev/antd'
 import type { HttpError } from '@refinedev/core'
 import { Descriptions, Empty, Form, List, Progress, Space, Tag, Typography } from 'antd'
@@ -35,23 +38,38 @@ export function MembershipList() {
   const { canManage } = useCatalogPermissions()
   const canSell = canManage && !access.loading && !access.error && (!access.isEnabled('CASHBOX') || access.canWrite('CASHBOX'))
   const [selectedId, setSelectedId] = useState<string>()
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ field: null, order: null })
   const { tableProps, searchFormProps, tableQuery } = useTable<Membership, HttpError, { q?: string }>({
     resource: 'memberships', pagination: { pageSize: 10 },
+    sorters: { mode: 'off' },
     onSearch: ({ q }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' }],
   })
+  const sortedMemberships = useMemo(() => sortMemberships(tableProps.dataSource ?? [], sortConfig), [tableProps.dataSource, sortConfig])
+  function sortable(field: SortField, label: string): Pick<ConfigurableColumn<Membership>, 'title' | 'label' | 'onHeaderCell'> {
+    const order = sortConfig.field === field ? sortConfig.order : null
+    return {
+      label,
+      title: <TableSortButton label={label} order={order === 'asc' ? 'ascend' : order === 'desc' ? 'descend' : null}
+        onClick={() => setSortConfig(current => nextMembershipSort(current, field))} />,
+      onHeaderCell: () => ({
+        'aria-sort': order === 'asc' ? 'ascending' : order === 'desc' ? 'descending' : 'none',
+      }),
+    }
+  }
 
   return <>
     <RefineList title="Абонементы" headerButtons={<CreateButton disabled={!canSell}>Продать абонемент</CreateButton>}>
       <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q">
         <LiveSearch loading={tableQuery.isFetching} suggestions={(tableProps.dataSource ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })} placeholder="Поиск клиента" onSearch={() => searchFormProps.form?.submit()} />
       </Form.Item></Form>
-      <ConfigurableTable<Membership> storageKey="horse_crm_memberships_columns_v1" {...tableProps} rowKey="id" columns={[
-        { key: 'client', fixed: 'left', width: 180, title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : '—'}</CardLink> },
-        { key: 'plan', width: 170, title: 'Услуга / тариф', render: (_: unknown, record) => record.serviceTitle || record.pricingPlan?.name || 'Индивидуальный' },
-        { key: 'price', align: 'right', width: 120, title: 'Стоимость', render: (_: unknown, record) => money(record.totalPrice) },
-        { key: 'lessons', align: 'right', width: 120, title: 'Остаток занятий', render: (_: unknown, record) => `${record.remainedLessons} / ${record.totalLessons}` },
-        { key: 'validUntil', width: 110, dataIndex: 'validUntil', title: 'Действует до', render: dateOnly },
-        { key: 'isActive', align: 'center', width: 120, dataIndex: 'isActive', title: 'Статус', render: (active: boolean) => <Tag color={active ? 'green' : 'default'}>{active ? 'Активен' : 'Неактивен'}</Tag> },
+      <Typography.Paragraph type="secondary">Сортировка по заголовкам применяется к текущей странице.</Typography.Paragraph>
+      <ConfigurableTable<Membership> storageKey="horse_crm_memberships_columns_v1" {...tableProps} dataSource={sortedMemberships} rowKey="id" columns={[
+        { key: 'client', fixed: 'left', width: 180, ...sortable('client', 'Клиент'), render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : '—'}</CardLink> },
+        { key: 'plan', width: 170, ...sortable('service', 'Услуга / тариф'), render: (_: unknown, record) => membershipServiceTitle(record) },
+        { key: 'price', align: 'right', width: 120, ...sortable('price', 'Стоимость'), render: (_: unknown, record) => money(record.totalPrice) },
+        { key: 'lessons', align: 'right', width: 120, ...sortable('lessons', 'Остаток занятий'), render: (_: unknown, record) => `${record.remainedLessons} / ${record.totalLessons}` },
+        { key: 'validUntil', width: 110, dataIndex: 'validUntil', ...sortable('validUntil', 'Действует до'), render: dateOnly },
+        { key: 'isActive', align: 'center', width: 120, dataIndex: 'isActive', ...sortable('status', 'Статус'), render: (active: boolean) => <Tag color={active ? 'green' : 'default'}>{active ? 'Активен' : 'Неактивен'}</Tag> },
       ]} />
     </RefineList>
     <DetailsModal<MembershipDetails> resource="memberships" id={selectedId} title="Карточка абонемента" onClose={() => setSelectedId(undefined)}>

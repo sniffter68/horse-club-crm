@@ -3,7 +3,7 @@ import type { ColumnType } from 'antd/es/table'
 
 export type ColumnPreference<K extends string = string> = { key: K; visible: boolean }
 export type ColumnDefinition<K extends string = string> = ColumnPreference<K> & { label: string }
-export type ConfigurableColumn<T extends object> = ColumnType<T> & { defaultVisible?: boolean }
+export type ConfigurableColumn<T extends object> = ColumnType<T> & { defaultVisible?: boolean; label?: string }
 
 export function parseColumnPreferences<K extends string>(raw: string | null, defaults: readonly ColumnPreference<K>[]): ColumnPreference<K>[] {
   try {
@@ -58,7 +58,7 @@ export function useTableColumns<T extends object>(definitions: readonly Configur
   const settings = useColumnPreferences(defaults, storageKey)
   const available: ColumnDefinition[] = definitions.filter(column => !column.fixed && !column.hidden).map(column => ({
     key: String(column.key), visible: column.defaultVisible !== false,
-    label: typeof column.title === 'string' ? column.title : String(column.key),
+    label: column.label ?? (typeof column.title === 'string' ? column.title : String(column.key)),
   }))
   return { columns: selectTableColumns(definitions, settings.columns), settings, available }
 }

@@ -22,6 +22,7 @@ function displayValue(value: unknown): ReactNode {
 }
 
 function columnLabel<T extends object>(column: ColumnType<T>): ReactNode {
+  if ('label' in column && typeof column.label === 'string') return column.label
   if (typeof column.title !== 'function') return column.title
   return typeof column.key === 'string' || typeof column.key === 'number' ? String(column.key) : ''
 }
