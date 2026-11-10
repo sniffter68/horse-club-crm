@@ -13,6 +13,7 @@ import type { CreateBookingDto } from './dto/create-booking.dto';
 import { queueTrainingConfirmation } from '../vk-bot/vk-training-notifications';
 import type { AuthUser } from '../auth/auth.types';
 import { assertHorseReplacement, defaultRolePermissions } from '../auth/role-access';
+import { defaultModuleAccess } from '../settings/module-access.service';
 
 const trainingTypes: Record<BookingServiceType, string> = {
   dressage: 'Выездка', jumping: 'Конкур', walks: 'Прогулка', beginners: 'Начальная подготовка',
@@ -93,11 +94,22 @@ export class BookingsService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, maxWait: 5000, timeout: 10000 });
   }
 
-  async replaceHorse(id: string, horseId: string, reason: string | undefined, actor: AuthUser) {
+  async replaceHorse(id: string, horseId: string, reason: string | undefined, actor: AuthUser, telegramSender?: string) {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         return await this.prisma.$transaction(async tx => {
           const previous = await tx.booking.findUnique({ where: { id } });
+          if (telegramSender) {
+            const user = await tx.user.findUnique({ where: { telegramUserId: telegramSender }, include: { trainer: true, staffProfile: true } });
+            const lesson = previous?.lessonId ? await tx.lesson.findUnique({ where: { id: previous.lessonId } }) : null;
+            if (!user || !user.crmAccess || user.id !== actor.id || user.role !== actor.role || !user.trainer?.isActive
+              || user.staffProfile?.isActive === false || (user.role !== 'ADMIN' && user.trainerId !== (lesson?.trainerId ?? previous?.trainerId)))
+              throw new ForbiddenException('Можно менять только свои занятия');
+            const module = await tx.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
+            const permission = await tx.roleModulePermission.findUnique({ where: { role_module: { role: user.role, module: 'SCHEDULE' } } });
+            if (module?.isEnabled === false || user.role !== 'ADMIN' && (permission?.accessLevel ?? defaultModuleAccess(user.role, 'SCHEDULE')) !== 'FULL')
+              throw new ForbiddenException('Недостаточно прав для изменения занятия');
+          }
           const oldHorseId = previous?.horseId ?? null;
           await this.rules.validate(tx, await this.replacementInput(tx, id, horseId, actor));
           const updated = await tx.booking.update({ where: { id }, data: { horseId, horseChangeReason: reason?.trim() || null } });

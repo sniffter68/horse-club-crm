@@ -516,7 +516,7 @@ export class LessonsService {
       }
       if (telegramSender) {
         const user = await tx.user.findUnique({ where: { telegramUserId: telegramSender }, include: { trainer: true, staffProfile: true } });
-        if (!user || user.id !== actor?.id || user.role !== actor.role || user.trainerId !== lesson.trainerId || user.trainer?.isActive === false || user.staffProfile?.isActive === false)
+        if (!user || !user.crmAccess || user.id !== actor?.id || user.role !== actor.role || (user.role !== 'ADMIN' && user.trainerId !== lesson.trainerId) || user.trainer?.isActive === false || user.staffProfile?.isActive === false)
           throw new ForbiddenException('Можно менять только свои занятия');
         const module = await tx.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
         const permission = await tx.roleModulePermission.findUnique({ where: { role_module: { role: user.role, module: 'SCHEDULE' } } });
@@ -642,7 +642,9 @@ export class LessonsService {
       }
       const updated = await tx.lesson.update({
         where: { id: lessonId },
-        data: { status: newStatus, ...financialData, ...(newStatus === 'CANCELLED' ? { cancelledAt: new Date(), deletedAt: new Date(), bookings: { updateMany: { where: {}, data: { status: 'cancelled_club', cancellationReason: cancellation?.reason ?? 'Отмена занятия' } } } } : {}) },
+        data: { status: newStatus, ...financialData,
+          ...(newStatus === 'NO_SHOW' && cancellation?.reason ? { bookings: { updateMany: { where: {}, data: { cancellationReason: cancellation.reason } } } } : {}),
+          ...(newStatus === 'CANCELLED' ? { cancelledAt: new Date(), deletedAt: new Date(), bookings: { updateMany: { where: {}, data: { status: 'cancelled_club', cancellationReason: cancellation?.reason ?? 'Отмена занятия' } } } } : {}) },
         ...lessonDetails,
       });
       if (newStatus === LessonStatus.CANCELLED) await this.notifyLesson(tx, updated, 'cancelled', 'Тренировка отменена');

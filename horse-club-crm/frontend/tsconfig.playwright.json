@@ -2,8 +2,8 @@
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023", "DOM"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "types": ["node"],
     "strict": true,
     "noEmit": true,
@@ -12,5 +12,5 @@
     "noUnusedParameters": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["playwright.config.ts", "playwright.crm.config.ts", "e2e/landing.spec.ts"]
+  "include": ["playwright.config.ts", "playwright.crm.config.ts", "playwright.tma.config.ts", "e2e/landing.spec.ts", "e2e/trainer-tma.spec.ts"]
 }

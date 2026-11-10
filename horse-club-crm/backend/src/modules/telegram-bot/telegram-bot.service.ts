@@ -49,7 +49,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const role = await this.personal.identity(sender);
       const keyboard = new InlineKeyboard();
       if (role === 'client') return keyboard.webApp('Записаться на занятие', url.href).row().text('Мои записи', 'my_bookings').text('Мой абонемент', 'my_balance');
-      if (role === 'trainer' || role === 'admin') keyboard.text('📅 Расписание на сегодня', 'club_schedule:today').row().text('🗓 Расписание на завтра', 'club_schedule:tomorrow').row();
+      if (role === 'trainer' || role === 'admin') keyboard.webApp('Открыть расписание тренера', new URL('/tma/trainer', url).href).row()
+        .text('📅 Расписание на сегодня', 'club_schedule:today').row().text('🗓 Расписание на завтра', 'club_schedule:tomorrow').row();
       keyboard.text('Расписание на день', 'day').row().text('Расписание на неделю', 'week');
       return keyboard;
     };

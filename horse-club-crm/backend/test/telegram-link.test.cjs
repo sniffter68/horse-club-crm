@@ -207,7 +207,8 @@ test('real bot dispatch handles username binding, role menus, personal queries a
     await callback('1', 'my_balance'); assert.equal(sent.at(-1).text, 'Остаток: 5'); assert.equal(sent.at(-1).parse_mode, 'HTML');
     await message('2', '123456'); assert.equal(consumed.at(-1)[0], '2');
     assert.match(sent.at(-1).text, /Выберите раздел/);
-    assert.ok(!sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.web_app));
+    assert.ok(sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.web_app?.url.endsWith('/tma/trainer')));
+    assert.ok(!sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.web_app && !button.web_app.url.endsWith('/tma/trainer')));
     await message('3', '/start'); assert.ok(sent.at(-1).reply_markup.inline_keyboard.flat().some(button => button.callback_data === 'day'));
     await callback('1', 'my_bookings'); assert.deepEqual(viewed, ['1']);
     await callback('2', 'day'); assert.match(sent.at(-1).text, /Моё занятие/);

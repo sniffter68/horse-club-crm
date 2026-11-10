@@ -1,0 +1,52 @@
+.trainer-tma {
+  --tma-bg: var(--trainer-bg, var(--crm-alabaster));
+  --tma-text: var(--trainer-text, var(--crm-ink));
+  --tma-surface: var(--trainer-surface, var(--crm-paper));
+  min-height: 100dvh;
+  background: var(--tma-bg);
+  color: var(--tma-text);
+  padding: max(20px, var(--tg-content-safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.trainer-header, .trainer-day, .trainer-gate { max-width: 600px; margin: 0 auto; }
+.trainer-gate { padding-top: 15vh; display: grid; gap: 24px; }
+.trainer-tma h1 { margin: 8px 0 24px; font-size: clamp(26px, 6vw, 34px); line-height: 1.2; overflow-wrap: anywhere; }
+.trainer-tma h2 { font-size: 17px; margin: 0; line-height: 1.4; }
+.trainer-tma h3 { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
+.trainer-tma p { margin: 8px 0; overflow-wrap: anywhere; }
+.trainer-eyebrow { font-size: 11px; letter-spacing: .14em; font-weight: 700; color: var(--trainer-hint, #71645e); }
+html[data-theme='dark'] .trainer-eyebrow, html[data-theme='dark'] .trainer-muted { color: var(--trainer-hint, #cbbfb6); }
+.trainer-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.trainer-week-nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 20px 0 10px; font-size: 14px; }
+.trainer-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.trainer-week button { display: grid; gap: 6px; place-items: center; padding: 10px 0; border: 1px solid var(--crm-border); border-radius: 14px; background: var(--tma-surface); color: var(--tma-text); cursor: pointer; font: inherit; }
+.trainer-week button span { text-transform: capitalize; font-size: 12px; }
+.trainer-week button strong { font-size: 18px; }
+.trainer-week button small { font-size: 11px; min-width: 18px; line-height: 18px; border-radius: 50%; background: var(--tma-bg); color: var(--tma-text); }
+.trainer-week button[aria-pressed='true'] { background: var(--trainer-button, var(--crm-saddle)); color: var(--trainer-button-text, #fff); border-color: transparent; }
+.trainer-week button:hover { outline: 1px solid var(--trainer-button, var(--crm-saddle)); }
+.trainer-week button:focus-visible { outline: 3px solid var(--trainer-button, var(--crm-saddle)); outline-offset: 3px; }
+.trainer-week button:active { transform: translateY(1px); }
+.trainer-week button:disabled { opacity: .55; cursor: not-allowed; }
+.trainer-day { margin-top: 28px; }
+.trainer-muted { font-size: 13px; line-height: 1.6; color: var(--trainer-hint, #71645e); }
+.trainer-loading, .trainer-empty { min-height: 240px; display: grid; place-content: center; text-align: center; }
+.trainer-lessons { display: grid; gap: 14px; margin-top: 20px; }
+.trainer-lesson { padding: 18px; background: var(--tma-surface); border: 1px solid var(--crm-border); border-radius: 20px; }
+.trainer-time { font-family: var(--crm-mono); font-size: 21px; font-variant-numeric: tabular-nums; letter-spacing: -.06em; }
+.trainer-lesson h3 { margin-top: 18px; }
+.trainer-horse { display: flex; align-items: center; gap: 12px; justify-content: space-between; flex-wrap: wrap; margin: 18px 0; }
+.trainer-horse > span { background: var(--tma-bg); padding: 8px 12px; border-radius: 12px; overflow-wrap: anywhere; }
+.trainer-actions { display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--crm-border); padding-top: 16px; }
+.trainer-actions > button { flex: 1 1 125px; }
+.trainer-complete.ant-btn { background: #e3eee4; color: #285238; border-color: #b1cbb7; }
+.trainer-complete.ant-btn:not(:disabled):hover { background: #cce0d0; color: #23472f; border-color: #3e5f48; }
+.trainer-complete.ant-btn:disabled { opacity: .55; }
+.trainer-sheet .ant-drawer-content-wrapper { max-height: 90dvh; }
+.trainer-sheet .ant-drawer-content { border-radius: 24px 24px 0 0; background: var(--trainer-bg, var(--crm-paper)); color: var(--trainer-text, var(--crm-ink)); }
+.trainer-sheet .ant-drawer-body { overflow-y: auto; }
+.trainer-sheet .ant-drawer-footer { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.trainer-sheet-content { display: grid; gap: 14px; max-width: 600px; margin: 0 auto; }
+.trainer-sheet-content p { overflow-wrap: anywhere; margin: 0; }
+.trainer-sheet textarea { resize: none; }
+@media (max-width: 360px) { .trainer-tma { padding-inline: 12px; } .trainer-lesson { padding: 14px; } .trainer-time { font-size: 20px; } }
+@media (prefers-reduced-motion: reduce) { .trainer-tma *, .trainer-sheet * { transition: none !important; animation: none !important; } }
