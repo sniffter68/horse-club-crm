@@ -9,10 +9,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ModuleAccessService } from '../../settings/module-access.service';
 import { validateTelegramInitData } from './telegram-init-data';
 import type { TrainerTmaHorseDto, TrainerTmaStatusDto } from './trainer-tma.dto';
+import { TmaBookingService } from './tma-booking.service';
 
 export enum TmaRole { ADMIN = 'ADMIN', TRAINER = 'TRAINER', CLIENT = 'CLIENT' }
 export type TmaBootstrapResponse =
-  | { role: TmaRole.CLIENT; token: null; user: { telegramId: string; firstName: string } }
+  | { role: TmaRole.CLIENT; token: null; user: { telegramId: string; firstName: string };
+      clientId: string | null; clientName: string | null;
+      activeMembership: Awaited<ReturnType<TmaBookingService['dashboard']>>['membership'];
+      nextLesson: Awaited<ReturnType<TmaBookingService['dashboard']>>['nextBooking'] }
   | { role: TmaRole.TRAINER; token: string; trainerId: string; user: { id: string; name: string }; accessLevel: 'FULL' | 'READ_ONLY' }
   | { role: TmaRole.ADMIN; token: string; trainerId: string | null; user: { id: string; name: string }; accessLevel: 'FULL' };
 
@@ -23,7 +27,7 @@ export interface TrainerTmaActor extends AuthUser { telegramUserId: string; trai
 export class TrainerTmaService {
   constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService,
     private readonly access: ModuleAccessService, private readonly lessons: LessonsService,
-    private readonly bookings: BookingsService) {}
+    private readonly bookings: BookingsService, private readonly clientBookings: TmaBookingService) {}
 
   private async linkedUser(telegramUserId: string) {
     const user = await this.prisma.user.findUnique({ where: { telegramUserId }, include: { trainer: true, staffProfile: true } });
@@ -41,8 +45,16 @@ export class TrainerTmaService {
     // A directly linked User takes precedence over the legacy Trainer binding.
     const direct = await this.prisma.user.findUnique({ where: { telegramUserId: identity.telegramUserId }, include: { trainer: true, staffProfile: true } });
     const candidate = direct ?? await this.prisma.user.findFirst({ where: { telegramUserId: null, trainer: { telegramId: identity.telegramUserId } }, include: { trainer: true, staffProfile: true } });
-    if (!candidate || candidate.role !== Role.ADMIN && candidate.role !== Role.TRAINER && !candidate.trainerId)
-      return { role: TmaRole.CLIENT, token: null, user: { telegramId: identity.telegramUserId, firstName: identity.firstName } };
+    if (!candidate || candidate.role !== Role.ADMIN && candidate.role !== Role.TRAINER && !candidate.trainerId) {
+      // Client/User IDs are String in Prisma; Trainer retains the legacy telegramId field.
+      const client = await this.prisma.client.findUnique({ where: { telegramUserId: identity.telegramUserId },
+        select: { id: true, name: true, deletedAt: true } });
+      const linked = client && !client.deletedAt ? client : null;
+      const dashboard = linked ? await this.clientBookings.dashboard(linked.id) : null;
+      return { role: TmaRole.CLIENT, token: null, user: { telegramId: identity.telegramUserId, firstName: identity.firstName },
+        clientId: linked?.id ?? null, clientName: linked?.name ?? null,
+        activeMembership: dashboard?.membership ?? null, nextLesson: dashboard?.nextBooking ?? null };
+    }
     const user = await this.linkedUser(identity.telegramUserId);
     if (!user) throw new UnauthorizedException('Привязка Telegram изменена. Повторите вход');
     const permission = (await this.access.forRole(user.role)).find(row => row.module === 'SCHEDULE');

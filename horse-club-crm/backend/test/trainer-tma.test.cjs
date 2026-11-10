@@ -35,14 +35,25 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
   const lesson = { id, trainerId, status: 'SCHEDULED', deletedAt: null, startTime: new Date('2026-11-11T07:00:00Z'), endTime: new Date('2026-11-11T07:45:00Z'),
     service: { title: 'Занятие 45 мин', name: 'Занятие' }, bookings: [{ id: bookingId, cancellationReason: null,
       client: { name: 'Всадник', firstName: 'Анна', lastName: 'Тест' }, horse: { id: horseId, name: 'Гром' } }] };
+  let client = null;
+  const membership = { id, title: 'Абонемент', remainingLessons: 5, totalLessons: 8, validUntil: '2026-12-31T00:00:00Z' };
   const prisma = { user: { findUnique: async () => linked ? user : null, findFirst: async () => null },
+    client: { findUnique: async query => {
+      assert.deepEqual(query.where, { telegramUserId: '12345' });
+      assert.deepEqual(query.select, { id: true, name: true, deletedAt: true });
+      return client;
+    } },
     lesson: { findMany: async query => { scheduleQuery = query; return [lesson]; }, findUnique: async () => ({ ...lesson, trainerId: owner }) },
     horse: { findMany: async query => { assert.deepEqual(query.where, { status: 'active', healthStatus: 'HEALTHY', isUnavailable: false }); return [{ id: horseId, name: 'Гром' }]; } } };
   const access = { forRole: async () => [{ module: 'SCHEDULE', isEnabled: enabled, accessLevel: level }] };
   const jwt = new JwtService({ secret, signOptions: { algorithm: 'HS256' } });
   const service = new TrainerTmaService(prisma, jwt, access,
     { updateLessonStatus: async (...args) => mutations.push(['status', ...args]) },
-    { replaceHorse: async (...args) => mutations.push(['horse', ...args]) });
+    { replaceHorse: async (...args) => mutations.push(['horse', ...args]) },
+    { dashboard: async clientId => {
+      assert.equal(clientId, id);
+      return { membership, nextBooking: { id: bookingId } };
+    } });
   const module = await Test.createTestingModule({ controllers: [TrainerTmaAuthController, TrainerTmaController], providers: [
     { provide: TrainerTmaService, useValue: service }, { provide: ModuleAccessService, useValue: access }, TrainerTmaGuard, ModuleAccessGuard,
   ] }).compile();
@@ -62,6 +73,21 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
     let result = await bootstrap().expect(201);
     assert.equal(result.body.role, 'CLIENT'); assert.equal(result.body.token, null);
     assert.equal(result.body.user.telegramId, '12345');
+    assert.equal(result.body.clientId, null);
+    assert.equal(result.body.activeMembership, null);
+    assert.equal(result.body.nextLesson, null);
+    client = { id, name: 'Постоянный клиент', deletedAt: null };
+    result = await bootstrap().expect(201);
+    assert.equal(result.body.role, 'CLIENT');
+    assert.equal(result.body.clientId, id);
+    assert.equal(result.body.clientName, client.name);
+    assert.deepEqual(result.body.activeMembership, membership);
+    assert.deepEqual(result.body.nextLesson, { id: bookingId });
+    client.deletedAt = new Date();
+    result = await bootstrap().expect(201);
+    assert.equal(result.body.clientId, null);
+    assert.equal(result.body.activeMembership, null);
+    client = null;
     linked = true;
     result = await bootstrap().expect(201);
     assert.equal(result.body.role, 'TRAINER'); assert.equal(result.body.trainerId, trainerId);

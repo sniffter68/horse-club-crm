@@ -41,5 +41,5 @@ export async function tmaRequest<T>(path: string, token: string | null, options:
 }
 
 export type TmaBootstrapResponse =
-  | { role: 'CLIENT'; token: null; user: { telegramId: string; firstName: string } }
+  | { role: 'CLIENT'; token: null; user: { telegramId: string; firstName: string }; clientId: string | null; clientName: string | null }
   | { role: 'TRAINER' | 'ADMIN'; token: string; trainerId: string | null; user: { id: string; name: string }; accessLevel: 'FULL' | 'READ_ONLY' }
