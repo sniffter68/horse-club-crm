@@ -105,7 +105,7 @@ for (const resource of ['clients', 'horses', 'trainers'] as const) {
       }
       return route.fulfill({ json: record })
     })
-    await page.route('**/api/horse-issues*', route => route.fulfill({ json: [] }))
+    await page.route('**/api/bookings/horse-issues*', route => route.fulfill({ json: [] }))
     await page.goto(`/${resource}`)
     await page.getByRole('button', { name: 'Тестовая запись', exact: true }).click()
     const card = page.getByRole('dialog', { name: cardTitle, exact: true })

@@ -1,7 +1,7 @@
 import { archiveTransaction } from '../common/archive-transaction';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PaymentStatus, Prisma } from '@prisma/client';
-import type { RefineQueryDto } from '../common/dto/refine-query.dto';
+import type { PaymentQueryDto } from './dto/payment-query.dto';
 import { rethrowCatalogMutation } from '../common/prisma-errors';
 import { parseRefineQuery, type PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,7 +11,7 @@ import type { UpdatePaymentDto } from './dto/update-payment.dto';
 const paymentInclude = Prisma.validator<Prisma.PaymentDefaultArgs>()({
   include: {
     client: { select: { id: true, name: true, firstName: true, lastName: true } },
-    boardingContract: { include: { horse: { select: { id: true, name: true } }, stall: { select: { id: true, name: true } } } },
+    boardingContract: { include: { horse: { select: { id: true, name: true } }, stall: { select: { id: true, name: true, number: true } } } },
     booking: { include: { lesson: { include: { service: { select: { id: true, title: true, name: true, price: true } } } } } },
     membership: { include: { pricingPlan: { select: { id: true, name: true, price: true } } } },
   },
@@ -42,7 +42,7 @@ type PaymentData = {
 export class PaymentsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(query: RefineQueryDto): Promise<PaginatedResult<PaymentWithRelations>> {
+  async findAll(query: PaymentQueryDto): Promise<PaginatedResult<PaymentWithRelations>> {
     const options = parseRefineQuery(query, ['id', 'amount', 'method', 'status', 'paidAt', 'createdAt', 'updatedAt'], 'createdAt');
     const where: Prisma.PaymentWhereInput = options.search ? { OR: [
       { client: { is: { OR: [
@@ -54,6 +54,7 @@ export class PaymentsService {
       { boardingContract: { is: { horse: { is: { name: { contains: options.search, mode: 'insensitive' } } } } } },
     ] } : {};
     where.archivedAt = null;
+    if (query.cashboxType) where.boardingContractId = query.cashboxType === 'BOARDING' ? { not: null } : null;
     const orderBy = { [options.sort]: options.order } as Prisma.PaymentOrderByWithRelationInput;
     const [total, data] = await this.prisma.$transaction([
       this.prisma.payment.count({ where }),

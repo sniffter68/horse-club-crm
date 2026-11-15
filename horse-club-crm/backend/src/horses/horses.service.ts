@@ -15,7 +15,7 @@ const horseDetailsInclude = Prisma.validator<Prisma.HorseDefaultArgs>()({
     boardingContracts: {
       include: {
         client: { select: { id: true, name: true, firstName: true, lastName: true } },
-        stall: { select: { id: true, name: true } },
+        stall: { select: { id: true, name: true, number: true } },
         payments: {
           select: { id: true, amount: true, status: true, paidAt: true, createdAt: true },
           orderBy: { createdAt: 'desc' },

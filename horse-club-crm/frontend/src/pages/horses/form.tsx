@@ -4,7 +4,7 @@ import type { Horse, HorseValues } from '../catalogs/types'
 import { useParams } from 'react-router-dom'
 import { HorseIssues } from '../schedule/HorseIssues'
 import { Form, InputNumber, Select } from 'antd'
-import { sexes } from '../stalls/mapTypes'
+import { HorseSexSelect } from './HorseSexSelect'
 import { ClientSelectWithCreate } from '../../components/ClientSelectWithCreate'
 import { horseStatuses } from '../stable/types'
 import { isUuid } from '../../uuid'
@@ -17,7 +17,7 @@ export function HorseForm({ action }: { action: 'create' | 'edit' }) {
     toPayload={({ isUnavailable, ...values }) => ({ ...values, isUnavailable: values.status ? values.status !== 'active' : isUnavailable, ownerId: values.ownerType === 'club' ? null : values.ownerId })}>
     <NumberField name="maxRiderWeight" label="Максимальный вес всадника, кг" min={1} max={1000} />
     <TextField name="name" label="Кличка" required />
-    <Form.Item name="sex" label="Пол" normalize={value => value ?? null}><Select allowClear options={Object.entries(sexes).map(([value, label]) => ({ value, label }))} /></Form.Item>
+    <Form.Item name="sex" label="Пол" normalize={value => value ?? null}><HorseSexSelect /></Form.Item>
     <Form.Item name="birthYear" label="Год рождения" normalize={value => value ?? null} rules={[{ type: 'integer', min: 1900, max: 2100, message: 'Укажите год от 1900 до 2100' }]}><InputNumber min={1900} max={2100} precision={0} /></Form.Item>
     <TextField name="breed" label="Порода" />
     <TextField name="coat" label="Масть" />

@@ -41,11 +41,11 @@ test('business days include the entire Moscow end date and reject invalid/revers
   assert.equal(range.start.toISOString(), '2026-09-30T21:00:00.000Z'); assert.equal(range.end.toISOString(), '2026-10-31T21:00:00.000Z');
   for (const [from, to] of [['2026-02-30', '2026-03-01'], ['2026-10-02', '2026-10-01'], ['2025-01-01', '2026-10-01']]) assert.throws(() => payrollRange(from, to), e => e.status === 400);
 });
-test('precise decimal formula, group fixed rate once per lesson, additive percentage and adjustment', () => {
+test('nominal 30% ignores discounts and configured percentage, fixed rates and adjustments remain additive', () => {
   const result = payrollAmounts(2, { shiftRate: new Prisma.Decimal('1500.10'), lessonRate: new Prisma.Decimal('400.20'), groupLessonRate: new Prisma.Decimal('700.30'), lessonPercentage: new Prisma.Decimal('12.5') }, [
-    { bookings: [{ costAmount: new Prisma.Decimal('1000.10') }] }, { bookings: [{ costAmount: new Prisma.Decimal('1000.10') }, { costAmount: new Prisma.Decimal('2000.20') }] },
+    { service: { price: new Prisma.Decimal('2000') }, bookings: [{ costAmount: new Prisma.Decimal('1000.10') }] }, { service: { price: new Prisma.Decimal('3000') }, bookings: [{ costAmount: new Prisma.Decimal('1000.10') }, { costAmount: new Prisma.Decimal('2000.20') }] },
   ], '100.10', '50.20');
-  assert.equal(result.shiftsTotal.toFixed(2), '3000.20'); assert.equal(result.lessonsTotal.toFixed(2), '1600.55'); assert.equal(result.totalAmount.toFixed(2), '4650.65'); assert.equal(result.lessonsCount, 2);
+  assert.equal(result.shiftsTotal.toFixed(2), '3000.20'); assert.equal(result.lessonsTotal.toFixed(2), '2600.50'); assert.equal(result.totalAmount.toFixed(2), '5650.60'); assert.equal(result.lessonsCount, 2);
   assert.equal(payrollAmounts(0, { lessonRate: new Prisma.Decimal('100') }, [{ bookings: [{ costAmount: new Prisma.Decimal(0) }, { costAmount: new Prisma.Decimal(0) }] }]).totalAmount.toString(), '100');
 });
 test('trainer is scoped to own profiles and shifts, foreign identifiers are forbidden including when profile is missing', async () => {

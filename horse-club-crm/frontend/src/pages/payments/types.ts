@@ -21,7 +21,7 @@ export interface Payment extends Omit<PaymentValues, 'amount' | 'paidAt'> {
   amount: string | number
   paidAt: string | null
   client: { id: string; name: string; firstName: string; lastName: string }
-  boardingContract: { id: string; horse: { id: string; name: string }; stall: { id: string; name: string } | null } | null
+  boardingContract: { id: string; horse: { id: string; name: string }; stall: { id: string; number?: string | null; name: string | null } | null } | null
   membership: { id: string; pricingPlan: { id: string; name: string; price: string | number } | null } | null
   booking: { id: string; lesson: { id: string; startTime: string; service: { id: string; title: string; name: string; price: string | number } } | null } | null
   createdAt: string

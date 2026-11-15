@@ -1,4 +1,4 @@
-import { LessonDrawer } from '../schedule/LessonDrawer'
+import { QuickBookingModal } from '../../components/QuickBookingModal'
 import { useEffect, useState } from 'react'
 import { Alert, Button, Form, Select, Spin } from 'antd'
 import { CalendarOutlined, ClockCircleOutlined, HomeOutlined, MedicineBoxOutlined, MinusOutlined, PlusOutlined } from '@ant-design/icons'
@@ -50,6 +50,7 @@ export function QuickActions({ onSaved, shifts }: { onSaved: () => void; shifts:
   return <>
     <section aria-label="Быстрые действия" className="dashboard-quick-actions">
       {permissions.canWrite('SCHEDULE') && <Button type="primary" icon={<CalendarOutlined aria-hidden />} onClick={() => setAction('lesson')}>+ Записать на тренировку</Button>}
+      {permissions.canWrite('SCHEDULE') && <Button onClick={() => setAction('lesson')}>Быстрая запись</Button>}
       {permissions.canWrite('CASHBOX') && <>
         <Button className="quick-action-success" icon={<PlusOutlined aria-hidden />} onClick={() => setAction('payment')}>+ Принять оплату</Button>
         <Button className="quick-action-warning" icon={<MinusOutlined aria-hidden />} onClick={() => setAction('expense')}>− Внести расход</Button>
@@ -58,7 +59,7 @@ export function QuickActions({ onSaved, shifts }: { onSaved: () => void; shifts:
       {permissions.canWrite('VETERINARY') && <Button className="quick-action-vet" icon={<MedicineBoxOutlined aria-hidden />} onClick={() => setAction('vet')}>Ветпроцедура</Button>}
       {permissions.canWrite('STAFF_PAYROLL') && <Button icon={<ClockCircleOutlined aria-hidden />} onClick={() => setAction('shift')}>Открыть / закрыть смену</Button>}
     </section>
-    {action === 'lesson' && permissions.canWrite('SCHEDULE') && <LessonDrawer onClose={close} onSaved={saved} />}
+    {action === 'lesson' && permissions.canWrite('SCHEDULE') && <QuickBookingModal onClose={close} onSaved={saved} />}
     {action === 'payment' && permissions.canWrite('CASHBOX') && <CashDeskPaymentModal variant="drawer" onClose={close} />}
     {action === 'expense' && permissions.canWrite('CASHBOX') && <ExpenseModal variant="drawer" onClose={close} />}
     {action === 'boarding' && permissions.canWrite('STABLES') && <QuickPlacement variant="drawer" context={{ kind: 'DASHBOARD', id: '', name: 'Клуб' }} onClose={close} onSaved={onSaved} />}

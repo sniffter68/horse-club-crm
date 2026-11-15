@@ -18,9 +18,9 @@ export function StallTransfer({ open, source, stalls, onClose, onSaved }: {
   const lock = useRef(false)
   const { message } = App.useApp()
   const { mutate: onError } = useOnError()
-  const candidates = stalls.filter(stall => stall.id !== source.id && !stall.isUnavailable &&
+  const candidates = stalls.filter(stall => stall.id !== source.id && stall.type !== 'SERVICE' && !stall.isUnavailable &&
     ['AVAILABLE', 'OCCUPIED'].includes(stall.status)).sort((a, b) => Number(Boolean(a.horse)) - Number(Boolean(b.horse)) ||
-      (a.number ?? a.name).localeCompare(b.number ?? b.name, 'ru', { numeric: true }))
+      (a.number ?? a.name ?? '').localeCompare(b.number ?? b.name ?? '', 'ru', { numeric: true }))
   const target = candidates.find(stall => stall.id === targetId)
   const valid = [source.id, source.horseId, targetId].every(isHorseUuid)
   useEffect(() => {

@@ -1,10 +1,11 @@
 import { LiveSearch } from '../../components/LiveSearch'
 import { recordSuggestion } from '../../components/searchText'
 import { usePermissions } from '../../modulePermissions'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useUpdate, type HttpError } from '@refinedev/core'
 import { List, useTable } from '@refinedev/antd'
-import { Alert, Button, Descriptions, Form, Space, Tag } from 'antd'
+import { Alert, Button, Descriptions, Form, Space, Tag, Tabs } from 'antd'
 import { money } from '../catalogs/format'
 import { dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
@@ -22,15 +23,19 @@ function source(payment: Payment): string {
 }
 
 export function PaymentList() {
+  const [params, setParams] = useSearchParams()
+  const cashboxType = ['MAIN', 'BOARDING'].includes(params.get('cashboxType') ?? '') ? params.get('cashboxType')! : ''
   const { canWrite } = usePermissions()
   const writable = canWrite('CASHBOX')
   const [updatingId, setUpdatingId] = useState<string>()
   const [selectedId, setSelectedId] = useState<string>()
   const { mutate: update } = useUpdate()
-  const { tableProps, searchFormProps, tableQuery } = useTable<Payment, HttpError, { q?: string }>({
+  const { tableProps, searchFormProps, tableQuery, setCurrentPage } = useTable<Payment, HttpError, { q?: string }>({
     resource: 'payments', pagination: { pageSize: 20 }, sorters: { initial: [{ field: 'createdAt', order: 'desc' }] },
+    filters: { permanent: [{ field: 'cashboxType', operator: 'eq', value: cashboxType || undefined }] },
     onSearch: ({ q }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' }],
   })
+  useEffect(() => { setCurrentPage(1) }, [cashboxType, setCurrentPage])
   const setPaid = (payment: Payment, paid: boolean) => {
     setUpdatingId(payment.id)
     update({
@@ -43,6 +48,8 @@ export function PaymentList() {
   return <>
     {!writable && <Alert type="info" showIcon message="Доступно только для просмотра" />}
     <List title="Платежи" canCreate={false}>
+      <Tabs activeKey={cashboxType} onChange={value => setParams(previous => { const next = new URLSearchParams(previous); if (value) next.set('cashboxType', value); else next.delete('cashboxType'); return next })}
+        items={[{ key: '', label: 'Все' }, { key: 'MAIN', label: 'Основная касса' }, { key: 'BOARDING', label: 'Касса постоя' }]} />
       <Alert type="info" showIcon message="Простой внутренний учёт"
         description="Начисления создаются автоматически. Нажмите «Оплачено», когда деньги получены. Кассовые чеки и бухгалтерия ведутся отдельно."
         style={{ marginBottom: 20 }} />

@@ -649,7 +649,14 @@ model HorseHealthLog {
   @@index([type, nextDueAt])
 }
 
+enum StallType {
+  STALL
+  PONY_PEN
+  SERVICE
+}
+
 model Stall {
+  type          StallType @default(STALL)
   number        String?
   zone          StallZone @default(MAIN)
   side          StallSide @default(LEFT)
@@ -662,7 +669,7 @@ model Stall {
   @@unique([zone, side, position])
   @@unique([zone, number])
   id            String             @id @default(uuid()) @db.Uuid
-  name          String             @unique
+  name          String?
   description   String?
   isUnavailable Boolean            @default(false)
   contracts     BoardingContract[]

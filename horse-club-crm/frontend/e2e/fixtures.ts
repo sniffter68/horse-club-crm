@@ -5,6 +5,7 @@ export type { Page, Locator } from '@playwright/test'
 // enabled there; module-access.spec.ts exercises the real matrix combinations.
 export const test = base.extend<{ modulePolicy: void }>({
   modulePolicy: [async ({ page }, use) => {
+    await page.route('**/api/cashbox/summary', route => route.fulfill({ json: { mainBalance: 0, boardingBalance: 0, mainOperationsCount: 0, boardingOperationsCount: 0 } }))
     await page.route('**/api/settings/access/me*', async route => {
       const role = await page.evaluate(() => localStorage.getItem('horsecrm.role'))
       await route.fulfill({ json: { role, userId: 'fixture-user', trainerId: null, permissions: {

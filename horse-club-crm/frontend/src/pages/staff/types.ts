@@ -3,7 +3,8 @@ export const shiftStatuses = { SCHEDULED: 'Запланирована', COMPLETE
 export type ShiftStatus = keyof typeof shiftStatuses
 export const shiftColors = { SCHEDULED: 'blue', COMPLETED: 'green', ABSENT: 'red', SICK: 'orange' }
 export type Shift = { id: string; staffId: string; date: string; startTime: string; endTime: string; status: ShiftStatus; notes?: string }
-export type Payroll = { id?: string; updatedAt?: string; staffId: string; fullName: string; roleTitle: string; shiftsCount: number; shiftsTotal: string; lessonsCount: number; lessonsTotal: string; bonuses: string; penalties: string; totalAmount: string; isPaid: boolean; blocked: boolean; paidAt?: string; expenseId?: string }
+export type Payroll = { id?: string; updatedAt?: string; staffId: string; fullName: string; roleTitle: string; shiftsCount: number; shiftsTotal: string; lessonsCount: number; lessonsTotal: string; bonuses: string; penalties: string; totalAmount: string; isPaid: boolean; blocked: boolean; paidAt?: string; expenseId?: string;
+  lessonBreakdown?: Array<{ id: string; startTime: string; serviceName?: string; nominalPrice: number; clientPaid: string; trainerPayout: number }> }
 export type PageData<T> = { data: T[]; total: number }
 export type PaidPeriod = { id: string; staffId: string; periodStart: string; periodEnd: string; createdAt: string }
 export type PayrollStatement = PaidPeriod & { staff: { fullName: string; roleTitle: string }; isPaid: boolean; totalAmount: string }

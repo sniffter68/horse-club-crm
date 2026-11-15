@@ -40,12 +40,12 @@ export function BoardingContractForm({ action }: { action: 'create' | 'edit' }) 
     pagination: { mode: 'off' },
   })
   const { query: stallsQuery } = useSelect<Stall>({
-    resource: 'stalls', optionLabel: stall => stall.name, optionValue: stall => stall.id,
+    resource: 'stalls', optionLabel: stall => stall.name || `Денник ${stall.number ?? 'без номера'}`, optionValue: stall => stall.id,
     pagination: { mode: 'off' },
   })
-  const stallOptions = stallsQuery.data?.data.map(stall => ({
+  const stallOptions = stallsQuery.data?.data.filter(stall => stall.type !== 'SERVICE').map(stall => ({
     value: stall.id,
-    label: stall.isUnavailable ? `${stall.name} — недоступен` : stall.name,
+    label: `${stall.name || `Денник ${stall.number ?? 'без номера'}`}${stall.isUnavailable ? ' — недоступен' : ''}`,
     disabled: stall.isUnavailable,
   })) ?? []
 

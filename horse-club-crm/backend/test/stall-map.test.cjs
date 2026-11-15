@@ -170,7 +170,7 @@ test('stall HTTP API validates assignment and restricts mutations to ADMIN/MANAG
     await request(server).patch(path).set('x-role', 'TRAINER').send({ horseId: hid }).expect(403);
     for (const body of [{}, { horseId: 'bad' }, { horseId: 12 }, { horseId: hid, status: 'OCCUPIED' }])
       await request(server).patch(path).set('x-role', 'ADMIN').send(body).expect(400);
-    for (const body of [{ status: null }, { zone: null }, { number: null }, { name: null }, { position: 0 }, { side: 'UP' }])
+    for (const body of [{ status: null }, { zone: null }, { number: null }, { position: 0 }, { side: 'UP' }])
       await request(server).patch(`/stalls/${sid}`).set('x-role', 'ADMIN').send(body).expect(400);
     await request(server).patch(path).set('x-role', 'MANAGER').send({ horseId: hid }).expect(200);
     const dto = { sourceStallId: sid, targetStallId: targetId, horseId: hid, swapIfOccupied: false };

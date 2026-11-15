@@ -2,8 +2,8 @@
 
 `GET /api/tma/my-bookings` сохраняет `bookings`/`hasMore` и добавляет `membership` (объект или `null`) на каждой странице. Авторизация и clientId берутся из проверенной Telegram initData. Ответ не кешируется.
 
-Общая выборка `activeTelegramMembership` обслуживает TMA и `/balance`: только `fixed_lessons`, `deletedAt: null`, `status: active`, `validFrom <= now`, `validUntil >= now`, `remainedLessons > 0`. Учитываются владелец и участники семейного абонемента. Депозит и постой не переводятся в занятия. Из нескольких пакетов выбирается ближайший к окончанию, при равенстве — последний купленный, затем по id. Поля остатка и срока соответствуют существующему отображению абонементов в CRM (`remainedLessons`, `validUntil`).
+Общая выборка `activeTelegramMembership` обслуживает TMA и `/balance`: только `fixed_lessons`, `deletedAt: null`, `status: active`, `validFrom <= now`, `validUntil >= now`, `remainedLessons > 0`. Учитываются владелец и участники семейного абонемента. Депозит и постой не переводятся в занятия. Из нескольких пакетов выбирается пакет с наиболее поздним сроком окончания, при равенстве — последний купленный, затем по id. Поля остатка и срока соответствуют существующему отображению абонементов в CRM (`remainedLessons`, `validUntil`).
 
-Ответ: `id`, `title` (название → услуга → тариф → «Абонемент»), `totalLessons`, `remainingLessons`, `validUntil` (ISO), `isExpiringSoon` (остаток ≤ 1 или до окончания ≤ 72 часов, включительно).
+Ответ: `id`, `title` (название → услуга → тариф → «Абонемент»), `totalLessons`, `remainingLessons` (алиас `remainedLessons`), `status`, `planName`, `validUntil` (ISO), `isExpiringSoon` (остаток ≤ 1 или до окончания ≤ 72 часов, включительно).
 
 В TMA карточка показывается над записями, в том числе при пустом списке. До ответа и при ошибке загрузки отсутствие абонемента не утверждается. Даты в TMA и боте отображаются в Europe/Moscow. Кнопка клиента «Мой абонемент» и `/balance` показывают одинаковый ответ; название экранируется для Telegram HTML. Миграции БД не требуются.

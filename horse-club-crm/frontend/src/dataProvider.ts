@@ -33,6 +33,12 @@ export const dataProvider = {
     }
 
     for (const filter of filters ?? []) {
+      if (resource === 'payments' && 'field' in filter && filter.field === 'cashboxType' && filter.operator === 'eq') {
+        if (!filter.value) continue
+        if (!['MAIN', 'BOARDING'].includes(filter.value)) throw new Error('Недопустимый тип кассы')
+        params.set('cashboxType', filter.value)
+        continue
+      }
       if (['clients', 'memberships'].includes(resource) && 'field' in filter
         && ['includeArchived', 'archivedOnly'].includes(filter.field) && filter.operator === 'eq') {
         if (filter.value == null || filter.value === '') continue

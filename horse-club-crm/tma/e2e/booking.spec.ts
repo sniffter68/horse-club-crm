@@ -3,7 +3,7 @@ import type { TelegramWebApp } from '../src/telegram';
 
 declare global {
   interface Window {
-    __tmaTest: { main(): void; back(): void; active(): boolean; haptics(): number; theme(): void };
+    __tmaTest: { main(): void; back(): void; backActive(): boolean; active(): boolean; haptics(): number; theme(): void };
   }
 }
 const serviceId = '11111111-1111-4111-8111-111111111111';
@@ -15,21 +15,23 @@ const booking = { id: bookingId, status: 'scheduled', startTime: start, endTime:
   clientCancellationRequested: false, costAmount: '1500', trainer: { name: 'Анна' },
   lesson: { status: 'SCHEDULED', deletedAt: null, startTime: start, endTime: start, service } };
 async function setup(page: Page) {
+  await page.route('**/api/tma/bootstrap', route => route.fulfill({ json: { role: 'CLIENT', clientId: null } }));
+  await page.route('**/api/tma/dashboard', route => route.fulfill({ json: { isEstablished: false, membership: null, nextBooking: null } }));
   await page.route('https://telegram.org/js/telegram-web-app.js', route => route.fulfill({ body: '', contentType: 'text/javascript' }));
   await page.addInitScript(() => {
-    let main = () => {}, back = () => {}, theme = () => {}, enabled = false, haptics = 0;
+    let main = () => {}, back = () => {}, theme = () => {}, enabled = false, backActive = false, haptics = 0;
     const app: TelegramWebApp = {
       initData: 'signed-data-test', initDataUnsafe: { user: { id: 123, first_name: 'Елена', username: 'elena' } },
       themeParams: { bg_color: '#17241c', text_color: '#f0f4f1', button_color: '#a4d5b8', button_text_color: '#163326', hint_color: '#b3bdb6', secondary_bg_color: '#28332c' },
       MainButton: { show() {}, hide() {}, showProgress() {}, hideProgress() {},
         setParams(params) { enabled = params.is_active && params.is_visible; },
         onClick(callback) { main = callback; }, offClick(callback) { if (main === callback) main = () => {}; } },
-      BackButton: { show() {}, hide() {}, onClick(callback) { back = callback; }, offClick(callback) { if (back === callback) back = () => {}; } },
+      BackButton: { show() { backActive = true; }, hide() { backActive = false; }, onClick(callback) { back = callback; }, offClick(callback) { if (back === callback) back = () => {}; } },
       HapticFeedback: { impactOccurred() { haptics++; } }, ready() {}, expand() {}, enableClosingConfirmation() {}, disableClosingConfirmation() {},
       onEvent(_event, callback) { theme = callback; }, offEvent() {},
     };
     window.Telegram = { WebApp: app };
-    window.__tmaTest = { main() { if (enabled) main(); }, back() { back(); }, active: () => enabled, haptics: () => haptics, theme() { app.themeParams.bg_color = '#f7f4f0'; theme(); } };
+    window.__tmaTest = { main() { if (enabled) main(); }, back() { back(); }, backActive: () => backActive, active: () => enabled, haptics: () => haptics, theme() { app.themeParams.bg_color = '#f7f4f0'; theme(); } };
   });
   await page.route('**/api/tma/services', route => route.fulfill({ json: { services: [service], consentVersion: '2026-09-19' } }));
   await page.route('**/api/tma/slots?**', route => route.fulfill({ json: { slots: [{ startTime: start, endTime: start, trainers: [{ id: trainerId, name: 'Анна' }] }] } }));
@@ -39,6 +41,74 @@ async function advance(page: Page) {
   await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(true);
   await page.evaluate(() => window.__tmaTest.main());
 }
+
+test('linked client opens dashboard despite empty profile classification and returns home after booking', async ({ page }) => {
+  await setup(page);
+  await page.route('**/api/tma/bootstrap', route => route.fulfill({ json: { role: 'CLIENT', clientId: serviceId } }));
+  let catalogs = 0;
+  page.on('request', request => { if (request.url().endsWith('/services')) catalogs++; });
+  await page.route('**/api/tma/dashboard', route => route.fulfill({ json: {
+    isEstablished: false, nextBooking: { ...booking, clientConfirmed: true },
+    membership: { id: serviceId, title: 'Абонемент 8 занятий', remainingLessons: 5, totalLessons: 8,
+      validUntil: '2026-12-09T21:30:00Z', isExpiringSoon: false },
+  } }));
+  await page.goto('');
+  await expect(page.getByRole('heading', { name: 'Личный кабинет' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Мой абонемент' })).toContainText('5 / 8 занятий');
+  await expect(page.getByRole('progressbar')).toHaveAttribute('value', '5');
+  await expect(page.getByRole('region', { name: 'Мой абонемент' })).toContainText('10.12.2026');
+  await expect(page.getByRole('region', { name: 'Ближайшая тренировка' })).toContainText('Анна');
+  await expect(page.getByText('Подтверждена', { exact: true })).toBeVisible();
+  expect(catalogs).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/client-dashboard.png', fullPage: true });
+  await page.getByRole('button', { name: '+ Записаться на занятие', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Каталог услуг' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__tmaTest.backActive())).toBe(true);
+  await page.evaluate(() => window.__tmaTest.back());
+  await expect(page.getByRole('heading', { name: 'Личный кабинет' })).toBeVisible();
+});
+
+test('linked client without membership stays on dashboard and can choose a lesson', async ({ page }) => {
+  await setup(page);
+  await page.route('**/api/tma/bootstrap', route => route.fulfill({ json: {
+    role: 'CLIENT', clientId: serviceId, activeMembership: null, nextLesson: null,
+  } }));
+  await page.goto('');
+  await expect(page.getByRole('heading', { name: 'Личный кабинет' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Мой абонемент' })).toContainText('нет активного абонемента');
+  await expect(page.getByRole('region', { name: 'Каталог услуг' })).toHaveCount(0);
+  await page.getByRole('button', { name: '+ Записаться на занятие', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('region', { name: 'Каталог услуг' })).toBeVisible();
+});
+
+test('dashboard supports remainedLessons and preserves zero in remainingLessons', async ({ page }) => {
+  await setup(page);
+  for (const remainingLessons of [undefined, 0]) {
+    await page.route('**/api/tma/dashboard', route => route.fulfill({ json: {
+      isEstablished: true, nextBooking: null, membership: { id: serviceId, title: 'Абонемент',
+        remainedLessons: 5, remainingLessons, totalLessons: 8, validUntil: '2026-12-09T21:30:00Z', isExpiringSoon: false },
+    } }));
+    await page.goto('');
+    await expect(page.getByRole('progressbar')).toHaveAttribute('value', String(remainingLessons ?? 5));
+  }
+});
+
+test('dashboard failure retries without classifying the client as new', async ({ page }) => {
+  await setup(page);
+  let fail = true;
+  await page.route('**/api/tma/dashboard', route => route.fulfill(fail
+    ? { status: 503, json: { message: 'Нет соединения' } }
+    : { json: { isEstablished: true, membership: null, nextBooking: null } }));
+  await page.goto('');
+  await expect(page.getByRole('alert')).toContainText('Нет соединения');
+  await expect(page.getByRole('region', { name: 'Каталог услуг' })).toHaveCount(0);
+  fail = false;
+  await page.getByRole('button', { name: 'Повторить загрузку' }).click();
+  await expect(page.getByRole('heading', { name: 'Личный кабинет' })).toBeVisible();
+  await expect(page.getByText('Предстоящих тренировок пока нет.', { exact: false })).toBeVisible();
+});
 
 test('membership appears above bookings with Moscow date and expiry warning, including empty booking history', async ({ page }) => {
   await setup(page);

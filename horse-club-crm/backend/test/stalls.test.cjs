@@ -45,9 +45,10 @@ test('stall creation normalizes its name and description', async () => {
   let data;
   const prisma = { stall: { create: async args => { data = args.data; return { id: 'stall-1', ...args.data }; } } };
   await new StallsService(prisma).create({
+    number: '1',
     name: '  Денник   1 ',
     description: '  Первый корпус  ',
     isUnavailable: false,
   });
-  assert.deepEqual(data, { name: 'Денник 1', description: 'Первый корпус', isUnavailable: false, status: 'AVAILABLE' });
+  assert.deepEqual(data, { number: '1', name: 'Денник 1', description: 'Первый корпус', isUnavailable: false, status: 'AVAILABLE' });
 });

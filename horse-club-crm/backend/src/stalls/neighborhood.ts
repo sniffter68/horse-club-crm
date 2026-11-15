@@ -1,5 +1,5 @@
 type NeighborStall = {
-  id: string; number: string | null; name: string; zone: string; side: string; position: number | null;
+  id: string; number: string | null; name: string | null; zone: string; side: string; position: number | null;
   horse: { sex: string | null; name: string } | null;
 };
 export function stallRowPosition(stall: NeighborStall, all: NeighborStall[]) {
@@ -23,7 +23,7 @@ export function neighborhoodWarnings(stall: NeighborStall, all: NeighborStall[])
     (other.side === stall.side ? adjacentIds.includes(other.id) : stallRowPosition(other, building) === stallRowPosition(stall, building)) &&
     ((stall.horse!.sex === 'STALLION' && ['MARE', 'STALLION'].includes(other.horse.sex ?? '')) ||
       (stall.horse!.sex === 'MARE' && other.horse.sex === 'STALLION')))
-    .map(other => ({ neighborId: other.id, neighborNumber: other.number ?? other.name,
+    .map(other => ({ neighborId: other.id, neighborNumber: other.number ?? other.name ?? 'Без номера',
       message: stall.horse!.sex === 'MARE' || other.horse!.sex === 'MARE'
         ? `Жеребец рядом с кобылой (${stall.horse!.name} и ${other.horse!.name})`
         : `Нежелательное соседство: жеребец ${other.side === stall.side ? 'рядом с жеребцом' : 'напротив жеребца'} (${stall.horse!.name} и ${other.horse!.name})` }));

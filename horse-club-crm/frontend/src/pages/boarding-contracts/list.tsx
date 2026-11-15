@@ -19,7 +19,7 @@ export function BoardingContractList() {
     <CatalogList<BoardingContract> resource="boarding-contracts" storageKey="horse_crm_boarding_contracts_columns_v1" defaultHiddenColumns={['startsAt', 'endsAt', 'payments']} title="Договоры постоя" columns={[
       { key: 'client', fixed: 'left', width: 180, title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : 'Лошадь клуба'}</CardLink> },
       { key: 'horse', width: 125, dataIndex: ['horse', 'name'], title: 'Лошадь' },
-      { key: 'stall', align: 'center', width: 100, title: 'Денник', render: (_: unknown, record) => record.stall?.name || '—' },
+      { key: 'stall', align: 'center', width: 100, title: 'Денник', render: (_: unknown, record) => record.stall?.name || record.stall?.number || '—' },
       { key: 'status', align: 'center', width: 140, dataIndex: 'status', title: 'Статус', sorter: true, render: (value: BoardingContractStatus) => <Tag color={statusColors[value]}>{statusLabels[value]}</Tag> },
       { key: 'startsAt', width: 110, dataIndex: 'startsAt', title: 'Начало', sorter: true, render: dateOnly },
       { key: 'endsAt', width: 110, dataIndex: 'endsAt', title: 'Окончание', sorter: true, render: dateOnly },
@@ -35,7 +35,7 @@ export function BoardingContractList() {
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'client', label: 'Клиент', children: contract.client ? personName(contract.client) : 'Лошадь клуба' },
           { key: 'horse', label: 'Лошадь', children: contract.horse.name },
-          { key: 'stall', label: 'Денник', children: contract.stall?.name || 'Не назначен' },
+          { key: 'stall', label: 'Денник', children: contract.stall?.name || contract.stall?.number || 'Не назначен' },
           { key: 'status', label: 'Статус', children: <Tag color={statusColors[contract.status]}>{statusLabels[contract.status]}</Tag> },
           { key: 'period', label: 'Период', children: `${dateOnly(contract.startsAt)} — ${dateOnly(contract.endsAt)}` },
           { key: 'rate', label: 'Стоимость в месяц', children: money(contract.monthlyRate) },

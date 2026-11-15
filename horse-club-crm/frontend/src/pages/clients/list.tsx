@@ -43,7 +43,7 @@ type ClientMembership = {
 type ClientDetails = Client & {
   memberships: ClientMembership[]
   boardingContracts: Array<{ id: string; status: string; startsAt: string; endsAt: string | null; monthlyRate: string | number;
-    horse: { id: string; name: string }; stall: { id: string; name: string } | null; payments: RelationPayment[] }>
+    horse: { id: string; name: string }; stall: { id: string; number?: string | null; name: string | null } | null; payments: RelationPayment[] }>
   bookings: Array<RelationBooking & { horse: { id: string; name: string } | null }>
   payments: Array<RelationPayment & { bookingId: string | null; boardingContractId: string | null; membershipId: string | null }>
 }
@@ -188,7 +188,7 @@ export function ClientList() {
           {client.boardingContracts.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Договоров постоя нет" /> :
             <List dataSource={client.boardingContracts} renderItem={contract => <List.Item>
               <Space wrap><Tag color={contract.status === 'ACTIVE' ? 'green' : 'default'}>{contract.status}</Tag>
-                <strong>{contract.horse.name}</strong><span>Денник: {contract.stall?.name || 'не назначен'}</span>
+                <strong>{contract.horse.name}</strong><span>Денник: {contract.stall?.name || contract.stall?.number || 'не назначен'}</span>
                 <span>{money(contract.monthlyRate)} / мес.</span><span>с {dateOnly(contract.startsAt)}</span></Space>
             </List.Item>} />}
         </div>

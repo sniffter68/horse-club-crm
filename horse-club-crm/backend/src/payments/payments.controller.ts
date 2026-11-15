@@ -8,7 +8,7 @@ import type { Response } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { RefineQueryDto } from '../common/dto/refine-query.dto';
+import { PaymentQueryDto } from './dto/payment-query.dto';
 import { setRefineTotalHeaders } from '../common/refine';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
@@ -25,7 +25,7 @@ export class PaymentsController {
   constructor(private readonly service: PaymentsService, private readonly cashDesk: CashDeskService) {}
 
   @Get()
-  async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) response: Response): Promise<PaymentWithRelations[]> {
+  async findAll(@Query() query: PaymentQueryDto, @Res({ passthrough: true }) response: Response): Promise<PaymentWithRelations[]> {
     const { data, total } = await this.service.findAll(query);
     setRefineTotalHeaders(response, total);
     return data;

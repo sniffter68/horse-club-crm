@@ -7,7 +7,7 @@ export interface MapHorse {
   owner?: { name: string; firstName: string; lastName: string; phone: string | null } | null;
 }
 export interface MapStall {
-  id: string; name: string; number: string | null; zone: keyof typeof zones; side: 'LEFT' | 'RIGHT';
+  id: string; name: string | null; type?: 'STALL' | 'PONY_PEN' | 'SERVICE'; number: string | null; zone: keyof typeof zones; side: 'LEFT' | 'RIGHT';
   position: number | null; status: keyof typeof statuses; horseId: string | null; horse: MapHorse | null;
   notes: string | null; warnings: Array<{ neighborId: string; neighborNumber: string; message: string }>;
   isUnavailable?: boolean;

@@ -52,7 +52,7 @@ const clientDetailsInclude = Prisma.validator<Prisma.ClientDefaultArgs>()({
     boardingContracts: {
       include: {
         horse: { select: { id: true, name: true } },
-        stall: { select: { id: true, name: true } },
+        stall: { select: { id: true, name: true, number: true } },
         payments: { select: paymentSummarySelect, orderBy: { createdAt: 'desc' } },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],

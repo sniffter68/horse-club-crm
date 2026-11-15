@@ -5,10 +5,14 @@ const ZONE = 'Europe/Moscow';
 export interface Service { id: string; title: string; name: string; description: string | null; price: string; durationMinutes: number }
 export interface Slot { startTime: string; endTime: string; trainers: { id: string; name: string }[] }
 export interface Membership {
-  id: string; title: string; totalLessons: number; remainingLessons: number;
+  id: string; title: string; totalLessons: number; remainingLessons?: number; remainedLessons?: number;
+  status?: string; planName?: string;
   validUntil: string; isExpiringSoon: boolean;
 }
 export interface MyBookingsResponse { bookings: Booking[]; hasMore: boolean; membership: Membership | null }
+export interface ClientDashboard { isEstablished: boolean; membership: Membership | null; nextBooking: Booking | null }
+export type BootstrapResponse = { role: 'CLIENT'; clientId: string | null; clientName: string | null;
+  activeMembership: Membership | null; nextLesson: Booking | null } | { role: 'ADMIN' | 'TRAINER' };
 export interface Booking {
   id: string; startTime: string; endTime: string; status: string; clientConfirmed: boolean;
   clientCancellationRequested: boolean; costAmount: string; trainer?: { name?: string } | null;

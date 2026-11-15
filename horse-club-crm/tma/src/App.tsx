@@ -1,24 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api, dateTime, money, moscowDate, requireUuid, time, upcoming, type Booking, type Membership, type MyBookingsResponse, type Service, type Slot } from './api';
+import { ClientDashboardView } from './ClientDashboardView';
+import { ClientBookingCatalog } from './ClientBookingCatalog';
+import { MembershipCard } from './MembershipCard';
+import type { BootstrapResponse, ClientDashboard } from './api';
 import { applyTheme, canRequestContact, haptic, telegram, withTelegram } from './telegram';
 import { useTelegramNavigation } from './useTelegramNavigation';
 
 const _h = React.createElement;
 
 const ADDRESS = 'Тамбов, ул. Бастионная, 22АС2';
-const FORMATS = [
-  { label: 'Первое знакомство', pattern: /знаком|перв|начал|нович/i },
-  { label: 'Пони для детей', pattern: /пони|дет/i },
-  { label: 'Прогулка', pattern: /прогул/i },
-  { label: 'Индивидуальная тренировка', pattern: /индивиду|трениров|конкур|выезд/i },
-];
-type Screen = 'catalog' | 'slots' | 'checkout' | 'success' | 'my-bookings';
+type Screen = 'loading' | 'dashboard' | 'catalog' | 'slots' | 'checkout' | 'success' | 'my-bookings';
 const errorText = (error: unknown): string => error instanceof Error ? error.message : 'Не удалось загрузить. Повторите попытку';
 const serviceTitle = (service: Service): string => service.title || service.name;
 const bookingTitle = (booking: Booking): string => booking.lesson?.service?.title || booking.lesson?.service?.name || 'Занятие в клубе';
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>('catalog');
+  const [screen, setScreen] = useState<Screen>('loading');
+  const [dashboard, setDashboard] = useState<ClientDashboard>();
+  const [home, setHome] = useState<'catalog' | 'dashboard'>('catalog');
   const [services, setServices] = useState<Service[]>([]);
   const [consentVersion, setConsentVersion] = useState('');
   const [service, setService] = useState<Service>();
@@ -46,7 +46,7 @@ export function App() {
   const native = Boolean(tg?.initData);
   const validPhone = /^\+7\d{10}$/.test(phone.replace(/[\s()-]/g, ''));
   const slotServiceId = screen === 'slots' ? service?.id : undefined;
-  const displayedServices = format ? services.filter(item => FORMATS.find(entry => entry.label === format)?.pattern.test(serviceTitle(item))) : services;
+
 
   useEffect(() => {
     applyTheme();
@@ -60,15 +60,33 @@ export function App() {
     withTelegram(app => {
       if (screen === 'checkout') app.enableClosingConfirmation(); else app.disableClosingConfirmation();
     });
-    document.title = `${({ catalog: 'Выбор занятия', slots: 'Дата и время', checkout: 'Оформление записи', success: 'Запись создана', 'my-bookings': 'Мои записи' })[screen]} · КСК «СЛКС»`;
+    document.title = `${({ loading: 'Кабинет клуба', dashboard: 'Личный кабинет', catalog: 'Выбор занятия', slots: 'Дата и время', checkout: 'Оформление записи', success: 'Запись создана', 'my-bookings': 'Мои записи' })[screen]} · КСК «СЛКС»`;
     heading.current?.focus();
   }, [screen, tg]);
 
   useEffect(() => {
     const controller = new AbortController();
-    if (screen !== 'catalog' && screen !== 'slots') return;
+    if (!['loading', 'dashboard', 'catalog', 'slots'].includes(screen)) return;
     setLoading(true); setError('');
-    if (screen === 'catalog') {
+    if (screen === 'loading' || screen === 'dashboard') {
+      const loadDashboard = async () => {
+        const bootstrap = screen === 'loading' ? await api<BootstrapResponse>('bootstrap', {
+          method: 'POST', body: JSON.stringify({ initData: tg?.initData }), signal: controller.signal,
+        }) : undefined;
+        const result = await api<ClientDashboard>('dashboard', { signal: controller.signal });
+        return { result, linked: bootstrap?.role === 'CLIENT' && Boolean(bootstrap.clientId) };
+      };
+      loadDashboard()
+        .then(({ result, linked }) => {
+          if (controller.signal.aborted) return;
+          setDashboard(result);
+          const target = linked || result.isEstablished || screen === 'dashboard' ? 'dashboard' : 'catalog';
+          setHome(target);
+          if (screen === 'loading') setScreen(target);
+        })
+        .catch((failure: unknown) => { if (!controller.signal.aborted) setError(errorText(failure)); })
+        .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    } else if (screen === 'catalog') {
       api<{ services: Service[]; consentVersion: string }>('services', { signal: controller.signal })
         .then(result => { setServices(result.services); setConsentVersion(result.consentVersion); })
         .catch((failure: unknown) => { if (!controller.signal.aborted) setError(errorText(failure)); })
@@ -88,7 +106,7 @@ export function App() {
     setBooking(undefined); setService(undefined); setSlot(undefined); setTrainerId(''); setConsent(false);
     requestId.current = ''; navigate('catalog');
   };
-  const back = screen === 'catalog' ? undefined : () => navigate(screen === 'checkout' ? 'slots' : 'catalog');
+  const back = screen === 'loading' || screen === home ? undefined : () => navigate(screen === 'checkout' ? 'slots' : screen === 'slots' ? 'catalog' : home);
   const next = () => {
     if (screen === 'catalog' && service) navigate('slots');
     else if (screen === 'slots' && slot) { requestId.current = crypto.randomUUID(); navigate('checkout'); }
@@ -135,7 +153,7 @@ export function App() {
     finally { submitting.current = false; setBusy(false); }
   }
 
-  const titles: Record<Screen, string> = { catalog: 'Время для лошадей', slots: 'Когда приедете?', checkout: 'Всё готово к записи', success: 'Ждём вас в клубе', 'my-bookings': 'Мои записи' };
+  const titles: Record<Screen, string> = { loading: 'Кабинет клуба', dashboard: 'Личный кабинет', catalog: 'Время для лошадей', slots: 'Когда приедете?', checkout: 'Всё готово к записи', success: 'Ждём вас в клубе', 'my-bookings': 'Мои записи' };
   return <main className="mx-auto max-w-xl px-5">
     <header className="mb-6 flex items-center justify-between gap-3">
       <span className="club-mark" aria-label="КСК СЛКС">СЛКС<span>КОННЫЙ КЛУБ · ТАМБОВ</span></span>
@@ -145,22 +163,9 @@ export function App() {
     {back && !native && <button className="quiet mb-4" disabled={busy} onClick={back}>← Назад</button>}
     <p className="eyebrow">{screen === 'catalog' ? 'В седле — ближе к природе' : screen === 'slots' ? 'Шаг 2 из 3' : screen === 'checkout' ? 'Шаг 3 из 3' : 'КСК «СЛКС»'}</p>
     <h1 ref={heading} tabIndex={-1}>{titles[screen]}</h1>
-    {screen === 'catalog' && <>
-      <p className="hint mb-6">Выберите занятие — и до встречи в седле.</p>
-      <div className="formats mb-4" aria-label="Выбор формата">
-        {['Все занятия', ...FORMATS.map(entry => entry.label)].map(label => <button key={label} className="quiet"
-          aria-pressed={(format || 'Все занятия') === label} onClick={() => { haptic(); setFormat(label === 'Все занятия' ? '' : label); setService(undefined); }}>{label}</button>)}
-      </div>
-      <div className="stack" aria-label="Форматы занятий">
-        {!loading && !error && services.length === 0 && <p className="notice">Запись закрыта. Телефон: <a href="tel:+79156720030">+7 (915) 672-00-30</a>.</p>}
-        {!loading && !error && services.length > 0 && displayedServices.length === 0 && <p className="notice">Нет доступных услуг. Выберите «Все занятия».</p>}
-        {displayedServices.map(item => <button key={item.id} className="choice service" aria-pressed={service?.id === item.id}
-          disabled={loading} onClick={() => { haptic(); setService(item); }}>
-          <span><strong>{serviceTitle(item)}</strong><span className="hint">{item.durationMinutes} мин</span></span>
-          <span className="price">{money(item.price)} <span aria-hidden="true">↗</span></span>
-        </button>)}
-      </div>
-    </>}
+    {screen === 'dashboard' && dashboard && <ClientDashboardView data={dashboard} onBook={newBooking} />}
+    {screen === 'catalog' && <ClientBookingCatalog services={services} serviceId={service?.id} format={format}
+      loading={loading} error={error} onFormat={value => { setFormat(value); setService(undefined); }} onSelect={setService} />}
     {screen === 'slots' && <>
       <p className="hint mb-6">{service && serviceTitle(service)} · Время московское</p>
       <label className="field">День занятия<input type="date" value={day} min={moscowDate()} max={moscowDate(30)}
@@ -201,7 +206,7 @@ export function App() {
       </div>
     </section>}
     {screen === 'my-bookings' && <MyBookings onBook={newBooking} />}
-    <div className="feedback" aria-live="polite">{loading && <p role="status">Проверяем свободные места…</p>}
+    <div className="feedback" aria-live="polite">{loading && <p role="status">{screen === 'loading' || screen === 'dashboard' ? 'Загружаем личный кабинет…' : 'Проверяем свободные места…'}</p>}
       {error && <div role="alert"><p>{error}</p>{screen !== 'checkout' && <button className="quiet mt-2" onClick={() => setRetry(value => value + 1)}>Повторить загрузку</button>}</div>}
     </div>
     {text && !native && <button className="primary w-full" disabled={!enabled} onClick={next}>{busy ? 'Сохраняем запись…' : text}</button>}
@@ -255,14 +260,7 @@ export function MyBookings({ onBook }: { onBook: () => void }) {
     { title: 'Прошедшие тренировки', rows: bookings.filter(booking => !isFuture(booking)) },
   ];
   return <section className="stack mt-4" aria-label="Список записей">
-    {membership !== undefined && <section className="summary membership" aria-label="Мой абонемент">
-      {membership ? <>
-        <h2>{membership.title}</h2>
-        <p>Осталось: {membership.remainingLessons} из {membership.totalLessons}</p>
-        <p>Действует до: <time dateTime={membership.validUntil}>{dateTime(membership.validUntil, true)}</time></p>
-        {membership.isExpiringSoon && <p className="badge">Абонемент скоро закончится</p>}
-      </> : <p>У вас нет активного абонемента. Оформите его у администратора.</p>}
-    </section>}
+    {membership !== undefined && <MembershipCard membership={membership} />}
     {groups.filter(group => group.rows.length > 0).map(group => <section className="stack" key={group.title} aria-label={group.title}>
       <h2>{group.title}</h2>
       {group.rows.map(booking => {

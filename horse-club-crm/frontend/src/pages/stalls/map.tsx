@@ -131,7 +131,7 @@ function StallDetails({ stall, horses, stalls, canManage, onClose, onSaved, onPr
     {stall.warnings?.map(w => <Alert key={w.neighborId} type="warning" showIcon message={w.message} description={`Денник ${w.neighborNumber}`} />)}
     {stall.horse && !stall.horse.sex && <Alert type="info" message="Укажите пол лошади в её карточке для проверки соседства." />}
     <Button icon={<PrinterOutlined />} onClick={onPrint}>Печать таблички на денник</Button>
-    {canManage && <div className="stall-assignment">
+    {canManage && stall.type !== 'SERVICE' && <div className="stall-assignment">
       {stall.horse ? <Space wrap>
         <Button disabled={dirty || busy} onClick={() => setTransferOpen(true)}>Перевести в денник</Button>
         <Button disabled={dirty} loading={busy} onClick={() => void assign(null)}>Убрать лошадь из денника</Button>

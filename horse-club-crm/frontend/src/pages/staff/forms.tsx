@@ -64,8 +64,9 @@ export function ProfileModal({ staff, onClose, onSaved, onTelegramChanged }: { s
     <Form.Item name="roleTitle" label="Должность" initialValue={staff?.roleTitle} rules={required}><Input aria-label="Должность" maxLength={150} /></Form.Item>
     <PhoneField initialValue={staff?.phone} />
     <Form.Item name="scheduleColor" label="Цвет в расписании" initialValue={staff?.scheduleColor} rules={[{ pattern: /^#[0-9a-fA-F]{6}$/, message: 'Укажите цвет в формате #724C39' }]}><Input aria-label="Цвет в расписании" maxLength={7} placeholder="#724C39" /></Form.Item>
-    {([['shiftRate', 'Ставка за смену (₽)'], ['lessonRate', 'Индивидуальное занятие (₽)'], ['groupLessonRate', 'Групповое занятие (₽)'], ['lessonPercentage', 'Процент от стоимости занятий (%)']] as const).map(([name, label]) =>
-      <Form.Item key={name} name={name} label={label} initialValue={staff?.[name] == null ? undefined : Number(staff[name])}><InputNumber {...moneyProps} max={name === 'lessonPercentage' ? 100 : moneyProps.max} /></Form.Item>)}
+    <Typography.Paragraph>Тренеру начисляется 30% от номинала услуги. Фиксированные ставки добавляются отдельно.</Typography.Paragraph>
+    {([['shiftRate', 'Ставка за смену (₽)'], ['lessonRate', 'Индивидуальное занятие (₽)'], ['groupLessonRate', 'Групповое занятие (₽)']] as const).map(([name, label]) =>
+      <Form.Item key={name} name={name} label={label} initialValue={staff?.[name] == null ? undefined : Number(staff[name])}><InputNumber {...moneyProps} max={moneyProps.max} /></Form.Item>)}
     <Typography.Paragraph type="secondary">Фиксированная ставка и процент складываются. Групповая ставка начисляется один раз за занятие с несколькими участниками; без отдельной ставки используется индивидуальная.</Typography.Paragraph>
     <Form.Item name="isActive" label="Активный сотрудник" valuePropName="checked" initialValue={staff?.isActive ?? true}><Switch /></Form.Item>
   </StableEntryModal>

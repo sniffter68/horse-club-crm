@@ -58,7 +58,7 @@ export function HorseList() {
             contracts={horse.boardingContracts} currentContract={horse.currentBoardingContract} disabled={!ready} />
           {horse.boardingContracts.length ? <List dataSource={horse.boardingContracts} renderItem={contract => <List.Item>
             <Space wrap><Tag color={contract.status === 'ACTIVE' ? 'green' : 'default'}>{contract.status}</Tag>
-              <span>{contract.client ? personName(contract.client) : 'Лошадь клуба'}</span><span>Денник: {contract.stall?.name || 'не назначен'}</span>
+              <span>{contract.client ? personName(contract.client) : 'Лошадь клуба'}</span><span>Денник: {contract.stall?.name || contract.stall?.number || 'не назначен'}</span>
               {contract.client && <span>{money(contract.monthlyRate)} / мес.</span>}</Space>
           </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Постоя нет" />}
         </section>}

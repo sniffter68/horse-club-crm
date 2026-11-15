@@ -71,7 +71,7 @@ export class StallsService {
     return this.prisma.horse.findMany({ select: { id: true, name: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] });
   }
 
-  private validateTransfer(stalls: Array<{ id: string; horseId: string | null; status: string; isUnavailable: boolean }>, dto: TransferStallDto) {
+  private validateTransfer(stalls: Array<{ id: string; type?: string; horseId: string | null; status: string; isUnavailable: boolean }>, dto: TransferStallDto) {
     if (dto.sourceStallId === dto.targetStallId) throw new BadRequestException('Выберите другой денник');
     const source = stalls.find(stall => stall.id === dto.sourceStallId);
     const target = stalls.find(stall => stall.id === dto.targetStallId);
@@ -79,7 +79,7 @@ export class StallsService {
     if (source.horseId !== dto.horseId) throw new ConflictException('Размещение изменилось. Обновите карту.');
     if (dto.expectedTargetHorseId !== undefined && target.horseId !== dto.expectedTargetHorseId)
       throw new ConflictException('Целевой денник изменился. Обновите карту и повторите.');
-    if (target.isUnavailable || ['MAINTENANCE', 'QUARANTINE'].includes(target.status) ||
+    if (target.type === 'SERVICE' || target.isUnavailable || ['MAINTENANCE', 'QUARANTINE'].includes(target.status) ||
       (target.horseId && (source.isUnavailable || source.status !== 'OCCUPIED')))
       throw new ConflictException('Денник недоступен для заселения');
     if (target.horseId && !dto.swapIfOccupied) throw new ConflictException('Денник занят. Подтвердите рокировку.');
@@ -123,6 +123,7 @@ export class StallsService {
     await this.serializable(async tx => {
       const stall = await tx.stall.findUnique({ where: { id } });
       if (!stall) throw new NotFoundException('Денник не найден');
+      if (horseId && stall.type === 'SERVICE') throw new ConflictException('В техническое помещение нельзя заселить лошадь');
       if (horseId === null) {
         await tx.stall.update({ where: { id }, data: { horseId: null,
           status: stall.status === 'OCCUPIED' ? 'AVAILABLE' : stall.status } });
@@ -162,9 +163,9 @@ export class StallsService {
 
   async create(dto: CreateStallDto): Promise<StallWithContracts> {
     try {
-      if (!dto.name?.trim() && !dto.number?.trim()) throw new BadRequestException('Укажите номер или название денника');
+      this.validateRoom(dto);
       if (dto.status === 'OCCUPIED') throw new BadRequestException('Используйте заселение лошади');
-      return await this.prisma.stall.create({ data: { ...this.normalize(dto), name: dto.name?.trim().replace(/\s+/g, ' ') || `Денник ${dto.number?.trim()}` }, include: stallInclude.include });
+      return await this.prisma.stall.create({ data: this.normalize(dto), include: stallInclude.include });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Денник');
     }
@@ -175,6 +176,10 @@ export class StallsService {
       await this.serializable(async tx => {
         const current = await tx.stall.findUnique({ where: { id } });
         if (!current) throw new NotFoundException('Денник не найден');
+        this.validateRoom({ type: dto.type ?? current.type,
+          name: dto.name === undefined ? current.name : dto.name,
+          number: dto.number === undefined ? current.number : dto.number });
+        if (dto.type === 'SERVICE' && current.horseId) throw new ConflictException('Сначала освободите денник');
         const status = dto.status ?? (dto.isUnavailable === undefined ? current.status : dto.isUnavailable ? 'MAINTENANCE' : current.horseId ? 'OCCUPIED' : 'AVAILABLE');
         if ((status === 'OCCUPIED') !== Boolean(current.horseId))
           throw new ConflictException('Сначала измените размещение лошади');
@@ -194,13 +199,19 @@ export class StallsService {
     }
   }
 
-  private normalize<T extends CreateStallDto | UpdateStallDto>(dto: T): T {
+  private validateRoom(dto: { type?: string; name?: string | null; number?: string | null }) {
+    if (dto.type === 'SERVICE') {
+      if (!dto.name?.trim()) throw new BadRequestException('Укажите название технического помещения');
+    } else if (!dto.number?.trim()) throw new BadRequestException('Укажите номер денника или бокса пони');
+  }
+
+  private normalize<T extends CreateStallDto | UpdateStallDto>(dto: T) {
     return {
       ...dto,
       ...(dto.status === undefined && dto.isUnavailable !== undefined ? { status: dto.isUnavailable ? 'MAINTENANCE' as const : 'AVAILABLE' as const } : {}),
       ...(dto.number !== undefined ? { number: dto.number.trim() } : {}),
       ...(dto.status !== undefined ? { isUnavailable: ['MAINTENANCE', 'QUARANTINE'].includes(dto.status) } : {}),
-      ...(dto.name !== undefined ? { name: dto.name.trim().replace(/\s+/g, ' ') } : {}),
+      ...(dto.name !== undefined ? { name: dto.name?.trim().replace(/\s+/g, ' ') || null } : {}),
       ...(dto.description !== undefined ? { description: dto.description.trim() || undefined } : {}),
     };
   }

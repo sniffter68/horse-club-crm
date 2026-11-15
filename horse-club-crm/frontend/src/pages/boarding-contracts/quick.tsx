@@ -10,7 +10,7 @@ import { useCatalogPermissions } from '../catalogs/permissions'
 import { CLUB_TIME_ZONE, toInstant, toLocalInput } from '../schedule/time'
 
 type PlacementContext = { kind: 'HORSE' | 'STALL' | 'DASHBOARD'; id: string; name: string; isUnavailable?: boolean; ownerClientId?: string | null }
-type ContractSummary = { id: string; status: string; startsAt: string; endsAt: string | null; stall?: { name: string } | null; horse?: { name: string } }
+type ContractSummary = { id: string; status: string; startsAt: string; endsAt: string | null; stall?: { name: string | null } | null; horse?: { name: string } }
 type Choice = { id: string; name: string; ownerClientId?: string | null }
 type Availability = { horses: Choice[]; stalls: Choice[] }
 type PlacementValues = { horseId: string; stallId: string; clientId?: string; startsAt: Dayjs; monthlyRate?: number }

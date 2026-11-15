@@ -51,6 +51,7 @@ import { dataProvider } from './dataProvider'
 import { LoginPage } from './pages/login'
 import { AppLayout } from './components/layout/AppLayout'
 import { LeadNotifications } from './components/LeadNotifications'
+import { CashboxHeaderWidget } from './components/CashboxHeaderWidget'
 import { DashboardPage } from './pages/dashboard'
 import { LessonHistoryPage } from './pages/lesson-history'
 import type { Role } from './authStorage'
@@ -180,7 +181,7 @@ export default function App() {
             options={{ syncWithLocation: true, disableTelemetry: true }}>
             <Routes>
               <Route element={<Authenticated key="private" fallback={<CatchAllNavigate to="/login" />} loading={<LoadingPage />}>
-                <PermissionsProvider><CashDeskProvider><AppLayout darkMode={darkMode} onToggleTheme={toggleTheme} header={<div className="cash-desk-header"><LeadNotifications /><CashDeskButton /></div>}><ModuleGuard><Outlet /></ModuleGuard></AppLayout></CashDeskProvider></PermissionsProvider>
+                <PermissionsProvider><CashDeskProvider><AppLayout darkMode={darkMode} onToggleTheme={toggleTheme} header={<div className="cash-desk-header"><CashboxHeaderWidget /><LeadNotifications /><CashDeskButton /></div>}><ModuleGuard><Outlet /></ModuleGuard></AppLayout></CashDeskProvider></PermissionsProvider>
               </Authenticated>}>
                 <Route index element={<DashboardRoute />} />
                 {catalogs.map(({ name, ListPage, CreatePage, EditPage }) => (

@@ -36,7 +36,7 @@ export function StableEntryModal<T extends object>({ title, form, initialValues,
     lock.current = true; setBusy(true); setError(undefined)
     try {
       await save(values)
-      await Promise.all(resources.map(resource => invalidate({ resource, invalidates: ['all'] })))
+      await Promise.all(resources.map(resource => invalidate({ resource, invalidates: ['resourceAll'] })))
       onSaved(); void message.success(successMessage)
     } catch (cause) {
       const failure = toHttpError(cause); setError(failure.message)

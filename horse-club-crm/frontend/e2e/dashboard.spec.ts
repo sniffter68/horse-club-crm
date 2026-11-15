@@ -214,6 +214,35 @@ async function setup(page: Page, role = 'ADMIN') {
   return state
 }
 
+for (const width of [1440, 390]) test(`quick booking shows nominal share, discounted cost and membership at ${width}px`, async ({ page }) => {
+  await setup(page)
+  await page.setViewportSize({ width, height: 900 })
+  await page.route('**/api/services?*', route => route.fulfill({ json: [{ id: '00000004-1111-4111-8111-111111111111', name: 'Выездка', durationMinutes: 60, price: 2000, allowMembership: true }], headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/clients/*', route => route.fulfill({ json: { ...client, memberships: [{ id: '00000006-1111-4111-8111-111111111111', type: 'fixed_lessons', isActive: true, status: 'active', remainedLessons: 3, validUntil: '2027-01-01' }] } }))
+  await page.route('**/api/bookings?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
+  await page.route('**/api/lessons?*', route => route.fulfill({ json: [] }))
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Быстрая запись', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
+  await choose(page, drawer, 'Услуга', 'Выездка')
+  await expect(drawer.getByText('Окончание: 20.10.2026 13:00 (Москва)', { exact: true })).toBeVisible()
+  await drawer.getByRole('spinbutton', { name: /Стоимость услуги/ }).fill('1000')
+  const summary = drawer.locator('.ant-descriptions').filter({ hasText: 'Финансовая сводка' })
+  await expect(summary).toContainText(/600 руб/)
+  await expect(summary).toContainText(/1\s*000 руб/)
+  for (const [label, value] of [['Клиент', 'Анна Орлова'], ['Тренер', 'Мария Волкова'], ['Лошадь', 'Валдай']]) await choose(page, drawer, label, value)
+  await drawer.getByRole('checkbox', { name: 'Списать занятие с абонемента', exact: true }).check()
+  await expect(summary).toContainText('0 руб. · занятие с абонемента')
+  await expect(summary).toContainText('600 руб.')
+  await page.screenshot({ path: `test-results/crm-quick-booking-${width}.png` })
+  let payload: Record<string, unknown> | undefined
+  await page.route('**/api/lessons', route => { payload = route.request().postDataJSON() as Record<string, unknown>; return route.fulfill({ status: 201, json: { id: 'created' } }) })
+  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await expect(drawer).toBeHidden()
+  expect(payload?.membershipId).toBe('00000006-1111-4111-8111-111111111111')
+  expect(payload?.cost).toBeUndefined()
+})
+
 async function choose(page: Page, drawer: Locator, label: string, value: string) {
   const input = drawer.getByRole('combobox', { name: label, exact: true })
   await input.scrollIntoViewIfNeeded()
@@ -411,7 +440,7 @@ for (const width of [1440, 390]) test(`creates a guest inside lesson drawer and 
 test('admin quick actions create a lesson in a right drawer and refresh the day counter', async ({ page }) => {
   const state = await setup(page)
   await page.goto('/')
-  await expect(page.getByRole('region', { name: 'Быстрые действия' }).getByRole('button')).toHaveCount(6)
+  await expect(page.getByRole('region', { name: 'Быстрые действия' }).getByRole('button')).toHaveCount(7)
   const drawer = await lesson(page)
   const bounds = await drawer.boundingBox()
   expect(bounds!.x + bounds!.width).toBeCloseTo(page.viewportSize()!.width, 0)
@@ -557,7 +586,7 @@ test('administrator signs in through the login screen and sees quick actions', a
   await page.getByLabel('Email', { exact: true }).fill('admin@example.com')
   await page.getByLabel('Пароль', { exact: true }).fill('test-password')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await expect(page.getByRole('region', { name: 'Быстрые действия' }).getByRole('button')).toHaveCount(6)
+  await expect(page.getByRole('region', { name: 'Быстрые действия' }).getByRole('button')).toHaveCount(7)
 })
 
 test('horse overload disables the option and Escape closes only the select popup', async ({ page }) => {

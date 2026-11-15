@@ -15,7 +15,7 @@ const contractInclude = Prisma.validator<Prisma.BoardingContractDefaultArgs>()({
   include: {
     client: { select: { id: true, name: true, firstName: true, lastName: true } },
     horse: { select: { id: true, name: true } },
-    stall: { select: { id: true, name: true, isUnavailable: true } },
+    stall: { select: { id: true, name: true, number: true, isUnavailable: true } },
     payments: {
       select: { id: true, amount: true, method: true, status: true, paidAt: true, createdAt: true },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
@@ -57,9 +57,9 @@ export class BoardingContractsService {
         tx.horse.findMany({ where: { boardingContracts: { none: reserved } }, select: { id: true, name: true,
           boardingContracts: { select: { clientId: true }, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], take: 1 },
         }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
-        tx.stall.findMany({ where: { isUnavailable: false, contracts: { none: reserved } }, select: { id: true, name: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
+        tx.stall.findMany({ where: { type: { not: 'SERVICE' }, isUnavailable: false, contracts: { none: reserved } }, select: { id: true, name: true, number: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
       ]);
-      return { horses: horses.map(({ boardingContracts, ...horse }) => ({ ...horse, ownerClientId: boardingContracts[0]?.clientId ?? null })), stalls };
+      return { horses: horses.map(({ boardingContracts, ...horse }) => ({ ...horse, ownerClientId: boardingContracts[0]?.clientId ?? null })), stalls: stalls.map(stall => ({ ...stall, name: stall.name || `Денник ${stall.number ?? 'без номера'}` })) };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
@@ -199,13 +199,13 @@ export class BoardingContractsService {
       data.clientId ? tx.client.findUnique({ where: { id: data.clientId }, select: { id: true } }) : Promise.resolve(null),
       tx.horse.findUnique({ where: { id: data.horseId }, select: { id: true } }),
       data.stallId
-        ? tx.stall.findUnique({ where: { id: data.stallId }, select: { id: true, isUnavailable: true } })
+        ? tx.stall.findUnique({ where: { id: data.stallId }, select: { id: true, type: true, isUnavailable: true } })
         : Promise.resolve(null),
     ]);
     if (data.clientId && !client) throw new NotFoundException('Клиент не найден');
     if (!horse) throw new NotFoundException('Лошадь не найдена');
     if (data.stallId && !stall) throw new NotFoundException('Денник не найден');
-    if (stall?.isUnavailable) throw new ConflictException('Выбранный денник недоступен');
+    if (stall?.isUnavailable || stall?.type === 'SERVICE') throw new ConflictException('Выбранный денник недоступен');
     if (!RESERVING_STATUSES.includes(data.status)) return;
 
     const interval = {
