@@ -11,6 +11,7 @@ caddy_config/
 .DS_Store
 *audit*.json
 project-*.txt
+test-results/
 
 uploads/
 __pycache__/
