@@ -139,6 +139,8 @@ export class CashDeskService {
           } });
         }
       }
+      if (dto.lessonCost == null) await tx.cashAuditLog.create({ data: { requestId, action: 'PAYMENT_RECEIVED', actorId: cashierId,
+        actorName: payment.cashier?.email ?? cashierId, details: { paymentId: payment.id } } });
       return payment;
     });
   }

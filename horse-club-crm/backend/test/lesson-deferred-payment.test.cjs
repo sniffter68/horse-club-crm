@@ -29,7 +29,7 @@ function harness({ status = 'SCHEDULED', membership = {}, lesson = {}, failReven
     const result = serial.then(async () => {
       const draft = structuredClone(state);
       const details = () => ({ ...draft.lesson, operations: draft.operations, bookings: draft.lesson.bookings.map(b => ({ ...b, membership: b.membershipId ? draft.membership : null })) });
-      const tx = {
+      const tx = { cashAuditLog: { create: async ({ data }) => data },
         $queryRaw: async sql => {
           const query = sql.join('');
           if (query.includes('CURRENT_TIMESTAMP')) return [{ now: new Date() }];
@@ -106,7 +106,7 @@ test('revenue failure rolls back debit, booking linkage and pending cancellation
 
 test('shared lesson rules check trainer occupancy even without a horse', async () => {
   const rules = new BookingRulesService();
-  const tx = {
+  const tx = { cashAuditLog: { create: async ({ data }) => data },
     $queryRaw: async () => [], trainer: { findUnique: async () => ({ isActive: true, maxParallelLessons: 1 }) },
     horse: { findMany: async ({ where }) => { assert.deepEqual(where.id.in, []); return []; } },
     client: { findMany: async () => [{ id: id(4) }] },
@@ -119,7 +119,7 @@ test('shared lesson rules check trainer occupancy even without a horse', async (
 
 test('HTTP creates individual lessons without horse, accepts empty/null horse and validates membership UUID', async () => {
   let created;
-  const tx = {
+  const tx = { cashAuditLog: { create: async ({ data }) => data },
     service: { findUnique: async () => ({ price: 1500, durationMinutes: 60, maxCapacity: 1, name: 'Training' }) },
     clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] }) },
     lesson: { findMany: async () => [], create: async ({ data }) => { created = data; return { ...data, id: id(2), trainer: {}, bookings: [] }; } },

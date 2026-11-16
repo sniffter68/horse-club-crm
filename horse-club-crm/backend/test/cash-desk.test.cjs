@@ -30,6 +30,7 @@ test('summary counts cash as receipt amount, aggregates all noncash and exact to
 function fixture({ booking, membership, previous = null, pending = null, failLedger = false } = {}) {
   const calls = [];
   const tx = {
+    cashAuditLog: { create: async args => calls.push(['audit', args]) },
     $queryRaw: async () => [],
     client: { findUnique: async () => ({ id: 'c1' }) },
     cashShift: { findFirst: async () => ({ id: 'shift1' }) },
@@ -50,6 +51,7 @@ const dto = { clientId: 'c1', amount: 1200.1, method: 'CASH', cashGiven: 2000, r
 test('cash payment links receipt, cashier, shift and purchase in one transaction', async () => {
   const { service, calls } = fixture(); const result = await service.pay(dto, 'u1');
   assert.equal(result.cashChange.toString(), '799.9'); assert.equal(result.cashierId, 'u1'); assert.equal(result.shiftId, 'shift1');
+  assert.equal(calls.find(([name]) => name === 'audit')[1].data.action, 'PAYMENT_RECEIVED');
   const ledger = calls.find(([name]) => name === 'ledger')[1].data;
   assert.equal(ledger.cashDeskPaymentId, 'p1'); assert.equal(ledger.transactionType, 'purchase'); assert.equal(ledger.amount.toString(), '1200.1');
 });
@@ -67,6 +69,7 @@ test('lesson balance can be collected after prepayment without overwriting the p
   let lessonData;
   const receipts = [];
   const tx = {
+    cashAuditLog: { create: async () => {} },
     $queryRaw: async () => [], client: { findUnique: async () => ({ id: 'c1' }) }, cashShift: { findFirst: async () => null },
     booking: { findUnique: async () => booking, update: async ({ data }) => Object.assign(booking, data), findMany: async () => [booking] },
     lesson: { update: async ({ data }) => { lessonData = data; } },

@@ -1,4 +1,5 @@
 import { telegramCancellation } from '../modules/telegram-bot/telegram-cancellation';
+import type { TrainerStatusDto } from '../workspace/workspace.dto';
 import { refundService, serviceRefundQuote } from '../payments/service-refund';
 import type { CancelServiceDto } from '../payments/dto/cancel-service.dto';
 import { canUseMembership, membershipAccessWhere } from '../memberships/membership-access';
@@ -178,7 +179,7 @@ export class LessonsService {
     });
   }
 
-  async rescheduleLesson(lessonId: string, startTime: string, durationMinutes: number, trainerId?: string, arenaId?: string): Promise<LessonDetails> {
+  async rescheduleLesson(lessonId: string, startTime: string, durationMinutes: number, trainerId?: string, arenaId?: string, actor?: AuthUser): Promise<LessonDetails> {
     const eventId = randomUUID();
     if (!Number.isSafeInteger(durationMinutes) || durationMinutes <= 0) throw new BadRequestException('Укажите положительную длительность занятия');
     const start = this.parseDate(startTime, 'Некорректное время начала занятия');
@@ -205,6 +206,7 @@ export class LessonsService {
       const updated = await tx.lesson.update({ where: { id: lessonId }, data: { startTime: start, endTime: end, ...(trainerId ? { trainerId } : {}), ...(arenaId ? { arenaId } : {}) }, ...lessonDetails });
       if (trainerId && trainerId !== lesson.trainerId || arenaId && arenaId !== lesson.arenaId || lesson.startTime.getTime() !== start.getTime() || lesson.endTime.getTime() !== end.getTime()) {
         await this.notifyLesson(tx, updated, `rescheduled:${eventId}`, 'Тренировка перенесена', undefined, lesson.startTime);
+        if (actor) await tx.cashAuditLog.create({ data: { requestId: eventId, action: 'LESSON_RESCHEDULED', actorId: actor.id, actorName: actor.email, details: { lessonId, startTime } } });
       }
       return updated;
     });
@@ -369,6 +371,7 @@ export class LessonsService {
       });
       await this.recordPrepayment(tx, created, clientIds[0], prepayment, dto.prepaymentMethod, actor);
       await this.notifyLesson(tx, created, 'created', 'Запись на тренировку подтверждена');
+      if (actor) await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'LESSON_CREATED', actorId: actor.id, actorName: actor.email, details: { lessonId: created.id } } });
       return created;
     };
     return transaction ? create(transaction) : this.runSerializable(create);
@@ -492,7 +495,11 @@ export class LessonsService {
     actor?: AuthUser,
     cancellation?: Partial<CancelServiceDto>,
     telegramSender?: string,
+    trainerUpdate?: TrainerStatusDto,
   ): Promise<LessonDetails> {
+    if (trainerUpdate && (trainerUpdate.status !== newStatus || !['COMPLETED', 'NO_SHOW'].includes(newStatus))) {
+      throw new BadRequestException('Тренеру доступны только отметки проведения и неявки');
+    }
     if (!ALLOWED_FINAL_STATUSES.has(newStatus)) {
       throw new BadRequestException('Недопустимый статус занятия');
     }
@@ -514,6 +521,13 @@ export class LessonsService {
       });
       if (!lesson) {
         throw new NotFoundException('Занятие не найдено');
+      }
+      if (trainerUpdate) {
+        const user = actor && await tx.user.findUnique({ where: { id: actor.id }, include: { trainer: true } });
+        if (!user || user.role !== 'TRAINER' || !user.crmAccess || !user.trainer?.isActive || user.trainerId !== lesson.trainerId)
+          throw new ForbiddenException('Можно отмечать только свои занятия');
+        if (lesson.status !== 'SCHEDULED' && lesson.status !== newStatus)
+          throw new ConflictException('Занятие уже отмечено. Обратитесь к администратору');
       }
       if (telegramSender) {
         const user = await tx.user.findUnique({ where: { telegramUserId: telegramSender }, include: { trainer: true, staffProfile: true } })
@@ -644,13 +658,14 @@ export class LessonsService {
       }
       const updated = await tx.lesson.update({
         where: { id: lessonId },
-        data: { status: newStatus, ...financialData,
+        data: { status: newStatus, ...financialData, ...(trainerUpdate?.trainerNote !== undefined ? { trainerNote: trainerUpdate.trainerNote.trim() } : {}),
           ...(newStatus === 'NO_SHOW' && cancellation?.reason ? { bookings: { updateMany: { where: {}, data: { cancellationReason: cancellation.reason } } } } : {}),
           ...(newStatus === 'CANCELLED' ? { cancelledAt: new Date(), deletedAt: new Date(), bookings: { updateMany: { where: {}, data: { status: 'cancelled_club', cancellationReason: cancellation?.reason ?? 'Отмена занятия' } } } } : {}) },
         ...lessonDetails,
       });
       if (newStatus === LessonStatus.CANCELLED) await this.notifyLesson(tx, updated, 'cancelled', 'Тренировка отменена');
       if (newStatus === LessonStatus.COMPLETED) await this.notifyTelegramLesson(tx, updated, 'completed', 'Тренировка состоялась');
+      if (actor && newStatus !== 'CANCELLED') await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: `LESSON_${newStatus}`, actorId: actor.id, actorName: actor.email, details: { lessonId, status: newStatus } } });
       return updated;
     });
   }

@@ -52,7 +52,8 @@ import { LoginPage } from './pages/login'
 import { AppLayout } from './components/layout/AppLayout'
 import { LeadNotifications } from './components/LeadNotifications'
 import { CashboxHeaderWidget } from './components/CashboxHeaderWidget'
-import { DashboardPage } from './pages/dashboard'
+import { AdminDashboardPage } from './pages/workspace/AdminDashboard'
+import { TrainerBoardPage } from './pages/workspace/TrainerBoard'
 import { LessonHistoryPage } from './pages/lesson-history'
 import type { Role } from './authStorage'
 import '@refinedev/antd/dist/reset.css'
@@ -92,8 +93,8 @@ function DashboardRoute() {
   const { data: role, isLoading } = usePermissions<Role>({})
   if (isLoading) return <LoadingPage />
   if (role === 'STABLE_WORKER') return <Navigate to="/stable" replace />
-  if (role === 'TRAINER') return <Navigate to="/schedule" replace />
-  return <DashboardPage />
+  if (role === 'TRAINER') return <Navigate to="/trainer" replace />
+  return <AdminDashboardPage />
 }
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem(THEME_STORAGE_KEY) === 'dark')
@@ -184,6 +185,8 @@ export default function App() {
                 <PermissionsProvider><CashDeskProvider><AppLayout darkMode={darkMode} onToggleTheme={toggleTheme} header={<div className="cash-desk-header"><CashboxHeaderWidget /><LeadNotifications /><CashDeskButton /></div>}><ModuleGuard><Outlet /></ModuleGuard></AppLayout></CashDeskProvider></PermissionsProvider>
               </Authenticated>}>
                 <Route index element={<DashboardRoute />} />
+                <Route path="dashboard" element={<DashboardRoute />} />
+                <Route path="trainer" element={<TrainerBoardPage />} />
                 {catalogs.map(({ name, ListPage, CreatePage, EditPage }) => (
                   <Route key={name} path={name}>
                     <Route index element={name === 'horse-health-logs' || name === 'boarding-contracts' || name === 'stalls' ? <PermissionGate permission={name === 'horse-health-logs' ? 'healthRead' : 'boardingAccess'}><ListPage /></PermissionGate> : <ListPage />} />

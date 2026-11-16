@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Prisma, type PaymentMethod } from '@prisma/client';
 import type { AuthUser } from '../auth/auth.types';
 import { defaultModuleAccess } from '../settings/module-access.service';
@@ -34,6 +35,7 @@ export async function postLessonReceipt(tx: Prisma.TransactionClient, actor: Aut
     status: 'PAID', paidAt: new Date(), cashierId: actor.id, shiftId: shift?.id,
     serviceType: category, description,
   } });
+  await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'PAYMENT_RECEIVED', actorId: actor.id, actorName: actor.email, details: { paymentId: payment.id } } });
   await tx.ledgerTransaction.create({ data: {
     clientId: booking.clientId, bookingId: booking.id, cashDeskPaymentId: payment.id,
     transactionType: 'purchase', amount, description,

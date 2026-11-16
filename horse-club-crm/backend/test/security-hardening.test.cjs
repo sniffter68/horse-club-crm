@@ -26,7 +26,7 @@ test('trainer cannot change lesson status through HTTP, manager can', async () =
   let changes = 0;
   const module = await Test.createTestingModule({ imports: [CommonModule], controllers: [LessonsController], providers: [
     { provide: LessonsService, useValue: { updateLessonStatus: async () => { changes++; return {}; },
-      findOne: async () => ({bookings:[{client:{name:'Test',medicalNotes:'secret'},payments:[{amount:10}]}]}) } }, RolesGuard,
+      findOne: async () => ({ id: 'lesson', trainerId: 'trainer', trainer: { id: 'trainer', name: 'Trainer' }, service: { id: 'service', name: 'Service' }, bookings:[{client:{name:'Test',medicalNotes:'secret'},payments:[{amount:10}]}] }) } }, RolesGuard,
   ] }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })
     .overrideGuard(JwtAuthGuard).useValue({ canActivate(ctx) {
     const req = ctx.switchToHttp().getRequest(); req.user = { role: req.headers['x-role'] }; return true;
@@ -39,7 +39,9 @@ test('trainer cannot change lesson status through HTTP, manager can', async () =
     await request(app.getHttpServer()).patch(path).set('x-role','MANAGER').send({status:'CANCELLED'}).expect(200);
     assert.equal(changes,1);
     const details = await request(app.getHttpServer()).get('/lessons/11111111-1111-4111-8111-111111111111').set('x-role','TRAINER').expect(200);
-    assert.deepEqual(details.body,{bookings:[{client:{name:'Test'},payments:[]}]});
+    assert.equal(details.body.isOwn, false);
+    assert.deepEqual(details.body.bookings, [{ client: null, horse: null }]);
+    assert.equal('payments' in details.body.bookings[0], false);
   } finally { await app.close(); }
 });
 

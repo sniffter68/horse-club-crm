@@ -4,6 +4,7 @@ import { queueVkAdministratorNotification, queueVkAdminChatNotification } from '
 import { queueTelegramAdmins } from '../modules/telegram-bot/telegram-delivery';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AcceptLeadDto } from './accept-lead.dto';
+import type { AuthUser } from '../auth/auth.types';
 import type { CreateLeadDto } from './create-lead.dto';
 import { currentLeadConsentVersion } from '../common/lead-consent';
 import { LessonsService } from '../lessons/lessons.service';
@@ -89,7 +90,7 @@ export class LeadsService {
     return { success: true, leadId: '', message: 'Заявка успешно принята' };
   }
 
-  async accept(id: string, dto: AcceptLeadDto) {
+  async accept(id: string, dto: AcceptLeadDto, actor?: AuthUser) {
     return this.retrySerializable(async tx => {
       const lead = await tx.leadRequest.findUnique({ where: { id } });
       if (!lead) throw new NotFoundException('Заявка не найдена');
@@ -118,7 +119,7 @@ export class LeadsService {
         if (!this.lessons) throw new ServiceUnavailableException('Сервис занятий недоступен');
         const { horseId, ...lessonInput } = dto.lesson;
         const lesson = await this.lessons.createLesson({ ...lessonInput, serviceId: serviceId!,
-          participants: [{ clientId: client.id, horseId }] }, tx);
+          participants: [{ clientId: client.id, horseId }] }, tx, actor);
         lessonId = lesson.id;
       }
       await tx.leadRequest.update({

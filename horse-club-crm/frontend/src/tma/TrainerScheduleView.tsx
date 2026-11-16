@@ -7,6 +7,7 @@ import { TmaApiError, tmaRequest, type LessonStatus, type TmaHorse, type Trainer
 import { tmaDay, tmaTime, tmaWeek } from './dates'
 import { useTelegramWebApp } from './useTelegramWebApp'
 import './trainer.css'
+import { TrainerBoardView } from '../pages/workspace/TrainerBoard'
 
 const statuses: Record<LessonStatus, { label: string; color: string }> = {
   SCHEDULED: { label: 'Запланировано', color: 'default' }, COMPLETED: { label: 'Проведено', color: 'success' },
@@ -17,12 +18,14 @@ type DayResult = { lessons: TrainerLesson[]; error?: string }
 
 export function TrainerScheduleView() {
   const { state, dark, retry, expire } = useTelegramWebApp()
+  const [board, setBoard] = useState(false)
   return <ConfigProvider locale={ruRU} theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm,
     token: { colorPrimary: window.Telegram?.WebApp?.themeParams.button_color ?? '#724C39', borderRadius: 12, controlHeight: 44 } }}>
     <App><main className="trainer-tma">
+      {state.kind === 'ready' && state.session.role !== 'ADMIN' && <Button onClick={() => setBoard(value => !value)}>{board ? 'Моё расписание' : 'Общая шахматка'}</Button>}
       {state.kind === 'ready' ? state.session.role === 'ADMIN'
         ? <AdminTmaView session={state.session} onExpired={expire} />
-        : <TrainerSchedule session={state.session} onExpired={expire} /> : <section className="trainer-gate">
+        : board ? <TrainerBoardView canWrite={state.session.accessLevel === 'FULL'} tmaToken={state.session.access_token} onExit={() => setBoard(false)} /> : <TrainerSchedule session={state.session} onExpired={expire} /> : <section className="trainer-gate">
         <img src="/horse-crm.svg" alt="КСК «СЛКС»" width={64} height={64} />
         <p className="trainer-eyebrow">HORSE CLUB · КСК «СЛКС»</p>
         <h1>Кабинет клуба</h1>

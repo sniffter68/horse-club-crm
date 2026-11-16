@@ -424,6 +424,7 @@ model VkConsent {
 }
 
 model Lesson {
+  trainerNote String? @db.VarChar(1000)
   financialActorId String? @db.Uuid
   deletedAt DateTime? @db.Timestamptz(6)
   cancelledAt DateTime? @db.Timestamptz(6)

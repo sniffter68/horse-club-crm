@@ -127,9 +127,9 @@ test('HTTP workload routing, DTO validation and transfer authorization match the
     await request(app.getHttpServer()).patch(path).set('x-role', 'TRAINER').send(body).expect(403);
     await request(app.getHttpServer()).patch(path).set('x-role', 'ADMIN').send({ ...body, allowOverload: true }).expect(400);
     await request(app.getHttpServer()).patch(path).set('x-role', 'MANAGER').send(body).expect(200);
-    assert.deepEqual(calls[1], [id, body.startTime, 60, undefined, undefined]);
+    assert.deepEqual(calls[1], [id, body.startTime, 60, undefined, undefined, { role: 'MANAGER' }]);
     await request(app.getHttpServer()).patch(path).set('x-role', 'MANAGER').send({ ...body, trainerId: id, arenaId: id }).expect(200);
-    assert.deepEqual(calls[2], [id, body.startTime, 60, id, id]);
+    assert.deepEqual(calls[2], [id, body.startTime, 60, id, id, { role: 'MANAGER' }]);
     await request(app.getHttpServer()).patch(path).set('x-role', 'ADMIN').send({ ...body, trainerId: 'bad' }).expect(400);
   } finally { await app.close(); }
 });

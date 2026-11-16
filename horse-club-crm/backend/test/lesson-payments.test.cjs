@@ -18,7 +18,7 @@ function harness({ enabled = true, failLedger = false, role = 'ADMIN', cost = 15
       // Keep real Decimal values and isolate every mutable row until commit.
       const draft = { ...state, lesson: state.lesson && { ...state.lesson, bookings: state.lesson.bookings.map(b => ({ ...b })) }, payments: [...state.payments], ledger: [...state.ledger] };
       const details = () => ({ ...draft.lesson, bookings: draft.lesson.bookings.map(b => ({ ...b, payments: draft.payments.filter(p => p.bookingId === b.id && p.status === 'PAID') })) });
-      const tx = {
+      const tx = { cashAuditLog: { create: async ({ data }) => data },
         service: { findUnique: async () => ({ id: 'service', isPerPerson, durationMinutes: 60, price: cost, maxCapacity: 1, allowMembership: true, name: 'Тренировка' }) },
         clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] }) },
         clubModuleSettings: { findUnique: async () => ({ isEnabled: enabled }) },

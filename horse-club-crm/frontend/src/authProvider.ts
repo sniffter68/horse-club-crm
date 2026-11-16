@@ -15,7 +15,7 @@ export const authProvider = {
         throw new Error('Сервер вернул некорректные данные авторизации')
       }
       saveSession(data.access_token, { email: data.user.email, role: data.user.role })
-      return { success: true, redirectTo: '/' }
+      return { success: true, redirectTo: data.user.role === 'TRAINER' ? '/trainer' : '/dashboard' }
     } catch (error: unknown) {
       const failure = toHttpError(error)
       return { success: false, error: { name: 'Ошибка входа', message: failure.statusCode === 401 ? 'Неверный email или пароль' : failure.message } }

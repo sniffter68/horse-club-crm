@@ -7,6 +7,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { AcceptLeadDto } from './accept-lead.dto';
 import { LeadsService } from './leads.service';
 import { LeadEventsService } from './lead-events.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthUser } from '../auth/auth.types';
 
 @ApiTags('Lead management')
 @ApiBearerAuth()
@@ -24,8 +26,8 @@ export class LeadManagementController {
 
   @Patch(':id/accept')
   accept(@Param('id', new ParseUUIDPipe()) id: string,
-    @Body(new ValidationPipe({ expectedType: AcceptLeadDto, whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: false } })) dto: unknown) {
-    return this.leads.accept(id, dto as AcceptLeadDto);
+    @Body(new ValidationPipe({ expectedType: AcceptLeadDto, whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: false } })) dto: unknown, @CurrentUser() actor: AuthUser) {
+    return this.leads.accept(id, dto as AcceptLeadDto, actor);
   }
 
   @Patch(':id/reject')

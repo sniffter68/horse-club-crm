@@ -1,4 +1,5 @@
 import { PublicModule } from './public/public.module';
+import { WorkspaceModule } from './workspace/workspace.module';
 import { TelegramBotModule } from './modules/telegram-bot/telegram-bot.module';
 import { StaffModule } from './staff/staff.module';
 import { UploadModule } from './upload/upload.module';
@@ -31,6 +32,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
+    WorkspaceModule,
     ScheduleModule.forRoot(),
     StaffModule,
     UploadModule,

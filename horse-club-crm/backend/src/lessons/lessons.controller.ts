@@ -1,4 +1,5 @@
 import { CancelServiceDto } from '../payments/dto/cancel-service.dto';
+import { TrainerStatusDto } from '../workspace/workspace.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
 import { CompleteLessonDto } from './dto/lesson-payment.dto';
@@ -36,6 +37,19 @@ import { RescheduleLessonDto, UpdateLessonStatusDto } from './dto/update-lesson.
 import type { LessonDetails } from './lessons.service';
 import { LessonsService } from './lessons.service';
 
+export function trainerLessonView(lesson: LessonDetails, actor: AuthUser) {
+  const isOwn = lesson.trainerId === actor.trainerId;
+  return { id: lesson.id, trainerId: lesson.trainerId, startTime: lesson.startTime, endTime: lesson.endTime, status: lesson.status, isOwn,
+    trainerNote: isOwn ? lesson.trainerNote : null,
+    trainer: { id: lesson.trainer.id, name: lesson.trainer.name },
+    service: { id: lesson.service.id, name: lesson.service.name, title: lesson.service.title },
+    arena: lesson.arena ? { id: lesson.arena.id, name: lesson.arena.name } : null,
+    bookings: lesson.bookings.map(row => ({ id: row.id, clientConfirmed: row.clientConfirmed,
+      client: isOwn ? { id: row.client.id, name: row.client.name } : null,
+      horse: row.horse ? { id: row.horse.id, name: row.horse.name } : null })),
+  };
+}
+
 @ApiTags('Lessons')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
@@ -43,6 +57,13 @@ import { LessonsService } from './lessons.service';
 @Controller('lessons')
 export class LessonsController {
   constructor(private readonly lessonsService: LessonsService) {}
+
+  @Patch(':id/trainer-status')
+  @Roles(Role.TRAINER)
+  async trainerStatus(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: TrainerStatusDto, @CurrentUser() actor: AuthUser) {
+    const lesson = await this.lessonsService.updateLessonStatus(id, dto.status, {}, actor, undefined, undefined, dto);
+    return { id: lesson.id, status: lesson.status, trainerNote: lesson.trainerNote, isOwn: true };
+  }
 
   @Get(':id/refund-quote')
   @Roles(Role.ADMIN, Role.MANAGER)
@@ -71,17 +92,18 @@ export class LessonsController {
   @Get()
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
   @ApiOkResponse({ description: 'Список занятий в заданном интервале.' })
-  findAll(@Query() query: ListLessonsQueryDto): Promise<LessonDetails[]> {
-    return this.lessonsService.findAll(query);
+  async findAll(@Query() query: ListLessonsQueryDto, @CurrentUser() actor: AuthUser) {
+    const rows = await this.lessonsService.findAll(query);
+    return actor.role === 'TRAINER' ? rows.map(row => trainerLessonView(row, actor)) : rows;
   }
 
   @Get('history')
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
   @ApiOkResponse({ description: 'Постраничный журнал занятий с фильтрами.' })
-  async findHistory(@Query() query: LessonHistoryQueryDto, @Res({ passthrough: true }) response: Response): Promise<LessonDetails[]> {
+  async findHistory(@Query() query: LessonHistoryQueryDto, @Res({ passthrough: true }) response: Response, @CurrentUser() actor: AuthUser) {
     const { data, total } = await this.lessonsService.findHistory(query);
     setRefineTotalHeaders(response, total);
-    return data;
+    return actor.role === 'TRAINER' ? data.map(row => trainerLessonView(row, actor)) : data;
   }
 
   @Patch(':id/status')
@@ -109,16 +131,18 @@ export class LessonsController {
 
   @Patch(':id/reschedule')
   @Roles(Role.ADMIN, Role.MANAGER)
-  reschedule(@Param('id', new ParseUUIDPipe()) lessonId: string, @Body() dto: RescheduleLessonDto): Promise<LessonDetails> {
-    return this.lessonsService.rescheduleLesson(lessonId, dto.startTime, dto.durationMinutes, dto.trainerId, dto.arenaId);
+  reschedule(@Param('id', new ParseUUIDPipe()) lessonId: string, @Body() dto: RescheduleLessonDto, @CurrentUser() actor: AuthUser): Promise<LessonDetails> {
+    return this.lessonsService.rescheduleLesson(lessonId, dto.startTime, dto.durationMinutes, dto.trainerId, dto.arenaId, actor);
   }
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
   @ApiOkResponse({ description: 'Карточка занятия и список участников.' })
-  findOne(
+  async findOne(
     @Param('id', new ParseUUIDPipe()) lessonId: string,
-  ): Promise<LessonDetails> {
-    return this.lessonsService.findOne(lessonId);
+    @CurrentUser() actor: AuthUser,
+  ) {
+    const lesson = await this.lessonsService.findOne(lessonId);
+    return actor.role === 'TRAINER' ? trainerLessonView(lesson, actor) : lesson;
   }
 }
