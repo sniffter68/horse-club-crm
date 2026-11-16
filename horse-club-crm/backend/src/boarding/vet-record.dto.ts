@@ -14,7 +14,7 @@ export class VetRecordQueryDto {
 }
 export class CreateVetRecordDto {
   @IsUUID() horseId!: string;
-  @IsEnum(VetRecordType) type!: VetRecordType;
+  @Transform(empty) @IsEnum(VetRecordType) type!: VetRecordType;
   @Transform(({ value }) => typeof value === 'string' ? value.trim() : value) @IsString() @MinLength(1) @MaxLength(250) title!: string;
   @IsISO8601({ strict: true }) performedAt!: string;
   @IsOptional() @IsISO8601({ strict: true }) nextDueDate?: string | null;

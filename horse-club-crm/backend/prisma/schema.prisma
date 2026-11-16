@@ -1024,6 +1024,8 @@ enum VetRecordType {
   EXAMINATION
   TREATMENT
   DENTAL
+  CASTRATION
+  TEETH_FLOATING
 }
 
 model VetRecord {
@@ -1055,6 +1057,8 @@ enum VetEventType {
   shoeing
   vet_check
   dentist
+  CASTRATION
+  TEETH_FLOATING
 }
 
 enum VetEventStatus {

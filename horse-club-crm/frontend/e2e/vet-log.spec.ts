@@ -5,6 +5,7 @@ const horse = { id: horseId, name: 'Валдай', status: 'active', isUnavailab
 const procedures = [
   ['Вакцинация', 'vaccination'], ['Дегельминтизация', 'deworming'], ['Ковка', 'shoeing'],
   ['Осмотр ветеринара', 'vet_check'], ['Стоматолог', 'dentist'],
+  ['Кастрация', 'CASTRATION'], ['Подпиливание зубов', 'TEETH_FLOATING'],
 ] as const
 
 test.beforeEach(async ({ page }) => {
@@ -105,7 +106,14 @@ for (const [label, key] of procedures) {
     const dialog = page.getByRole('dialog', { name: 'Новая вет-процедура' })
     await dialog.getByRole('combobox', { name: 'Процедура', exact: true }).focus()
     await page.keyboard.press('ArrowDown')
-    await page.locator('.ant-select-dropdown:visible').getByTitle(label, { exact: true }).click()
+    const dropdown = page.locator('.ant-select-dropdown:visible')
+    await expect(dropdown).toBeVisible()
+    for (let step = 0; step < procedures.length; step++) {
+      if (await dropdown.locator('.ant-select-item-option-active').getAttribute('title') === label) break
+      await page.keyboard.press('ArrowDown')
+    }
+    await page.keyboard.press('Enter')
+    await expect(dropdown).toHaveCount(0)
     await dialog.getByRole('button', { name: 'Сохранить процедуру' }).click()
     await expect(dialog).toHaveCount(0)
     expect(payload?.type).toBe(key)

@@ -1,4 +1,4 @@
-export const recordTypes = { VACCINATION: 'Вакцинация', DEWORMING: 'Глистогон', BLOOD_TEST: 'Кровь', FARRIER: 'Ковка / расчистка', EXAMINATION: 'Осмотр', TREATMENT: 'Лечение', DENTAL: 'Стоматология' } as const
+export const recordTypes = { VACCINATION: 'Вакцинация', DEWORMING: 'Глистогон', BLOOD_TEST: 'Кровь', FARRIER: 'Ковка / расчистка', EXAMINATION: 'Осмотр', TREATMENT: 'Лечение', DENTAL: 'Стоматология', CASTRATION: 'Кастрация', TEETH_FLOATING: 'Подпиливание зубов' } as const
 export type RecordType = keyof typeof recordTypes
 export const healthStatuses = { HEALTHY: 'Здорова', TREATMENT: 'На лечении', QUARANTINE: 'Карантин', RETIRED: 'Выбыла / пенсия' } as const
 export type HealthStatus = keyof typeof healthStatuses
@@ -14,4 +14,5 @@ export const recordTemplates: Partial<Record<RecordType, string[]>> = {
   VACCINATION: ['Грипп + столбняк', 'Сибирская язва', 'Бешенство', 'Ринопневмония', 'Дерматомикозы'],
   DEWORMING: ['Ивермектин (дегельминтизация)'], BLOOD_TEST: ['Исследование крови на САП / ИНАН', 'Случная болезнь', 'Бруцеллёз'],
   FARRIER: ['Плановая расчистка', 'Ковка передних копыт'], EXAMINATION: ['Плановый осмотр'], DENTAL: ['Пилка зубов'],
+  CASTRATION: ['Кастрация'], TEETH_FLOATING: ['Подпиливание зубов'],
 }

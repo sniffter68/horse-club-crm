@@ -15,7 +15,10 @@ const id = '00000000-0000-4000-8000-000000000001';
 const dto = { horseId: id, type: 'FARRIER', title: 'Плановая расчистка', performedAt: '2026-01-01', specialist: 'Коваль' };
 
 test('vet DTO validates every procedure, rejects invalid values and normalizes blank query parameters', async () => {
-  for (const type of ['VACCINATION', 'DEWORMING', 'BLOOD_TEST', 'FARRIER', 'EXAMINATION', 'TREATMENT', 'DENTAL']) assert.equal((await validate(plainToInstance(CreateVetRecordDto, { ...dto, type }))).length, 0);
+  for (const type of ['VACCINATION', 'DEWORMING', 'BLOOD_TEST', 'FARRIER', 'EXAMINATION', 'TREATMENT', 'DENTAL', 'CASTRATION', 'TEETH_FLOATING']) {
+    assert.equal((await validate(plainToInstance(CreateVetRecordDto, { ...dto, type }))).length, 0);
+    assert.equal((await validate(plainToInstance(VetRecordQueryDto, { type }))).length, 0);
+  }
   for (const patch of [{ title: ' ' }, { specialist: '' }, { horseId: 'x' }, { performedAt: 'x' }, { performedAt: '2026-02-30' }, { cost: -1 }, { cost: 1.001 }, { documentUrl: 'javascript:alert(1)' }, { type: 'shoeing' }]) assert.ok((await validate(plainToInstance(CreateVetRecordDto, { ...dto, ...patch }))).length);
   const query = plainToInstance(VetRecordQueryDto, { horseId: '', type: '', from: '', to: '', offset: '', limit: '' });
   assert.equal((await validate(query)).length, 0);
@@ -42,6 +45,41 @@ function fixture() {
     vetRecord: { create: async ({ data }) => { writes.push(data); return { id: 'record', ...data }; }, findUnique: async () => ({ ...dto, performedAt: new Date('2025-12-31T21:00Z'), nextDueDate: new Date('2026-02-14T21:00Z') }), update: async ({ data }) => data } };
   return { service: new VetRecordService({ $transaction: async work => work(tx) }), writes, tx };
 }
+
+test('performed castration changes only stallions, including edits; teeth floating preserves explicit reminders', async () => {
+  for (const sex of ['STALLION', 'MARE', 'GELDING', null]) {
+    const { service, tx } = fixture();
+    let currentSex = sex;
+    tx.horse.updateMany = async ({ where, data }) => {
+      assert.deepEqual(where, { id, sex: 'STALLION' });
+      assert.deepEqual(data, { sex: 'GELDING' });
+      if (currentSex === where.sex) currentSex = data.sex;
+    };
+    const record = await service.create({ ...dto, type: 'CASTRATION' }, id);
+    assert.equal(record.type, 'CASTRATION'); assert.equal(record.nextDueDate, null);
+    assert.equal(currentSex, sex === 'STALLION' ? 'GELDING' : sex);
+    currentSex = sex;
+    await service.update(id, { type: 'CASTRATION' });
+    assert.equal(currentSex, sex === 'STALLION' ? 'GELDING' : sex);
+    tx.horse.updateMany = async () => assert.fail('Other procedures must not change sex');
+    const teeth = await service.create({ ...dto, type: 'TEETH_FLOATING', nextDueDate: '2027-01-01' }, id);
+    assert.equal(teeth.nextDueDate.toISOString(), '2026-12-31T21:00:00.000Z');
+    assert.equal((await service.create({ ...dto, type: 'TEETH_FLOATING', nextDueDate: null }, id)).nextDueDate, null);
+  }
+});
+
+test('castration uses the record transaction and propagates horse/record write failures', async () => {
+  const { service, tx } = fixture();
+  let changes = 0;
+  tx.horse.updateMany = async () => { changes++; throw new Error('horse write failed'); };
+  tx.vetRecord.create = async () => assert.fail('Record must not be saved after horse update fails');
+  await assert.rejects(service.create({ ...dto, type: 'CASTRATION' }, id), /horse write failed/);
+  assert.equal(changes, 1);
+  tx.horse.updateMany = async () => { changes++; };
+  tx.vetRecord.create = async () => { throw new Error('record write failed'); };
+  await assert.rejects(service.create({ ...dto, type: 'CASTRATION' }, id), /record write failed/);
+  assert.equal(changes, 2);
+});
 test('create stores author and Moscow dates; explicit null disables reminders; edit preserves or recalculates deadlines', async () => {
   const { service, writes } = fixture();
   await service.create(dto, id);

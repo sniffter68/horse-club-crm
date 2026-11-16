@@ -24,6 +24,8 @@ const instant = (date: Dayjs) => toInstant(`${date.format('YYYY-MM-DD')}T12:00`)
 
 export function VetEntry({ variant = 'modal', horseId, event, onClose, onSaved }: { variant?: 'modal' | 'drawer'; horseId?: string; event?: VetEvent; onClose: () => void; onSaved: () => void }) {
   const [form] = Form.useForm<VetValues>()
+  const selectedType = Form.useWatch('type', form)
+  const selectedStatus = Form.useWatch('status', form)
   const { selectProps } = useSelect<Horse>({ resource: 'horses', optionLabel: 'name', optionValue: 'id', pagination: { pageSize: 100 },
     queryOptions: { enabled: !horseId && !event, retry: false } })
   const today = dayjs(DateTime.now().setZone(CLUB_TIME_ZONE).toISODate())
@@ -44,6 +46,7 @@ export function VetEntry({ variant = 'modal', horseId, event, onClose, onSaved }
         <DatePicker locale={ruDatePicker} format="DD.MM.YYYY" style={{ width: '100%' }} />
       </Form.Item>
     </>}
+    {(event?.type === 'CASTRATION' || selectedType === 'CASTRATION' && selectedStatus === 'completed') && <Alert type="info" showIcon role="status" message="После сохранения пол лошади в карточке будет автоматически изменён с жеребца на мерина" />}
     <Form.Item name="nextDueDate" label="Следующая процедура (необязательно)"><DatePicker locale={ruDatePicker} format="DD.MM.YYYY" style={{ width: '100%' }} /></Form.Item>
     <Form.Item name="performedBy" label="Ветеринар / коваль" rules={[{ max: 200 }]}><Input maxLength={200} /></Form.Item>
     <Form.Item name="notes" label="Комментарий" rules={[{ max: 2000 }]}><Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} maxLength={2000} /></Form.Item>

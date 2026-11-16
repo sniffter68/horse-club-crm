@@ -5,7 +5,7 @@
 ## API
 
 - `GET /api/vet/records`: `horseId`, `type`, `from`, `to`, `offset` (0), `limit` (20, максимум 100). Пустые query-параметры игнорируются. Даты без смещения интерпретируются в Москве; конечная дата без времени включает весь день.
-- `POST /api/vet/records`: выполненная процедура, автор берётся из сессии. Типы: `VACCINATION`, `DEWORMING`, `BLOOD_TEST`, `FARRIER`, `EXAMINATION`, `TREATMENT`, `DENTAL`.
+- `POST /api/vet/records`: выполненная процедура, автор берётся из сессии. Типы: `VACCINATION`, `DEWORMING`, `BLOOD_TEST`, `FARRIER`, `EXAMINATION`, `TREATMENT`, `DENTAL`, `CASTRATION` (Кастрация), `TEETH_FLOATING` (Подпиливание зубов).
 - `POST /api/vet/records/batch`: вместо `horseId` — `horseIds`, 1–100 уникальных UUID; вакцинация или дегельминтизация. Все лошади проверяются и блокируются до записи; операция атомарна.
 - `PATCH /api/vet/records/:id`, `DELETE /api/vet/records/:id`.
 - `GET /api/vet/upcoming`: прежние `data`/`total` календаря плюс `overdue`, `next14Days`, `next30Days`, `thisMonth`, `restrictedHorses`. `GET /api/vet/summary` возвращает только новую сводку.
@@ -36,3 +36,11 @@ npm.cmd run build
 Миграция добавляет таблицу и поля, переносит существующие sick/quarantine в статус здоровья и сохраняет старую историю. Нужна доступная PostgreSQL. Проверки: `backend/test/vet-records.test.cjs`, `backend/test/booking-rules.test.cjs`, `frontend/e2e/vet-records.spec.ts`, регрессия `frontend/e2e/vet-log.spec.ts`.
 
 PostgreSQL-интеграция: `backend/test/vet-records.postgres.test.cjs` запускается существующим `node test/run-stall-postgres.cjs` в одноразовой локальной базе. Live Playwright: `frontend/e2e/vet-records.live.spec.ts`, переменные `CRM_VET_ADMIN_EMAIL`, `CRM_VET_ADMIN_PASSWORD`, `CRM_VET_HORSE_ID` и локальный `CRM_TEST_BASE_URL`. Использовать здоровую тестовую лошадь; тест удаляет созданную запись и возвращает ей здоровье после проверки. Без переменных live-тест пропускается.
+
+## Кастрация и подпиливание зубов
+
+Миграция `20261117120000_vet_castration_teeth_floating` безопасно расширяет `VetRecordType` и `VetEventType` через `ADD VALUE IF NOT EXISTS`. Перед запуском новой версии backend выполнить на сервере `npx prisma migrate deploy`; Prisma Client пересоздать через `npx prisma generate`.
+
+Создание или редактирование выполненной записи `CASTRATION` меняет только `Horse.sex = STALLION` на `GELDING` в той же serializable-транзакции с блокировкой лошади. Для календаря изменение происходит при создании уже выполненной процедуры или отметке выполнения; запланированная процедура пол не меняет. Удаление или исправление записи не восстанавливает прежний пол. Карточка и карта денников читают актуальный `Horse.sex`.
+
+`TEETH_FLOATING` поддерживает стандартный `nextDueDate`, фильтры, напоминания и календарное продолжение. Новый интервал по умолчанию не задаётся: дату назначает ветеринар. Старые записи `DENTAL` сохраняются.

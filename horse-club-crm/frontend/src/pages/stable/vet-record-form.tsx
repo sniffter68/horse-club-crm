@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useSelect } from '@refinedev/antd'
-import { DatePicker, Form, Input, InputNumber, Select, Typography } from 'antd'
+import { Alert, DatePicker, Form, Input, InputNumber, Select, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
 import { DateTime } from 'luxon'
 import { API_URL, httpClient } from '../../httpClient'
 import { toInstant } from '../schedule/time'
 import { StableEntryModal } from './shared'
+import { isHorseUuid } from './horseId'
 import { recordIntervals, recordTemplates, recordTypes, type RecordType, type VetRecord } from './vet-record-types'
 
 type Values = { horseId?: string; horseIds?: string[]; type: RecordType; title: string; performedAt: Dayjs; nextDueDate?: Dayjs | null; specialist: string; medication?: string; notes?: string; cost?: number | null; documentUrl?: string }
@@ -19,12 +20,15 @@ export function VetRecordForm({ horseId, record, onClose, onSaved }: { horseId?:
   const { selectProps } = useSelect({ resource: 'horses', optionLabel: 'name', optionValue: 'id', pagination: { pageSize: 100 }, queryOptions: { enabled: !horseId, retry: false } })
   const date = (s: string) => dayjs(DateTime.fromISO(s, { zone: 'Europe/Moscow' }).toISODate())
   const today = dayjs(DateTime.now().setZone('Europe/Moscow').toISODate())
-  return <StableEntryModal title={record ? 'Редактировать ветзапись' : 'Добавить ветеринарную запись'} form={form} submitLabel="Сохранить ветзапись" onClose={onClose} onSaved={onSaved}
+  return <StableEntryModal variant="drawer" title={record ? 'Редактировать ветзапись' : 'Добавить ветеринарную запись'} form={form} submitLabel="Сохранить ветзапись" onClose={onClose} onSaved={onSaved}
     save={values => {
+      const selectedHorseId = horseId || values.horseId
+      if (batch ? !values.horseIds?.length || values.horseIds.some(id => !isHorseUuid(id)) : !isHorseUuid(selectedHorseId)) throw new Error('Выберите лошадь из списка')
+      if (record && !isHorseUuid(record.id)) throw new Error('Некорректный идентификатор ветзаписи')
       const { horseIds, performedAt, nextDueDate, ...fields } = values
       const performedInstant = record && performedAt.isSame(date(record.performedAt), 'day') ? record.performedAt
         : performedAt.isSame(today, 'day') ? new Date().toISOString() : instant(performedAt)
-      const payload = { ...fields, horseId: horseId || values.horseId, performedAt: performedInstant,
+      const payload = { ...fields, horseId: selectedHorseId, performedAt: performedInstant,
         nextDueDate: nextDueDate ? instant(nextDueDate) : manualDue ? null : undefined,
         medication: values.medication || null, notes: values.notes || null, documentUrl: values.documentUrl || null, cost: values.cost ?? null }
       return record ? httpClient.patch(`${API_URL}/vet/records/${record.id}`, payload)
@@ -41,6 +45,7 @@ export function VetRecordForm({ horseId, record, onClose, onSaved }: { horseId?:
     <Form.Item name="type" label="Тип процедуры" initialValue={record?.type || 'FARRIER'} rules={[{ required: true }]}><Select aria-label="Тип процедуры" options={Object.entries(recordTypes).filter(([key]) => !batch || ['VACCINATION', 'DEWORMING'].includes(key)).map(([value, label]) => ({ value, label }))}
       onChange={(next: RecordType) => { form.setFieldsValue({ title: undefined }); if (!manualDue) form.setFieldsValue({ nextDueDate: recordIntervals[next] ? (form.getFieldValue('performedAt') || today).add(recordIntervals[next], 'day') : null }) }} /></Form.Item>
     <Form.Item label="Частый шаблон"><Select aria-label="Частый шаблон" placeholder="Выберите или заполните название ниже" value={undefined} options={(recordTemplates[type as RecordType] || []).map(label => ({ value: label, label }))} onChange={title => form.setFieldsValue({ title })} /></Form.Item>
+    {type === 'CASTRATION' && <Alert type="info" showIcon role="status" message="После сохранения пол лошади в карточке будет автоматически изменён с жеребца на мерина" />}
     <Form.Item name="title" label="Название процедуры" initialValue={record?.title} rules={[{ required: true, whitespace: true, message: 'Укажите название процедуры' }, { max: 250 }]}><Input maxLength={250} /></Form.Item>
     <Form.Item name="performedAt" label="Дата проведения (Москва)" initialValue={record ? date(record.performedAt) : today} rules={[{ required: true, message: 'Укажите дату' }]}><DatePicker locale={ruDatePicker} format="DD.MM.YYYY" style={{ width: '100%' }} disabledDate={d => d.isAfter(today, 'day')}
       onChange={d => { if (d && !manualDue) form.setFieldsValue({ nextDueDate: recordIntervals[type as RecordType] ? d.add(recordIntervals[type as RecordType]!, 'day') : null }) }} /></Form.Item>

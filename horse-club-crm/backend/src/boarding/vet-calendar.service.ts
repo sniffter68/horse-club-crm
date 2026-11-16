@@ -4,6 +4,7 @@ import { DateTime } from 'luxon';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CompleteVetEventDto, CreateVetEventDto, VetQueryDto } from './boarding.dto';
 import { period, serializable } from './boarding.service';
+import { applyCastration } from './vet-horse-sex';
 
 const include = { horse: { select: { id: true, name: true, status: true } } } satisfies Prisma.VetEventInclude;
 export const vetStatus = (event: { status: string; eventDate: Date }, now: Date) => event.status === 'completed' ? 'completed'
@@ -30,6 +31,7 @@ export class VetCalendarService {
     if (dto.status === 'completed' && eventDate > new Date()) throw new BadRequestException('Выполненная процедура не может быть в будущем');
     return serializable(this.prisma, async tx => {
       await this.lockHorse(tx, dto.horseId);
+      if (dto.status === 'completed') await applyCastration(tx, dto.horseId, dto.type);
       const event = await tx.vetEvent.create({ data: { ...dto, status: dto.status ?? 'scheduled', eventDate, nextDueDate: dto.nextDueDate ? new Date(dto.nextDueDate) : null,
         notes: dto.notes?.trim() || null, performedBy: dto.performedBy?.trim() || null }, include });
       if (event.status === 'completed') await this.followup(tx, event);
@@ -47,6 +49,7 @@ export class VetCalendarService {
       const eventDate = new Date();
       const nextDueDate = dto.nextDueDate ?? current.nextDueDate?.toISOString();
       this.validateNext(nextDueDate, eventDate);
+      await applyCastration(tx, current.horseId, current.type);
       const event = await tx.vetEvent.update({ where: { id }, data: { status: 'completed', eventDate,
         nextDueDate: nextDueDate ? new Date(nextDueDate) : null, performedBy: dto.performedBy?.trim() || current.performedBy,
         notes: dto.notes?.trim() || current.notes }, include });

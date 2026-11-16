@@ -18,6 +18,7 @@ import { HorseStatusEditor } from '../stable/horse-status'
 import { horseStatuses } from '../stable/types'
 import { HorseIssues } from '../schedule/HorseIssues'
 import { useRoleAccess } from '../../access'
+import { sexes } from '../stalls/mapTypes'
 
 const healthLabels = { VACCINATION: 'Вакцинация', FARRIER: 'Коваль', DEWORMING: 'Дегельминтизация', INSPECTION: 'Осмотр' }
 
@@ -43,6 +44,7 @@ export function HorseList() {
         actions={<><CatalogEditAction resource="horses" id={horse.id}><HorseForm action="edit" /></CatalogEditAction>{canManage && <HorseStatusEditor horse={horse} cardAction />}</>} />} >
       {(horse, ready) => <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <ProfileSection title="Основная информация"><ProfileFields items={[
+          { label: 'Пол', value: horse.sex ? sexes[horse.sex] : 'Не указан' },
           { label: 'Порода', value: horse.breed || 'Не указана' },
           { label: 'Масть', value: horse.coat || 'Не указана' },
           { label: 'Год рождения', value: horse.birthYear || 'Не указан' },

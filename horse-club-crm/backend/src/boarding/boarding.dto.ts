@@ -19,7 +19,7 @@ export class CreateBoardingLogDto {
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
 }
 export class VetQueryDto extends BoardingQueryDto {
-  @IsOptional() @IsEnum(VetEventType) type?: VetEventType;
+  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsEnum(VetEventType) type?: VetEventType;
 }
 export class CreateVetEventDto {
   @IsUUID() horseId!: string;

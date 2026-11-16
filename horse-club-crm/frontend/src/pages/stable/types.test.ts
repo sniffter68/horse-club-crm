@@ -5,6 +5,7 @@ describe('veterinary procedure API contract', () => {
   it.each([
     ['Вакцинация', 'vaccination'], ['Дегельминтизация', 'deworming'], ['Ковка', 'shoeing'],
     ['Осмотр ветеринара', 'vet_check'], ['Стоматолог', 'dentist'],
+    ['Кастрация', 'CASTRATION'], ['Подпиливание зубов', 'TEETH_FLOATING'],
   ] as const)('displays %s and serializes %s as a string', (label, key) => {
     expect(vetTypes[key]).toBe(label)
     expect(JSON.parse(JSON.stringify({ type: vetTypeForApi(key) }))).toEqual({ type: key })

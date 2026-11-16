@@ -1,5 +1,5 @@
 // API keys match Prisma VetEventType; Russian labels are presentation only.
-export const vetTypes = { vaccination: 'Вакцинация', deworming: 'Дегельминтизация', shoeing: 'Ковка', vet_check: 'Осмотр ветеринара', dentist: 'Стоматолог' } as const
+export const vetTypes = { vaccination: 'Вакцинация', deworming: 'Дегельминтизация', shoeing: 'Ковка', vet_check: 'Осмотр ветеринара', dentist: 'Стоматолог', CASTRATION: 'Кастрация', TEETH_FLOATING: 'Подпиливание зубов' } as const
 export const horseStatuses = { active: 'Доступна', rest: 'Отдых', sick: 'Болеет', quarantine: 'Карантин' }
 export type VetType = keyof typeof vetTypes
 export function vetTypeForApi(value: unknown): VetType {

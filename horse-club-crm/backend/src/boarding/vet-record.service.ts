@@ -3,6 +3,7 @@ import { Prisma, VetRecordType } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../prisma/prisma.service';
 import { serializable } from './boarding.service';
+import { applyCastration } from './vet-horse-sex';
 import { BatchVetRecordDto, CreateVetRecordDto, HorseHealthDto, UpdateVetRecordDto, VetRecordQueryDto } from './vet-record.dto';
 
 export const VET_INTERVALS: Partial<Record<VetRecordType, number>> = { DEWORMING: 90, FARRIER: 45, BLOOD_TEST: 180, VACCINATION: 365, DENTAL: 365 };
@@ -54,7 +55,9 @@ export class VetRecordService {
   create(dto: CreateVetRecordDto, author: string) {
     return serializable(this.prisma, async tx => {
       await this.lockHorses(tx, [dto.horseId]);
-      return tx.vetRecord.create({ data: { ...this.data(dto), title: dto.title, specialist: dto.specialist, horseId: dto.horseId, createdById: author }, include });
+      const data = this.data(dto);
+      await applyCastration(tx, dto.horseId, data.type);
+      return tx.vetRecord.create({ data: { ...data, title: dto.title, specialist: dto.specialist, horseId: dto.horseId, createdById: author }, include });
     });
   }
   batch(dto: BatchVetRecordDto, author: string) {
@@ -73,7 +76,9 @@ export class VetRecordService {
       const current = await tx.vetRecord.findUnique({ where: { id } });
       if (!current) throw new NotFoundException('Ветзапись не найдена');
       await this.lockHorses(tx, [current.horseId, dto.horseId ?? current.horseId]);
-      return tx.vetRecord.update({ where: { id }, data: this.data(dto, current), include });
+      const data = this.data(dto, current);
+      await applyCastration(tx, dto.horseId ?? current.horseId, data.type);
+      return tx.vetRecord.update({ where: { id }, data, include });
     });
   }
   async remove(id: string) {

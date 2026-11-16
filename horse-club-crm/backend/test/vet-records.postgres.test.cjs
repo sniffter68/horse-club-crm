@@ -31,6 +31,16 @@ test('PostgreSQL vet CRUD, superseded reminders, atomic batch, passport and heal
     await service.update(old.id, { notes: 'Акт', nextDueDate: null });
     assert.equal((await p.vetRecord.findUnique({ where: { id: old.id } })).nextDueDate, null);
     await service.remove(old.id); assert.equal(await p.vetRecord.findUnique({ where: { id: old.id } }), null);
+    await p.horse.update({ where: { id: horseId }, data: { sex: 'STALLION' } });
+    // A foreign-key failure after the horse update must roll back both changes.
+    await assert.rejects(service.create({ ...details, type: 'CASTRATION' }, randomUUID()));
+    assert.equal((await p.horse.findUniqueOrThrow({ where: { id: horseId } })).sex, 'STALLION');
+    const castration = await service.create({ ...details, type: 'CASTRATION' }, authorId);
+    assert.equal((await service.passport(horseId)).horse.sex, 'GELDING');
+    await service.remove(castration.id);
+    assert.equal((await p.horse.findUniqueOrThrow({ where: { id: horseId } })).sex, 'GELDING');
+    const teeth = await service.create({ ...details, type: 'TEETH_FLOATING', nextDueDate: '2027-01-01' }, authorId);
+    assert.equal(teeth.nextDueDate.toISOString(), '2026-12-31T21:00:00.000Z');
   } finally {
     await p.vetRecord.deleteMany({ where: { horseId: { in: [horseId, privateId] } } });
     await p.horse.deleteMany({ where: { id: { in: [horseId, privateId] } } });
