@@ -1,6 +1,7 @@
 import { BooleanField, CatalogForm, NumberField, TextField } from '../catalogs/shared'
 import { Alert, Button, Form, Select } from 'antd'
-import { useList } from '@refinedev/core'
+import { useEffect, useState } from 'react'
+import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { isUuid } from '../../uuid'
 import type { StableBuilding } from './gridLayout'
 import type { Stall, StallValues } from '../catalogs/types'
@@ -24,10 +25,30 @@ export function StallForm({ action }: { action: 'create' | 'edit' }) {
 }
 
 function BuildingFields({ required }: { required: boolean }) {
-  const { result, query } = useList<StableBuilding>({ resource: 'stable-buildings', pagination: { mode: 'off' }, errorNotification: false, queryOptions: { retry: false } })
+  const [buildings, setBuildings] = useState<StableBuilding[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>()
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    const controller = new AbortController()
+    const load = async () => {
+      if (controller.signal.aborted) return
+      setLoading(true); setError(undefined)
+      try {
+        const { data } = await httpClient.get<StableBuilding[]>(`${API_URL}/stable-buildings`, { signal: controller.signal })
+        if (!controller.signal.aborted) setBuildings(data)
+      } catch (cause) {
+        if (!controller.signal.aborted) setError(toHttpError(cause).message)
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
+    }
+    void Promise.resolve().then(load)
+    return () => controller.abort()
+  }, [attempt])
   return <>
-    {query.error && <Alert type="error" message="Не удалось загрузить корпуса" action={<Button onClick={() => void query.refetch()}>Повторить</Button>} />}
-    <Form.Item name="buildingId" label="Корпус" rules={[{ required, message: 'Выберите корпус' }, { validator: async (_, id?: string) => { if (id && !isUuid(id)) throw new Error('Выберите корпус из списка') } }]}><Select loading={query.isLoading} options={result?.data.map(b => ({ value: b.id, label: b.name }))} /></Form.Item>
+    {error && <Alert type="error" message="Не удалось загрузить корпуса" description={error} action={<Button disabled={loading} onClick={() => setAttempt(value => value + 1)}>Повторить</Button>} />}
+    <Form.Item name="buildingId" label="Корпус" rules={[{ required, message: 'Выберите корпус' }, { validator: async (_, id?: string) => { if (id && !isUuid(id)) throw new Error('Выберите корпус из списка') } }]}><Select loading={loading} options={buildings.map(b => ({ value: b.id, label: b.name }))} /></Form.Item>
     <NumberField name="row" label="Ряд" min={1} max={100} required={required} />
     <NumberField name="col" label="Колонка" min={1} max={100} required={required} />
     <NumberField name="rowSpan" label="Высота в ячейках" min={1} max={3} required={required} />
