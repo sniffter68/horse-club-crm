@@ -1,12 +1,17 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, Min, IsBoolean, IsOptional, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsUUID, IsEnum, IsInt, Min, IsBoolean, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 
 import { StallZone, StallSide, StallStatus, StallType } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 
 export class CreateStallDto {
+  @Transform(({ value }) => value === '' ? undefined : value) @ValidateIf((_object, value) => value !== undefined) @IsUUID() buildingId?: string;
+  @Type(() => Number) @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(1) row?: number;
+  @Type(() => Number) @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(1) col?: number;
+  @Type(() => Number) @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(1) rowSpan?: number;
+  @Type(() => Number) @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(1) colSpan?: number;
   @ApiPropertyOptional({ enum: StallType }) @Transform(({ value }) => value === '' ? undefined : value) @ValidateIf((_object, value) => value !== undefined) @IsEnum(StallType) type?: StallType;
-  @ApiPropertyOptional() @ValidateIf((_object, value) => value !== undefined) @IsString() @MinLength(1) @MaxLength(30) number?: string;
+  @ApiPropertyOptional() @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(30) number?: string;
   @ApiPropertyOptional({ enum: StallZone }) @Transform(({ value }) => value === '' ? undefined : value) @ValidateIf((_object, value) => value !== undefined) @IsEnum(StallZone) zone?: StallZone;
   @ApiPropertyOptional({ enum: StallSide }) @Transform(({ value }) => value === '' ? undefined : value) @ValidateIf((_object, value) => value !== undefined) @IsEnum(StallSide) side?: StallSide;
   @ApiPropertyOptional() @Type(() => Number) @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(1) position?: number;

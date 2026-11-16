@@ -655,7 +655,26 @@ enum StallType {
   SERVICE
 }
 
+model StableBuilding {
+  id        String @id @default(uuid()) @db.Uuid
+  name      String @unique
+  order     Int @default(0)
+  gridRows  Int @default(10)
+  gridCols  Int @default(4)
+  aisleCols Int[] @default([2, 3])
+  stalls    Stall[]
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+}
+
 model Stall {
+  buildingId String? @db.Uuid
+  building StableBuilding? @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  row Int @default(1)
+  col Int @default(1)
+  rowSpan Int @default(1)
+  colSpan Int @default(1)
+  @@index([buildingId])
   type          StallType @default(STALL)
   number        String?
   zone          StallZone @default(MAIN)
@@ -667,7 +686,7 @@ model Stall {
   notes         String?
 
   @@unique([zone, side, position])
-  @@unique([zone, number])
+
   id            String             @id @default(uuid()) @db.Uuid
   name          String?
   description   String?

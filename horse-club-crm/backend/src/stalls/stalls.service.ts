@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { BoardingContractStatus, Prisma } from '@prisma/client';
-import type { RefineQueryDto } from '../common/dto/refine-query.dto';
+import type { StallQueryDto } from './dto/stall-query.dto';
+import type { LayoutBlockDto } from './dto/layout.dto';
+import { validateGridBlock, type GridBlock } from './grid';
 import { rethrowCatalogMutation } from '../common/prisma-errors';
 import { parseRefineQuery, type PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
@@ -32,7 +34,7 @@ export type StallWithContracts = Prisma.StallGetPayload<typeof stallInclude> & {
 export class StallsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(query: RefineQueryDto): Promise<PaginatedResult<StallWithContracts>> {
+  async findAll(query: StallQueryDto): Promise<PaginatedResult<StallWithContracts>> {
     const options = parseRefineQuery(
       query,
       ['id', 'name', 'isUnavailable', 'createdAt', 'updatedAt'],
@@ -46,6 +48,7 @@ export class StallsService {
           ],
         }
       : {};
+    if (query.buildingId) where.buildingId = query.buildingId;
     const orderBy = { [options.sort]: options.order } as Prisma.StallOrderByWithRelationInput;
     const [total, data] = await this.prisma.$transaction([
       this.prisma.stall.count({ where }),
@@ -165,7 +168,12 @@ export class StallsService {
     try {
       this.validateRoom(dto);
       if (dto.status === 'OCCUPIED') throw new BadRequestException('Используйте заселение лошади');
-      return await this.prisma.stall.create({ data: this.normalize(dto), include: stallInclude.include });
+      if (!dto.buildingId) return await this.prisma.stall.create({ data: this.normalize(dto), include: stallInclude.include });
+      return await this.serializable(async tx => {
+        const block = { row: 1, col: 1, rowSpan: 1, colSpan: 1, ...dto };
+        await this.validatePlacement(tx, block);
+        return tx.stall.create({ data: this.normalize(dto), include: stallInclude.include });
+      });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Денник');
     }
@@ -176,6 +184,7 @@ export class StallsService {
       await this.serializable(async tx => {
         const current = await tx.stall.findUnique({ where: { id } });
         if (!current) throw new NotFoundException('Денник не найден');
+        await this.validatePlacement(tx, { ...current, ...dto });
         this.validateRoom({ type: dto.type ?? current.type,
           name: dto.name === undefined ? current.name : dto.name,
           number: dto.number === undefined ? current.number : dto.number });
@@ -183,7 +192,8 @@ export class StallsService {
         const status = dto.status ?? (dto.isUnavailable === undefined ? current.status : dto.isUnavailable ? 'MAINTENANCE' : current.horseId ? 'OCCUPIED' : 'AVAILABLE');
         if ((status === 'OCCUPIED') !== Boolean(current.horseId))
           throw new ConflictException('Сначала измените размещение лошади');
-        await tx.stall.update({ where: { id }, data: { ...this.normalize(dto), status } });
+        await tx.stall.update({ where: { id }, data: { ...this.normalize(dto),
+          ...((dto.type ?? current.type) === 'SERVICE' ? { number: '' } : {}), status } });
       });
       return this.findOne(id);
     } catch (error: unknown) {
@@ -199,6 +209,32 @@ export class StallsService {
     }
   }
 
+  private async validatePlacement(tx: Prisma.TransactionClient, block: GridBlock) {
+    if (!block.buildingId) return;
+    const building = await tx.stableBuilding.findUnique({ where: { id: block.buildingId } });
+    if (!building) throw new BadRequestException('Корпус не найден');
+    const others = await tx.stall.findMany({ where: { buildingId: block.buildingId } });
+    validateGridBlock(block, building, others);
+  }
+
+  async saveLayout(blocks: LayoutBlockDto[]) {
+    if (!blocks.length || blocks.length > 10000 || new Set(blocks.map(b => b.id)).size !== blocks.length)
+      throw new BadRequestException('Укажите непустой список помещений без повторений');
+    await this.serializable(async tx => {
+      const all = await tx.stall.findMany();
+      if (blocks.some(b => !all.some(s => s.id === b.id))) throw new NotFoundException('Помещение не найдено');
+      const buildings = await tx.stableBuilding.findMany();
+      const projected = all.map(s => ({ ...s, ...blocks.find(b => b.id === s.id) }));
+      for (const block of blocks) {
+        const building = buildings.find(b => b.id === block.buildingId);
+        if (!building) throw new BadRequestException('Корпус не найден');
+        validateGridBlock(block, building, projected);
+      }
+      for (const { id, ...data } of blocks) await tx.stall.update({ where: { id }, data });
+    });
+    return this.map();
+  }
+
   private validateRoom(dto: { type?: string; name?: string | null; number?: string | null }) {
     if (dto.type === 'SERVICE') {
       if (!dto.name?.trim()) throw new BadRequestException('Укажите название технического помещения');
@@ -209,7 +245,7 @@ export class StallsService {
     return {
       ...dto,
       ...(dto.status === undefined && dto.isUnavailable !== undefined ? { status: dto.isUnavailable ? 'MAINTENANCE' as const : 'AVAILABLE' as const } : {}),
-      ...(dto.number !== undefined ? { number: dto.number.trim() } : {}),
+      ...(dto.type === 'SERVICE' ? { number: '' } : dto.number !== undefined ? { number: dto.number.trim() } : {}),
       ...(dto.status !== undefined ? { isUnavailable: ['MAINTENANCE', 'QUARANTINE'].includes(dto.status) } : {}),
       ...(dto.name !== undefined ? { name: dto.name?.trim().replace(/\s+/g, ' ') || null } : {}),
       ...(dto.description !== undefined ? { description: dto.description.trim() || undefined } : {}),

@@ -3,11 +3,17 @@ const horse = { id: '00000000-0000-4000-8000-000000000011', name: 'Буран', 
   feedingNotes: 'Утро: овёс 1 кг\nДень: морковь\nВечер: овёс 1 кг\nСено: 8 кг\nПодкормки: соль',
   owner: { name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567' } }
 const mare = { ...horse, id: '00000000-0000-4000-8000-000000000012', name: 'Искра', sex: 'MARE', ownerType: 'club' }
+const mainBuilding = '00000000-0000-4000-8000-000000000101'
+const summerBuilding = '00000000-0000-4000-8000-000000000102'
+const buildings = [
+  { id: mainBuilding, name: 'Основная конюшня', order: 0, gridRows: 3, gridCols: 4, aisleCols: [2, 3], total: 2, occupied: 2, available: 0, roomCount: 2 },
+  { id: summerBuilding, name: 'Летники', order: 1, gridRows: 3, gridCols: 4, aisleCols: [2, 3], total: 1, occupied: 0, available: 1, roomCount: 1 },
+]
 const initial = [
   { id: '00000000-0000-4000-8000-000000000001', name: 'Денник 1', number: '1', zone: 'MAIN', side: 'LEFT', position: 1, status: 'OCCUPIED', horseId: '00000000-0000-4000-8000-000000000011', horse, notes: 'Двойной слой опилок', warnings: [{ neighborId: '00000000-0000-4000-8000-000000000002', neighborNumber: '2', message: 'Жеребец рядом с кобылой (Буран и Искра)' }] },
   { id: '00000000-0000-4000-8000-000000000002', name: 'Денник 2', number: '2', zone: 'MAIN', side: 'RIGHT', position: 1, status: 'OCCUPIED', horseId: '00000000-0000-4000-8000-000000000012', horse: mare, notes: null, warnings: [] },
   { id: '00000000-0000-4000-8000-000000000003', name: 'Летник 1', number: 'Л-1', zone: 'SUMMER', side: 'LEFT', position: 1, status: 'AVAILABLE', horseId: null, horse: null, notes: null, warnings: [] },
-]
+].map(s => ({ ...s, buildingId: s.zone === 'SUMMER' ? summerBuilding : mainBuilding, row: 1, col: s.side === 'RIGHT' ? 4 : 1, rowSpan: 1, colSpan: 1, type: 'STALL' }))
 async function setup(page: Page, role = 'ADMIN', empty = false) {
   await page.addInitScript(role => {
     localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.role', role); localStorage.setItem('horsecrm.email', 'qa@example.com')
@@ -17,6 +23,7 @@ async function setup(page: Page, role = 'ADMIN', empty = false) {
     horseReplaceOwn: true, horseReplaceAny: true, healthRead: true, healthWrite: true, financeRead: true, boardingAccess: true,
   } } }))
   const state = { stalls: empty ? [] : structuredClone(initial), fail: false, assignments: 0 }
+  await page.route('**/api/stable-buildings', route => route.fulfill({ json: buildings }))
   await page.route('**/api/stalls/assignment-horses', route => route.fulfill({ json: [horse, mare] }))
   await page.route('**/api/stalls/map', route => state.fail ? route.fulfill({ status: 503, json: { message: 'Сервер временно недоступен' } }) : route.fulfill({ json: state.stalls }))
   await page.route('**/api/stalls/transfer/preview', route => route.fulfill({ json: [
@@ -51,6 +58,121 @@ async function setup(page: Page, role = 'ADMIN', empty = false) {
   await page.goto('/stable')
   return state
 }
+
+test('constructor moves a pen into the aisle, rejects collisions, retains failed draft and saves spans', async ({ page }) => {
+  const state = await setup(page)
+  let saves = 0
+  await page.route('**/api/stalls/layout', async route => {
+    saves++
+    if (state.fail) return route.fulfill({ status: 409, json: { message: 'Схема изменилась. Повторите сохранение.' } })
+    const blocks = route.request().postDataJSON() as Array<{ id: string; row: number; col: number; rowSpan: number; colSpan: number }>
+    for (const b of blocks) Object.assign(state.stalls.find(s => s.id === b.id)!, b)
+    return route.fulfill({ json: state.stalls })
+  })
+  await page.getByRole('switch', { name: 'Режим конструктора' }).click()
+  const controls = page.getByLabel('Расположение 1', { exact: true })
+  await controls.getByRole('button', { name: 'Вправо', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Денник 1, Буран', exact: true }).locator('..')).toHaveCSS('grid-column-start', '2')
+  await page.getByRole('combobox', { name: 'Высота 1', exact: true }).focus()
+  await page.keyboard.press('ArrowDown')
+  await page.locator('.ant-select-dropdown:visible').getByText('2×', { exact: true }).click()
+  await controls.getByRole('button', { name: 'Вправо', exact: true }).click()
+  await expect(controls.getByRole('button', { name: 'Вправо', exact: true })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await page.screenshot({ path: 'test-results/stall-grid-constructor.png', fullPage: true })
+  state.fail = true
+  await page.getByRole('button', { name: 'Сохранить схему', exact: true }).click()
+  await expect(page.getByText('Схема изменилась. Повторите сохранение.')).toBeVisible()
+  await expect(page.getByRole('switch', { name: 'Режим конструктора' })).toBeChecked()
+  state.fail = false
+  await page.getByRole('button', { name: 'Сохранить схему', exact: true }).click()
+  await expect(page.getByText('Схема сохранена', { exact: true })).toBeVisible()
+  expect(saves).toBe(2); expect(state.stalls[0].col).toBe(3); expect(state.stalls[0].rowSpan).toBe(2)
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Денник 1, Буран', exact: true }).locator('..')).toHaveCSS('grid-column-start', '3')
+})
+
+test('building settings create, rename and delete an empty building with recoverable errors', async ({ page }) => {
+  await setup(page)
+  const data = structuredClone(buildings)
+  let fail = true
+  await page.route('**/api/stable-buildings', async route => {
+    if (route.request().method() === 'POST') {
+      if (fail) return route.fulfill({ status: 400, json: { message: 'Корпус с таким названием уже существует' } })
+      const b = { ...route.request().postDataJSON(), id: '00000000-0000-4000-8000-000000000199', total: 0, occupied: 0, available: 0, roomCount: 0 }
+      data.push(b); return route.fulfill({ json: b })
+    }
+    return route.fulfill({ json: data })
+  })
+  await page.route('**/api/stable-buildings/*', async route => {
+    const id = route.request().url().split('/').at(-1)
+    if (route.request().method() === 'DELETE') { data.splice(data.findIndex(b => b.id === id), 1); return route.fulfill({ json: { id } }) }
+    const b = data.find(b => b.id === id)!; Object.assign(b, route.request().postDataJSON()); return route.fulfill({ json: b })
+  })
+  await page.getByRole('button', { name: 'Настроить корпуса', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Удалить Основная конюшня', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Создать корпус', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Название корпуса', exact: true }).fill('Новый корпус')
+  await page.getByRole('button', { name: 'Сохранить корпус', exact: true }).click()
+  await expect(page.getByText('Корпус с таким названием уже существует')).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Название корпуса', exact: true })).toHaveValue('Новый корпус')
+  fail = false
+  await page.getByRole('button', { name: 'Сохранить корпус', exact: true }).click()
+  await expect(page.getByRole('tab', { name: /Новый корпус/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Изменить Новый корпус', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Название корпуса', exact: true }).fill('Пони')
+  await page.getByRole('button', { name: 'Сохранить корпус', exact: true }).click()
+  await expect(page.getByRole('tab', { name: /Пони/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Удалить Пони', exact: true }).click()
+  await page.getByRole('dialog').last().getByRole('button', { name: 'Удалить', exact: true }).click()
+  await expect(page.getByRole('tab', { name: /Пони/ })).toHaveCount(0)
+})
+
+test('service card is neutral and read-only access hides constructor and building mutations', async ({ page }) => {
+  const state = await setup(page, 'TRAINER')
+  Object.assign(state.stalls[2], { type: 'SERVICE', name: 'Амуничник', number: '' })
+  await page.getByRole('button', { name: 'Обновить', exact: true }).click()
+  const card = page.getByRole('button', { name: 'Амуничник, служебное' })
+  await expect(card).toContainText('Служебное')
+  await expect(card).not.toContainText('№'); await expect(card).not.toContainText('Свободен'); await expect(card).not.toContainText('—')
+  await expect(page.getByRole('switch', { name: 'Режим конструктора' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Настроить корпуса', exact: true })).toHaveCount(0)
+})
+
+test('empty aisle slot creates a service room without a number', async ({ page }) => {
+  const state = await setup(page)
+  await page.route('**/api/stalls', async route => {
+    const values = route.request().postDataJSON()
+    expect(values.type).toBe('SERVICE'); expect(values.number).toBe(''); expect(values.col).toBe(2)
+    const room = { ...state.stalls[0], ...values, id: '00000000-0000-4000-8000-000000000099', horse: null, horseId: null, status: 'AVAILABLE', warnings: [] }
+    state.stalls.push(room); return route.fulfill({ json: room })
+  })
+  await page.getByRole('switch', { name: 'Режим конструктора' }).click()
+  await page.getByRole('button', { name: 'Поместить сюда: ряд 1, колонка 2, Основная конюшня', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Тип помещения', exact: true }).focus()
+  await page.keyboard.press('ArrowDown')
+  await page.locator('.ant-select-dropdown:visible').getByText('Служебное помещение', { exact: true }).click()
+  await page.getByRole('textbox', { name: 'Название', exact: true }).fill('Туалет')
+  await page.getByRole('button', { name: 'Создать помещение', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Туалет, служебное', exact: true })).toBeVisible()
+  await expect(page.getByRole('switch', { name: 'Режим конструктора' })).not.toBeChecked()
+})
+
+test('drag moves into an aisle and cancelling a dirty layout requires confirmation', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await setup(page)
+  await page.getByRole('switch', { name: 'Режим конструктора' }).click()
+  const tile = page.getByRole('button', { name: 'Денник 1, Буран', exact: true }).locator('..')
+  await tile.dragTo(page.getByRole('button', { name: 'Поместить сюда: ряд 1, колонка 2, Основная конюшня', exact: true }))
+  await expect(tile).toHaveCSS('grid-column-start', '2')
+  await page.getByRole('switch', { name: 'Режим конструктора' }).click()
+  await expect(page.getByRole('dialog')).toContainText('Отменить изменения схемы?')
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click()
+  await expect(tile).toHaveCSS('grid-column-start', '2')
+  await page.getByRole('switch', { name: 'Режим конструктора' }).click()
+  await page.getByRole('button', { name: 'Отменить изменения', exact: true }).click()
+  await expect(tile).toHaveCSS('grid-column-start', '1')
+})
 test('map shows both rows, warnings, sign and isolated print layout', async ({ page }) => {
   await setup(page)
   await expect(page.getByRole('heading', { name: 'Карта денников' })).toBeVisible()
@@ -125,11 +247,9 @@ test('narrow layout, building filter, keyboard selection and focus restoration',
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(tile).toBeFocused()
-  await page.getByRole('combobox', { name: 'Корпус' }).focus()
-  await page.keyboard.press('ArrowDown')
-  await page.locator('.ant-select-dropdown').getByText('Летники', { exact: true }).click()
+  await page.getByRole('tab', { name: /Летники/ }).click()
   await expect(tile).toHaveCount(0)
-  await expect(page).toHaveURL(/zone=SUMMER/)
+  await expect(page).toHaveURL(/buildingId=/)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.keyboard.press('Escape')
   await page.screenshot({ path: 'test-results/stall-map-mobile.png', fullPage: true })

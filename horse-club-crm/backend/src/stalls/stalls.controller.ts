@@ -7,7 +7,9 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { RequirePermission, RoleAccessGuard } from '../auth/role-access.guard';
-import { RefineQueryDto } from '../common/dto/refine-query.dto';
+import { StallQueryDto } from './dto/stall-query.dto';
+import { LayoutBlockDto } from './dto/layout.dto';
+import { ParseArrayPipe } from '@nestjs/common';
 import { setRefineTotalHeaders } from '../common/refine';
 import { CreateStallDto } from './dto/create-stall.dto';
 import { UpdateStallDto } from './dto/update-stall.dto';
@@ -28,7 +30,7 @@ export class StallsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
-  async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) response: Response): Promise<StallWithContracts[]> {
+  async findAll(@Query() query: StallQueryDto, @Res({ passthrough: true }) response: Response): Promise<StallWithContracts[]> {
     const { data, total } = await this.service.findAll(query);
     setRefineTotalHeaders(response, total);
     return data;
@@ -41,6 +43,10 @@ export class StallsController {
   @Get('assignment-horses')
   @Roles(Role.ADMIN, Role.MANAGER)
   assignmentHorses() { return this.service.assignmentHorses(); }
+
+  @Patch('layout')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  layout(@Body(new ParseArrayPipe({ items: LayoutBlockDto, whitelist: true, forbidNonWhitelisted: true })) blocks: LayoutBlockDto[]) { return this.service.saveLayout(blocks); }
 
   @Patch(':id/assign')
   @Roles(Role.ADMIN, Role.MANAGER)

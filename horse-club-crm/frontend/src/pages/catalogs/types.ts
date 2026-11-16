@@ -63,6 +63,7 @@ export interface Service extends Omit<ServiceValues, 'price'> { id: string; pric
 export interface ArenaValues { name: string; description?: string; capacity: number; isUnavailable: boolean }
 export interface Arena extends Omit<ArenaValues, 'description'> { id: string; description: string | null; createdAt: string; updatedAt: string; maxRidersCapacity?: number; isActive?: boolean }
 export interface StallValues { name?: string | null; type?: 'STALL' | 'PONY_PEN' | 'SERVICE'; description?: string; isUnavailable: boolean;
+  buildingId?: string; row?: number; col?: number; rowSpan?: number; colSpan?: number;
   number?: string; zone?: 'MAIN' | 'SUMMER' | 'QUARANTINE'; side?: 'LEFT' | 'RIGHT'; position?: number }
 export interface StallContractSummary {
   id: string; status: 'DRAFT' | 'ACTIVE' | 'SUSPENDED'; startsAt: string; endsAt: string | null;

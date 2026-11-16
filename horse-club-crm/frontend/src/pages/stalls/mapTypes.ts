@@ -10,6 +10,7 @@ export interface MapStall {
   id: string; name: string | null; type?: 'STALL' | 'PONY_PEN' | 'SERVICE'; number: string | null; zone: keyof typeof zones; side: 'LEFT' | 'RIGHT';
   position: number | null; status: keyof typeof statuses; horseId: string | null; horse: MapHorse | null;
   notes: string | null; warnings: Array<{ neighborId: string; neighborNumber: string; message: string }>;
+  buildingId?: string | null; row?: number; col?: number; rowSpan?: number; colSpan?: number;
   isUnavailable?: boolean;
   rowPosition?: number | null;
 }
