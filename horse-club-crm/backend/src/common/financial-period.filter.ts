@@ -5,6 +5,11 @@ import { Prisma } from '@prisma/client';
 // Trigger failures contain SQL and row data. Expose only the known business
 // message; leave unrelated database failures to the standard exception handler.
 const messages = [
+  'Финансовый период закрыт. Изменение проводок запрещено',
+  'Выплаченная ведомость неизменяема',
+  'Период уже оплачен',
+  'Сначала утвердите ведомость',
+  'Неверный расход выплаты из основной кассы',
   'Финансовый месяц закрыт. Изменение проводок запрещено',
   'Проведенное занятие можно только отменить',
   'У абонемента не указана стоимость для признания выручки',

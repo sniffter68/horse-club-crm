@@ -1,3 +1,4 @@
+import { PeriodClosingButton } from '../cash-desk/PeriodClosingModal'
 import { MonthlyClosingPanel } from './MonthlyClosingPanel'
 import { usePermissions as useModules } from '../../modulePermissions'
 import { useEffect, useState } from 'react'
@@ -86,7 +87,7 @@ function CashDeskBook() {
   } })
   return <Space className="cash-desk-page" direction="vertical" size="large" style={{ width: '100%' }}>
     {!writable && <Alert type="info" showIcon message="Доступно только для просмотра" />}
-    <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}><div><Typography.Title level={2}>Касса</Typography.Title><Typography.Text type="secondary">Кассовая книга · время Москвы</Typography.Text></div><Space wrap><CashDeskButton /><Button type="primary" disabled={!writable} onClick={() => setExpenseOpen(true)}>Внести расход</Button><Button onClick={() => setRefresh(value => value + 1)} loading={loading}>Обновить</Button>{writable && role === 'ADMIN' && <CashManagement onReset={() => { setShift(null); setSummary(undefined); changeParams({ period: 'today', page: '1', expensePage: '1' }) }} />}</Space></Space>
+    <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}><div><Typography.Title level={2}>Касса</Typography.Title><Typography.Text type="secondary">Кассовая книга · время Москвы</Typography.Text></div><Space wrap><PeriodClosingButton /><CashDeskButton /><Button type="primary" disabled={!writable} onClick={() => setExpenseOpen(true)}>Внести расход</Button><Button onClick={() => setRefresh(value => value + 1)} loading={loading}>Обновить</Button>{writable && role === 'ADMIN' && <CashManagement onReset={() => { setShift(null); setSummary(undefined); changeParams({ period: 'today', page: '1', expensePage: '1' }) }} />}</Space></Space>
     <MonthlyClosingPanel canClose={writable && (role === 'ADMIN' || role === 'MANAGER')} refresh={refresh} />
     <Card><Space wrap>
       <Tag>{shift ? `Смена открыта ${cashTime(shift.openedAt)}` : 'Нет открытой смены'}</Tag>

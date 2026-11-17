@@ -1,3 +1,4 @@
+const { TrainerPayoutService } = require('../dist/staff/trainer-payout.service');
 require('reflect-metadata');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -71,7 +72,7 @@ test('invalid shift range, future completion, paid shift modification and manage
 });
 test('HTTP RBAC and validation: trainers read only, managers cannot delete, authors cannot be spoofed', async () => {
   let role = 'TRAINER', received;
-  const module = await Test.createTestingModule({ controllers: [StaffController, PayrollController], providers: [RolesGuard, { provide: StaffService, useValue: {
+  const module = await Test.createTestingModule({ controllers: [StaffController, PayrollController], providers: [RolesGuard, { provide: TrainerPayoutService, useValue: {} }, { provide: StaffService, useValue: {
     profiles: async () => ({ data: [], total: 0 }), shifts: async () => ({ data: [], total: 0 }), calculate: async () => ({ data: [], total: 0 }),
     createShifts: async (dto, user) => { received = user.id; return { count: 1 }; }, changeShift: async () => ({}), payout: async () => ({}), reopenPayroll: async () => ({ isPaid: false }), payrolls: async () => ({ data: [], total: 0 }),
   } }] }).overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true })

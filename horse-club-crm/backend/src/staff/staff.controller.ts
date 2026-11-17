@@ -1,4 +1,4 @@
-import { ModuleAccessGuard, RequireModule, PersonalModuleAccess } from '../auth/module-access.guard';
+import { ModuleAccessGuard, RequireModule, RequireAdditionalModule, PersonalModuleAccess } from '../auth/module-access.guard';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -7,6 +7,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthUser } from '../auth/auth.types';
 import { DutyDto, StaffQueryDto, CreateShiftDto, PayoutDto, PayrollQueryDto, SavePayrollDto, ShiftQueryDto, StaffProfileDto, UpdateShiftDto, UpdateStaffProfileDto } from './staff.dto';
 import { StaffService } from './staff.service';
+import { TrainerPayoutService } from './trainer-payout.service';
+import { GenerateTrainerStatementDto, TrainerStatementQueryDto } from './trainer-payout.dto';
 
 @RequireModule('STAFF_PAYROLL')
 @Controller('staff')
@@ -39,7 +41,16 @@ export class StaffController {
 @UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
 export class PayrollController {
-  constructor(private readonly service: StaffService) {}
+  constructor(private readonly service: StaffService, private readonly statements: TrainerPayoutService) {}
+  @Get('statements') @Roles(Role.ADMIN, Role.MANAGER)
+  statementsList(@Query() dto: TrainerStatementQueryDto) { return this.statements.list(dto); }
+  @Post('statements/generate') @Roles(Role.ADMIN, Role.MANAGER)
+  generateStatements(@Body() dto: GenerateTrainerStatementDto, @Req() req: { user: AuthUser }) { return this.statements.generate(dto, req.user); }
+  @Patch('statements/:id/approve') @Roles(Role.ADMIN, Role.MANAGER)
+  approveStatement(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: AuthUser }) { return this.statements.transition(id, false, req.user); }
+  @Patch('statements/:id/pay') @Roles(Role.ADMIN, Role.MANAGER)
+  @RequireAdditionalModule('CASHBOX', 'FULL')
+  payStatement(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: AuthUser }) { return this.statements.transition(id, true, req.user); }
   @Get('calculations')
   list(@Query() query: ShiftQueryDto, @Req() req: { user: AuthUser }) { return this.service.payrolls(query, req.user); }
   @Post('calculations/:id/reopen') @Roles(Role.ADMIN)

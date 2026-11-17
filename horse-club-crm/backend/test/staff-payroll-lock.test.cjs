@@ -13,6 +13,7 @@ function store() {
   state.expenses.push({ id: state.payrolls[0].expenseId, category: 'SALARY', amount: '1000', createdById: admin.id, cancelledAt: null });
   const matching = where => state.payrolls.filter(row => (!where.staffId || row.staffId === where.staffId) && (where.isPaid === undefined || row.isPaid === where.isPaid) && (!where.periodStart || row.periodStart <= where.periodStart.lte) && (!where.periodEnd || row.periodEnd >= where.periodEnd.gte));
   const tx = {
+    trainerPayout: { findMany: async () => [] },
     staffProfile: { findUnique: async () => ({ id: staffId, isActive: true }) },
     payrollCalculation: {
       findMany: async ({ where }) => matching(where), count: async ({ where }) => matching(where).length,

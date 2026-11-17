@@ -175,7 +175,12 @@ export class StaffService {
   paidPeriods(staffId: string, user: AuthUser) {
     return this.prisma.$transaction(async tx => {
       await this.scope(tx, user, staffId);
-      return tx.payrollCalculation.findMany({ where: { staffId, isPaid: true }, select: { id: true, staffId: true, periodStart: true, periodEnd: true, createdAt: true }, orderBy: { periodStart: 'asc' } });
+      const select = { id: true, staffId: true, periodStart: true, periodEnd: true, createdAt: true };
+      const [legacy, trainers] = await Promise.all([
+        tx.payrollCalculation.findMany({ where: { staffId, isPaid: true }, select, orderBy: { periodStart: 'asc' } }),
+        tx.trainerPayout.findMany({ where: { staffId, status: 'PAID' }, select, orderBy: { periodStart: 'asc' } }),
+      ]);
+      return [...legacy, ...trainers].sort((a, b) => a.periodStart.getTime() - b.periodStart.getTime());
     });
   }
   reopenPayroll(id: string, user: AuthUser) {

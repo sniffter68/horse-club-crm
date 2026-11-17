@@ -14,7 +14,7 @@ const { ModuleAccessService } = require('../dist/settings/module-access.service'
 const { PrismaService } = require('../dist/prisma/prisma.service');
 const user = { id: randomUUID(), email: 'admin@example.com', role: 'ADMIN' };
 const dto = () => ({ confirmation: 'RESET_ALL_OPERATIONAL_DATA', requestId: randomUUID() });
-const models = ['monthlyFinancialClosing', 'payrollCalculation', 'ledgerTransaction', 'revenueRecognition',
+const models = ['financialPeriodClosing', 'trainerPayout', 'monthlyFinancialClosing', 'payrollCalculation', 'ledgerTransaction', 'revenueRecognition',
   'membershipOp', 'bookingHorseChange', 'booking', 'lesson', 'membershipMember', 'membership', 'expense', 'payment', 'cashShift'];
 
 function fixture(failAt) {

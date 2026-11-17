@@ -757,6 +757,7 @@ enum ExpenseCategory {
 }
 
 model Expense {
+  trainerPayout TrainerPayout?
   operationType CashOperationType @default(EXPENSE)
   refundPaymentId String? @unique @db.Uuid
   refundPayment Payment? @relation(fields: [refundPaymentId], references: [id], onDelete: Restrict)
@@ -793,6 +794,7 @@ enum WorkShiftStatus {
 }
 
 model StaffProfile {
+  trainerPayouts TrainerPayout[]
   phone String?
   scheduleColor String? @db.VarChar(7)
   id String @id @default(uuid()) @db.Uuid
@@ -1136,4 +1138,51 @@ model OpeningBalance {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
   @@unique([year, month])
+}
+
+enum TrainerPayoutType {
+  ADVANCE
+  FINAL_SALARY
+}
+
+enum TrainerPayoutStatus {
+  DRAFT
+  APPROVED
+  PAID
+}
+
+model TrainerPayout {
+  id String @id @default(uuid()) @db.Uuid
+  staffId String @db.Uuid
+  staff StaffProfile @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  type TrainerPayoutType
+  month String @db.VarChar(7)
+  periodStart DateTime @db.Date
+  periodEnd DateTime @db.Date
+  status TrainerPayoutStatus @default(DRAFT)
+  lessonsCount Int
+  nominalBase Decimal @db.Decimal(14, 2)
+  accrued Decimal @db.Decimal(14, 2)
+  advanceDeducted Decimal @db.Decimal(14, 2)
+  totalAmount Decimal @db.Decimal(14, 2)
+  lessonBreakdown Json
+  expenseId String? @unique @db.Uuid
+  expense Expense? @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  paidAt DateTime? @db.Timestamptz(6)
+  createdById String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  @@unique([staffId, type, periodStart, periodEnd])
+  @@index([staffId, month, status])
+}
+
+model FinancialPeriodClosing {
+  id String @id @default(uuid()) @db.Uuid
+  type String @db.VarChar(5)
+  periodStart DateTime @db.Timestamptz(6)
+  periodEnd DateTime @db.Timestamptz(6)
+  snapshot Json
+  closedById String @db.Uuid
+  closedAt DateTime @default(now()) @db.Timestamptz(6)
+  @@unique([type, periodStart])
 }

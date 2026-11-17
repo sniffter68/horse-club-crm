@@ -1,3 +1,4 @@
+import { TrainerStatements } from './TrainerStatements'
 import { EditOutlined, LockOutlined } from '@ant-design/icons'
 import { usePermissions as useModules } from '../../modulePermissions'
 import { useEffect, useRef, useState } from 'react'
@@ -31,8 +32,9 @@ export function StaffPage() {
   const month = validDate(`${params.get('month') ?? now.toFormat('yyyy-MM')}-01`, now.startOf('month').toISODate()!)
   const from = validDate(params.get('from'), now.startOf('month').toISODate()!)
   const to = validDate(params.get('to'), now.endOf('month').toISODate()!)
+  const canViewTrainers = role === 'ADMIN' || role === 'MANAGER'
   const rawTab = params.get('tab') ?? 'employees'
-  const tab = ['employees', 'shifts', 'payroll', ...(canManage ? ['rates', 'statements'] : [])].includes(rawTab) ? rawTab : 'shifts'
+  const tab = ['employees', 'shifts', 'payroll', ...(canViewTrainers ? ['trainers'] : []), ...(canManage ? ['rates', 'statements'] : [])].includes(rawTab) ? rawTab : 'shifts'
   const roleFilter = params.get('role') || undefined
   const activity = params.get('activity') || undefined
   const duty = params.get('duty') || undefined
@@ -59,7 +61,7 @@ export function StaffPage() {
   const [adjustment, setAdjustment] = useState<Payroll>()
   const [payout, setPayout] = useState<Payroll>()
   useEffect(() => {
-    if (roleLoading) return
+    if (roleLoading || tab === 'trainers') return
     const controller = new AbortController()
     const load = async () => {
       await Promise.resolve()
@@ -141,8 +143,8 @@ export function StaffPage() {
   return <div className="staff-page">
     <Typography.Title level={2}>Персонал</Typography.Title>
     <Typography.Paragraph type="secondary">График работы, табель и зарплата · время Москвы</Typography.Paragraph>
-    <Tabs activeKey={tab} onChange={key => update({ tab: key, page: '1' })} items={[{ key: 'employees', label: 'Сотрудники' }, { key: 'shifts', label: 'График смен' }, { key: 'payroll', label: 'Табель и расчет зарплаты' }, ...(canManage ? [{ key: 'rates', label: 'Настройки ставок' }, { key: 'statements', label: 'Сформированные ведомости' }] : [])]} />
-    <Card>
+    <Tabs activeKey={tab} onChange={key => update({ tab: key, page: '1' })} items={[{ key: 'employees', label: 'Сотрудники' }, { key: 'shifts', label: 'График смен' }, { key: 'payroll', label: 'Табель и расчет зарплаты' }, ...(canViewTrainers ? [{ key: 'trainers', label: 'Выплаты тренерам' }] : []), ...(canManage ? [{ key: 'rates', label: 'Настройки ставок' }, { key: 'statements', label: 'Сформированные ведомости' }] : [])]} />
+    {tab === 'trainers' ? <TrainerStatements /> : <Card>
       <Space wrap className="staff-toolbar">
         {tab === 'employees' && <>
           <Select aria-label="Фильтр роли" placeholder="Все роли" allowClear value={roleFilter} style={{ minWidth: 160 }} options={Object.entries(staffRoles).map(([value, label]) => ({ value, label }))} onChange={value => update({ role: value ?? '', page: '1' })} />
@@ -205,7 +207,7 @@ export function StaffPage() {
         ]} />}
         <Pagination className="staff-pagination" current={page} pageSize={10} total={total} showSizeChanger={false} showTotal={count => `${tab === 'statements' ? 'Ведомостей' : 'Сотрудников'}: ${count}`} onChange={next => update({ page: String(next) })} />
       </>}
-    </Card>
+    </Card>}
     {profileModal && <ProfileModal staff={profileModal === 'new' ? undefined : profileModal} onClose={() => setProfileModal(undefined)} onSaved={changed} onTelegramChanged={() => refresh(value => value + 1)} />}
     {shiftModal && <ShiftModal variant="drawer" staff={staff} shift={shiftModal === 'new' ? undefined : shiftModal} selectedDate={month.slice(0, 7) === now.toFormat('yyyy-MM') ? now.toISODate()! : month} onClose={() => setShiftModal(undefined)} onSaved={changed} onDelete={role === 'ADMIN' ? remove : undefined} />}
     {adjustment && <AdjustmentModal row={adjustment} from={from} to={to} onClose={() => setAdjustment(undefined)} onSaved={changed} />}

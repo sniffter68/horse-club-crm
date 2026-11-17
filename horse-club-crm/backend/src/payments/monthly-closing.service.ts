@@ -71,10 +71,23 @@ export class MonthlyClosingService {
   }
 
   async close(dto: ConfirmMonthlyClosingDto, closedById: string) {
-    const { end } = this.period(dto);
+    this.period(dto);
     for (let attempt = 0; ; attempt++) {
       try {
         return await this.prisma.$transaction(async tx => {
+          return this.closeInTransaction(tx, dto, closedById);
+        }, { isolationLevel: 'Serializable', timeout: 20000 });
+      } catch (error) {
+        // A concurrent serializable snapshot can surface the month unique index
+        // as P2002; retry with a fresh snapshot to return the normal 409.
+        const uniqueConflict = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+        if ((isSerializationFailure(error) || uniqueConflict) && attempt < 4) continue;
+        throw error;
+      }
+    }
+  }
+  async closeInTransaction(tx: Prisma.TransactionClient, dto: ConfirmMonthlyClosingDto, closedById: string) {
+    const { end } = this.period(dto);
           await tx.$queryRaw`SELECT pg_advisory_xact_lock(6842026)::text`;
           const closed = await tx.monthlyFinancialClosing.findUnique({ where: { year_month: { year: dto.year, month: dto.month } } });
           if (closed) throw new ConflictException('Месяц уже закрыт. Остатки уже перенесены');
@@ -96,14 +109,6 @@ export class MonthlyClosingService {
             create: { year: next.year, month: next.month, ...balances }, update: balances });
           const openingBalance = await tx.openingBalance.findUnique({ where: { year_month: { year: dto.year, month: dto.month } } });
           return { ...this.report(result), openingBalance, isClosed: true };
-        }, { isolationLevel: 'Serializable', timeout: 20000 });
-      } catch (error) {
-        // A concurrent serializable snapshot can surface the month unique index
-        // as P2002; retry with a fresh snapshot to return the normal 409.
-        const uniqueConflict = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
-        if ((isSerializationFailure(error) || uniqueConflict) && attempt < 4) continue;
-        throw error;
-      }
-    }
   }
+
 }

@@ -14,7 +14,7 @@ test('PostgreSQL operational reset: real FKs, immutable snapshots, boarding proj
   assert.ok(['localhost', '127.0.0.1'].includes(url.hostname));
   assert.match(url.searchParams.get('schema'), /^operational_reset_check_\d+$/);
   const p = new PrismaClient();
-  const tables = ['monthlyFinancialClosing', 'payrollCalculation', 'ledgerTransaction', 'revenueRecognition',
+  const tables = ['financialPeriodClosing', 'trainerPayout', 'monthlyFinancialClosing', 'payrollCalculation', 'ledgerTransaction', 'revenueRecognition',
     'membershipOp', 'bookingHorseChange', 'booking', 'lesson', 'membershipMember', 'membership', 'expense', 'payment', 'cashShift'];
   try {
     const actor = await p.user.create({ data: { email: 'reset@test.local', passwordHash: 'test', role: 'ADMIN' } });

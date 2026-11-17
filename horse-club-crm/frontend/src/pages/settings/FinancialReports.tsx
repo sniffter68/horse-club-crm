@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { PeriodClosingButton } from '../cash-desk/PeriodClosingModal'
 import { Alert, Button, Card, Col, Row, Select, Space, Statistic, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
@@ -30,6 +31,7 @@ export function FinancialReportsPage() {
   }, [period, page, revision])
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
     <Typography.Title level={2}>Финансовые отчёты</Typography.Title>
+    <PeriodClosingButton />
     <Space wrap><Select aria-label="Период отчёта" value={period} onChange={value => setParams({ period: value, page: '1' })}
       options={[{ value: 'today', label: 'Сегодня' }, { value: 'yesterday', label: 'Вчера' }, { value: 'week', label: 'Неделя' }, { value: 'month', label: 'Месяц' }]} />
       <Button disabled={loading} onClick={() => setRevision(value => value + 1)}>Обновить отчёт</Button></Space>

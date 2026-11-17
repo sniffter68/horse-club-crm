@@ -7,6 +7,8 @@ import type { AuthRequest } from './auth.types';
 export const MODULE_ACCESS_KEY = 'system-module';
 export const RequireModule = (module: SystemModule, minAccessLevel: AccessLevel = AccessLevel.READ_ONLY) =>
   SetMetadata(MODULE_ACCESS_KEY, { module, minAccessLevel });
+export const RequireAdditionalModule = (module: SystemModule, minAccessLevel: AccessLevel = AccessLevel.READ_ONLY) =>
+  SetMetadata('additional-system-module', { module, minAccessLevel });
 export const RequireModuleForFields = (module: SystemModule, fields: string[]) => SetMetadata('system-module-fields', { module, fields });
 // This exception is only for a controller that scopes all data to the authenticated account.
 export const PersonalModuleAccess = () => SetMetadata('personal-module-access', true);
@@ -20,6 +22,8 @@ export class ModuleAccessGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthRequest & { method: string; body?: Record<string, unknown> }>();
     const fieldPolicy = this.reflector.getAllAndOverride<{ module: SystemModule; fields: string[] }>('system-module-fields', [context.getHandler(), context.getClass()]);
     const requirements = required ? [required] : [];
+    const additional = this.reflector.getAllAndOverride<{ module: SystemModule; minAccessLevel: AccessLevel }>('additional-system-module', [context.getHandler(), context.getClass()]);
+    if (additional) requirements.push(additional);
     if (fieldPolicy?.fields.some(field => Object.prototype.hasOwnProperty.call(request.body ?? {}, field)))
       requirements.push({ module: fieldPolicy.module, minAccessLevel: AccessLevel.FULL });
     if (!requirements.length) return true;

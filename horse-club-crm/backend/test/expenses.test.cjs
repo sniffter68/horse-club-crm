@@ -1,3 +1,4 @@
+const { PeriodClosingService } = require('../dist/payments/period-closing.service');
 const { MonthlyClosingService } = require('../dist/payments/monthly-closing.service');
 require('reflect-metadata');
 const { test } = require('node:test');
@@ -113,7 +114,7 @@ test('cancel preserves financial record and actor, is idempotent and blocks MANA
 test('HTTP permissions: TRAINER gets 403, MANAGER creates/reads but cannot delete, ADMIN cancels; JWT author cannot be spoofed', async () => {
   let role = 'TRAINER', receivedAuthor, closingAuthor;
   const userId = randomUUID(), id = randomUUID();
-  const module = await Test.createTestingModule({ controllers: [FinanceController], providers: [RolesGuard, { provide: MonthlyClosingService, useValue: {
+  const module = await Test.createTestingModule({ controllers: [FinanceController], providers: [RolesGuard, { provide: PeriodClosingService, useValue: {} }, { provide: MonthlyClosingService, useValue: {
     status: async dto => ({ ...dto, isClosed: false }), close: async (dto, author) => { closingAuthor = author; return { ...dto, isClosed: true }; },
   } }, { provide: FinanceService, useValue: {
     create: async (dto, author) => { receivedAuthor = author; return { id, ...dto }; }, list: async () => ({ data: [], total: 0 }), summary: async () => ({}), cancel: async () => ({ id }),

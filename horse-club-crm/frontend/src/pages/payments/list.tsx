@@ -1,4 +1,5 @@
 import { LiveSearch } from '../../components/LiveSearch'
+import { PeriodClosingButton } from '../cash-desk/PeriodClosingModal'
 import { recordSuggestion } from '../../components/searchText'
 import { usePermissions } from '../../modulePermissions'
 import { useEffect, useState } from 'react'
@@ -48,6 +49,7 @@ export function PaymentList() {
   return <>
     {!writable && <Alert type="info" showIcon message="Доступно только для просмотра" />}
     <List title="Платежи" canCreate={false}>
+      <PeriodClosingButton />
       <Tabs activeKey={cashboxType} onChange={value => setParams(previous => { const next = new URLSearchParams(previous); if (value) next.set('cashboxType', value); else next.delete('cashboxType'); return next })}
         items={[{ key: '', label: 'Все' }, { key: 'MAIN', label: 'Основная касса' }, { key: 'BOARDING', label: 'Касса постоя' }]} />
       <Alert type="info" showIcon message="Простой внутренний учёт"

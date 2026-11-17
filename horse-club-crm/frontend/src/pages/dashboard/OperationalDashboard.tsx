@@ -1,3 +1,4 @@
+import { PeriodClosingButton } from '../cash-desk/PeriodClosingModal'
 import { LessonPaymentBadge } from '../schedule/LessonPayments'
 import type { LessonMoney } from '../schedule/types'
 import { Button, Card, Col, Empty, List, Progress, Row, Space, Statistic, Tag, Typography } from 'antd'
@@ -27,6 +28,7 @@ export function OperationalDashboard({ summary, loading, refresh, complete, upda
   const lessons = summary?.todayLessons, horses = summary?.horsesStatus
   const cash = modules.canRead('CASHBOX') ? summary?.cashboxSummary : undefined
   return <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <PeriodClosingButton />
     <QuickActions onSaved={refresh} shifts={(summary?.onDutyStaff ?? []).map(row => ({ ...row, date: '' }))} />
     <Row gutter={[16, 16]} aria-label="Показатели дня">
       {modules.canRead('SCHEDULE') && <Col xs={24} sm={12} xl={6}><Link to="/schedule" className="dashboard-metric-link" aria-label="Тренировки сегодня — открыть расписание"><Card title="Тренировки сегодня" extra={<ArrowRightOutlined aria-hidden />} className="dashboard-day-card dashboard-day-card--lessons" loading={loading}>

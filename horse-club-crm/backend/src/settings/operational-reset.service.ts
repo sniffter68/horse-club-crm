@@ -19,7 +19,7 @@ export class OperationalResetService {
       await tx.$executeRaw`SET LOCAL lock_timeout = '10s'`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(6842026)`;
       await tx.$executeRaw`LOCK TABLE "Payment", "Expense", "CashShift",
-        "MonthlyFinancialClosing", "PayrollCalculation", "LedgerTransaction",
+        "MonthlyFinancialClosing", "FinancialPeriodClosing", "TrainerPayout", "PayrollCalculation", "LedgerTransaction",
         "RevenueRecognition", "MembershipOp", "BookingHorseChange", "Booking",
         "Lesson", "MembershipMember", "Membership", "Client" IN EXCLUSIVE MODE`;
       const previous = await tx.cashAuditLog.findUnique({ where: { requestId } });
@@ -35,6 +35,8 @@ export class OperationalResetService {
         expenses: await tx.expense.findMany(),
         ledger: await tx.ledgerTransaction.findMany(),
         payroll: await tx.payrollCalculation.findMany(),
+        trainerPayouts: await tx.trainerPayout.findMany(),
+        periodClosings: await tx.financialPeriodClosing.findMany(),
         monthlyClosings: await tx.monthlyFinancialClosing.findMany({ include: { openingBalance: true } }),
         revenue: await tx.revenueRecognition.findMany(),
         memberships: await tx.membership.findMany(),
@@ -51,6 +53,8 @@ export class OperationalResetService {
       } });
       await tx.$queryRaw`SELECT set_config('horsecrm.operational_reset_id', ${requestId}, true)`;
       const deleted: Record<string, number> = {};
+      deleted.financialPeriodClosing = (await tx.financialPeriodClosing.deleteMany()).count;
+      deleted.trainerPayout = (await tx.trainerPayout.deleteMany()).count;
       deleted.monthlyFinancialClosing = (await tx.monthlyFinancialClosing.deleteMany()).count;
       deleted.payrollCalculation = (await tx.payrollCalculation.deleteMany()).count;
       // Ledger holds RESTRICT links to membership operations and bookings.

@@ -1,4 +1,6 @@
 import { MonthlyClosingService } from './monthly-closing.service';
+import { PeriodClosingService } from './period-closing.service';
+import { PeriodClosingDto } from './dto/period-closing.dto';
 import { ConfirmMonthlyClosingDto, MonthlyClosingDto } from './dto/monthly-closing.dto';
 import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
@@ -18,7 +20,11 @@ import { FinanceService } from './finance.service';
 @UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.MANAGER)
 export class FinanceController {
-  constructor(private readonly service: FinanceService, private readonly monthlyClosing: MonthlyClosingService) {}
+  constructor(private readonly service: FinanceService, private readonly monthlyClosing: MonthlyClosingService, private readonly periods: PeriodClosingService) {}
+  @Get('closing-preview')
+  periodPreview(@Query() dto: PeriodClosingDto) { return this.periods.preview(dto); }
+  @Post('close-period')
+  closePeriod(@Body() dto: PeriodClosingDto, @Req() req: { user: { id: string; email: string } }) { return this.periods.close(dto, req.user); }
   @Get('monthly-closing/status')
   closingStatus(@Query() dto: MonthlyClosingDto) { return this.monthlyClosing.status(dto); }
   @Get('monthly-closing/preview')
