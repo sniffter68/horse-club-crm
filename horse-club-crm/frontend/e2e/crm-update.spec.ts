@@ -50,7 +50,7 @@ for (const width of [1440, 390]) test(`cashbox links, URL tabs, refresh and fail
 
 for (const surface of ['page', 'drawer']) test(`placed horse sex can be cleared, reopened with keyboard and saved in ${surface}`, async ({ page }) => {
   await login(page)
-  const row = { id, name: 'Амур', sex: 'STALLION', stallId: 'placed', status: 'active', ownerType: 'club',
+  const row = { id, name: 'Амур', sex: 'STALLION', stallId: '00000000-0000-4000-8000-000000000811', status: 'active', ownerType: 'club',
     maxDailyMinutes: 240, minRestMinutes: 15, maxRiderWeight: 85, isPublic: true, order: 0,
     memberships: [], boardingContracts: [], bookings: [], payments: [], healthLogs: [] }
   let saved: Record<string, unknown> | undefined
@@ -67,6 +67,7 @@ for (const surface of ['page', 'drawer']) test(`placed horse sex can be cleared,
   } else await page.goto(`/horses/edit/${id}`)
   const field = page.getByRole('combobox', { name: 'Пол', exact: true })
   await expect(field).toBeEnabled()
+  await expect(field.locator('xpath=ancestor::div[contains(@class,"ant-select-selector")]')).toContainText('Жеребец')
   await field.scrollIntoViewIfNeeded()
   await field.locator('xpath=ancestor::div[contains(@class,"ant-select")]').first().hover()
   await field.locator('xpath=ancestor::div[contains(@class,"ant-select")]').first().locator('.ant-select-clear').click()
@@ -82,9 +83,13 @@ for (const surface of ['page', 'drawer']) test(`placed horse sex can be cleared,
 test('stall name optional and service room name required in the same form', async ({ page }) => {
   await login(page)
   let saved: Record<string, unknown> | undefined
+  const buildingId = '00000000-0000-4000-8000-000000000812'
+  await page.route('**/api/stable-buildings', route => route.fulfill({ json: [{ id: buildingId, name: 'Основная конюшня', order: 0 }] }))
   await page.route('**/api/stalls', route => { saved = route.request().postDataJSON() as Record<string, unknown>; return route.fulfill({ status: 201, json: { id, ...saved } }) })
   await page.route('**/api/stalls?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   await page.goto('/stalls/new')
+  await page.getByRole('combobox', { name: /Корпус/ }).click()
+  await page.getByTitle('Основная конюшня', { exact: true }).click()
   await page.getByRole('textbox', { name: 'Номер денника', exact: true }).fill('17')
   await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
   await expect.poll(() => saved?.number).toBe('17')
@@ -92,6 +97,8 @@ test('stall name optional and service room name required in the same form', asyn
   await expect(page).toHaveURL(/\/stalls$/)
   saved = undefined
   await page.goto('/stalls/new', { waitUntil: 'domcontentloaded' })
+  await page.getByRole('combobox', { name: /Корпус/ }).click()
+  await page.getByTitle('Основная конюшня', { exact: true }).click()
   await page.getByRole('combobox', { name: 'Тип помещения', exact: true }).focus()
   await page.keyboard.press('ArrowDown')
   await page.locator('.ant-select-dropdown:visible').getByText('Техническое помещение', { exact: true }).click()

@@ -55,8 +55,8 @@ test('matrix locks administrator, supports keyboard and persists manager read-on
   await expect(page.locator('.ant-modal-mask')).toBeHidden()
   await page.screenshot({ path: info.outputPath('matrix.png'), fullPage: true, animations: 'disabled' })
 })
-test('trainer read-only veterinary has no mutations; hidden cash and payroll block direct links', async ({ page }) => {
-  await setup(page, 'TRAINER'); await page.goto('/vet')
+test('stable worker read-only veterinary has no mutations; hidden cash and payroll block direct links', async ({ page }) => {
+  await setup(page, 'STABLE_WORKER'); await page.goto('/vet')
   await expect(page.getByRole('heading', { name: 'Ветеринарный журнал', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Добавить ветзапись' })).toHaveCount(0)
   for (const url of ['/cash-desk', '/staff', '/horse-health-logs/new']) {

@@ -118,8 +118,11 @@ test('card choices survive form errors, preserve the comment and reach the lead 
 test('production CSP allows uploaded photos on same-origin and API origin; SEO and lazy media are present', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const caddy = readFileSync(new URL('../../docker/Caddyfile', import.meta.url), 'utf8');
-  const csp = caddy.match(/Content-Security-Policy "([^"]+)"/)![1];
-  expect(caddy.match(/Content-Security-Policy "/g)).toHaveLength(1);
+  // The landing imports the common policy; Telegram routes have separate CSPs.
+  const common = caddy.split('(common) {')[1].split('{$API_SITE}')[0];
+  const csp = common.match(/Content-Security-Policy "([^"]+)"/)![1];
+  expect(common.match(/Content-Security-Policy "/g)).toHaveLength(1);
+  expect(caddy.split('{$LANDING_SITE}')[1]).toContain('import common');
   expect(caddy).toContain('@uploads path /uploads /uploads/*');
   const violations: string[] = [];
   await page.exposeFunction('recordCspViolation', (directive: string) => violations.push(directive));

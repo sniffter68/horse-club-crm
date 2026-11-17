@@ -457,8 +457,14 @@ for (const mode of ['TRAINER', 'READ_ONLY']) test(`lesson deletion is hidden for
   if (mode === 'TRAINER') await page.addInitScript(() => localStorage.setItem('horsecrm.role', 'TRAINER'))
   else await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'ADMIN', modules:
     ['SCHEDULE', 'STABLES', 'VETERINARY', 'CASHBOX', 'STAFF_PAYROLL'].map(module => ({ module, isEnabled: true, accessLevel: module === 'SCHEDULE' ? 'READ_ONLY' : 'FULL' })) } }))
-  await page.goto('/schedule'); await page.locator('.fc-event').first().click()
-  await expect(page.getByRole('dialog', { name: 'Карточка занятия' })).toBeVisible()
+  await page.goto('/schedule')
+  if (mode === 'TRAINER') {
+    await expect(page).toHaveURL(/\/trainer$/)
+    await expect(page.getByRole('heading', { name: 'Расписание клуба' })).toBeVisible()
+  } else {
+    await page.locator('.fc-event').first().click()
+    await expect(page.getByRole('dialog', { name: 'Карточка занятия' })).toBeVisible()
+  }
   await expect(page.getByRole('button', { name: 'Удалить занятие', exact: true })).toHaveCount(0)
 })
 

@@ -141,9 +141,9 @@ test('mobile keyboard flow, dark theme, reduced motion and dirty cancellation pr
   await expect(dialog.getByLabel('Название процедуры')).toHaveValue('Длинное описание обследования лошади')
   await page.screenshot({ path: 'test-results/vet-mobile-form.png', fullPage: true })
 })
-test('loading and failed journal offer recovery; trainers cannot see write controls', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('horsecrm.role', 'TRAINER'))
-  await page.route('**/api/settings/access/me*', route => route.fulfill({ json: { role: 'TRAINER', permissions: { healthRead: true, healthWrite: true, boardingAccess: true } } }))
+test('loading and failed journal offer recovery; stable workers cannot see write controls', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('horsecrm.role', 'STABLE_WORKER'))
+  await page.route('**/api/settings/access/me*', route => route.fulfill({ json: { role: 'STABLE_WORKER', permissions: { healthRead: true, healthWrite: true, boardingAccess: true } } }))
   await page.route('**/api/vet/records?*', route => route.fulfill({ status: 503, json: { message: 'Сервер недоступен' } }))
   await page.goto('/vet'); await expect(page.getByText('Не удалось загрузить журнал')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Добавить ветзапись', exact: true })).toHaveCount(0)

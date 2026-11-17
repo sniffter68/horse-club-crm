@@ -40,6 +40,22 @@ npm run test:e2e:live
 npx playwright test --config=playwright.crm.config.ts --project=operational-reset
 ```
 
+The mock project also includes `workspace.spec.ts` and `trainer-tma.spec.ts`;
+the standalone workspace and TMA configurations remain available for focused runs.
+For a complete CRM regression run without retries:
+
+```powershell
+$env:CRM_TEST_BASE_URL = 'http://127.0.0.1:5173'
+npm.cmd run test:e2e:mock -- --workers=3 --retries=0
+```
+
+Use deterministic UUID v4 values for entity IDs, including related records and
+request assertions. Invalid-ID cases intentionally retain malformed values.
+TRAINER sessions redirect desktop routes to `/trainer`; desktop read-only
+catalogue scenarios use MANAGER with `READ_ONLY` or STABLE_WORKER instead.
+Mock horse availability as well as the catalogue: the shared lesson drawer
+requires an `AVAILABLE` workload entry before a horse can be selected.
+
 Start the CRM dev server separately for these legacy commands. They use Edge;
 live suites also require their existing backend/database setup. The operational
 reset suite is run explicitly because it resets operational data.

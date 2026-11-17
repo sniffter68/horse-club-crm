@@ -10,6 +10,6 @@ export async function openCalendarLesson(page: Page) {
   const slotBounds = await slot.boundingBox()
   if (!bounds || !slotBounds) throw new Error('Calendar day is not visible')
   await page.mouse.click(bounds.x + bounds.width / 2, slotBounds.y + 1)
-  await expect(page.getByRole('dialog', { name: 'Быстрое бронирование' })).toBeVisible()
-  await page.getByRole('dialog', { name: 'Быстрое бронирование' }).getByLabel('Длительность, мин', { exact: true }).fill('60')
+  await expect(page.getByRole('dialog', { name: 'Записать на тренировку' })).toBeVisible()
+  await page.getByRole('dialog', { name: 'Записать на тренировку' }).getByRole('spinbutton').first().fill('60')
 }

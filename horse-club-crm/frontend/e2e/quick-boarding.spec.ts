@@ -178,8 +178,8 @@ test('failed release retains occupied state and confirmation for retry, even for
   expect(state.stallReads).toBeGreaterThan(1)
 })
 
-test('TRAINER sees both cards without placement or release actions', async ({ page }) => {
-  await setup(page, { role: 'TRAINER' })
+test('STABLE_WORKER sees both cards without placement or release actions', async ({ page }) => {
+  await setup(page, { role: 'STABLE_WORKER' })
   for (const kind of ['horse', 'stall'] as const) {
     const card = await openCard(page, kind)
     await expect(card.getByRole('button', { name: /Разместить|Заселить|Освободить/ })).toHaveCount(0)
@@ -280,8 +280,8 @@ for (const width of [1280, 320]) test(`feeding edit preserves drafts on failure,
   expect(state.feedingNotes).toBeNull()
 })
 
-test('trainer can read feeding notes but cannot edit them', async ({ page }) => {
-  const state = await setup(page, { role: 'TRAINER' })
+test('stable worker can read feeding notes but cannot edit them', async ({ page }) => {
+  const state = await setup(page, { role: 'STABLE_WORKER' })
   state.feedingNotes = 'Утро: сено'
   const card = await openCard(page, 'horse')
   await expect(card.getByText('Утро: сено', { exact: true })).toBeVisible()

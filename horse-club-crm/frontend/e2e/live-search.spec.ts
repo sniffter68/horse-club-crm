@@ -13,14 +13,20 @@ for (const resource of ['clients', 'horses', 'trainers']) {
       breed: 'Орловская', createdAt: '2026-10-01', clientType: 'REGULAR', isRider: true, isPayer: true,
       isUnavailable: false, maxDailyMinutes: 180, minRestMinutes: 30, maxDailyLoad: 180,
     }))
+    await page.clock.install()
     const queries: string[] = []
+    let releaseSlow!: () => void
+    let finishSlow!: () => void
+    const slowGate = new Promise<void>(resolve => { releaseSlow = resolve })
+    const slowFinished = new Promise<void>(resolve => { finishSlow = resolve })
     await page.route(`**/api/${resource}?*`, async route => {
       const q = new URL(route.request().url()).searchParams.get('q') || ''
       queries.push(q)
       if (q === 'ошибка') return route.fulfill({ status: 400, json: { message: 'Ошибка поиска' } })
-      if (q === 'Бор') await new Promise(resolve => setTimeout(resolve, 700))
+      if (q === 'Бор') await slowGate
       const data = rows.filter(row => row.name.toLowerCase().includes(q.toLowerCase()))
       await route.fulfill({ json: data, headers: { 'x-total-count': String(data.length) } })
+      if (q === 'Бор') finishSlow()
     })
     await page.goto(`/${resource}`)
     const input = page.getByRole('combobox', { name: 'Поиск', exact: true })
@@ -39,13 +45,14 @@ for (const resource of ['clients', 'horses', 'trainers']) {
     await expect(clear).toBeFocused()
     await clear.press('Enter')
     await expect(page.getByRole('button', { name: 'Борис', exact: true })).toBeVisible()
-    await page.waitForTimeout(400)
+    await page.clock.fastForward(400)
     expect(queries).not.toContain('Аннаx')
     await input.fill('Бор')
     await expect.poll(() => queries.includes('Бор')).toBe(true)
     await input.fill('Ан')
     await expect(page.getByRole('button', { name: 'Анна', exact: true })).toBeVisible()
-    await page.waitForTimeout(850)
+    releaseSlow()
+    await slowFinished
     await expect(input).toHaveValue('Ан')
     await expect(page.getByRole('button', { name: 'Борис', exact: true })).toHaveCount(0)
     await input.fill('нет совпадений')
@@ -59,7 +66,7 @@ for (const resource of ['clients', 'horses', 'trainers']) {
     const compositionStart = queries.length
     await input.dispatchEvent('compositionstart')
     await input.fill('Ан')
-    await page.waitForTimeout(400)
+    await page.clock.fastForward(400)
     expect(queries.length).toBe(compositionStart)
     await input.dispatchEvent('compositionend', { data: 'Ан' })
     await expect(page.locator('.ant-select-item-option-content mark')).toHaveText('Ан')

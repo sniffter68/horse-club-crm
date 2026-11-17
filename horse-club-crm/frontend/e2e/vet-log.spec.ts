@@ -9,6 +9,9 @@ const procedures = [
 ] as const
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/boarding/expenses?*', route => route.fulfill({ json: { data: [], total: 0 } }))
+  await page.route('**/api/vet/records?*', route => route.fulfill({ json: { data: [], total: 0 } }))
+  await page.route('**/api/vet/summary*', route => route.fulfill({ json: {} }))
   await page.route('**/api/settings/access/me*', route => route.fulfill({ json: { role: 'ADMIN', permissions: {
     horseReplaceOwn: true, horseReplaceAny: true, healthRead: true, healthWrite: true, financeRead: true, boardingAccess: true,
   } } }))
@@ -29,10 +32,21 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
+async function openHorseCard(page: import('@playwright/test').Page) {
+  const loaded = page.waitForResponse(response => response.url().endsWith(`/api/horses/${horseId}`) && response.ok())
+  await page.getByRole('button', { name: 'Валдай', exact: true }).click()
+  await loaded
+  await expect(page.getByRole('dialog', { name: 'Карточка лошади' }).getByRole('heading', { name: 'Основная информация', exact: true })).toBeVisible()
+}
+
 async function openHorseProcedure(page: import('@playwright/test').Page) {
   await page.goto('/horses')
-  await page.getByRole('button', { name: 'Валдай', exact: true }).click()
-  await page.getByRole('tab', { name: 'Здоровье и ковка' }).click()
+  await openHorseCard(page)
+  await expect(async () => {
+    await page.getByRole('tab', { name: 'Здоровье и ковка' }).focus()
+    await page.getByRole('tab', { name: 'Здоровье и ковка' }).press('Enter')
+    await expect(page.getByRole('tab', { name: 'Календарь назначений' })).toBeVisible()
+  }).toPass({ timeout: 5000 })
   await page.getByRole('tab', { name: 'Календарь назначений' }).click()
   await page.getByRole('button', { name: 'Добавить процедуру' }).click()
 }
@@ -43,8 +57,12 @@ for (const invalidId of [undefined, null, '', 'invalid-id', 123, { id: horseId }
     page.on('request', request => { if (/\/api\/vet\/(events|upcoming)/.test(request.url())) requests.push(request.url()) })
     await page.route(`**/api/horses/${horseId}`, route => route.fulfill({ json: { ...horse, id: invalidId } }))
     await page.goto('/horses')
-    await page.getByRole('button', { name: 'Валдай', exact: true }).click()
-    await page.getByRole('tab', { name: 'Здоровье и ковка' }).click()
+    await openHorseCard(page)
+    await expect(async () => {
+    await page.getByRole('tab', { name: 'Здоровье и ковка' }).focus()
+    await page.getByRole('tab', { name: 'Здоровье и ковка' }).press('Enter')
+    await expect(page.getByRole('tab', { name: 'Календарь назначений' })).toBeVisible()
+  }).toPass({ timeout: 5000 })
   await page.getByRole('tab', { name: 'Календарь назначений' }).click()
     const section = page.getByRole('region', { name: 'Здоровье и ковка' })
     await expect(section.getByText('Журнал здоровья недоступен')).toBeVisible()
@@ -68,7 +86,11 @@ test('waits for the horse card to load and then sends its UUID', async ({ page }
   await expect(page.getByRole('dialog', { name: 'Карточка лошади' })).toBeVisible()
   expect(requests).toEqual([])
   release()
-  await page.getByRole('tab', { name: 'Здоровье и ковка' }).click()
+  await expect(async () => {
+    await page.getByRole('tab', { name: 'Здоровье и ковка' }).focus()
+    await page.getByRole('tab', { name: 'Здоровье и ковка' }).press('Enter')
+    await expect(page.getByRole('tab', { name: 'Календарь назначений' })).toBeVisible()
+  }).toPass({ timeout: 5000 })
   await page.getByRole('tab', { name: 'Календарь назначений' }).click()
   await expect.poll(() => requests).toContain(horseId)
   expect(requests.every(id => id === horseId)).toBe(true)
@@ -84,8 +106,12 @@ test('horse journal preserves the last type filter without an extra question mar
     return route.fulfill({ json: { data: [], total: 0 } })
   })
   await page.goto('/horses')
-  await page.getByRole('button', { name: 'Валдай', exact: true }).click()
-  await page.getByRole('tab', { name: 'Здоровье и ковка' }).click()
+  await openHorseCard(page)
+  await expect(async () => {
+    await page.getByRole('tab', { name: 'Здоровье и ковка' }).focus()
+    await page.getByRole('tab', { name: 'Здоровье и ковка' }).press('Enter')
+    await expect(page.getByRole('tab', { name: 'Календарь назначений' })).toBeVisible()
+  }).toPass({ timeout: 5000 })
   await page.getByRole('tab', { name: 'Календарь назначений' }).click()
   await page.getByRole('combobox', { name: 'Тип процедуры' }).focus()
   await page.keyboard.press('ArrowDown')

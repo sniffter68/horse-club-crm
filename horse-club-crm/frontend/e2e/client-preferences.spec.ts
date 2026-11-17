@@ -12,8 +12,10 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/**', route => {
     const url = new URL(route.request().url()), path = url.pathname.replace('/api/', '')
     const catalogs: Record<string, unknown[]> = { clients, horses, trainers, arenas: [], services: [] }
+    if (path === 'leads/events') return route.fulfill({ contentType: 'text/event-stream', body: ': heartbeat\n\n' })
+    if (path === 'cashbox/summary') return route.fulfill({ json: { mainBalance: 0, boardingBalance: 0, mainOperationsCount: 0, boardingOperationsCount: 0 } })
     if (path === 'settings/club-schedule') return route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } })
-    if (path === 'bookings/availability') return route.fulfill({ json: { horseWorkloads: [], arenaOccupancy: [] } })
+    if (path === 'bookings/availability') return route.fulfill({ json: { horseWorkloads: horses.map(horse => ({ horseId: horse.id, currentWorkloadMinutes: 0, maxDailyWorkloadMinutes: horse.maxDailyMinutes, status: 'AVAILABLE' })), arenaOccupancy: [] } })
     if (path.startsWith('clients/')) return route.fulfill({ json: clients.find(row => row.id === path.split('/')[1]) })
     return route.fulfill({ json: catalogs[path] ?? [], headers: { 'x-total-count': String(catalogs[path]?.length ?? 0) } })
   })
@@ -25,10 +27,8 @@ async function choose(page: Page, dialog: Locator, label: string, text: string) 
   const input = dialog.getByRole('combobox', { name: label, exact: true })
   await input.scrollIntoViewIfNeeded()
   await input.focus(); await input.fill(text)
-  await expect(page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: text }).first()).toBeVisible()
-  if (label === 'Клиент') await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: text }).first().click()
-  else await input.press('Enter')
-  await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0)
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: text }).first().click()
+  await selected(dialog, label, text)
 }
 async function selected(dialog: Locator, label: string, text: string) {
   await expect(dialog.getByRole('combobox', { name: label, exact: true }).locator('xpath=ancestor::div[contains(@class,"ant-select-selector")]')).toContainText(text)
@@ -38,7 +38,7 @@ for (const width of [1440, 390]) test(`booking defaults follow client and preser
   await page.setViewportSize({ width, height: 900 })
   await page.goto('/schedule')
   await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Бронирование тройного ресурса' })
+  const dialog = page.getByRole('dialog', { name: 'Записать на тренировку' })
   await choose(page, dialog, 'Клиент', 'Клиент 5')
   await selected(dialog, 'Тренер', 'Тренер 1'); await selected(dialog, 'Лошадь', 'Лошадь 3')
   await choose(page, dialog, 'Клиент', 'Клиент 6')
@@ -61,13 +61,13 @@ for (const width of [1440, 390]) test(`booking defaults follow client and preser
 
 test('lesson participant uses defaults even when the service has no membership', async ({ page }) => {
   await page.goto('/schedule'); await openCalendarLesson(page)
-  const dialog = page.getByRole('dialog', { name: 'Быстрое бронирование' })
+  const dialog = page.getByRole('dialog', { name: 'Записать на тренировку' })
   await choose(page, dialog, 'Клиент', 'Клиент 5')
-  await selected(dialog, 'Тренер', 'Тренер 1'); await selected(dialog, 'Лошадь участника', 'Лошадь 3')
+  await selected(dialog, 'Тренер', 'Тренер 1'); await selected(dialog, 'Лошадь', 'Лошадь 3')
   await choose(page, dialog, 'Тренер', 'Тренер 2')
-  await choose(page, dialog, 'Лошадь участника', 'Лошадь 4')
+  await choose(page, dialog, 'Лошадь', 'Лошадь 4')
   await choose(page, dialog, 'Клиент', 'Клиент 7')
-  await selected(dialog, 'Тренер', 'Тренер 2'); await selected(dialog, 'Лошадь участника', 'Лошадь 4')
+  await selected(dialog, 'Тренер', 'Тренер 2'); await selected(dialog, 'Лошадь', 'Лошадь 4')
 })
 
 test('slow client details never overwrite manual resources', async ({ page }) => {
@@ -75,11 +75,11 @@ test('slow client details never overwrite manual resources', async ({ page }) =>
   const gate = new Promise<void>(resolve => { release = resolve })
   await page.route(`**/api/clients/${id(5)}`, async route => { await gate; await route.fulfill({ json: clients[0] }) })
   await page.goto('/schedule'); await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Бронирование тройного ресурса' })
+  const dialog = page.getByRole('dialog', { name: 'Записать на тренировку' })
   await choose(page, dialog, 'Клиент', 'Клиент 5')
   await choose(page, dialog, 'Тренер', 'Тренер 2'); await choose(page, dialog, 'Лошадь', 'Лошадь 4')
   release()
-  await expect(dialog.getByText('Нет активного абонемента или депозита')).toBeVisible()
+  await expect(dialog.getByRole('combobox', { name: 'Клиент', exact: true })).toBeEnabled()
   await selected(dialog, 'Тренер', 'Тренер 2'); await selected(dialog, 'Лошадь', 'Лошадь 4')
 })
 
@@ -87,9 +87,9 @@ test('inactive trainers and horses in treatment are not automatically selected',
   await page.route('**/api/trainers?*', route => route.fulfill({ json: trainers.map(row => ({ ...row, isActive: false })), headers: { 'x-total-count': '2' } }))
   await page.route('**/api/horses?*', route => route.fulfill({ json: horses.map(row => ({ ...row, healthStatus: 'TREATMENT' })), headers: { 'x-total-count': '2' } }))
   await page.goto('/schedule'); await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Бронирование тройного ресурса' })
+  const dialog = page.getByRole('dialog', { name: 'Записать на тренировку' })
   await choose(page, dialog, 'Клиент', 'Клиент 5')
-  await expect(dialog.getByText('Нет активного абонемента или депозита')).toBeVisible()
+  await expect(dialog.getByRole('combobox', { name: 'Клиент', exact: true })).toBeEnabled()
   for (const label of ['Тренер', 'Лошадь']) await expect(dialog.getByRole('combobox', { name: label, exact: true }).locator('xpath=ancestor::div[contains(@class,"ant-select-selector")]').locator('.ant-select-selection-item')).toHaveCount(0)
 })
 

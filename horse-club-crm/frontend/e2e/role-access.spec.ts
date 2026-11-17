@@ -7,7 +7,7 @@ const horse = { id: '00000000-0000-4000-8000-000000000004', name: 'Валдай'
 const replacement = { ...horse, id: '00000000-0000-4000-8000-000000000005', name: 'Буран' }
 const client = { id: '00000000-0000-4000-8000-000000000006', firstName: 'Анна', name: 'Анна', weightKg: 70 }
 const own = { id: ownId, name: 'Мария', isActive: true }, other = { id: otherId, name: 'Ольга', isActive: true }
-const arena = { id: 'a1', name: 'Манеж', isActive: true }
+const arena = { id: '00000000-0000-4000-8000-000000000007', name: 'Манеж', isActive: true }
 const permissions = { horseReplaceOwn: true, horseReplaceAny: false, healthRead: true, healthWrite: false, financeRead: false, boardingAccess: true }
 const adminPermissions = { ...permissions, horseReplaceAny: true, healthWrite: true, financeRead: true }
 const bookings = [own, other].map((trainer, index) => ({
@@ -21,6 +21,11 @@ async function setup(page: Page, role = 'TRAINER', policy = permissions) {
     localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.role', role); localStorage.setItem('horsecrm.email', 'qa@example.com')
   }, role)
   await page.route('**/api/settings/access/me*', route => route.fulfill({ json: { userId, trainerId: ownId, role, permissions: policy } }))
+  await page.route('**/api/workspace/trainer-board?*', route => route.fulfill({ json: {
+    date: '2026-10-15', trainerId: ownId, trainers: [own, other], openTime: '09:00', closeTime: '21:00', horses: [],
+    lessons: bookings.map(row => ({ id: row.id, trainerId: row.trainerId, trainer: row.trainer, startTime: row.startTime, endTime: row.endTime,
+      status: 'SCHEDULED', isOwn: row.trainerId === ownId, arena, trainerNote: null, bookings: [{ id: row.id, horse, client: row.trainerId === ownId ? client : null }] })),
+  } }))
   await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } }))
   for (const [resource, data] of Object.entries({ clients: [client], horses: [horse, replacement], trainers: [own, other], arenas: [arena], services: [], lessons: [], bookings })) {
     await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: data, headers: { 'x-total-count': String(data.length) } }))
@@ -31,7 +36,7 @@ async function setup(page: Page, role = 'TRAINER', policy = permissions) {
   await page.route('**/api/bookings/*/available-horses', route => route.fulfill({ json: [replacement] }))
 }
 
-for (const role of ['TRAINER', 'ADMIN', 'MANAGER']) test(`${role} can replace a horse in an allowed lesson`, async ({ page }) => {
+for (const role of ['TRAINER', 'ADMIN', 'MANAGER']) test(`${role} lesson actions respect its workspace`, async ({ page }) => {
   await setup(page, role)
   let saved = false
   const selected = role === 'TRAINER' ? bookings[0] : bookings[1]
@@ -40,7 +45,14 @@ for (const role of ['TRAINER', 'ADMIN', 'MANAGER']) test(`${role} can replace a 
     return route.fulfill({ json: { ...selected, horseId: replacement.id } })
   })
   await page.goto('/schedule')
-  await page.locator('.fc-event').filter({ hasText: role === 'TRAINER' ? 'Мария' : 'Ольга' }).click()
+  if (role === 'TRAINER') {
+    await expect(page).toHaveURL(/\/trainer$/)
+    await expect(page.locator('.board-lesson-own').getByRole('button', { name: 'Проведено', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Сменить лошадь', exact: true })).toHaveCount(0)
+    expect(saved).toBe(false)
+    return
+  }
+  await page.locator('.fc-event').filter({ hasText: 'Ольга' }).click()
   await page.getByRole('button', { name: 'Сменить лошадь', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Сменить лошадь' })
   const select = dialog.getByRole('combobox', { name: 'Новая лошадь' })
@@ -53,8 +65,10 @@ test('trainer has no replacement action in a colleague lesson and a rejected req
   await setup(page)
   await page.route(`**/api/bookings/${bookings[1].id}/horse`, route => route.fulfill({ status: 403, json: { message: 'Вы можете заменять лошадей только в своих занятиях' } }))
   await page.goto('/schedule')
-  await page.locator('.fc-event').filter({ hasText: 'Ольга' }).click()
-  const card = page.getByRole('dialog', { name: 'Карточка бронирования' })
+  await expect(page).toHaveURL(/\/trainer$/)
+  const card = page.getByRole('article', { name: '13:00 Ольга' })
+  await expect(card).toBeVisible()
+  await expect(card.getByRole('textbox')).toHaveCount(0)
   await expect(card.getByRole('button', { name: 'Сменить лошадь', exact: true })).toHaveCount(0)
   // HTTP authorization itself is covered with the real Nest controller in backend/test/role-access.test.cjs.
   const response = await page.evaluate(async ({ id, horseId }) => {
@@ -66,14 +80,16 @@ test('trainer has no replacement action in a colleague lesson and a rejected req
 
 test('revoked own-lesson permission hides replacement even in the trainer lesson', async ({ page }) => {
   await setup(page, 'TRAINER', { ...permissions, horseReplaceOwn: false })
-  await page.goto('/schedule'); await page.locator('.fc-event').filter({ hasText: 'Мария' }).click()
-  await expect(page.getByRole('dialog', { name: 'Карточка бронирования' }).getByRole('button', { name: 'Сменить лошадь', exact: true })).toHaveCount(0)
+  await page.goto('/schedule')
+  await expect(page).toHaveURL(/\/trainer$/)
+  await expect(page.locator('.board-lesson-own')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Сменить лошадь', exact: true })).toHaveCount(0)
 })
 
-test('legacy group lesson uses the assigned trainer for replacement', async ({ page }) => {
-  await setup(page)
+test('administrator can replace a horse in a legacy group lesson', async ({ page }) => {
+  await setup(page, 'ADMIN')
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
-  await page.route('**/api/lessons?*', route => route.fulfill({ json: [{ id: 'lesson', startTime: bookings[0].startTime, endTime: bookings[0].endTime,
+  await page.route('**/api/lessons?*', route => route.fulfill({ json: [{ id: '00000000-0000-4000-8000-000000000099', startTime: bookings[0].startTime, endTime: bookings[0].endTime,
     status: 'SCHEDULED', trainer: own, service: { title: 'Выездка' }, arena, bookings: [{ id: bookings[0].id, client, horse, membership: null }] }] }))
   await page.goto('/schedule'); await page.locator('.fc-event').first().click()
   await expect(page.getByRole('dialog', { name: 'Карточка занятия' }).getByRole('button', { name: 'Сменить лошадь', exact: true })).toBeVisible()
@@ -130,12 +146,14 @@ test('administrator links a trainer account and confirms session revocation', as
   await expect(confirm).toHaveCount(0); expect(saved).toBe(true)
 })
 
-test('trainer cannot open role management; finance grant is read only and revocation blocks the report', async ({ page }) => {
+test('trainer redirects role management and financial reports even with a legacy finance grant', async ({ page }) => {
   await setup(page, 'TRAINER', { ...permissions, financeRead: true })
-  await page.route('**/api/payments/summary?*', route => route.fulfill({ json: { totalCash: '100', totalCard: '200', totalRevenue: '300', operationsCount: 0, operations: [] } }))
-  await page.goto('/settings'); await expect(page.getByRole('tab', { name: 'Роли и доступ' })).toHaveCount(0)
-  await page.goto('/financial-reports'); await expect(page.getByRole('heading', { name: 'Финансовые отчёты' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Принять платёж' })).toHaveCount(0)
-  await page.route('**/api/settings/access/me*', route => route.fulfill({ json: { role: 'TRAINER', userId, trainerId: ownId, permissions } }))
-  await page.reload(); await expect(page.getByText('У вашей роли нет доступа к этому разделу')).toBeVisible()
+  for (const path of ['/settings', '/financial-reports']) {
+    await page.goto(path)
+    await expect(page).toHaveURL(/\/trainer$/)
+    await expect(page.getByRole('heading', { name: 'Расписание клуба' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Роли и доступ' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Финансовые отчёты' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Принять платёж' })).toHaveCount(0)
+  }
 })

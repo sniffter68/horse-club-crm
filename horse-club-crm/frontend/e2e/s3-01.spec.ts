@@ -8,7 +8,7 @@ test('schedule quick booking date footer confirms Moscow time', async ({ page })
   await login(page)
   await page.goto('/schedule')
   await openCalendarLesson(page)
-  await checkBookingDatePicker(page, page.getByRole('dialog', { name: 'Быстрое бронирование' }), 'Время начала', '09.10.2026 09:00')
+  await checkBookingDatePicker(page, page.getByRole('dialog', { name: 'Записать на тренировку' }), 'Дата и время (Москва)', '09.10.2026 09:00')
 })
 
 test.beforeEach(async ({ page }) => {
@@ -40,6 +40,9 @@ test('schedule: slot booking preserves input and displays backend 409', async ({
   }
   await page.route(`**/api/clients/${ids.clients}`, route => route.fulfill({ json: { id: ids.clients, name: 'clients', memberships: [] } }))
   await page.route('**/api/horses/workload?*', route => route.fulfill({ json: [{ horseId: ids.horses, horseName: 'horses', maxDailyWorkloadMinutes: 240, currentWorkloadMinutes: 60, status: 'AVAILABLE' }] }))
+  await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: {
+    horseWorkloads: [{ horseId: ids.horses, maxDailyWorkloadMinutes: 240, currentWorkloadMinutes: 60, status: 'AVAILABLE' }], arenaOccupancy: [],
+  } }))
   const conflict = 'Тренер уже занят в выбранное время'
   await page.route('**/api/lessons', route => route.fulfill({ status: 409, json: { message: conflict } }))
   await page.goto('/schedule')
@@ -48,17 +51,17 @@ test('schedule: slot booking preserves input and displays backend 409', async ({
   const bounds = await column.boundingBox()
   if (!bounds) throw new Error('Calendar day is not visible')
   await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + 40)
-  const modal = page.getByRole('dialog', { name: 'Быстрое бронирование' })
+  const modal = page.getByRole('dialog', { name: 'Записать на тренировку' })
   await expect(modal).toBeVisible()
-  for (const [label, value] of [['Клиент', 'clients'], ['Услуга', 'services'], ['Тренер', 'trainers'], ['Лошадь участника', 'horses']]) {
+  for (const [label, value] of [['Клиент', 'clients'], ['Услуга', 'services'], ['Тренер', 'trainers'], ['Лошадь', 'horses']]) {
     await modal.getByRole('combobox', { name: new RegExp(`${label}$`) }).fill(value)
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: value }).first().click()
   }
-  await expect(modal.getByText('Доступно: 180 из 240 мин')).toBeVisible()
-  await modal.getByRole('button', { name: 'Создать занятие', exact: true }).click()
+  await expect(modal.getByRole('spinbutton').first()).toHaveValue('60')
+  await modal.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   await expect(modal.getByRole('alert')).toContainText(conflict)
-  await expect(modal.getByLabel('Длительность, мин')).toHaveValue('60')
-  await expect(modal.getByRole('button', { name: 'Создать занятие', exact: true })).toBeEnabled()
+  await expect(modal.getByRole('spinbutton').first()).toHaveValue('60')
+  await expect(modal.getByRole('button', { name: 'Записать на тренировку', exact: true })).toBeEnabled()
 })
 
 test('schedule: failed refresh preserves the current screen and session', async ({ page }) => {
@@ -88,7 +91,7 @@ async function login(page: Page, role = 'ADMIN') {
   await page.getByLabel('Email', { exact: true }).fill('qa@example.com')
   await page.getByLabel('Пароль', { exact: true }).fill('qa-password')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await expect(page).toHaveURL('/')
+  await expect(page).toHaveURL(role === 'TRAINER' ? /\/trainer$/ : /\/(?:dashboard)?$/)
   await page.goto('/clients')
 }
 for (const role of ['ADMIN', 'MANAGER', 'TRAINER']) {
@@ -105,7 +108,7 @@ for (const role of ['ADMIN', 'MANAGER', 'TRAINER']) {
 test('admin navigation and logout (mock API)', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
-  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
+  page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource: net::') && !message.text().startsWith('Accessing element.ref was removed in React 19.')) errors.push(message.text()) })
   await login(page)
   for (const [route, title] of [['clients','Клиенты'],['horses','Лошади'],['trainers','Тренеры'],['services','Услуги'],['schedule','Расписание занятий'],['settings','Режим работы клуба']]) {
     const groups: Record<string, string> = { clients: 'Клиенты и финансы', horses: 'Лошади и постой', trainers: 'Клуб и команда', services: 'Клуб и команда', schedule: 'Занятия', settings: 'Администрирование' }

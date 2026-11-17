@@ -91,7 +91,7 @@ for (const resource of ['clients', 'horses', 'trainers'] as const) {
       id, name: 'Тестовая запись', firstName: 'Тестовая', lastName: 'запись', phone: '+79991234567', email: 'qa@example.com',
       clientType: 'REGULAR', isRider: true, isPayer: false, createdAt: '2026-10-01', membership: null,
       maxRiderWeight: 85, maxDailyMinutes: 120, minRestMinutes: 45, isUnavailable: false, status: 'active', ownerType: 'club',
-      maxDailyLoad: 480, baseRate: 1500, isPublic: false, order: 0,
+      maxDailyLoad: 480, maxParallelLessons: 4, baseRate: 1500, isPublic: false, order: 0,
       memberships: [], bookings: [], payments: [], boardingContracts: [], healthLogs: [],
     }
     let fail = true

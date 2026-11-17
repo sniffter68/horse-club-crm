@@ -1,7 +1,9 @@
 import { expect, type Locator, type Page } from './fixtures'
 
 export async function checkBookingDatePicker(page: Page, owner: Locator, label: string, now: string) {
-  const input = owner.getByLabel(label, { exact: true })
+  const input = label === 'Дата и время (Москва)'
+    ? owner.getByPlaceholder('Выберите дату', { exact: true })
+    : owner.getByLabel(label, { exact: true })
   await input.click()
   const popup = page.locator('.booking-date-popup:visible')
   const ok = popup.getByRole('button', { name: 'ОК', exact: true })

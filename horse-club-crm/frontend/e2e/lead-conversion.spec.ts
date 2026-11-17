@@ -1,29 +1,27 @@
+import { workspaceSummary } from './workspaceSummary'
 import { test, expect, type Page, type Locator } from './fixtures'
 
 test.setTimeout(45000)
 
-const service = { id: 'service', title: 'Индивидуальная тренировка', durationMinutes: 45 }
-const lead = { id: 'lead', firstName: 'Анна', phone: '+79991234567', email: null, preferences: 'Новичок', service, createdAt: '2026-10-11T08:00:00Z' }
+const service = { id: '00000000-0000-4000-8000-000000000601', title: 'Индивидуальная тренировка', durationMinutes: 45 }
+const lead = { id: '00000000-0000-4000-8000-000000000602', firstName: 'Анна', phone: '+79991234567', email: null, preferences: 'Новичок', service, createdAt: '2026-10-11T08:00:00Z' }
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => { localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.role', 'ADMIN'); localStorage.setItem('horsecrm.email', 'qa@example.com') })
-  await page.route('**/api/dashboard/summary', route => route.fulfill({ json: {
-    generatedAt: '2026-10-11T08:00:00Z', workDay: { date: '2026-10-11', openAt: '2026-10-11T06:00:00Z', closeAt: '2026-10-11T18:00:00Z', timeZone: 'Europe/Moscow' },
-    alerts: [], horseWorkloads: [], leadRequests: [lead], kpi: { lessonsTotal: 0, lessonsCompleted: 0, newLeads: 1, activeMemberships: 0 },
-  } }))
+  await page.route('**/api/workspace/admin-summary', route => route.fulfill({ json: workspaceSummary({ leadRequests: [lead] }) }))
   for (const [resource, data] of Object.entries({
-    trainers: [{ id: 'trainer', name: 'Мария Волкова', isActive: true }, { id: 'inactive', name: 'Неактивный тренер', isActive: false }],
-    horses: [{ id: 'horse', name: 'Валдай', isUnavailable: false, status: 'active' }, { id: 'rest', name: 'Лошадь на отдыхе', isUnavailable: false, status: 'rest' }],
-    arenas: [{ id: 'arena', name: 'Крытый манеж', isActive: true }], services: [service],
+    trainers: [{ id: '00000000-0000-4000-8000-000000000603', name: 'Мария Волкова', isActive: true }, { id: '00000000-0000-4000-8000-000000000604', name: 'Неактивный тренер', isActive: false }],
+    horses: [{ id: '00000000-0000-4000-8000-000000000605', name: 'Валдай', isUnavailable: false, status: 'active' }, { id: '00000000-0000-4000-8000-000000000606', name: 'Лошадь на отдыхе', isUnavailable: false, status: '00000000-0000-4000-8000-000000000606' }],
+    arenas: [{ id: '00000000-0000-4000-8000-000000000607', name: 'Крытый манеж', isActive: true }], services: [service],
   })) await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: data, headers: { 'x-total-count': String(data.length) } }))
   await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: {
-    horseWorkloads: [{ horseId: 'horse', currentWorkloadMinutes: 0, maxDailyWorkloadMinutes: 240, status: 'AVAILABLE' }], arenaOccupancy: [],
+    horseWorkloads: [{ horseId: '00000000-0000-4000-8000-000000000605', currentWorkloadMinutes: 0, maxDailyWorkloadMinutes: 240, status: 'AVAILABLE' }], arenaOccupancy: [],
   } }))
 })
 
 async function open(page: Page) {
   await page.goto('/')
-  await page.locator('#pending-leads').getByRole('button', { name: 'Открыть' }).click()
+  await page.locator('#pending-leads').last().getByRole('button', { name: 'Открыть' }).click()
   return page.getByRole('dialog', { name: 'Обработка заявки', exact: true })
 }
 async function choose(page: Page, modal: Locator, label: string, value: string) {
@@ -44,22 +42,22 @@ async function fillLesson(page: Page, modal: Locator) {
 
 test('client-only conversion omits hidden lesson data when the switch is turned off', async ({ page }) => {
   let payload: Record<string, unknown> | undefined
-  await page.route('**/api/leads/lead/accept', route => { payload = route.request().postDataJSON(); return route.fulfill({ json: { success: true } }) })
+  await page.route('**/api/leads/00000000-0000-4000-8000-000000000602/accept', route => { payload = route.request().postDataJSON(); return route.fulfill({ json: { success: true } }) })
   const modal = await open(page)
   await fillLesson(page, modal)
   await modal.getByLabel('Сразу назначить тренировку').uncheck()
   await modal.getByRole('button', { name: 'Создать клиента', exact: true }).click()
   await expect(modal).not.toBeVisible()
   expect(payload).toMatchObject({ firstName: 'Анна', phone: '+79991234567' })
-  expect(payload).not.toHaveProperty('lesson')
+  expect(payload).not.toHaveProperty('00000000-0000-4000-8000-000000000608')
   expect(payload).not.toHaveProperty('assignLesson')
 })
 
 test('conflict retains the draft and retry sends one atomic request with club time', async ({ page }) => {
   const payloads: Record<string, unknown>[] = []
-  await page.route('**/api/leads/lead/accept', route => {
+  await page.route('**/api/leads/00000000-0000-4000-8000-000000000602/accept', route => {
     payloads.push(route.request().postDataJSON())
-    return route.fulfill(payloads.length === 1 ? { status: 409, json: { message: 'Тренер уже занят в этот интервал времени' } } : { json: { success: true, lessonId: 'lesson' } })
+    return route.fulfill(payloads.length === 1 ? { status: 409, json: { message: 'Тренер уже занят в этот интервал времени' } } : { json: { success: true, lessonId: '00000000-0000-4000-8000-000000000608' } })
   })
   const modal = await open(page)
   await fillLesson(page, modal)
@@ -73,13 +71,13 @@ test('conflict retains the draft and retry sends one atomic request with club ti
   await save.click()
   await expect(modal).not.toBeVisible()
   expect(payloads).toHaveLength(2)
-  expect(payloads[1]).toMatchObject({ lesson: { trainerId: 'trainer', horseId: 'horse', arenaId: 'arena', serviceId: 'service', startTime: '2026-10-14T10:00:00.000Z', durationMinutes: 60 } })
+  expect(payloads[1]).toMatchObject({ lesson: { trainerId: '00000000-0000-4000-8000-000000000603', horseId: '00000000-0000-4000-8000-000000000605', arenaId: '00000000-0000-4000-8000-000000000607', serviceId: '00000000-0000-4000-8000-000000000601', startTime: '2026-10-14T10:00:00.000Z', durationMinutes: 60 } })
 })
 
 test('catalog failure can be retried; pending conversion blocks closing and duplicate submission', async ({ page }) => {
   let fail = true, finish: (() => void) | undefined, calls = 0
-  await page.route('**/api/trainers?*', route => route.fulfill(fail ? { status: 503, json: { message: 'Справочник недоступен' } } : { json: [{ id: 'trainer', name: 'Мария Волкова', isActive: true }] }))
-  await page.route('**/api/leads/lead/accept', async route => {
+  await page.route('**/api/trainers?*', route => route.fulfill(fail ? { status: 503, json: { message: 'Справочник недоступен' } } : { json: [{ id: '00000000-0000-4000-8000-000000000603', name: 'Мария Волкова', isActive: true }] }))
+  await page.route('**/api/leads/00000000-0000-4000-8000-000000000602/accept', async route => {
     calls++
     await new Promise<void>(resolve => { finish = resolve })
     await route.fulfill({ json: { success: true } })

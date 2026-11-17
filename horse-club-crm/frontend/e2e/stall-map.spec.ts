@@ -14,21 +14,23 @@ const initial = [
   { id: '00000000-0000-4000-8000-000000000002', name: 'Денник 2', number: '2', zone: 'MAIN', side: 'RIGHT', position: 1, status: 'OCCUPIED', horseId: '00000000-0000-4000-8000-000000000012', horse: mare, notes: null, warnings: [] },
   { id: '00000000-0000-4000-8000-000000000003', name: 'Летник 1', number: 'Л-1', zone: 'SUMMER', side: 'LEFT', position: 1, status: 'AVAILABLE', horseId: null, horse: null, notes: null, warnings: [] },
 ].map(s => ({ ...s, buildingId: s.zone === 'SUMMER' ? summerBuilding : mainBuilding, row: 1, col: s.side === 'RIGHT' ? 4 : 1, rowSpan: 1, colSpan: 1, type: 'STALL' }))
-async function setup(page: Page, role = 'ADMIN', empty = false) {
+type FixtureStall = Omit<(typeof initial)[number], 'horse' | 'horseId' | 'notes'> & { horse: typeof horse | null; horseId: string | null; notes: string | null }
+async function setup(page: Page, role = 'ADMIN', empty = false, readOnly = false) {
   await page.addInitScript(role => {
     localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.role', role); localStorage.setItem('horsecrm.email', 'qa@example.com')
     Object.defineProperty(window, 'print', { value: () => { document.body.dataset.printed = 'true' } })
   }, role)
-  await page.route('**/api/settings/access/me*', route => route.fulfill({ json: { role, userId: 'u1', permissions: {
+  await page.route('**/api/settings/access/me*', route => route.fulfill({ json: { role, userId: '00000000-0000-4000-8000-000000000201', permissions: {
     horseReplaceOwn: true, horseReplaceAny: true, healthRead: true, healthWrite: true, financeRead: true, boardingAccess: true,
   } } }))
-  const state = { stalls: empty ? [] : structuredClone(initial), fail: false, assignments: 0 }
+  if (readOnly) await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role, modules: [{ module: 'STABLES', isEnabled: true, accessLevel: 'READ_ONLY' }] } }))
+  const state = { stalls: empty ? [] : structuredClone(initial) as FixtureStall[], fail: false, assignments: 0 }
   await page.route('**/api/stable-buildings', route => route.fulfill({ json: buildings }))
   await page.route('**/api/stalls/assignment-horses', route => route.fulfill({ json: [horse, mare] }))
   await page.route('**/api/stalls/map', route => state.fail ? route.fulfill({ status: 503, json: { message: 'Сервер временно недоступен' } }) : route.fulfill({ json: state.stalls }))
   await page.route('**/api/stalls/transfer/preview', route => route.fulfill({ json: [
     { stallId: state.stalls[0]?.id, number: '1', warnings: [] },
-    { stallId: state.stalls[1]?.id, number: '2', warnings: [{ neighborId: 'neighbor', neighborNumber: '3', message: 'Жеребец рядом с жеребцом (Буран и Кролик)' }] },
+    { stallId: state.stalls[1]?.id, number: '2', warnings: [{ neighborId: '00000000-0000-4000-8000-000000000202', neighborNumber: '3', message: 'Жеребец рядом с жеребцом (Буран и Кролик)' }] },
   ] }))
   await page.route('**/api/stalls/transfer', route => {
     state.assignments++
@@ -129,7 +131,7 @@ test('building settings create, rename and delete an empty building with recover
 })
 
 test('service card is neutral and read-only access hides constructor and building mutations', async ({ page }) => {
-  const state = await setup(page, 'TRAINER')
+  const state = await setup(page, 'MANAGER', false, true)
   Object.assign(state.stalls[2], { type: 'SERVICE', name: 'Амуничник', number: '' })
   await page.getByRole('button', { name: 'Обновить', exact: true }).click()
   const card = page.getByRole('button', { name: 'Амуничник, служебное' })
@@ -215,8 +217,8 @@ test('manager relocates a horse and the previous stall becomes free', async ({ p
   await expect(page.getByRole('button', { name: 'Денник 1, Свободен', exact: true })).toBeVisible()
   expect(state.assignments).toBe(1)
 })
-test('trainer can read rations and print but cannot mutate', async ({ page }) => {
-  await setup(page, 'TRAINER')
+test('read-only manager can read rations and print but cannot mutate', async ({ page }) => {
+  await setup(page, 'MANAGER', false, true)
   await page.getByRole('button', { name: 'Денник 1, Буран', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Рацион кормления' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Сохранить денник' })).toHaveCount(0)
@@ -239,7 +241,7 @@ test('failed assignment retains selection and shows a recoverable error', async 
 })
 test('narrow layout, building filter, keyboard selection and focus restoration', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await setup(page, 'TRAINER')
+  await setup(page, 'MANAGER', false, true)
   const tile = page.getByRole('button', { name: 'Денник 1, Буран', exact: true })
   await tile.focus(); await page.keyboard.press('Enter')
   await expect(page.getByRole('dialog')).toBeVisible()

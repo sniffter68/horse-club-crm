@@ -17,7 +17,7 @@ async function setup(page: Page, role = 'ADMIN') {
       const payload = route.request().postDataJSON()
       state.expensePosts.push(payload)
       if (state.expenseFail) return route.fulfill({ status: 500, json: { message: 'Не удалось сохранить расход' } })
-      if (!state.expenses.some(row => row.requestId === payload.requestId)) state.expenses.push({ id: 'expense1', ...payload, createdBy: { email: 'qa@example.com' } })
+      if (!state.expenses.some(row => row.requestId === payload.requestId)) state.expenses.push({ id: '00000000-0000-4000-8000-000000000006', ...payload, createdBy: { email: 'qa@example.com' } })
       return route.fulfill({ status: 201, json: state.expenses[0] })
     }
     if (route.request().method() === 'DELETE') { state.expenses = []; return route.fulfill({ json: {} }) }
@@ -28,21 +28,21 @@ async function setup(page: Page, role = 'ADMIN') {
   await page.route('**/api/finance/summary?*', route => {
     state.summaries.push(route.request().url())
     const expense = state.expenses.reduce((sum, row) => sum + Number(row.amount), 0)
-    return route.fulfill({ json: { totalCash: state.paid ? '1200.10' : '0', totalCard: '0', totalRevenue: state.paid ? '1200.10' : '0', balanceCash: 5000 - expense, balanceCard: 2000, totalExpenses: expense, totalExpensesCash: expense, totalExpensesCard: 0, netTotal: -expense, operationsCount: state.paid ? 1 : 0, operations: state.paid ? [{ id: 'p1', amount: '1200.10', cashChange: '799.90', method: 'CASH', client: { name: 'Анна Орлова' }, service: { title: 'Индивидуальная тренировка' }, cashier: { email: 'qa@example.com' }, paidAt: '2026-10-09T09:00:00Z' }] : [] } })
+    return route.fulfill({ json: { totalCash: state.paid ? '1200.10' : '0', totalCard: '0', totalRevenue: state.paid ? '1200.10' : '0', balanceCash: 5000 - expense, balanceCard: 2000, totalExpenses: expense, totalExpensesCash: expense, totalExpensesCard: 0, netTotal: -expense, operationsCount: state.paid ? 1 : 0, operations: state.paid ? [{ id: '00000000-0000-4000-8000-000000000004', amount: '1200.10', cashChange: '799.90', method: 'CASH', client: { name: 'Анна Орлова' }, service: { title: 'Индивидуальная тренировка' }, cashier: { email: 'qa@example.com' }, paidAt: '2026-10-09T09:00:00Z' }] : [] } })
   })
-  await page.route('**/api/clients?*', route => route.fulfill({ json: [{ id: 'c1', name: 'Анна Орлова', phone: '+79991234567' }], headers: { 'x-total-count': '1' } }))
-  await page.route('**/api/services?*', route => route.fulfill({ json: [{ id: 's1', title: 'Индивидуальная тренировка', price: '1200.10' }], headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/clients?*', route => route.fulfill({ json: [{ id: '00000000-0000-4000-8000-000000000001', name: 'Анна Орлова', phone: '+79991234567' }], headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/services?*', route => route.fulfill({ json: [{ id: '00000000-0000-4000-8000-000000000003', title: 'Индивидуальная тренировка', price: '1200.10' }], headers: { 'x-total-count': '1' } }))
   await page.route('**/api/payments/cash-desk/options/*', route => route.fulfill({ json: { bookings: [], memberships: [] } }))
-  await page.route('**/api/payments/shifts/current', route => route.fulfill({ json: { id: 'shift1', openedAt: '2026-10-09T07:00:00Z', startingCash: '1000' } }))
+  await page.route('**/api/payments/shifts/current', route => route.fulfill({ json: { id: '00000000-0000-4000-8000-000000000005', openedAt: '2026-10-09T07:00:00Z', startingCash: '1000' } }))
   await page.route('**/api/payments/summary?*', route => {
     state.summaries.push(route.request().url())
-    return route.fulfill({ json: { totalCash: state.paid ? '1200.10' : '0', totalCard: '0', totalRevenue: state.paid ? '1200.10' : '0', operationsCount: state.paid ? 1 : 0, operations: state.paid ? [{ id: 'p1', amount: '1200.10', cashChange: '799.90', method: 'CASH', client: { name: 'Анна Орлова' }, service: { title: 'Индивидуальная тренировка' }, cashier: { email: 'qa@example.com' }, paidAt: '2026-10-09T09:00:00Z' }] : [] } })
+    return route.fulfill({ json: { totalCash: state.paid ? '1200.10' : '0', totalCard: '0', totalRevenue: state.paid ? '1200.10' : '0', operationsCount: state.paid ? 1 : 0, operations: state.paid ? [{ id: '00000000-0000-4000-8000-000000000004', amount: '1200.10', cashChange: '799.90', method: 'CASH', client: { name: 'Анна Орлова' }, service: { title: 'Индивидуальная тренировка' }, cashier: { email: 'qa@example.com' }, paidAt: '2026-10-09T09:00:00Z' }] : [] } })
   })
   await page.route('**/api/payments/cash-desk', route => {
     state.posts.push(route.request().postDataJSON())
     if (state.fail) return route.fulfill({ status: 500, json: { message: 'Ответ сервера потерян' } })
     state.paid = true
-    return route.fulfill({ json: { id: 'p1', cashChange: '799.90', method: state.posts.at(-1)?.method } })
+    return route.fulfill({ json: { id: '00000000-0000-4000-8000-000000000004', cashChange: '799.90', method: state.posts.at(-1)?.method } })
   })
   return state
 }
@@ -65,7 +65,7 @@ for (const width of [1440, 390]) test(`monthly accrual closing preserves summary
   const posts: unknown[] = []
   const report = (month = 9) => ({ year: 2026, month, isClosed: month === 9 && closed, closedAt: closed ? '2026-10-09T09:00:00Z' : null,
     cashFlowIncome: '8000', cashFlowExpense: '500', recognizedRevenue: '1000', deferredRevenueCarriedOver: '7000', activeMembershipsCarriedOver: 1,
-    currentCashBalance: '10500', membershipsAdvanceSummary: { totalAdvance: '7000', rows: [{ membershipId: 'm1', clientId: 'c1', clientName: 'Анна Орлова', membershipTitle: '8 занятий', remainingLessons: 7, pricePerLesson: '1000', amountToCarryOver: '7000' }] },
+    currentCashBalance: '10500', membershipsAdvanceSummary: { totalAdvance: '7000', rows: [{ membershipId: '00000000-0000-4000-8000-000000000007', clientId: '00000000-0000-4000-8000-000000000001', clientName: 'Анна Орлова', membershipTitle: '8 занятий', remainingLessons: 7, pricePerLesson: '1000', amountToCarryOver: '7000' }] },
     openingBalance: month === 10 && closed ? { incomingCashBalance: '10500', incomingAdvanceBalance: '7000' } : null })
   await page.route('**/api/finance/monthly-closing/status?*', route => route.fulfill({ json: report(Number(new URL(route.request().url()).searchParams.get('month'))) }))
   await page.route('**/api/finance/monthly-closing/preview?*', route => route.fulfill({ json: report() }))
@@ -169,9 +169,9 @@ for (const width of [1440, 390]) test(`owner reset requires exact word, preserve
   await page.route('**/api/finance/summary?*', route => route.fulfill({ json: {
     balanceCash: reset ? 0 : 5000, balanceCard: reset ? 0 : 2000,
     totalExpenses: 0, operationsCount: reset ? 0 : 1,
-    operations: reset ? [] : [{ id: 'p1', amount: '1000', method: 'CASH', paidAt: '2026-10-09T09:00:00Z', client: { name: 'Тестовый платёж' } }],
+    operations: reset ? [] : [{ id: '00000000-0000-4000-8000-000000000004', amount: '1000', method: 'CASH', paidAt: '2026-10-09T09:00:00Z', client: { name: 'Тестовый платёж' } }],
   } }))
-  await page.route('**/api/payments/shifts/current', route => route.fulfill({ json: reset ? null : { id: 'shift1', openedAt: '2026-10-09T07:00:00Z', startingCash: '1000' } }))
+  await page.route('**/api/payments/shifts/current', route => route.fulfill({ json: reset ? null : { id: '00000000-0000-4000-8000-000000000005', openedAt: '2026-10-09T07:00:00Z', startingCash: '1000' } }))
   await page.goto('/cash-desk')
   await expect(page.getByText('Тестовый платёж', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Очистить журнал кассы', exact: true }).click()
@@ -311,7 +311,7 @@ for (const width of [1440, 390]) test(`cash payment and book refresh at ${width}
   await expect(modal).not.toBeVisible()
   await expect(page.getByText('Анна Орлова', { exact: true })).toBeVisible()
   expect(state.posts).toHaveLength(1)
-  expect(state.posts[0]).toMatchObject({ clientId: 'c1', amount: 1200.1, cashGiven: 2000, method: 'CASH', serviceId: 's1' })
+  expect(state.posts[0]).toMatchObject({ clientId: '00000000-0000-4000-8000-000000000001', amount: 1200.1, cashGiven: 2000, method: 'CASH', serviceId: '00000000-0000-4000-8000-000000000003' })
   await page.getByText('Текущая неделя', { exact: true }).click()
   await expect.poll(() => new URL(state.summaries.at(-1)!).searchParams.get('from')).toBe('2026-10-05T00:00:00.000+03:00')
 })
@@ -344,7 +344,8 @@ test('noncash SBP skips cash input and trainer cannot access cash desk', async (
   expect(state.posts[0].cashGiven).toBeUndefined()
   await page.evaluate(() => sessionStorage.setItem('qa.role', 'TRAINER'))
   await page.reload()
-  await expect(page.getByText('Касса доступна администратору и менеджеру', { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/trainer$/)
+  await expect(page.getByRole('heading', { name: 'Расписание клуба' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Принять платёж', exact: true })).not.toBeVisible()
 })
 test('custom date picker uses Russian calendar and Moscow date boundaries', async ({ page }) => {
@@ -368,7 +369,7 @@ for (const width of [1440, 390]) test(`quick client creation preserves payment a
   const clientPosts: Record<string, unknown>[] = []
   await page.route('**/api/clients/quick', route => {
     clientPosts.push(route.request().postDataJSON())
-    return route.fulfill({ json: { id: 'c2', name: 'Мария', phone: '+79995554433' } })
+    return route.fulfill({ json: { id: '00000000-0000-4000-8000-000000000002', name: 'Мария', phone: '+79995554433' } })
   })
   await page.goto('/cash-desk')
   const payment = await fillPayment(page)
@@ -413,7 +414,7 @@ for (const width of [1440, 390]) test(`quick client creation preserves payment a
   await payment.getByRole('button', { name: 'Провести платёж', exact: true }).click()
   expect(clientPosts).toEqual([{ name: 'Мария', phone: '+79995554433', isOneTime: true }])
   await expect(payment).not.toBeVisible()
-  expect(state.posts[0]).toMatchObject({ clientId: 'c2', serviceId: 's1', amount: 1450.5, cashGiven: 2000, method: 'CASH', notes: 'Сохранить заметку' })
+  expect(state.posts[0]).toMatchObject({ clientId: '00000000-0000-4000-8000-000000000002', serviceId: '00000000-0000-4000-8000-000000000003', amount: 1450.5, cashGiven: 2000, method: 'CASH', notes: 'Сохранить заметку' })
 })
 
 test('quick client phone prefill, validation, failure and cancel retain noncash payment', async ({ page }) => {

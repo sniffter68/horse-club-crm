@@ -1,3 +1,4 @@
+import { workspaceSummary } from './workspaceSummary'
 import { test, expect, type Page } from './fixtures'
 
 const payload = { id: '22222222-2222-4222-8222-222222222222', clientName: 'Анна', phone: '+79991234567', serviceName: 'Конкур', createdAt: '2026-10-21T09:00:00Z' }
@@ -26,12 +27,9 @@ async function setup(page: Page, permission = 'granted', role = 'ADMIN') {
     HTMLMediaElement.prototype.pause = function() {};
   ` })
   let summaryCalls = 0
-  await page.route('**/api/dashboard/summary', route => {
+  await page.route('**/api/workspace/admin-summary', route => {
     summaryCalls++
-    return route.fulfill({ json: {
-      generatedAt: payload.createdAt, workDay: { openAt: payload.createdAt, closeAt: payload.createdAt, timeZone: 'Europe/Moscow' },
-      alerts: [], horseWorkloads: [], leadRequests: [], kpi: { lessonsTotal: 0, lessonsCompleted: 0, newLeads: 0, activeMemberships: 0 },
-    } })
+    return route.fulfill({ json: workspaceSummary() })
   })
   await page.route('**/api/clients*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   let emit: (() => void) | undefined
@@ -65,7 +63,7 @@ test('native EventSource receives a lead with hidden visibility; push click requ
   await expect(page).toHaveURL(/\/#pending-leads$/)
   expect(await page.evaluate(() => Reflect.get(window, '__leadQA').focus)).toBe(1)
   await page.bringToFront()
-  await expect(page.locator('#pending-leads')).toBeVisible()
+  await expect(page.locator('#pending-leads').last()).toBeVisible()
   await expect.poll(state.summaryCalls).toBeGreaterThan(0)
 })
 

@@ -112,9 +112,10 @@ test('legacy lesson participant can replace a horse beside its unavailable badge
   await expect(dialog).toHaveCount(0); await expect(card).toHaveCount(0)
 })
 
-test('trainer sees problems without replacement actions', async ({ page }) => {
+test('trainer redirects to the shared board without desktop replacement actions', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('horsecrm.role', 'TRAINER'))
   await page.goto('/schedule')
-  await expect(page.getByText('Требуют замены лошади: 1')).toBeVisible()
+  await expect(page).toHaveURL(/\/trainer$/)
+  await expect(page.getByRole('heading', { name: 'Расписание клуба' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Сменить лошадь', exact: true })).toHaveCount(0)
 })

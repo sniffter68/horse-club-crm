@@ -1,3 +1,4 @@
+import { openTriadBooking } from './openTriadBooking'
 import { test, expect, type Locator, type Page } from './fixtures'
 import { checkBookingDatePicker } from './bookingDatePicker'
 
@@ -7,22 +8,22 @@ for (const width of [1280, 375]) test(`booking date footer confirms selections a
   await expect(page.getByRole('button', { name: 'Новое бронирование', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Новое занятие', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Записать на тренировку', exact: true })).toHaveCount(1)
-  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await openTriadBooking(page)
   const modal = page.getByRole('dialog', { name: 'Бронирование тройного ресурса', exact: true })
   for (const label of ['Начало', 'Окончание']) {
     await checkBookingDatePicker(page, modal, label, '09.10.2026 09:00')
   }
 })
 
-const horse = { id: 'h1', name: 'Валдай', status: 'active', isUnavailable: false, maxRiderWeight: 85, maxDailyWorkloadMinutes: 120, requiredRestMinutes: 45, maxDailyMinutes: 120, minRestMinutes: 45 }
-const trainer = { id: 't1', name: 'Мария', fullName: 'Мария Волкова', specializations: ['Выездка'], isActive: true }
-const client = { id: 'c1', name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567', weightKg: '75.00', membership: { planName: 'Клубный', remainingUnits: 5, totalUnits: 8 } }
-const arena = { id: 'a1', name: 'Крытый манеж', capacity: 6, maxRidersCapacity: 6, isActive: true, isUnavailable: false }
-const booking = { id: 'booking1', clientId: 'c1', horseId: 'h1', trainerId: 't1', arenaId: 'a1', membershipId: null, startTime: '2026-10-09T07:00:00Z', endTime: '2026-10-09T08:00:00Z', serviceType: 'dressage', costAmount: '1500', status: 'scheduled', client, horse, trainer, arena }
+const horse = { id: '00000000-0000-4000-8000-000000001101', name: 'Валдай', status: 'active', isUnavailable: false, maxRiderWeight: 85, maxDailyWorkloadMinutes: 120, requiredRestMinutes: 45, maxDailyMinutes: 120, minRestMinutes: 45 }
+const trainer = { id: '00000000-0000-4000-8000-000000001103', name: 'Мария', fullName: 'Мария Волкова', specializations: ['Выездка'], isActive: true }
+const client = { id: '00000000-0000-4000-8000-000000001104', name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567', weightKg: '75.00', membership: { planName: 'Клубный', remainingUnits: 5, totalUnits: 8 } }
+const arena = { id: '00000000-0000-4000-8000-000000001106', name: 'Крытый манеж', capacity: 6, maxRidersCapacity: 6, isActive: true, isUnavailable: false }
+const booking = { id: '00000000-0000-4000-8000-000000001107', clientId: '00000000-0000-4000-8000-000000001104', horseId: '00000000-0000-4000-8000-000000001101', trainerId: '00000000-0000-4000-8000-000000001103', arenaId: '00000000-0000-4000-8000-000000001106', membershipId: null, startTime: '2026-10-09T07:00:00Z', endTime: '2026-10-09T08:00:00Z', serviceType: 'dressage', costAmount: '1500', status: 'scheduled', client, horse, trainer, arena }
 
 for (const width of [1280, 375]) test(`parallel trainer cards remain separate and clickable at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 })
-  const second = { ...booking, id: 'booking2', horseId: 'h2', clientId: 'c2', costAmount: '2200', horse: { ...horse, id: 'h2', name: 'Буран' }, client: { ...client, id: 'c2', name: 'Борис', firstName: 'Борис', lastName: '' } }
+  const second = { ...booking, id: '00000000-0000-4000-8000-000000001108', horseId: '00000000-0000-4000-8000-000000001102', clientId: '00000000-0000-4000-8000-000000001105', costAmount: '2200', horse: { ...horse, id: '00000000-0000-4000-8000-000000001102', name: 'Буран' }, client: { ...client, id: '00000000-0000-4000-8000-000000001105', name: 'Борис', firstName: 'Борис', lastName: '' } }
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking, second], headers: { 'x-total-count': '2' } }))
   await page.goto('/schedule')
   const calendar = page.locator('.fc-timegrid-event-harness')
@@ -47,9 +48,9 @@ for (const width of [1280, 375]) test(`parallel trainer cards remain separate an
 
 test('trainer overlap is informational while horse overlap disables save', async ({ page }) => {
   let submitted = 0
-  const other = { ...booking, id: 'parallel', startTime: '2026-10-09T06:00:00Z', horseId: 'h2', clientId: 'c2', horse: { ...horse, id: 'h2', name: 'Буран' }, client: { ...client, id: 'c2', name: 'Борис', firstName: 'Борис', lastName: '' } }
+  const other = { ...booking, id: '00000000-0000-4000-8000-000000001109', startTime: '2026-10-09T06:00:00Z', horseId: '00000000-0000-4000-8000-000000001102', clientId: '00000000-0000-4000-8000-000000001105', horse: { ...horse, id: '00000000-0000-4000-8000-000000001102', name: 'Буран' }, client: { ...client, id: '00000000-0000-4000-8000-000000001105', name: 'Борис', firstName: 'Борис', lastName: '' } }
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking, other], headers: { 'x-total-count': '2' } }))
-  await page.route('**/api/bookings/booking1', route => { submitted++; return route.fulfill({ json: booking }) })
+  await page.route('**/api/bookings/00000000-0000-4000-8000-000000001107', route => { submitted++; return route.fulfill({ json: booking }) })
   const modal = await openExisting(page)
   await expect(modal.getByText(/Параллельная запись доступна/)).toContainText('Борис / Буран')
   await expect(modal.getByRole('status').filter({ hasText: 'Тренер:' })).toContainText('занято 1/4, свободно 3')
@@ -67,7 +68,7 @@ test('trainer overlap is informational while horse overlap disables save', async
 
 test('trainer capacity blocks an extra rider and refreshes when the interval changes', async ({ page }) => {
   await page.route('**/api/trainers?*', route => route.fulfill({ json: [{ ...trainer, maxParallelLessons: 2 }], headers: { 'x-total-count': '1' } }))
-  const others = [1, 2].map(i => ({ ...booking, id: `parallel-${i}`, trainerId: 't1', horseId: `other-horse-${i}`, clientId: `other-client-${i}`,
+  const others = [1, 2].map(i => ({ ...booking, id: `00000000-0000-4000-8000-${String(1200 + i).padStart(12, '0')}`, trainerId: '00000000-0000-4000-8000-000000001103', horseId: `00000000-0000-4000-8000-${String(1300 + i).padStart(12, '0')}`, clientId: `00000000-0000-4000-8000-${String(1400 + i).padStart(12, '0')}`,
     startTime: '2026-10-09T07:00:00Z', endTime: '2026-10-09T08:00:00Z' }))
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking, ...others], headers: { 'x-total-count': '3' } }))
   const modal = await openExisting(page)
@@ -83,22 +84,22 @@ test('trainer capacity blocks an extra rider and refreshes when the interval cha
 })
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
-  await page.route('**/api/bookings/booking1/available-horses', route => route.fulfill({ json: [{ ...horse, id: 'h2', name: 'Буран', maxRiderWeight: 110 }] }))
+  await page.route('**/api/bookings/00000000-0000-4000-8000-000000001107/available-horses', route => route.fulfill({ json: [{ ...horse, id: '00000000-0000-4000-8000-000000001102', name: 'Буран', maxRiderWeight: 110 }] }))
   await page.clock.setFixedTime(new Date('2026-10-09T06:00:00Z'))
   await page.addInitScript(() => { localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.role', 'ADMIN'); localStorage.setItem('horsecrm.email', 'qa@example.com') })
   await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } }))
-  for (const [resource, data] of Object.entries({ clients: [client, { ...client, id: 'c2', name: 'Борис', firstName: 'Борис', lastName: '', weightKg: '95' }], horses: [horse, { ...horse, id: 'h2', name: 'Буран', maxRiderWeight: 110 }], trainers: [trainer], arenas: [arena], services: [] })) {
+  for (const [resource, data] of Object.entries({ clients: [client, { ...client, id: '00000000-0000-4000-8000-000000001105', name: 'Борис', firstName: 'Борис', lastName: '', weightKg: '95' }], horses: [horse, { ...horse, id: '00000000-0000-4000-8000-000000001102', name: 'Буран', maxRiderWeight: 110 }], trainers: [trainer], arenas: [arena], services: [] })) {
     await page.route(`**/api/${resource}?*`, route => {
       const q = new URL(route.request().url()).searchParams.get('q')?.toLocaleLowerCase('ru')
       const rows = resource === 'clients' && q ? data.filter(row => row.name.toLocaleLowerCase('ru').includes(q)) : data
       return route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } })
     })
   }
-  await page.route('**/api/clients/c*', route => route.fulfill({ json: { ...client, memberships: [{ id: 'm1', type: 'fixed_lessons', title: 'Клубный', totalLessons: 8, remainedLessons: 5, validUntil: '2099-01-01', initialUnits: '8', remainingUnits: '7' }, { id: 'm2', type: 'deposit', title: 'Депозит', totalLessons: 0, remainedLessons: 0, validUntil: '2020-01-01', validTo: '2099-01-01', remainingUnits: '2500.50', initialUnits: '5000' }] } }))
+  await page.route('**/api/clients/00000000-*', route => route.fulfill({ json: { ...client, memberships: [{ id: '00000000-0000-4000-8000-000000001110', type: 'fixed_lessons', title: 'Клубный', totalLessons: 8, remainedLessons: 5, validUntil: '2099-01-01', initialUnits: '8', remainingUnits: '7' }, { id: '00000000-0000-4000-8000-000000001111', type: 'deposit', title: 'Депозит', totalLessons: 0, remainedLessons: 0, validUntil: '2020-01-01', validTo: '2099-01-01', remainingUnits: '2500.50', initialUnits: '5000' }] } }))
   await page.route('**/api/lessons?*', route => route.fulfill({ json: [] }))
   await page.route('**/api/horses/workload?*', route => route.fulfill({ json: [] }))
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
-  await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { date: '2026-10-09', horseWorkloads: [{ horseId: 'h1', horseName: 'Валдай', currentWorkloadMinutes: 60, maxDailyWorkloadMinutes: 120, status: 'AVAILABLE' }], arenaOccupancy: [{ arenaId: 'a1', occupied: 2, maxRidersCapacity: 6 }] } }))
+  await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { date: '2026-10-09', horseWorkloads: [{ horseId: '00000000-0000-4000-8000-000000001101', horseName: 'Валдай', currentWorkloadMinutes: 60, maxDailyWorkloadMinutes: 120, status: 'AVAILABLE' }], arenaOccupancy: [{ arenaId: '00000000-0000-4000-8000-000000001106', occupied: 2, maxRidersCapacity: 6 }] } }))
 })
 async function choose(page: Page, modal: Locator, field: string, starts: string) {
   const input = modal.getByRole('combobox', { name: field, exact: true })
@@ -110,7 +111,7 @@ async function choose(page: Page, modal: Locator, field: string, starts: string)
 }
 async function openFilled(page: Page) {
   await page.goto('/schedule')
-  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await openTriadBooking(page)
   const modal = page.getByRole('dialog', { name: 'Бронирование тройного ресурса', exact: true })
   await choose(page, modal, 'Клиент', 'Анна Орлова')
   await choose(page, modal, 'Лошадь', 'Валдай')
@@ -126,7 +127,7 @@ async function openExisting(page: Page) {
 }
 
 test('family membership payment option names the owner and submits beneficiary booking', async ({ page }) => {
-  await page.route('**/api/clients/c*', route => route.fulfill({ json: { ...client, memberships: [{
+  await page.route('**/api/clients/00000000-*', route => route.fulfill({ json: { ...client, memberships: [{
     id: '00000000-0000-4000-8000-000000000033', type: 'fixed_lessons', title: '8 занятий',
     totalLessons: 8, remainedLessons: 4, validUntil: '2099-01-01', isShared: true, ownerName: 'Елена Смирнова',
   }] } }))
@@ -142,13 +143,13 @@ test('family membership payment option names the owner and submits beneficiary b
   await payment.press('Enter')
   await modal.getByRole('button', { name: 'Создать бронирование', exact: true }).click()
   await expect(modal).toHaveCount(0)
-  expect(payload).toMatchObject({ clientId: 'c1', membershipId: '00000000-0000-4000-8000-000000000033' })
+  expect(payload).toMatchObject({ clientId: '00000000-0000-4000-8000-000000001104', membershipId: '00000000-0000-4000-8000-000000000033' })
 })
 test('creates a real triad payload, preserves precision and refreshes the calendar', async ({ page }) => {
   let created = false
   await page.route('**/api/bookings', async route => {
     const body = route.request().postDataJSON()
-    expect(body).toMatchObject({ clientId: 'c1', horseId: 'h1', trainerId: 't1', arenaId: 'a1', serviceType: 'dressage', costAmount: 1500.5 })
+    expect(body).toMatchObject({ clientId: '00000000-0000-4000-8000-000000001104', horseId: '00000000-0000-4000-8000-000000001101', trainerId: '00000000-0000-4000-8000-000000001103', arenaId: '00000000-0000-4000-8000-000000001106', serviceType: 'dressage', costAmount: 1500.5 })
     expect(body.startTime).toBe('2026-10-09T06:00:00.000Z'); expect(body.endTime).toBe('2026-10-09T07:00:00.000Z')
     created = true; await route.fulfill({ status: 201, json: booking })
   })
@@ -159,7 +160,7 @@ test('creates a real triad payload, preserves precision and refreshes the calend
   await modal.getByLabel('Стоимость, ₽', { exact: true }).fill('1500.50')
   await modal.getByRole('button', { name: 'Создать бронирование', exact: true }).click()
   await expect(modal).toHaveCount(0)
-  await expect(page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') })).toBeVisible()
+  await expect(page.locator('.resource-booking').filter({ has: page.locator('[title*="Валдай"]') })).toBeVisible()
 })
 for (const [code, field] of [['HORSE_OVERLOADED', 'Лошадь'], ['HORSE_REST_VIOLATION', 'Лошадь'], ['RIDER_WEIGHT_EXCEEDED', 'Лошадь'], ['TRAINER_BUSY', 'Тренер'], ['ARENA_FULL', 'Локация']]) {
   test(`409 ${code} preserves form and highlights ${field}`, async ({ page }) => {
@@ -195,8 +196,8 @@ test('resource groupings show riders, arena capacity and the 45-minute rest buff
 test('edits a scheduled booking through PATCH, excluding its own reservation from availability', async ({ page }) => {
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
   let excluded = false
-  await page.route('**/api/bookings/availability?*', route => { excluded ||= new URL(route.request().url()).searchParams.get('excludeBookingId') === 'booking1'; return route.fulfill({ json: { date: '2026-10-09', horseWorkloads: [], arenaOccupancy: [] } }) })
-  await page.route('**/api/bookings/booking1', route => { expect(route.request().method()).toBe('PATCH'); return route.fulfill({ json: booking }) })
+  await page.route('**/api/bookings/availability?*', route => { excluded ||= new URL(route.request().url()).searchParams.get('excludeBookingId') === '00000000-0000-4000-8000-000000001107'; return route.fulfill({ json: { date: '2026-10-09', horseWorkloads: [], arenaOccupancy: [] } }) })
+  await page.route('**/api/bookings/00000000-0000-4000-8000-000000001107', route => { expect(route.request().method()).toBe('PATCH'); return route.fulfill({ json: booking }) })
   await page.goto('/schedule'); await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   await page.getByRole('button', { name: 'Редактировать бронирование' }).click()
   const modal = page.getByRole('dialog', { name: 'Редактирование бронирования' })
@@ -248,8 +249,9 @@ test('availability failure retains the draft and supports retry', async ({ page 
   await expect(modal.getByRole('combobox', { name: 'Клиент', exact: true })).toBeVisible()
 })
 
-test('trainer reads resource schedule without mutation controls', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('horsecrm.role', 'TRAINER'))
+test('read-only manager reads resource schedule without mutation controls', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('horsecrm.role', 'MANAGER'))
+  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'MANAGER', modules: [{ module: 'SCHEDULE', isEnabled: true, accessLevel: 'READ_ONLY' }] } }))
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
   await page.goto('/schedule')
   await expect(page.getByRole('button', { name: 'Записать на тренировку' })).toHaveCount(0)
@@ -265,7 +267,7 @@ for (const [action, label, confirmation, status, statusLabel] of [
 ]) test(`lifecycle ${action} confirms billing, refreshes calendar and locks the terminal outcome`, async ({ page }) => {
   let current = booking
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [current], headers: { 'x-total-count': '1' } }))
-  await page.route(`**/api/bookings/booking1/${action}`, route => { expect(route.request().method()).toBe('PATCH'); current = { ...booking, status }; return route.fulfill({ json: current }) })
+  await page.route(`**/api/bookings/00000000-0000-4000-8000-000000001107/${action}`, route => { expect(route.request().method()).toBe('PATCH'); current = { ...booking, status }; return route.fulfill({ json: current }) })
   await page.goto('/schedule'); await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   const detail = page.getByRole('dialog', { name: 'Карточка бронирования' })
   await detail.getByRole('button', { name: label, exact: true }).click()
@@ -282,7 +284,7 @@ for (const kind of ['penalty', 'free', 'club']) test(`cancellation ${kind} expla
   await page.clock.setFixedTime(new Date(kind === 'free' ? '2026-10-08T18:00:00Z' : '2026-10-09T02:00:00Z'))
   let payload: unknown
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
-  await page.route('**/api/bookings/booking1/cancel', route => { payload = route.request().postDataJSON(); return route.fulfill({ json: { ...booking, status: kind === 'club' ? 'cancelled_club' : kind === 'free' ? 'cancelled_client' : 'penalty_cancellation' } }) })
+  await page.route('**/api/bookings/00000000-0000-4000-8000-000000001107/cancel', route => { payload = route.request().postDataJSON(); return route.fulfill({ json: { ...booking, status: kind === 'club' ? 'cancelled_club' : kind === 'free' ? 'cancelled_client' : 'penalty_cancellation' } }) })
   await page.goto('/schedule'); await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   await page.getByRole('dialog', { name: 'Карточка бронирования' }).getByRole('button', { name: 'Отменить', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Отмена бронирования' })
@@ -305,7 +307,7 @@ for (const kind of ['penalty', 'free', 'club']) test(`cancellation ${kind} expla
 test('billing conflict keeps details open and permits an idempotent retry', async ({ page }) => {
   let calls = 0
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
-  await page.route('**/api/bookings/booking1/complete', route => route.fulfill(++calls === 1
+  await page.route('**/api/bookings/00000000-0000-4000-8000-000000001107/complete', route => route.fulfill(++calls === 1
     ? { status: 409, json: { code: 'MEMBERSHIP_INSUFFICIENT', message: 'Недостаточно занятий или средств на абонементе' } }
     : { json: { ...booking, status: 'completed' } }))
   await page.goto('/schedule'); await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
@@ -321,7 +323,7 @@ test('billing conflict keeps details open and permits an idempotent retry', asyn
 test('mobile cancellation validates reason and retains it on API failure', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 900 })
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
-  await page.route('**/api/bookings/booking1/cancel', route => route.fulfill({ status: 409, json: { message: 'Недостаточно занятий или средств на абонементе' } }))
+  await page.route('**/api/bookings/00000000-0000-4000-8000-000000001107/cancel', route => route.fulfill({ status: 409, json: { message: 'Недостаточно занятий или средств на абонементе' } }))
   await page.goto('/schedule'); await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   await page.getByRole('dialog', { name: 'Карточка бронирования' }).getByRole('button', { name: 'Отменить', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Отмена бронирования' })
@@ -339,7 +341,7 @@ test('pending billing prevents closing, editing and duplicate status requests', 
   let resolve!: () => void, calls = 0
   const gate = new Promise<void>(done => { resolve = done })
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
-  await page.route('**/api/bookings/booking1/complete', async route => { calls++; await gate; await route.fulfill({ json: { ...booking, status: 'completed' } }) })
+  await page.route('**/api/bookings/00000000-0000-4000-8000-000000001107/complete', async route => { calls++; await gate; await route.fulfill({ json: { ...booking, status: 'completed' } }) })
   await page.goto('/schedule'); await page.locator('.fc-event').filter({ has: page.locator('[title*="Валдай"]') }).click()
   const detail = page.getByRole('dialog', { name: 'Карточка бронирования' })
   await detail.getByRole('button', { name: 'Завершить', exact: true }).click()
@@ -351,7 +353,7 @@ test('pending billing prevents closing, editing and duplicate status requests', 
 
 test('resource selectors support pointer selection after asynchronous balance loading', async ({ page }) => {
   await page.goto('/schedule')
-  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await openTriadBooking(page)
   const modal = page.getByRole('dialog', { name: 'Бронирование тройного ресурса', exact: true })
   for (const [field, label] of [['Клиент', 'Анна Орлова'], ['Лошадь', 'Валдай'], ['Тренер', 'Мария Волкова'], ['Локация', 'Крытый манеж']]) {
     await modal.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: field, exact: true }) }).click()
@@ -368,12 +370,12 @@ for (const width of [1280, 375]) {
     let attempts = 0
     let current = booking
     await page.route('**/api/bookings?*', route => route.fulfill({ json: [current], headers: { 'x-total-count': '1' } }))
-    await page.route('**/api/bookings/booking1/horse', async route => {
+    await page.route('**/api/bookings/00000000-0000-4000-8000-000000001107/horse', async route => {
       expect(route.request().method()).toBe('PATCH')
-      expect(route.request().postDataJSON()).toEqual({ horseId: 'h2', reason: 'Хромота' })
+      expect(route.request().postDataJSON()).toEqual({ horseId: '00000000-0000-4000-8000-000000001102', reason: 'Хромота' })
       attempts++
       if (attempts === 1) return route.fulfill({ status: 409, json: { code: 'HORSE_REST_VIOLATION', message: 'Лошадь не успеет отдохнуть' } })
-      current = { ...booking, horseId: 'h2', horse: { ...horse, id: 'h2', name: 'Буран' } }
+      current = { ...booking, horseId: '00000000-0000-4000-8000-000000001102', horse: { ...horse, id: '00000000-0000-4000-8000-000000001102', name: 'Буран' } }
       return route.fulfill({ json: current })
     })
     await page.goto('/schedule')

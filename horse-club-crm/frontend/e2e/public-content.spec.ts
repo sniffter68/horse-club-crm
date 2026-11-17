@@ -34,15 +34,16 @@ for (const resource of ['horses', 'trainers', 'services']) {
       localStorage.setItem('horsecrm.role', 'ADMIN')
       localStorage.setItem('horsecrm.email', 'qa@example.com')
     })
-    let saved: Record<string, unknown> = { id: '1', name: 'Фото', title: 'Фото', imageUrl: uploadedPhoto, baseRate: 0,
+    let saved: Record<string, unknown> = { id: '00000000-0000-4000-8000-000000000801', name: 'Фото', title: 'Фото', imageUrl: uploadedPhoto, baseRate: 0,
       price: 100, durationMinutes: 60, maxCapacity: 1, cancellationWindowHours: 24, allowMembership: true,
-      maxRiderWeight: 85, maxDailyMinutes: 240, minRestMinutes: 15, maxDailyLoad: 480, isPublic: true, order: 0 }
+      maxRiderWeight: 85, maxDailyMinutes: 240, minRestMinutes: 15, maxDailyLoad: 480, maxParallelLessons: 4, isPublic: true, order: 0 }
     let failUpload = true
     let release: (() => void) | undefined
     let uploadStarted = false
     await page.route('**/uploads/*', route => route.fulfill({ contentType: 'image/png', body: png }))
     await page.route(/\/api\//, async route => {
       const req = route.request()
+      if (/\/api\/(settings\/(my-permissions|access\/me)|cashbox\/summary)/.test(req.url())) return route.fallback()
       if (req.url().endsWith('/upload/image')) {
         uploadStarted = true
         expect(req.headers()['content-type']).toContain('multipart/form-data; boundary=')
@@ -54,9 +55,9 @@ for (const resource of ['horses', 'trainers', 'services']) {
         saved = { ...saved, ...req.postDataJSON() }
         return route.fulfill({ json: saved })
       }
-      return route.fulfill({ json: req.url().split('?')[0].endsWith(`/${resource}/1`) ? saved : [], headers: { 'x-total-count': '0' } })
+      return route.fulfill({ json: req.url().split('?')[0].endsWith(`/${resource}/00000000-0000-4000-8000-000000000801`) ? saved : [], headers: { 'x-total-count': '0' } })
     })
-    await page.goto(`/${resource}/edit/1`)
+    await page.goto(`/${resource}/edit/00000000-0000-4000-8000-000000000801`)
     await expect(page.getByAltText('Предпросмотр фото')).toBeVisible()
     const picker = page.getByLabel('Выбрать фото', { exact: true })
     await picker.setInputFiles({ name: 'bad.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg/>') })
@@ -94,7 +95,7 @@ for (const resource of ['horses', 'trainers', 'services']) {
     await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`/${resource}(\\?.*)?$`))
     expect(saved.imageUrl).toBe(uploadedPhoto)
-    await page.goto(`/${resource}/edit/1`)
+    await page.goto(`/${resource}/edit/00000000-0000-4000-8000-000000000801`)
     await expect(page.getByAltText('Предпросмотр фото')).toBeVisible()
     await page.getByLabel('Ссылка на фото', { exact: true }).clear()
     await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
@@ -114,11 +115,12 @@ for (const resource of ['horses', 'trainers', 'services']) {
     let saved: Record<string, unknown> = {}
     await page.route(/\/api\//, async route => {
       const req = route.request()
+      if (/\/api\/(settings\/(my-permissions|access\/me)|cashbox\/summary)/.test(req.url())) return route.fallback()
       if (['POST', 'PATCH'].includes(req.method())) {
-        saved = { ...saved, ...req.postDataJSON(), id: '1' }
+        saved = { ...saved, ...req.postDataJSON(), id: '00000000-0000-4000-8000-000000000801' }
         return route.fulfill({ json: saved })
       }
-      return route.fulfill({ json: req.url().split('?')[0].endsWith(`/${resource}/1`) ? saved : [], headers: { 'x-total-count': '0' } })
+      return route.fulfill({ json: req.url().split('?')[0].endsWith(`/${resource}/00000000-0000-4000-8000-000000000801`) ? saved : [], headers: { 'x-total-count': '0' } })
     })
     await page.goto(`/${resource}/new`)
     await expect(page.getByLabel('Отображать на сайте')).toBeChecked()
@@ -134,7 +136,7 @@ for (const resource of ['horses', 'trainers', 'services']) {
     await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`/${resource}(\\?.*)?$`))
     expect(saved).toMatchObject({ isPublic: false, imageUrl: 'https://example.com/photo.jpg', description: 'Описание из CRM', role: 'Обучение', order: 3 })
-    await page.goto(`/${resource}/edit/1`)
+    await page.goto(`/${resource}/edit/00000000-0000-4000-8000-000000000801`)
     await expect(page.getByLabel('Отображать на сайте')).not.toBeChecked()
     await expect(page.getByLabel('Ссылка на фото', { exact: true })).toHaveValue('https://example.com/photo.jpg')
     await page.getByLabel('Ссылка на фото', { exact: true }).scrollIntoViewIfNeeded()

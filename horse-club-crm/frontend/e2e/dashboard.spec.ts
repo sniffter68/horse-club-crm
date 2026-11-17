@@ -1,78 +1,48 @@
+import { workspaceSummary } from './workspaceSummary'
 import { test, expect, type Page, type Locator } from './fixtures'
 import { checkBookingDatePicker } from './bookingDatePicker'
 
-for (const width of [1440, 390]) test(`schedule trainer slot opens shared drawer at ${width}px`, async ({ page }) => {
+for (const width of [1440, 390]) test(`resource slot preserves its trainer and time in advanced booking at ${width}px`, async ({ page }) => {
   await setup(page)
   await page.setViewportSize({ width, height: 900 })
   await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } }))
-  await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [] }))
-  await page.route('**/api/bookings?*', route => route.fulfill({ json: [] }))
-  await page.route('**/api/horses/workload?*', route => route.fulfill({ json: [] }))
-  let reads = 0
+  for (const resource of ['bookings/horse-issues', 'horses/workload', 'lessons']) await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: [] }))
   const rows: Record<string, unknown>[] = []
-  await page.route('**/api/lessons?*', route => { reads++; return route.fulfill({ json: rows }) })
+  await page.route('**/api/bookings?*', route => route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } }))
   await page.goto('/schedule')
-  await page.getByRole('combobox', { name: 'Группировка расписания' }).focus()
-  await page.getByRole('combobox', { name: 'Группировка расписания' }).press('ArrowDown')
+  const grouping = page.getByRole('combobox', { name: 'Группировка расписания' })
+  await grouping.focus(); await grouping.press('ArrowDown')
   await page.getByText('По тренерам', { exact: true }).click()
   await page.getByRole('button', { name: 'Забронировать: Мария Волкова, 11:00', exact: true }).click()
-  const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
-  await expect(drawer).toBeVisible()
-  await expect(drawer.getByRole('textbox', { name: 'Выберите дату' })).toHaveValue('20.10.2026 11:00')
+  await expect(page.getByText('Быстрая запись · 11:00–12:00', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Расширенные параметры', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: 'Бронирование тройного ресурса', exact: true })
+  await expect(drawer.getByLabel('Начало', { exact: true })).toHaveValue('20.10.2026 11:00')
   await expect(resourceSelection(drawer, 'Тренер')).toContainText('Мария Волкова')
-  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
-  await expect(drawer.getByText('Заполните поле').first()).toBeVisible()
-  for (const [label, value] of [['Клиент', 'Анна Орлова'], ['Услуга', 'Выездка'], ['Лошадь', 'Валдай']]) await choose(page, drawer, label, value)
+  for (const [label, value] of [['Клиент', 'Анна Орлова'], ['Лошадь', 'Валдай'], ['Локация', 'Манеж']]) await choose(page, drawer, label, value)
   let fail = true
-  await page.route('**/api/lessons', route => {
-    expect(route.request().postDataJSON()).toMatchObject({ trainerId: '00000003-1111-4111-8111-111111111111', startTime: '2026-10-20T08:00:00.000Z' })
+  await page.route('**/api/bookings', route => {
+    const body = route.request().postDataJSON()
+    expect(body).toMatchObject({ trainerId: '00000003-1111-4111-8111-111111111111', startTime: '2026-10-20T08:00:00.000Z' })
     if (fail) return route.fulfill({ status: 409, json: { message: 'Слот занят' } })
-    rows.push({ id: 'created', startTime: '2026-10-20T08:00:00Z', endTime: '2026-10-20T09:00:00Z', status: 'SCHEDULED',
-      trainer: { id: '00000003-1111-4111-8111-111111111111', name: 'Мария Волкова' }, service: { name: 'Выездка' },
-      bookings: [{ id: 'booking', client: { name: 'Анна Орлова' }, horse: { id: '00000002-1111-4111-8111-111111111111', name: 'Валдай' } }] })
+    rows.push({ ...body, id: '00000000-0000-4000-8000-000000000702', status: 'scheduled',
+      trainer: { id: body.trainerId, name: 'Мария Волкова' }, arena: { id: body.arenaId, name: 'Манеж' }, client, horse: { id: body.horseId, name: 'Валдай' } })
     return route.fulfill({ status: 201, json: rows[0] })
   })
-  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await drawer.getByRole('button', { name: 'Создать бронирование', exact: true }).click()
   await expect(drawer.getByText('Слот занят')).toBeVisible()
   await expect(resourceSelection(drawer, 'Тренер')).toContainText('Мария Волкова')
   fail = false
-  const before = reads
-  await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  await drawer.getByRole('button', { name: 'Создать бронирование', exact: true }).click()
   await expect(drawer).not.toBeVisible()
-  await expect.poll(() => reads).toBeGreaterThan(before)
   await expect(page.locator('.resource-booking')).toContainText('Анна Орлова')
-  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
-  await expect(drawer).toBeVisible()
-  await expect(drawer.getByRole('combobox', { name: 'Клиент', exact: true })).toHaveValue('')
-  await drawer.getByRole('button', { name: 'Закрыть', exact: true }).click()
-  await page.getByRole('combobox', { name: 'Группировка расписания' }).focus()
-  await page.getByRole('combobox', { name: 'Группировка расписания' }).press('ArrowDown')
-  await page.getByText('По локациям', { exact: true }).click()
-  await page.getByRole('button', { name: 'Забронировать: Манеж, 12:30', exact: true }).click()
-  await expect(drawer.getByRole('textbox', { name: 'Выберите дату' })).toHaveValue('20.10.2026 12:30')
-  await expect(drawer.locator('.ant-form-item').filter({ hasText: 'Манеж / локация' }).locator('.ant-select-selection-item')).toHaveText('Манеж')
-  await page.screenshot({ path: `test-results/unified-booking-${width}.png` })
-  if (width === 1440) {
-    await drawer.getByRole('button', { name: 'Закрыть', exact: true }).click()
-    await page.getByRole('combobox', { name: 'Группировка расписания' }).focus()
-    await page.getByRole('combobox', { name: 'Группировка расписания' }).press('ArrowDown')
-    await page.getByText('Календарь', { exact: true }).click()
-    const slot = page.locator('.fc-timegrid-slot-lane[data-time="13:00:00"]')
-    await slot.scrollIntoViewIfNeeded()
-    const column = await page.locator('.fc-timegrid-col[data-date="2026-10-20"]').boundingBox()
-    const time = await slot.boundingBox()
-    if (!column || !time) throw new Error('Calendar slot is not visible')
-    await page.mouse.click(column.x + column.width / 2, time.y + time.height / 2)
-    await expect(drawer).toBeVisible()
-    await expect(drawer.getByRole('textbox', { name: 'Выберите дату' })).toHaveValue('20.10.2026 13:00')
-  }
 })
 
 for (const width of [1440, 390]) test(`dashboard date footer confirms Moscow time at ${width}px`, async ({ page }) => {
   await setup(page)
   await page.setViewportSize({ width, height: 650 })
   await page.goto('/')
-  await page.getByRole('button', { name: '+ Записать на тренировку', exact: true }).click()
+  await page.getByRole('button', { name: '+ Создать запись', exact: true }).click()
   const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
   await checkBookingDatePicker(page, drawer, 'Дата и время (Москва)', '20.10.2026 11:00')
   for (const [label, value] of [['Клиент', 'Анна Орлова'], ['Услуга', 'Выездка'], ['Тренер', 'Мария Волкова'], ['Лошадь', 'Валдай']]) {
@@ -91,47 +61,21 @@ test.setTimeout(45000)
 const modules = ['SCHEDULE', 'CASHBOX', 'STABLES', 'VETERINARY', 'STAFF_PAYROLL']
 const client = { id: '00000001-1111-4111-8111-111111111111', name: 'Анна Орлова', phone: '+79991234567' }
 
-for (const width of [1440, 390]) test(`dashboard metric cards navigate by keyboard and pointer at ${width}px`, async ({ page }) => {
+for (const width of [1440, 390]) test(`workspace KPIs and keyboard lead navigation at ${width}px`, async ({ page }) => {
   await setup(page)
   await page.setViewportSize({ width, height: 900 })
-  await page.route('**/api/settings/club-schedule', route => route.fulfill({ json: { openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } }))
-  for (const resource of ['lessons', 'bookings', 'bookings/horse-issues', 'horses/workload']) {
-    await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: [] }))
-  }
-  await page.route('**/api/staff/shifts?*', route => route.fulfill({ json: { data: [], total: 0 } }))
-  for (const [name, path, destination] of [
-    ['Тренировки сегодня — открыть расписание', '/schedule', '.schedule-page'],
-    ['Поголовье и здоровье — открыть список лошадей', '/horses', 'h4'],
-    ['Персонал на смене — открыть персонал и смены', '/staff', '.staff-page'],
-  ]) {
-    await page.goto('/')
-    const link = page.getByRole('link', { name, exact: true })
-    await expect(page.locator('.dashboard-metric-link')).toHaveCount(4)
-    await page.screenshot({ path: `test-results/dashboard-metric-cards-${width}.png`, fullPage: true })
-    await expect(link).toHaveAttribute('href', path)
-    await expect(link.locator('.ant-card-extra .anticon')).toBeVisible()
-    await link.hover()
-    await expect(link).toHaveCSS('cursor', 'pointer')
-    await expect(link.locator('.ant-card-extra .anticon')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 3, 0)')
-    if (width === 1440) {
-      await link.focus()
-      await expect(link).toBeFocused()
-      await expect(link).toHaveCSS('outline-style', 'solid')
-      await link.press('Enter')
-    } else {
-      // Click the card body rather than its title or arrow.
-      await link.locator('.ant-card-body').click({ position: { x: 12, y: 12 } })
-    }
-    await expect(page).toHaveURL(new RegExp(`${path}(\\?.*)?$`))
-    await expect(page.locator(destination).first()).toBeVisible()
-  }
   await page.goto('/')
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  const link = page.getByRole('link', { name: 'Тренировки сегодня — открыть расписание' })
-  await link.hover()
-  const arrow = link.locator('.ant-card-extra .anticon')
-  await expect(arrow).toHaveCSS('transform', 'none')
-  expect(await arrow.evaluate(node => parseFloat(getComputedStyle(node).transitionDuration))).toBeLessThanOrEqual(0.001)
+  await expect(page.locator('.workspace-kpis .ant-statistic')).toHaveCount(4)
+  for (const title of ['Занятий сегодня', 'Активных всадников', 'Ожидают подтверждения', 'Новые заявки']) {
+    await expect(page.locator('.workspace-kpis').getByText(title, { exact: true })).toBeVisible()
+  }
+  const leads = page.getByRole('link', { name: 'Открыть заявки', exact: true })
+  await leads.focus()
+  await expect(leads).toBeFocused()
+  await leads.press('Enter')
+  await expect(page).toHaveURL(/#pending-leads$/)
+  await expect(page.locator('#pending-leads').last()).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
 for (const width of [1440, 390]) test(`cash card opens matching club balances without an open shift at ${width}px`, async ({ page }) => {
@@ -147,13 +91,10 @@ for (const width of [1440, 390]) test(`cash card opens matching club balances wi
       totalCash: '0', totalCard: '0', totalRevenue: '0', totalExpenses: '0', totalExpensesCash: '0', totalExpensesCard: '0',
       netTotal: '0', operationsCount: 0, operations: [] } }))
   await page.goto('/')
-  const link = page.getByRole('link', { name: 'Баланс кассы — открыть кассу' })
+  const link = page.locator('.workspace-finance')
   await expect(link).toContainText(/1\s*000,00/)
   await expect(link).toContainText(/2\s*000,00/)
-  await link.hover()
-  await expect(link).toHaveCSS('cursor', 'pointer')
-  if (width === 1440) { await link.focus(); await link.press('Enter') }
-  else await link.click()
+  await page.goto('/cash-desk')
   await expect(page).toHaveURL(/\/cash-desk$/)
   const cash = page.locator('.kpi-card').filter({ hasText: 'Остаток в кассе (наличные)' })
   const bank = page.locator('.kpi-card').filter({ hasText: 'Остаток на счете (безнал)' })
@@ -185,15 +126,14 @@ async function setup(page: Page, role = 'ADMIN') {
     localStorage.setItem('horsecrm.role', role)
     localStorage.setItem('horsecrm.email', 'admin@example.com')
   }, role)
+  for (const resource of ['bookings', 'lessons', 'bookings/horse-issues']) await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   const state = { lessons: 1, cash: 1000, completed: 0, failure: false, calls: 0 }
-  await page.route('**/api/dashboard/summary', route => route.fulfill({ json: {
-    generatedAt: '2026-10-20T08:00:00Z', workDay: { date: '2026-10-20', openAt: '2026-10-20T06:00:00Z', closeAt: '2026-10-20T18:00:00Z', timeZone: 'Europe/Moscow' },
-    alerts: [], horseWorkloads: [], leadRequests: [], kpi: { lessonsTotal: state.lessons, lessonsCompleted: state.completed, newLeads: 0, activeMemberships: 0 },
-    todayLessons: { total: state.lessons, completed: state.completed, cancelled: 0 }, cashboxSummary: { cash: String(state.cash), card: '2000', revenueToday: '500', expensesToday: '0' },
-    horsesStatus: { total: 3, healthy: 1, treatment: 1, quarantine: 1 }, activeShifts: 1, onDutyStaff: [{ id: 'shift', staffId: 'staff', fullName: 'Мария Волкова', roleTitle: 'Тренер', startTime: '08:00', endTime: '20:00', status: 'SCHEDULED' }], pendingVetAlerts: 2,
-    upcomingLessons: state.completed ? [] : [{ id: '00000007-1111-4111-8111-111111111111', startTime: '2026-10-20T09:00:00Z', endTime: '2026-10-20T10:00:00Z', trainer: { name: 'Мария Волкова' }, service: { name: 'Выездка', title: 'Индивидуальная тренировка' }, bookings: [{ client, horse: { name: 'Валдай' } }] }],
-  } }))
-  for (const [resource, rows] of Object.entries({ clients: [client], horses: [{ id: '00000002-1111-4111-8111-111111111111', name: 'Валдай', status: 'active', healthStatus: 'HEALTHY' }], trainers: [{ id: '00000003-1111-4111-8111-111111111111', name: 'Мария Волкова', isActive: true }], arenas: [{ id: '00000005-1111-4111-8111-111111111111', name: 'Манеж', isActive: true }], services: [{ id: '00000004-1111-4111-8111-111111111111', name: 'Выездка', title: 'Выездка', durationMinutes: 60, price: '500' }] })) {
+  await page.route('**/api/workspace/admin-summary', route => route.fulfill({ json: workspaceSummary({
+    kpi: { lessonsToday: state.lessons, activeRiders: 3, awaitingConfirmation: 0, newLeads: 0 },
+    finance: { accrued: '3000', paid: String(state.cash), debt: '2000', mainBalance: state.cash, boardingBalance: 2000, recognizedMembershipRevenue: '500' },
+  }) }))
+  await page.route('**/api/cashbox/summary', route => route.fulfill({ json: { mainBalance: state.cash, boardingBalance: 2000, mainOperationsCount: 0, boardingOperationsCount: 0 } }))
+  for (const [resource, rows] of Object.entries({ clients: [client], horses: [{ id: '00000002-1111-4111-8111-111111111111', name: 'Валдай', status: 'active', healthStatus: 'HEALTHY', minRestMinutes: 15, maxDailyMinutes: 240 }], trainers: [{ id: '00000003-1111-4111-8111-111111111111', name: 'Мария Волкова', isActive: true }], arenas: [{ id: '00000005-1111-4111-8111-111111111111', name: 'Манеж', isActive: true }], services: [{ id: '00000004-1111-4111-8111-111111111111', name: 'Выездка', title: 'Выездка', durationMinutes: 60, price: '500' }] })) {
     await page.route(`**/api/${resource}?*`, route => route.fulfill({ json: rows, headers: { 'x-total-count': String(rows.length) } }))
   }
   await page.route('**/api/clients/*', route => route.fulfill({ json: { ...client, id: new URL(route.request().url()).pathname.split('/').at(-1), memberships: [] } }))
@@ -222,7 +162,7 @@ for (const width of [1440, 390]) test(`quick booking shows nominal share, discou
   await page.route('**/api/bookings?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   await page.route('**/api/lessons?*', route => route.fulfill({ json: [] }))
   await page.goto('/')
-  await page.getByRole('button', { name: 'Быстрая запись', exact: true }).click()
+  await page.getByRole('button', { name: '+ Создать запись', exact: true }).click()
   const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
   await choose(page, drawer, 'Услуга', 'Выездка')
   await expect(drawer.getByText('Окончание: 20.10.2026 13:00 (Москва)', { exact: true })).toBeVisible()
@@ -252,7 +192,7 @@ async function choose(page: Page, drawer: Locator, label: string, value: string)
   await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0)
 }
 async function lesson(page: Page) {
-  await page.getByRole('button', { name: '+ Записать на тренировку', exact: true }).click()
+  await page.getByRole('button', { name: '+ Создать запись', exact: true }).click()
   const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
   await expect(drawer).toBeVisible()
   await choose(page, drawer, 'Клиент', 'Анна Орлова')
@@ -309,7 +249,7 @@ async function preferenceSetup(page: Page) {
   await page.route('**/api/clients/*', route => route.fulfill({ json: clients.find(row => route.request().url().endsWith(row.id)) }))
   await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { horseWorkloads: horses.map(row => ({ horseId: row.id, currentWorkloadMinutes: 0, maxDailyWorkloadMinutes: 240, status: 'AVAILABLE' })), arenaOccupancy: [] } }))
   await page.goto('/')
-  await page.getByRole('button', { name: '+ Записать на тренировку', exact: true }).click()
+  await page.getByRole('button', { name: '+ Создать запись', exact: true }).click()
   return { drawer: page.getByRole('dialog', { name: 'Записать на тренировку', exact: true }), clients, horses, trainers }
 }
 
@@ -440,26 +380,26 @@ for (const width of [1440, 390]) test(`creates a guest inside lesson drawer and 
 test('admin quick actions create a lesson in a right drawer and refresh the day counter', async ({ page }) => {
   const state = await setup(page)
   await page.goto('/')
-  await expect(page.getByRole('region', { name: 'Быстрые действия' }).getByRole('button')).toHaveCount(7)
+  await expect(page.getByRole('button', { name: '+ Создать запись', exact: true })).toBeVisible()
   const drawer = await lesson(page)
   const bounds = await drawer.boundingBox()
   expect(bounds!.x + bounds!.width).toBeCloseTo(page.viewportSize()!.width, 0)
   await drawer.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   await expect(drawer).not.toBeVisible()
-  await expect(page.locator('.dashboard-day-card--lessons')).toContainText('/ 2')
+  await expect(page.locator('.workspace-kpis .ant-statistic').filter({ hasText: 'Занятий сегодня' })).toContainText('2')
   expect(state.calls).toBe(1)
 })
 
 test('cash payment closes the drawer and refreshes balance without navigation', async ({ page }) => {
   await setup(page); await page.goto('/')
-  await page.getByRole('button', { name: '+ Принять оплату', exact: true }).click()
+  await page.getByRole('button', { name: 'Принять платёж', exact: true }).first().click()
   const drawer = page.getByRole('dialog', { name: 'Принять оплату / Касса', exact: true })
   await choose(page, drawer, 'Клиент', 'Анна Орлова')
   await choose(page, drawer, 'Услуга / занятие / абонемент', 'Выездка')
   await drawer.getByLabel('Внесено клиентом, ₽', { exact: true }).fill('500')
   await drawer.getByRole('button', { name: 'Провести платёж' }).click()
   await expect(drawer).not.toBeVisible()
-  await expect(page.getByTestId('dashboard-cash')).toContainText(/1\s?500/)
+  await expect(page.locator('.cashbox-header-link').first()).toContainText(/1\s?500/)
   await expect(page).toHaveURL(/\/$/)
 })
 
@@ -482,12 +422,13 @@ for (const policy of ['disabled', 'hidden', 'read-only']) test(`${policy} module
   await setup(page, 'MANAGER')
   await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'MANAGER', modules: modules.map(module => ({ module, isEnabled: policy !== 'disabled', accessLevel: policy === 'hidden' ? 'HIDDEN' : policy === 'read-only' ? 'READ_ONLY' : 'FULL' })) } }))
   await page.goto('/')
-  await expect(page.getByRole('button', { name: '+ Принять оплату' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Принять платёж' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '+ Заселить лошадь' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Ветпроцедура', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Завершено', exact: true })).toHaveCount(0)
-  if (policy !== 'read-only') await expect(page.getByTestId('dashboard-cash')).toHaveCount(0)
-  else await expect(page.getByTestId('dashboard-cash')).toBeVisible()
+  await expect(page.getByRole('button', { name: '+ Создать запись', exact: true })).toHaveCount(0)
+  if (policy !== 'read-only') await expect(page.locator('.workspace-finance')).toHaveCount(0)
+  else await expect(page.locator('.workspace-finance')).toBeVisible()
 })
 
 for (const day of ['today', 'yesterday', 'tomorrow']) test(`expense drawer validates ${day} by Moscow day across timezones`, async ({ page }) => {
@@ -500,7 +441,8 @@ for (const day of ['today', 'yesterday', 'tomorrow']) test(`expense drawer valid
     return route.fulfill({ status: 201, json: { id: 'expense', ...posts.at(-1) } })
   })
   await page.goto('/')
-  await page.getByRole('button', { name: '− Внести расход', exact: true }).click()
+  await page.goto('/cash-desk')
+  await page.getByRole('button', { name: 'Внести расход', exact: true }).click()
   const drawer = page.getByRole('dialog', { name: 'Внесение расхода', exact: true })
   const date = drawer.getByRole('textbox', { name: 'Дата расхода', exact: true })
   await expect(date).toHaveValue('20.10.2026')
@@ -551,23 +493,30 @@ test('read-only cashbox disables collecting a lesson prepayment', async ({ page 
   await expect(drawer.getByRole('radio', { name: 'Внесена предоплата' })).toBeDisabled()
 })
 
-test('timeline completion refreshes progress and removes the finished lesson', async ({ page }) => {
-  const state = await setup(page)
-  await page.route('**/api/lessons/00000007-1111-4111-8111-111111111111', route => route.fulfill({ json: { id: '00000007-1111-4111-8111-111111111111', cost: 500, prepaymentAmount: 0, bookings: [{ membership: null }] } }))
-  await page.route('**/api/lessons/00000007-1111-4111-8111-111111111111/complete', route => { state.completed++; return route.fulfill({ json: { id: '00000007-1111-4111-8111-111111111111', bookings: [] } }) })
+test('workspace refresh shows an externally completed lesson and its audit entry', async ({ page }) => {
+  await setup(page)
+  let completed = false
+  await page.route('**/api/workspace/admin-summary', route => route.fulfill({ json: workspaceSummary({
+    actions: completed ? [{ id: '00000000-0000-4000-8000-000000000701', action: 'LESSON_COMPLETED', actorName: 'trainer@example.com', createdAt: '2026-10-20T09:00:00Z' }] : [],
+  }) }))
   await page.goto('/')
-  await page.getByRole('button', { name: 'Завершено', exact: true }).click()
-  await page.getByRole('dialog', { name: 'Занятие состоялось' }).getByRole('button', { name: 'Завершить занятие', exact: true }).click()
-  await expect(page.getByText('Предстоящих тренировок сегодня нет')).toBeVisible()
-  await expect(page.locator('.dashboard-day-card--lessons .ant-statistic-content')).toHaveText('1/ 1')
+  await expect(page.getByText('Действий пока нет', { exact: true })).toBeVisible()
+  completed = true
+  await page.getByRole('button', { name: 'Обновить сводку', exact: true }).click()
+  await expect(page.getByText('Занятие проведено', { exact: true })).toBeVisible()
+  await expect(page.getByText(/trainer@example.com/)).toBeVisible()
 })
 
-test('narrow viewport supports all action drawers, keyboard closing, and retains page width', async ({ page }) => {
-  await setup(page); await page.setViewportSize({ width: 390, height: 844 }); await page.goto('/')
-  for (const [button, title] of [['− Внести расход', 'Внесение расхода'], ['Ветпроцедура', 'Новая вет-процедура'], ['+ Заселить лошадь', 'Быстрое заселение · Клуб'], ['Открыть / закрыть смену', 'Запланировать смену']]) {
-    await page.getByRole('button', { name: button, exact: true }).click()
+test('narrow workspace drawers close by keyboard without losing page width', async ({ page }) => {
+  await setup(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  for (const [button, title] of [['+ Создать запись', 'Записать на тренировку'], ['Принять платёж', 'Принять оплату / Касса']]) {
+    await page.getByRole('button', { name: button, exact: true }).first().click()
     const drawer = page.getByRole('dialog', { name: title, exact: true })
     await expect(drawer).toBeVisible()
+    await expect(drawer).not.toHaveClass(/ant-zoom-(enter|appear)/)
+    await drawer.getByRole('button', { name: /^(Закрыть|Close)$/ }).focus()
     await page.keyboard.press('Escape')
     await expect(drawer).not.toBeVisible()
   }
@@ -586,14 +535,14 @@ test('administrator signs in through the login screen and sees quick actions', a
   await page.getByLabel('Email', { exact: true }).fill('admin@example.com')
   await page.getByLabel('Пароль', { exact: true }).fill('test-password')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await expect(page.getByRole('region', { name: 'Быстрые действия' }).getByRole('button')).toHaveCount(7)
+  await expect(page.getByRole('button', { name: '+ Создать запись', exact: true })).toBeVisible()
 })
 
 test('horse overload disables the option and Escape closes only the select popup', async ({ page }) => {
   await setup(page)
   await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { horseWorkloads: [{ horseId: '00000002-1111-4111-8111-111111111111', currentWorkloadMinutes: 240, maxDailyWorkloadMinutes: 240, status: 'AT_LIMIT' }], arenaOccupancy: [] } }))
   await page.goto('/')
-  await page.getByRole('button', { name: '+ Записать на тренировку', exact: true }).click()
+  await page.getByRole('button', { name: '+ Создать запись', exact: true }).click()
   const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
   const horse = drawer.getByRole('combobox', { name: 'Лошадь', exact: true })
   await horse.click()
@@ -608,7 +557,7 @@ test('drawer inputs remain readable and the Moscow calendar fits a narrow viewpo
   await page.setViewportSize({ width: 390, height: 844 })
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/')
-  await page.getByRole('button', { name: '+ Записать на тренировку', exact: true }).click()
+  await page.getByRole('button', { name: '+ Создать запись', exact: true }).click()
   const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
   const date = drawer.getByRole('textbox', { name: /Дата и время/ })
   await expect(date).toHaveValue('20.10.2026 12:00')

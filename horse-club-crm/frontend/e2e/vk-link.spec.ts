@@ -145,7 +145,7 @@ test('staff drawer saves VK with the employee profile and displays its existing 
 })
 
 test('read-only catalog hides VK mutations', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('horsecrm.role', 'TRAINER'))
+  await page.addInitScript(() => localStorage.setItem('horsecrm.role', 'STABLE_WORKER'))
   await page.route('**/api/clients?*', route => route.fulfill({ json: [profile], headers: { 'x-total-count': '1' } }))
   await page.goto('/clients')
   await expect(page.getByRole('button', { name: 'Анна Орлова', exact: true })).toBeVisible()
@@ -159,7 +159,9 @@ test('drawer supports dark theme, reduced motion and Escape', async ({ page }) =
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click()
   await expect(page.getByRole('button', { name: 'Включить светлую тему' })).toBeVisible()
   const trigger = page.getByRole('button', { name: 'Привязать VK', exact: true })
-  await trigger.click()
+  await trigger.focus()
+  await expect(trigger).toBeFocused()
+  await trigger.press('Enter')
   await expect(page.getByRole('dialog').getByLabel('VK ID или ссылка на страницу')).toBeVisible()
   await page.screenshot({ path: 'test-results/vk-direct-dark.png', fullPage: true })
   await page.getByRole('dialog').getByLabel('VK ID или ссылка на страницу').focus()

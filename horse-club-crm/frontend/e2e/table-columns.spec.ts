@@ -59,7 +59,17 @@ for (const tab of ['payroll', 'statements', 'rates']) test(`staff ${tab}: compac
   await expect(table.locator('tbody tr.ant-table-row')).toHaveCount(1)
   await expect(table.locator('th.ant-table-cell-fix-left').first()).toBeVisible()
   await expect(table.locator('th.ant-table-cell-fix-right')).toHaveText('Действия')
-  expect(await table.locator('.ant-table-content').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1)
+  if (tab === 'payroll') {
+    // The lesson payout breakdown adds a wide column. Scroll the table while
+    // keeping employee and actions visible; the document must still fit.
+    await expect(table.getByRole('columnheader', { name: 'Начисление за занятия' })).toBeVisible()
+    await table.locator('.ant-table-content').evaluate(el => { el.scrollLeft = el.scrollWidth })
+    await expect(table.locator('th.ant-table-cell-fix-left').first()).toBeInViewport({ ratio: 1 })
+    await expect(table.locator('th.ant-table-cell-fix-right')).toBeInViewport({ ratio: 1 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  } else {
+    await expect.poll(() => table.locator('.ant-table-content').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1)
+  }
   await page.getByRole('button', { name: 'Настройка колонок', exact: true }).click()
   const option = page.getByRole('checkbox').first()
   const checked = await option.isChecked()
