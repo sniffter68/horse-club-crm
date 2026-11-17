@@ -130,11 +130,11 @@ export default function App() {
       borderRadius: 12,
       borderRadiusLG: 24,
       borderRadiusSM: 10,
-      fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontFamily: 'var(--crm-font-body)',
       fontFamilyCode: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
       controlHeight: 40,
       controlOutline: 'rgba(114, 76, 57, 0.22)',
-      boxShadowSecondary: '0 18px 48px rgba(58, 47, 43, 0.10)',
+      boxShadowSecondary: 'var(--crm-shadow-card-hover)',
     },
     components: {
       Tabs: {

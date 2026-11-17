@@ -11,6 +11,8 @@ import { usePermissions } from '../../modulePermissions'
 import { useWorkspace } from './useWorkspace'
 import type { BoardLesson, TrainerBoard as Board } from './types'
 import './workspace.css'
+import { ClubIcon } from '../../components/ClubIcon'
+import { lessonAccent } from '../../components/lessonAccent'
 import { tmaRequest } from '../../tma/api'
 
 const zone = 'Europe/Moscow'
@@ -33,8 +35,8 @@ function LessonCard({ lesson, canWrite, onSaved, tmaToken }: { lesson: BoardLess
     } catch (cause: unknown) { setError(toHttpError(cause).message) }
     finally { lock.current = false; setBusy(false) }
   }
-  return <article className={`board-lesson ${lesson.isOwn ? 'board-lesson-own' : ''}`} aria-label={`${clock(lesson.startTime)} ${lesson.trainer.name}`}>
-    <strong>{clock(lesson.startTime)}–{clock(lesson.endTime)}</strong>
+  return <article className={`board-lesson ${lesson.isOwn ? 'board-lesson-own' : ''}`} style={lessonAccent(lesson.trainerId)} aria-label={`${clock(lesson.startTime)} ${lesson.trainer.name}`}>
+    <strong className="club-icon-label"><ClubIcon name="clock" />{clock(lesson.startTime)}–{clock(lesson.endTime)}</strong>
     {lesson.isOwn ? <><b>{lesson.bookings.map(row => row.client?.name).filter(Boolean).join(', ') || 'Всадник не назначен'}</b>
       <Tag color={lesson.bookings.length && lesson.bookings.every(row => row.clientConfirmed) ? 'success' : 'warning'}>{lesson.bookings.length && lesson.bookings.every(row => row.clientConfirmed) ? 'Подтверждено' : 'Ждём подтверждения'}</Tag></> : <b>{lesson.trainer.name}</b>}
     <span>{lesson.bookings.map(row => row.horse?.name).filter(Boolean).join(', ') || 'Лошадь не назначена'}</span>
@@ -43,7 +45,7 @@ function LessonCard({ lesson, canWrite, onSaved, tmaToken }: { lesson: BoardLess
     {lesson.isOwn && lesson.status === 'SCHEDULED' && canWrite && <>
       <label htmlFor={`note-${lesson.id}`}>Заметка по тренировке / лошади</label>
       <Input id={`note-${lesson.id}`} value={note} maxLength={1000} disabled={busy} onChange={event => setNote(event.target.value)} />
-      <div className="board-actions"><Button type="primary" disabled={busy} onClick={() => void mark('COMPLETED')}>Проведено</Button><Button disabled={busy} onClick={() => void mark('NO_SHOW')}>Неявка</Button></div>
+      <div className="board-actions"><Button icon={<ClubIcon name="check" />} type="primary" disabled={busy} onClick={() => void mark('COMPLETED')}>Проведено</Button><Button disabled={busy} onClick={() => void mark('NO_SHOW')}>Неявка</Button></div>
     </>}
     {lesson.isOwn && lesson.status !== 'SCHEDULED' && lesson.trainerNote && <p>{lesson.trainerNote}</p>}
     {error && <Alert type="error" showIcon message={error} />}
@@ -59,6 +61,13 @@ export function TrainerBoardPage() {
 export function TrainerBoardView({ canWrite, onExit, tmaToken }: { canWrite: boolean; onExit: () => void; tmaToken?: string }) {
   const [date, setDate] = useState(() => DateTime.now().setZone(zone).toISODate()!)
   const [mine, setMine] = useState(false)
+  const [now, setNow] = useState(() => DateTime.now().setZone(zone))
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(DateTime.now().setZone(zone)), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const nowMinute = now.hour * 60 + now.minute
+  const isCurrentSlot = (minute: number) => date === now.toISODate() && nowMinute >= minute && nowMinute < minute + 30
   const { data, error, loading, refresh } = useWorkspace<Board>(`trainer-board?date=${date}`, tmaToken)
   useEffect(() => { window.Telegram?.WebApp?.ready(); window.Telegram?.WebApp?.expand() }, [])
   const trainers = data?.trainers.filter(row => !mine || row.id === data.trainerId) ?? []
@@ -70,7 +79,7 @@ export function TrainerBoardView({ canWrite, onExit, tmaToken }: { canWrite: boo
   const last = Math.min(1440, Math.max(Math.ceil(minutes(data?.closeTime ?? '22:00') / 30) * 30, ...lessons.map(row => Math.ceil(DateTime.fromISO(row.endTime, { zone }).diff(DateTime.fromISO(date, { zone }), 'minutes').minutes / 30) * 30)))
   const slots = Array.from({ length: Math.max(1, (last - first) / 30) }, (_, index) => first + index * 30)
   return <main className="trainer-workspace">
-    <header className="trainer-workspace-header"><div><Typography.Title level={3}>Расписание клуба</Typography.Title><span>{data?.trainers.find(row => row.id === data.trainerId)?.name || 'Рабочее место тренера'}</span></div><Button onClick={onExit}>{tmaToken ? 'Назад' : 'Выйти'}</Button></header>
+    <header className="trainer-workspace-header"><div><Typography.Title level={3}><ClubIcon name="calendar" /> Расписание клуба</Typography.Title><span>{data?.trainers.find(row => row.id === data.trainerId)?.name || 'Рабочее место тренера'}</span></div><Button onClick={onExit}>{tmaToken ? 'Назад' : 'Выйти'}</Button></header>
     <div className="workspace-toolbar"><label htmlFor="trainer-board-date">Дата</label><DatePicker id="trainer-board-date" locale={ruDatePicker} placement="bottomRight" classNames={{ popup: { root: 'trainer-date-popup' } }} allowClear={false} value={dayjs(date).locale('ru')} onChange={value => { if (value) setDate(value.format('YYYY-MM-DD')) }} />
       <Segmented value={mine ? 'Только мои' : 'Все тренеры'} options={['Все тренеры', 'Только мои']} onChange={value => setMine(value === 'Только мои')} /><Button onClick={refresh}>Обновить</Button></div>
     <p>Время московское · Свои занятия выделены. Остальные показывают занятость площадок и лошадей.</p>
@@ -79,7 +88,7 @@ export function TrainerBoardView({ canWrite, onExit, tmaToken }: { canWrite: boo
       {!lessons.length && <Empty description="На эту дату занятий нет" />}
       <div className="trainer-board-scroll" tabIndex={0} aria-label="Общая шахматка расписания">
         <table className="trainer-board"><thead><tr><th scope="col">МСК</th>{trainers.map(trainer => <th scope="col" key={trainer.id}>{trainer.name}</th>)}</tr></thead>
-          <tbody>{slots.map(minute => <tr key={minute}><th scope="row">{DateTime.fromISO(date, { zone }).plus({ minutes: minute }).toFormat('HH:mm')}</th>{trainers.map(trainer => {
+          <tbody>{slots.map(minute => <tr key={minute} className={isCurrentSlot(minute) ? 'board-row-current' : undefined}><th scope="row">{isCurrentSlot(minute) && <span className="board-now-indicator" role="img" aria-label={`Сейчас ${now.toFormat('HH:mm')} МСК`} />}{DateTime.fromISO(date, { zone }).plus({ minutes: minute }).toFormat('HH:mm')}</th>{trainers.map(trainer => {
             const at = DateTime.fromISO(date, { zone }).plus({ minutes: minute }).toMillis()
             const starting = lessons.filter(lesson => lesson.trainerId === trainer.id && (+new Date(lesson.startTime) >= at || minute === 0) && +new Date(lesson.startTime) < at + 1800000)
             const continuing = lessons.filter(lesson => lesson.trainerId === trainer.id && +new Date(lesson.startTime) < at && +new Date(lesson.endTime) > at && lesson.status !== 'CANCELLED')

@@ -1,0 +1,51 @@
+/* Runtime values live in index.css; these recipes adapt shared Ant components. */
+h1, h2, h3 { font-family: var(--crm-font-display); letter-spacing: -0.025em; }
+.ant-statistic-content { font-family: var(--crm-font-display); font-variant-numeric: tabular-nums; }
+.ant-table, .ant-descriptions, .ant-input-number, .cashbox-header-widget,
+.client-membership, .schedule-calendar, .trainer-board { font-variant-numeric: tabular-nums; }
+.club-icon { flex: none; vertical-align: -0.15em; }
+.club-icon-label { display: inline-flex; align-items: center; gap: 8px; }
+.ant-statistic-title .club-icon-label { align-items: flex-start; }
+.workspace-kpis .ant-statistic-content { font-size: clamp(30px, 3vw, 40px); font-weight: 700; letter-spacing: -0.035em; }
+.ant-tabs-tab .club-icon { margin-inline-end: 6px; }
+.ant-btn, .ant-tabs-tab-btn, .ant-segmented-item, .ant-tag-checkable, .cashbox-header-link {
+  transition: transform var(--crm-motion-press) ease, background-color var(--crm-motion-press) ease,
+    border-color var(--crm-motion-press) ease, color var(--crm-motion-press) ease,
+    box-shadow var(--crm-motion-shadow) ease;
+}
+.ant-btn:not(:disabled):not(.ant-btn-loading):active,
+.ant-tabs-tab:not(.ant-tabs-tab-disabled) .ant-tabs-tab-btn:active,
+.ant-segmented:not(.ant-segmented-disabled) .ant-segmented-item:not(.ant-segmented-item-disabled):active,
+.ant-tag-checkable:active, .cashbox-header-link:active { transform: scale(var(--crm-press-scale)); }
+.cashbox-header-link { background: var(--crm-paper); box-shadow: var(--crm-shadow-card); }
+.cashbox-header-link:hover { box-shadow: var(--crm-shadow-card-hover); }
+
+.equestrian-motif { position: absolute; width: 290px; height: 290px; inset-inline-end: 5%; top: -72px; opacity: 0.06; pointer-events: none; transform: rotate(-20deg); }
+.workspace-toolbar.shift-welcome { position: relative; isolation: isolate; overflow: hidden; justify-content: space-between; padding: 32px; border-radius: 24px; background: linear-gradient(120deg, var(--crm-chocolate), #42332b); color: #faf7f2; box-shadow: var(--crm-shadow-card); }
+.shift-welcome > :not(.equestrian-motif) { position: relative; }
+.shift-welcome h2.ant-typography { color: #faf7f2; font-weight: 700; margin: 0 0 8px; }
+.shift-welcome .ant-typography { color: #e4dad0; }
+.shift-welcome .ant-btn { background: rgb(255 255 255 / 8%); border-color: rgb(255 255 255 / 28%); color: #faf7f2; }
+.shift-welcome .ant-btn:not(:disabled):hover { background: rgb(255 255 255 / 16%); border-color: #e4dad0; color: #fff; }
+.shift-welcome .ant-btn:focus-visible { outline: 2px solid #e4dad0; outline-offset: 3px; }
+
+.login-page { position: relative; isolation: isolate; overflow: hidden; background: radial-gradient(ellipse at 18% 20%, rgb(228 218 208 / 85%), transparent 58%), radial-gradient(ellipse at 90% 85%, rgb(114 76 57 / 16%), transparent 60%), var(--crm-alabaster); }
+.login-page .equestrian-motif--horse { width: min(75vw, 700px); height: min(75vw, 700px); top: auto; bottom: -4%; inset-inline-end: -2%; transform: rotate(-8deg); color: var(--crm-saddle); }
+.login-page .login-card { position: relative; background: color-mix(in srgb, var(--crm-paper) 78%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid color-mix(in srgb, var(--crm-paper) 80%, var(--crm-border)); box-shadow: var(--crm-shadow-card); }
+.login-card h2.ant-typography { font-weight: 700; font-size: clamp(24px, 5vw, 30px); }
+
+.schedule-event-content { border-inline-start: 4px solid var(--lesson-accent, var(--crm-saddle)); padding-inline-start: 8px; }
+.monthly-payment-progress .ant-progress-bg { transform-origin: left center; animation: monthly-payment-fill 800ms cubic-bezier(0.22, 1, 0.36, 1) both; transition: width 800ms cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes monthly-payment-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes board-now-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgb(114 76 57 / 24%); } 50% { box-shadow: 0 0 0 5px rgb(114 76 57 / 0%); } }
+@media (max-width: 575px) { .workspace-toolbar.shift-welcome { padding: 24px; } .shift-welcome .equestrian-motif { inset-inline-end: -80px; } }
+@media (prefers-reduced-motion: reduce) {
+  :root { --crm-press-scale: 1; --crm-motion-press: 0ms; --crm-motion-shadow: 0ms; }
+  .ant-btn, .ant-tabs-tab-btn, .ant-segmented-item, .ant-tag-checkable, .cashbox-header-link,
+  .ant-card, .trainer-board .board-lesson, .monthly-payment-progress .ant-progress-bg { transition: none; animation: none; }
+  .ant-btn:not(:disabled):active, .ant-tabs-tab .ant-tabs-tab-btn:active,
+  .ant-segmented .ant-segmented-item:active, .ant-tag-checkable:active, .cashbox-header-link:active,
+  .ant-card-hoverable:hover { transform: none; }
+  .trainer-board .board-now-indicator { animation: none; }
+}
+@media (forced-colors: active) { .board-now-indicator { background: Highlight; } .schedule-event-content { border-inline-start-color: CanvasText; } }

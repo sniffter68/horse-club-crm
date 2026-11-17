@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSelect } from '@refinedev/antd'
 import { useSearchParams } from 'react-router-dom'
 import { Alert, Button, DatePicker, Form, Input, List, Select, Space, Tabs, Tag, Typography } from 'antd'
+import { ClubIcon } from '../../components/ClubIcon'
 import dayjs, { type Dayjs } from 'dayjs'
 import 'dayjs/locale/ru'
 import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
@@ -109,13 +110,13 @@ function LegacyVetJournal({ horseId, scope = 'horse' }: { horseId?: string; scop
 }
 
 export function VetCalendarPage() {
-  return <div className="stable-dashboard"><Typography.Title level={2}>Ветеринарный журнал</Typography.Title>
+  return <div className="stable-dashboard"><Typography.Title level={2}><ClubIcon name="activity" /> Ветеринарный журнал</Typography.Title>
     <Typography.Paragraph>Ближайшие процедуры и просроченные назначения по всей конюшне.</Typography.Paragraph><VetJournal scope="all" /></div>
 }
 
 export function VetJournal(props: { horseId?: string; scope?: 'horse' | 'all' }) {
   return <Tabs destroyOnHidden items={[
-    { key: 'records', label: 'Ветзаписи и паспорт', children: <VetRecordsJournal {...props} /> },
-    { key: 'calendar', label: 'Календарь назначений', children: <LegacyVetJournal {...props} /> },
+    { key: 'records', icon: <ClubIcon name="activity" />, label: 'Ветзаписи и паспорт', children: <VetRecordsJournal {...props} /> },
+    { key: 'calendar', icon: <ClubIcon name="calendar" />, label: 'Календарь назначений', children: <LegacyVetJournal {...props} /> },
   ]} />
 }

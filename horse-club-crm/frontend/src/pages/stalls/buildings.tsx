@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Alert, App, Button, Empty, Form, Input, InputNumber, Modal, Select, Space, Switch, Tabs, Typography } from 'antd'
+import { ClubIcon } from '../../components/ClubIcon'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { isUuid } from '../../uuid'
 import { useSearchParams } from 'react-router-dom'
@@ -67,7 +68,7 @@ export function BuildingMap({ buildings, stalls, canManage, tile, onSaved, onEdi
       {editing && <><Button type="primary" aria-label="Сохранить схему" aria-busy={busy} loading={busy} disabled={!dirty || busy} onClick={() => void save()}>Сохранить схему</Button><Button disabled={busy} onClick={stop}>Отмена</Button></>}
     </Space>
     {failure && <Alert type="error" showIcon message="Схема не сохранена" description={failure} />}
-    <Tabs activeKey={active} onChange={id => setParams(current => { if (id === 'ALL') current.delete('buildingId'); else current.set('buildingId', id); return current })} items={[{ key: 'ALL', label: 'Все корпуса' }, ...buildings.map(b => ({ key: b.id, label: `${b.name} · ${b.occupied}/${b.total}` }))]} />
+    <Tabs activeKey={active} onChange={id => setParams(current => { if (id === 'ALL') current.delete('buildingId'); else current.set('buildingId', id); return current })} items={[{ key: 'ALL', icon: <ClubIcon name="stable" />, label: 'Все корпуса' }, ...buildings.map(b => ({ key: b.id, icon: <ClubIcon name="stable" />, label: `${b.name} · ${b.occupied}/${b.total}` }))]} />
     {!buildings.length && <Empty description="Корпусов пока нет. Создайте корпус, чтобы разместить денники." />}
     {buildings.filter(b => active === 'ALL' || b.id === active).map(building => <section key={building.id} aria-label={building.name}>
       <Typography.Title level={3}>{building.name}</Typography.Title>

@@ -15,14 +15,20 @@
 .trainer-board tr > th:first-child { position: sticky; left: 0; z-index: 1; min-width: 60px; font-variant-numeric: tabular-nums; }
 .trainer-board thead tr > th:first-child { z-index: 3; }
 .board-lesson { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px; border: 1px solid var(--crm-border); border-radius: 12px; margin-bottom: 8px; overflow-wrap: anywhere; }
-.board-lesson-own { border-left: 4px solid var(--crm-saddle); background: var(--crm-alabaster); }
+.board-lesson { border-inline-start: 4px solid var(--lesson-accent, var(--crm-saddle)); box-shadow: var(--crm-shadow-card); transition: box-shadow var(--crm-motion-shadow) ease; }
+.board-lesson:hover { box-shadow: var(--crm-shadow-card-hover); }
+.board-lesson-own { background: var(--crm-alabaster); }
+.trainer-board-scroll { box-shadow: var(--crm-shadow-card); }
+.board-row-current > th:first-child { color: var(--crm-saddle); }
+.board-row-current > td { background: color-mix(in srgb, var(--crm-beige) 20%, var(--crm-paper)); }
+.board-now-indicator { display: inline-block; width: 8px; height: 8px; margin-inline-end: 6px; border-radius: 50%; background: var(--crm-saddle); animation: board-now-pulse 2s ease-in-out infinite; }
 .board-lesson label { font-size: 12px; }
 .board-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .board-actions button, .trainer-workspace-header button { min-height: 44px; }
 .board-continuation { display: block; font-size: 12px; padding: 6px 0; color: var(--crm-ink); }
 .admin-workspace-columns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 24px; align-items: start; }
 .workspace-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 24px 0; }
-.workspace-lesson { padding: 16px 0; border-bottom: 1px solid var(--crm-border); display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.workspace-lesson { padding: 16px 12px; margin-top: 12px; border-bottom: 1px solid var(--crm-border); border-inline-start: 4px solid var(--lesson-accent, var(--crm-saddle)); border-radius: 8px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .workspace-lesson time { font-variant-numeric: tabular-nums; font-weight: 600; }
 .workspace-finance dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
 .workspace-finance > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; flex-wrap: wrap; }

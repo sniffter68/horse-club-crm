@@ -1,12 +1,14 @@
 import { useLogin } from '@refinedev/core'
 import { Alert, Button, Card, Form, Input, Typography } from 'antd'
 import type { LoginCredentials } from '../../authProvider'
+import { EquestrianMotif } from '../../components/EquestrianMotif'
 
 export function LoginPage() {
   const { mutate: login, isPending, data, error } = useLogin<LoginCredentials>()
   const message = error?.message ?? (data?.success === false ? data.error?.message : undefined)
   return (
     <main className="login-page">
+      <EquestrianMotif horse />
       <Card className="login-card">
         <Typography.Title level={2}>Вход в Horse CRM</Typography.Title>
         {message && <Alert type="error" showIcon message={message} className="login-error" />}

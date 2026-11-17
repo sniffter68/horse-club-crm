@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, Space, Spin } from 'antd'
 import { Link } from 'react-router-dom'
+import { ClubIcon } from './ClubIcon'
 import { usePermissions } from '../modulePermissions'
 import { getIdentity } from '../authStorage'
 import { API_URL, httpClient, toHttpError } from '../httpClient'
@@ -44,7 +45,7 @@ export function CashboxHeaderWidget() {
       ['MAIN', 'Основная касса', data.mainBalance, data.mainOperationsCount],
       ['BOARDING', 'Касса постоя', data.boardingBalance, data.boardingOperationsCount],
     ] as const).map(([type, label, balance, count]) => <Link key={type} className="cashbox-header-link" to={`/payments?cashboxType=${type}`}>
-      <span>{label}</span><strong>{balance.toLocaleString('ru-RU')} руб.</strong><span>{count.toLocaleString('ru-RU')} оп.</span>
+      <span className="club-icon-label"><ClubIcon name="wallet" />{label}</span><strong>{balance.toLocaleString('ru-RU')} руб.</strong><span>{count.toLocaleString('ru-RU')} оп.</span>
     </Link>)}
   </Space>
 }
