@@ -1,6 +1,6 @@
 import { money } from '../catalogs/format'
 import { useState } from 'react'
-import { Descriptions } from 'antd'
+import { Descriptions, Tag } from 'antd'
 import { CardLink, DetailsModal } from '../cards/shared'
 import { CatalogEditAction } from '../catalogs/EditDrawer'
 import { TrainerForm } from './form'
@@ -25,6 +25,7 @@ export function TrainerList() {
     { key: 'maxDailyLoad', align: 'right', width: 115, dataIndex: 'maxDailyLoad', title: 'Дневная нагрузка, мин', sorter: true },
   ]
   if (canManage && canRead('STAFF_PAYROLL')) columns.push({ key: 'baseRate', align: 'right', width: 120, dataIndex: 'baseRate', title: 'Базовая ставка', sorter: true, render: money })
+  if (canManage && canRead('STAFF_PAYROLL')) columns.push({ key: 'commissionPercent', width: 140, title: 'Ставка тренера', render: (_, row) => <Tag color="processing">{Number(row.commissionPercent ?? 30)}%</Tag> })
   return <><CatalogList<Trainer> resource="trainers" onSearchSelect={setSelectedId} storageKey="horse_crm_trainers_columns_v1" defaultHiddenColumns={['vk', 'qualification']} title="Тренеры" columns={columns} />
     <DetailsModal<Trainer> resource="trainers" id={selectedId} title="Карточка тренера" onClose={() => setSelectedId(undefined)}>
       {trainer => <><CatalogEditAction resource="trainers" id={trainer.id}><TrainerForm action="edit" /></CatalogEditAction>
@@ -36,6 +37,7 @@ export function TrainerList() {
           { key: 'qualification', label: 'Специализация', children: trainer.qualification || '—' },
           { key: 'maxParallelLessons', label: 'Максимум одновременных всадников', children: trainer.maxParallelLessons ?? 4 },
           ...(canManage && canRead('STAFF_PAYROLL') ? [{ key: 'rate', label: 'Ставка', children: money(trainer.baseRate) }] : []),
+          ...(canManage && canRead('STAFF_PAYROLL') ? [{ key: 'commission', label: 'Ставка тренера, %', children: <Tag color="processing">{Number(trainer.commissionPercent ?? 30)}%</Tag> }] : []),
         ]} /></>}
     </DetailsModal></>
 }

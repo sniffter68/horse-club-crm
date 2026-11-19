@@ -20,12 +20,12 @@ export function payrollRange(from: string, to: string) {
   if (periodStart > periodEnd || (periodEnd.getTime() - periodStart.getTime()) / 86400000 > 365) throw new BadRequestException('Период должен быть от 1 до 366 дней');
   return { periodStart, periodEnd, start: DateTime.fromISO(from, { zone: 'Europe/Moscow' }).toJSDate(), end: DateTime.fromISO(to, { zone: 'Europe/Moscow' }).plus({ days: 1 }).toJSDate() };
 }
-const person = { user: { select: { trainerId: true } } } satisfies Prisma.StaffProfileInclude;
+const person = { user: { select: { trainerId: true, trainer: { select: { commissionPercent: true } } } } } satisfies Prisma.StaffProfileInclude;
 const zero = () => new Prisma.Decimal(0);
-export const TRAINER_SHARE_RATE = 0.30;
-type PayrollLesson = { id?: string; startTime?: Date; service?: { price: Prisma.Decimal; name?: string } | null; bookings: Array<{ costAmount: Prisma.Decimal }> };
+type PayrollLesson = { trainer?: { commissionPercent: Prisma.Decimal } | null; id?: string; startTime?: Date; service?: { price: Prisma.Decimal; name?: string } | null; bookings: Array<{ costAmount: Prisma.Decimal }> };
 export function trainerPayout(lesson: PayrollLesson): number {
-  return Math.round(Number(lesson.service?.price ?? 0) * TRAINER_SHARE_RATE);
+  // Preserve the established whole-ruble rounding of legacy staff payrolls.
+  return new Prisma.Decimal(lesson.service?.price ?? 0).mul(lesson.trainer?.commissionPercent ?? 30).div(100).toDecimalPlaces(0).toNumber();
 }
 export function payrollAmounts(shiftsCount: number, profile: Pick<StaffProfile, 'shiftRate' | 'lessonRate' | 'groupLessonRate' | 'lessonPercentage'>, lessons: PayrollLesson[], bonuses: Prisma.Decimal.Value = 0, penalties: Prisma.Decimal.Value = 0) {
   const shiftsTotal = new Prisma.Decimal(profile.shiftRate ?? 0).mul(shiftsCount);
@@ -66,7 +66,7 @@ export class StaffService {
         isActive: query.activity ? query.activity === 'active' : undefined,
         ...(query.duty ? { shifts: query.duty === 'on' ? { some: this.dutyWhere() } : { none: this.dutyWhere() } } : {}) };
 
-      return { data: await tx.staffProfile.findMany({ where, include: { user: { select: { telegramUserId: true, telegramUsername: true, vkId: true, role: true, email: true, trainerId: true, crmAccess: true } }, shifts: { where: this.dutyWhere(), select: { id: true } } }, orderBy: [{ fullName: 'asc' }, { id: 'asc' }], skip: ((query.page ?? 1) - 1) * (query.pageSize ?? 20), take: query.pageSize ?? 20 }), total: await tx.staffProfile.count({ where }) };
+      return { data: await tx.staffProfile.findMany({ where, include: { user: { select: { telegramUserId: true, telegramUsername: true, vkId: true, role: true, email: true, trainerId: true, trainer: { select: { commissionPercent: true } }, crmAccess: true } }, shifts: { where: this.dutyWhere(), select: { id: true } } }, orderBy: [{ fullName: 'asc' }, { id: 'asc' }], skip: ((query.page ?? 1) - 1) * (query.pageSize ?? 20), take: query.pageSize ?? 20 }), total: await tx.staffProfile.count({ where }) };
     });
   }
   candidates(user: AuthUser) {
@@ -239,8 +239,8 @@ export class StaffService {
     const range = payrollRange(from, to);
     const count = await tx.workShift.count({ where: { staffId: staff.id, status: 'COMPLETED', date: { gte: range.periodStart, lte: range.periodEnd } } });
     // Completing a Lesson does not change participant Booking.status in the schedule module.
-    const lessons = staff.user.trainerId ? await tx.lesson.findMany({ where: { trainerId: staff.user.trainerId, status: 'COMPLETED', startTime: { gte: range.start, lt: range.end }, bookings: { some: { status: { in: ['scheduled', 'completed'] } } } }, select: { id: true, startTime: true, service: { select: { name: true, price: true } }, bookings: { where: { status: { in: ['scheduled', 'completed'] } }, select: { costAmount: true } } } }) : [];
-    return { amounts: payrollAmounts(count, staff, lessons, bonuses, penalties), lessonBreakdown: lessons.map(lesson => ({ id: lesson.id, startTime: lesson.startTime, serviceName: lesson.service?.name, nominalPrice: Number(lesson.service?.price ?? 0), clientPaid: lesson.bookings.reduce((sum, booking) => sum.plus(booking.costAmount), zero()), trainerPayout: trainerPayout(lesson) })) };
+    const lessons = staff.user.trainerId ? await tx.lesson.findMany({ where: { trainerId: staff.user.trainerId, status: 'COMPLETED', startTime: { gte: range.start, lt: range.end }, bookings: { some: { status: { in: ['scheduled', 'completed'] } } } }, select: { trainer: { select: { commissionPercent: true } }, id: true, startTime: true, service: { select: { name: true, price: true } }, bookings: { where: { status: { in: ['scheduled', 'completed'] } }, select: { costAmount: true } } } }) : [];
+    return { amounts: payrollAmounts(count, staff, lessons, bonuses, penalties), lessonBreakdown: lessons.map(lesson => ({ id: lesson.id, startTime: lesson.startTime!.toISOString(), serviceName: lesson.service?.name, nominalPrice: Number(lesson.service?.price ?? 0), commissionPercent: Number(lesson.trainer?.commissionPercent ?? 30), clientPaid: lesson.bookings.reduce((sum, booking) => sum.plus(booking.costAmount), zero()).toFixed(2), trainerPayout: trainerPayout(lesson) })) };
   }
   calculate(query: ShiftQueryDto, user: AuthUser) {
     if (!query.from || !query.to) throw new BadRequestException('Укажите период расчета');
@@ -254,7 +254,7 @@ export class StaffService {
         const saved = await tx.payrollCalculation.findUnique({ where: { staffId_periodStart_periodEnd: { staffId: profile.id, periodStart, periodEnd } } });
         const overlap = await tx.payrollCalculation.findFirst({ where: { staffId: profile.id, isPaid: true, periodStart: { lte: periodEnd }, periodEnd: { gte: periodStart } } });
         const computed = saved?.isPaid ? undefined : await this.compute(tx, profile, query.from!, query.to!, saved?.bonuses, saved?.penalties);
-        data.push({ ...saved, ...computed?.amounts, lessonBreakdown: computed?.lessonBreakdown, staffId: profile.id, fullName: profile.fullName, roleTitle: profile.roleTitle, isPaid: saved?.isPaid ?? false, blocked: !!overlap && !saved?.isPaid });
+        data.push({ ...saved, ...computed?.amounts, lessonBreakdown: computed?.lessonBreakdown ?? saved?.lessonBreakdown, commissionPercent: profile.user.trainer?.commissionPercent, staffId: profile.id, fullName: profile.fullName, roleTitle: profile.roleTitle, isPaid: saved?.isPaid ?? false, blocked: !!overlap && !saved?.isPaid });
       }
       return { data, total: await tx.staffProfile.count({ where }) };
     }, { isolationLevel: 'RepeatableRead' });
@@ -268,9 +268,9 @@ export class StaffService {
       if (dto.expectedUpdatedAt !== undefined && (previous?.updatedAt.toISOString() ?? null) !== dto.expectedUpdatedAt) throw new ConflictException('Расчет изменен другим пользователем. Обновите ведомость');
       const staff = await tx.staffProfile.findUnique({ where: { id: dto.staffId }, include: person });
       if (!staff) throw new NotFoundException('Сотрудник не найден');
-      const { amounts } = await this.compute(tx, staff, dto.from, dto.to, dto.bonuses, dto.penalties);
+      const { amounts, lessonBreakdown } = await this.compute(tx, staff, dto.from, dto.to, dto.bonuses, dto.penalties);
       if (amounts.totalAmount.isNegative() || [amounts.totalAmount, amounts.shiftsTotal, amounts.lessonsTotal].some(value => value.gt('9999999999.99'))) throw new BadRequestException('Суммы расчета должны быть от 0 до 9 999 999 999,99 ₽');
-      return tx.payrollCalculation.upsert({ where: { staffId_periodStart_periodEnd: { staffId: staff.id, periodStart, periodEnd } }, create: { staffId: staff.id, periodStart, periodEnd, ...amounts, createdById: user.id }, update: amounts });
+      return tx.payrollCalculation.upsert({ where: { staffId_periodStart_periodEnd: { staffId: staff.id, periodStart, periodEnd } }, create: { staffId: staff.id, periodStart, periodEnd, ...amounts, lessonBreakdown, createdById: user.id }, update: { ...amounts, lessonBreakdown } });
     });
   }
   payout(dto: PayoutDto, user: AuthUser) {
@@ -285,14 +285,14 @@ export class StaffService {
       }
       await this.unlocked(tx, row.staffId, row.periodStart, row.periodEnd);
       const from = row.periodStart.toISOString().slice(0, 10), to = row.periodEnd.toISOString().slice(0, 10);
-      const { amounts } = await this.compute(tx, row.staff, from, to, row.bonuses, row.penalties);
+      const { amounts, lessonBreakdown } = await this.compute(tx, row.staff, from, to, row.bonuses, row.penalties);
       if (!amounts.totalAmount.equals(dto.expectedTotal) || !row.totalAmount.equals(dto.expectedTotal)) throw new ConflictException('Начисления изменились. Обновите и сохраните расчет перед выплатой');
       if (amounts.totalAmount.lte(0)) throw new BadRequestException('Сумма выплаты должна быть положительной');
       const paidAt = new Date();
       const shift = await tx.cashShift.findFirst({ where: { cashierId: user.id, closedAt: null, openedAt: { lte: paidAt } } });
       const expense = await tx.expense.create({ data: { category: 'SALARY', amount: amounts.totalAmount, paymentMethod: dto.paymentMethod, description: `Выплата зарплаты: ${row.staff.fullName}, период ${from}–${to}`, createdById: user.id, date: paidAt, shiftId: shift?.id } });
       // FinanceService derives balances from Expense in the same database; no duplicate balance cache.
-      return tx.payrollCalculation.update({ where: { id: row.id }, data: { ...amounts, isPaid: true, paidAt, expenseId: expense.id } });
+      return tx.payrollCalculation.update({ where: { id: row.id }, data: { ...amounts, lessonBreakdown, isPaid: true, paidAt, expenseId: expense.id } });
     });
   }
 }

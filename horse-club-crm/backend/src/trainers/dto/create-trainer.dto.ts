@@ -4,6 +4,13 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, Matches, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 
 export class CreateTrainerDto extends PublicationDto {
+  @ApiPropertyOptional({ default: 30, minimum: 0, maximum: 100 })
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  commissionPercent?: number;
+
   @ApiPropertyOptional({ nullable: true })
   @Transform(({ value }: { value: unknown }) => typeof value === 'number' && Number.isSafeInteger(value) ? String(value) : value)
   @IsOptional()

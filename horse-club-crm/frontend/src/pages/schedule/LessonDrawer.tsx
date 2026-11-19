@@ -97,6 +97,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
       && (!(membership.validTo || membership.validUntil) || +new Date(membership.validTo || membership.validUntil) >= at)
   })
   const selectedService = catalogs.services.find(row => row.id === serviceId)
+  const commissionPercent = Number(catalogs.trainers.find(row => row.id === trainerId)?.commissionPercent ?? 30)
   const nominalPrice = Number(selectedService?.price ?? 0)
   const blockedHorse = (id: string) => {
     const load = availability.data?.horseWorkloads.find(row => row.horseId === id)
@@ -161,7 +162,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
     {serviceId && !membershipId && <LessonPriceFields key={serviceId} perPerson={perPerson} price={catalogs.services.find(row => row.id === serviceId)?.price} />}
     {serviceId && <Descriptions title="Финансовая сводка" column={1} size="small" items={[
       { key: 'nominal', label: 'Номинал услуги', children: `${nominalPrice.toLocaleString('ru-RU')} руб.` },
-      { key: 'trainer', label: 'Начисление тренеру 30%', children: `${Math.round(nominalPrice * 0.30).toLocaleString('ru-RU')} руб.` },
+      { key: 'trainer', label: `Начисление тренеру ${commissionPercent}%`, children: `${(Math.round(nominalPrice * commissionPercent) / 100).toLocaleString('ru-RU')} руб.` },
       { key: 'client', label: 'К оплате клиентом', children: membershipId ? '0 руб. · занятие с абонемента' : `${Number(cost ?? nominalPrice).toLocaleString('ru-RU')} руб.` },
     ]} />}
   </StableEntryModal>

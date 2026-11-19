@@ -16,18 +16,19 @@ test('Moscow defaults: advance 1–15, final full month, invalid and cross-month
   assert.equal(closingRange({ type: 'SHIFT', date: '2026-10-01' }).end.toISO(), '2026-10-02T00:00:00.000+03:00');
 });
 
-function payrollFixture() {
+function payrollFixture(initialRate = 30) {
   let row, expenses = [], audit = [], paid = [], failAudit = false;
+  let commissionPercent = initialRate;
   const tx = {
     $queryRaw: async () => [],
-    trainer: { findMany: async query => { assert.equal(query.where.isActive, true); assert.equal(query.where.lessons.some.status, 'COMPLETED'); return [{ id: 'trainer' }]; } },
+    trainer: { findMany: async query => { assert.equal(query.where.isActive, true); assert.equal(query.where.lessons.some.status, 'COMPLETED'); return [{ id: 'trainer', commissionPercent: d(commissionPercent) }]; } },
     payrollCalculation: { findFirst: async () => null },
     lesson: { findMany: async query => { assert.equal(query.where.status, 'COMPLETED'); assert.equal(query.where.trainerId, 'trainer'); assert.equal(query.where.deletedAt, null); assert.equal(query.where.bookings, undefined); return [
       { id: 'lesson', startTime: new Date('2026-10-02T07:00Z'), service: { name: 'Урок', price: d('1000.50') }, costAmount: d(100) },
     ]; } },
     trainerPayout: {
       findFirst: async () => null,
-      findUnique: async () => row, findMany: async () => paid,
+      findUnique: async ({ where }) => where.trainerId_type_periodStart_periodEnd && row?.type !== where.trainerId_type_periodStart_periodEnd.type ? undefined : row, findMany: async () => paid,
       upsert: async ({ create }) => row = { id: 'statement', status: 'DRAFT', trainer: { name: 'Тренер' }, staff: null, ...create },
       update: async ({ data }) => { row = { ...row, ...data }; if (row.status === 'PAID') paid = [row]; return row; },
     },
@@ -38,8 +39,51 @@ function payrollFixture() {
     assert.equal(options.isolationLevel, 'Serializable'); const before = { row, expenses: [...expenses], audit: [...audit], paid: [...paid] };
     try { return await work(tx); } catch (error) { ({ row, expenses, audit, paid } = before); throw error; }
   } });
-  return { service, state: () => ({ row, expenses, audit }), fail: () => { failAudit = true; }, setPaid: rows => { paid = rows; } };
+  return { service, state: () => ({ row, expenses, audit }), fail: () => { failAudit = true; }, setPaid: rows => { paid = rows; }, setRate: value => { commissionPercent = value; } };
 }
+
+test('individual 0/30/100/fractional commissions use nominal price and freeze approved/paid snapshots', async () => {
+  for (const [rate, expected] of [[0, '0.00'], [30, '300.15'], [100, '1000.50'], [33.33, '333.47']]) {
+    const f = payrollFixture(rate);
+    const dto = { type: 'ADVANCE', month: '2026-10' };
+    const [row] = await f.service.generate(dto, actor);
+    assert.equal(row.accrued.toFixed(2), expected);
+    assert.equal(row.lessonBreakdown[0].commissionPercent, rate);
+    await f.service.transition(row.id, false, actor);
+    f.setRate(50);
+    const [again] = await f.service.generate(dto, actor);
+    assert.equal(again.status, 'APPROVED');
+    assert.deepEqual(again.lessonBreakdown, row.lessonBreakdown);
+    const paid = await f.service.transition(row.id, true, actor);
+    assert.equal(paid.accrued.toFixed(2), expected);
+    const [stillPaid] = await f.service.generate(dto, actor);
+    assert.deepEqual(stillPaid, paid);
+  }
+});
+
+test('final retains the paid advance nominal amount and rate after a commission change', async () => {
+  const f = payrollFixture(100);
+  const [advance] = await f.service.generate({ type: 'ADVANCE', month: '2026-10' }, actor);
+  await f.service.transition(advance.id, false, actor);
+  await f.service.transition(advance.id, true, actor);
+  f.setRate(0);
+  f.setPaid([{ ...advance, type: 'ADVANCE', status: 'PAID' }]);
+  const [final] = await f.service.generate({ type: 'FINAL_SALARY', month: '2026-10' }, actor);
+  assert.equal(final.totalAmount.toFixed(2), '0.00');
+  assert.equal(final.lessonBreakdown[0].commissionPercent, 100);
+  assert.equal(final.accrued.toFixed(2), '1000.50');
+});
+
+test('historical 30% statement without per-line commission can still be approved and paid', async () => {
+  const f = payrollFixture();
+  const [row] = await f.service.generate({ type: 'ADVANCE', month: '2026-10' }, actor);
+  delete row.lessonBreakdown[0].commissionPercent;
+  await f.service.transition(row.id, false, actor);
+  f.setRate(100);
+  const paid = await f.service.transition(row.id, true, actor);
+  assert.equal(paid.totalAmount.toFixed(2), '300.15');
+  assert.equal(paid.lessonBreakdown[0].commissionPercent, undefined);
+});
 
 test('advance uses 30% nominal ignoring discount; approval and payout are atomic, MAIN salary and idempotent', async () => {
   const f = payrollFixture();

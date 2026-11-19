@@ -27,6 +27,10 @@ test('catalog mutations enforce their module and trainer rates additionally enfo
   assert.equal(await check(TrainersController, 'update', { phone: '+79991234567' }, { SCHEDULE: 'FULL', STAFF_PAYROLL: 'READ_ONLY' }), true);
   await assert.rejects(check(TrainersController, 'update', { baseRate: 2000 }, { SCHEDULE: 'FULL', STAFF_PAYROLL: 'READ_ONLY' }), error => error.getStatus() === 403);
   assert.equal(await check(TrainersController, 'update', { baseRate: 2000 }, { SCHEDULE: 'FULL', STAFF_PAYROLL: 'FULL' }), true);
+  for (const commissionPercent of [0, 100]) {
+    for (const access of ['READ_ONLY', 'HIDDEN']) await assert.rejects(check(TrainersController, 'update', { commissionPercent }, { SCHEDULE: 'FULL', STAFF_PAYROLL: access }), error => error.getStatus() === 403);
+    assert.equal(await check(TrainersController, 'update', { commissionPercent }, { SCHEDULE: 'FULL', STAFF_PAYROLL: 'FULL' }), true);
+  }
 });
 
 test('profile dates, owner UUIDs and schedule colors are validated; clearable fields accept null', async () => {

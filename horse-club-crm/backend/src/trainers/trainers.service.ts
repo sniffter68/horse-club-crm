@@ -95,10 +95,22 @@ export class TrainersService {
     });
   }
 
-  async update(id: string, dto: UpdateTrainerDto): Promise<Trainer> {
+  async update(id: string, dto: UpdateTrainerDto, actor?: AuthUser): Promise<Trainer> {
     const { vkId: input, ...data } = dto;
     const vk = input === undefined ? undefined : await this.identity.normalize(input);
+    const commissionPercent = dto.commissionPercent;
     try {
+      if (commissionPercent !== undefined) return await this.identity.atomic(async tx => {
+        const previous = await tx.trainer.findUnique({ where: { id } });
+        if (!previous) throw new NotFoundException('Тренер не найден');
+        if (vk) await this.identity.applyTrainer(tx, id, vk.vkId);
+        const updated = await tx.trainer.update({ where: { id }, data });
+        if (!previous.commissionPercent.equals(commissionPercent)) await tx.cashAuditLog.create({ data: {
+          requestId: randomUUID(), action: 'TRAINER_COMMISSION_CHANGED', actorId: actor?.id ?? 'system', actorName: actor?.email ?? 'system',
+          details: { trainerId: id, before: previous.commissionPercent.toFixed(2), after: String(commissionPercent) },
+        } });
+        return updated;
+      });
       if (!vk) return await this.prisma.trainer.update({ where: { id }, data });
       return await this.identity.atomic(async tx => {
         await this.identity.applyTrainer(tx, id, vk.vkId);

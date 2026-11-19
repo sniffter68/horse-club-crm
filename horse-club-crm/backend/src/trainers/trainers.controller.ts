@@ -25,9 +25,9 @@ import { ModuleAccessGuard, RequireModule, RequireModuleForFields } from '../aut
 @ApiTags('Trainers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
-@RequireModuleForFields('STAFF_PAYROLL', ['baseRate'])
+@RequireModuleForFields('STAFF_PAYROLL', ['baseRate', 'commissionPercent'])
 @UseInterceptors(SanitizeRbacInterceptor)
-@SanitizeTrainerFields('baseRate')
+@SanitizeTrainerFields('baseRate', 'commissionPercent')
 @Controller('trainers')
 export class TrainersController {
   constructor(private readonly trainersService: TrainersService, private readonly identity: VkIdentityService) {}
@@ -67,8 +67,8 @@ export class TrainersController {
   @Patch(':id')
   @RequireModule('SCHEDULE')
   @Roles(Role.ADMIN, Role.MANAGER)
-  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateTrainerDto): Promise<Trainer> {
-    return this.trainersService.update(id, dto);
+  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateTrainerDto, @Req() req: { user: AuthUser }): Promise<Trainer> {
+    return this.trainersService.update(id, dto, req.user);
   }
 
   @Delete(':id')

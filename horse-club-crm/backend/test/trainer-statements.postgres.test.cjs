@@ -90,5 +90,34 @@ test('PostgreSQL: nominal advance/final, atomic MAIN expense, concurrent pay, bo
       const profile = await p.staffProfile.create({ data: { userId: profileUser.id, fullName: 'Without login', roleTitle: 'Trainer' } });
       await assert.rejects(() => p.payrollCalculation.create({ data: { staffId: profile.id, periodStart: new Date('2026-11-01'), periodEnd: new Date('2026-11-15'), shiftsCount: 0, shiftsTotal: 0, lessonsCount: 1, lessonsTotal: '300.15', totalAmount: '300.15', createdById: actor.id } }), /уже оплачен/);
     });
+    await t.test('30% and 100% in one period; inclusive SQL range, audit and immutable paid snapshots', async () => {
+      const trainers = await Promise.all([30, 100].map(commissionPercent => p.trainer.create({ data: { name: `Commission ${commissionPercent}`, commissionPercent } })));
+      for (const trainer of trainers) await p.lesson.create({ data: { trainerId: trainer.id, serviceId: offering.id, status: 'COMPLETED', startTime: new Date('2026-08-02T07:00Z'), endTime: new Date('2026-08-02T08:00Z') } });
+      const rows = await payroll.generate({ type: 'ADVANCE', month: '2026-08' }, actor);
+      assert.equal(rows.length, 2);
+      for (const trainer of trainers) {
+        const row = rows.find(row => row.trainerId === trainer.id);
+        const expected = trainer.commissionPercent.equals(100) ? '1000.50' : '300.15';
+        assert.equal(row.totalAmount.toFixed(2), expected);
+        assert.equal(row.lessonBreakdown[0].commissionPercent, trainer.commissionPercent.toNumber());
+        await payroll.transition(row.id, false, actor);
+        const { TrainersService } = require('../dist/trainers/trainers.service');
+        await new TrainersService(p).update(trainer.id, { commissionPercent: 0 }, actor);
+        assert.ok(await p.cashAuditLog.findFirst({ where: { action: 'TRAINER_COMMISSION_CHANGED', actorId: actor.id } }));
+        const [approved] = await payroll.generate({ type: 'ADVANCE', month: '2026-08', trainerId: trainer.id }, actor);
+        assert.equal(approved.status, 'APPROVED');
+        const paid = await payroll.transition(row.id, true, actor);
+        assert.equal(paid.totalAmount.toFixed(2), expected);
+        await p.trainer.update({ where: { id: trainer.id }, data: { commissionPercent: 50 } });
+        const [again] = await payroll.generate({ type: 'ADVANCE', month: '2026-08', trainerId: trainer.id }, actor);
+        assert.deepEqual(again.lessonBreakdown, paid.lessonBreakdown);
+        assert.equal(again.commissionPercent.toString(), paid.commissionPercent.toString());
+        const [final] = await payroll.generate({ type: 'FINAL_SALARY', month: '2026-08', trainerId: trainer.id }, actor);
+        assert.equal(final.totalAmount.toFixed(2), '0.00');
+        assert.deepEqual(final.lessonBreakdown, paid.lessonBreakdown);
+      }
+      for (const commissionPercent of [-1, 101]) await assert.rejects(() => p.trainer.create({ data: { name: 'Invalid commission', commissionPercent } }));
+      assert.equal((await p.trainer.create({ data: { name: 'Default commission' } })).commissionPercent.toNumber(), 30);
+    });
   } finally { await p.$disconnect(); }
 });

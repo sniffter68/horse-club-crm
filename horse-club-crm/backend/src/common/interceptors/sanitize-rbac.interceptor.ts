@@ -31,7 +31,7 @@ export class SanitizeRbacInterceptor implements NestInterceptor {
       if (!visible('STABLES')) hidden.push('boardingContracts', 'currentBoardingContract', 'stall');
       if (!visible('SCHEDULE')) hidden.push('bookings', 'lessons');
       if (!visible('CASHBOX')) hidden.push('payments', 'operations', 'recognizedRevenue', 'revenueRecognitions', 'pricePerLesson', 'totalPrice');
-      if (!visible('STAFF_PAYROLL') || (user.role !== Role.ADMIN && user.role !== Role.MANAGER)) hidden.push('baseRate', 'shiftRate', 'lessonRate', 'groupLessonRate', 'lessonPercentage');
+      if (!visible('STAFF_PAYROLL') || (user.role !== Role.ADMIN && user.role !== Role.MANAGER)) hidden.push('baseRate', 'commissionPercent', 'shiftRate', 'lessonRate', 'groupLessonRate', 'lessonPercentage');
       return this.interceptLegacy(context, next).pipe(map(value => this.sanitize(value, hidden)));
     }));
   }

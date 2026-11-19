@@ -295,6 +295,7 @@ model Trainer {
   qualification String?
   maxDailyLoad  Int      @default(480)
   maxParallelLessons Int @default(4)
+  commissionPercent Decimal @default(30) @db.Decimal(5, 2)
   baseRate      Decimal  @default(0) @db.Decimal(12, 2)
   lessons       Lesson[]
 }
@@ -835,6 +836,7 @@ model WorkShift {
 }
 
 model PayrollCalculation {
+  lessonBreakdown Json @default("[]")
   id String @id @default(uuid()) @db.Uuid
   staffId String @db.Uuid
   staff StaffProfile @relation(fields: [staffId], references: [id], onDelete: Restrict)
@@ -1153,6 +1155,7 @@ enum TrainerPayoutStatus {
 }
 
 model TrainerPayout {
+  commissionPercent Decimal @default(30) @db.Decimal(5, 2)
   id String @id @default(uuid()) @db.Uuid
   // Nullable only for unresolved historical statements; new statements require a trainer.
   trainerId String? @db.Uuid

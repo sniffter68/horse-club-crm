@@ -9,7 +9,7 @@ import { GenerateTrainerStatementDto, TrainerStatementQueryDto } from './trainer
 import { payrollRange } from './staff.service';
 
 const zone = 'Europe/Moscow';
-const include = { trainer: { select: { id: true, name: true, fullName: true } }, staff: { select: { fullName: true } } } satisfies Prisma.TrainerPayoutInclude;
+const include = { trainer: { select: { id: true, name: true, fullName: true, commissionPercent: true } }, staff: { select: { fullName: true } } } satisfies Prisma.TrainerPayoutInclude;
 export function statementPeriod(dto: GenerateTrainerStatementDto) {
   const month = DateTime.fromISO(`${dto.month}-01`, { zone });
   if (!month.isValid || month.year < 2000) throw new BadRequestException('Некорректный месяц');
@@ -37,7 +37,7 @@ export class TrainerPayoutService {
   list(dto: TrainerStatementQueryDto) {
     return this.prisma.trainerPayout.findMany({ where: { month: dto.month }, include, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }] });
   }
-  private async compute(tx: Prisma.TransactionClient, trainerId: string, dto: GenerateTrainerStatementDto) {
+  private async compute(tx: Prisma.TransactionClient, trainerId: string, dto: GenerateTrainerStatementDto, commissionPercent: Prisma.Decimal.Value = 30) {
     const range = statementPeriod(dto);
     const legacy = await tx.payrollCalculation.findFirst({ where: { staff: { user: { trainerId } }, isPaid: true, periodStart: { lte: range.periodEnd }, periodEnd: { gte: range.periodStart } } });
     if (legacy) throw new ConflictException('Период уже оплачен в ведомости персонала');
@@ -46,13 +46,26 @@ export class TrainerPayoutService {
     const lessons = await tx.lesson.findMany({ where: { trainerId, deletedAt: null, status: 'COMPLETED', startTime: { gte: range.start, lt: range.end } },
       select: { id: true, startTime: true, service: { select: { name: true, price: true } } }, orderBy: [{ startTime: 'asc' }, { id: 'asc' }] });
     if (lessons.some(row => !row.service)) throw new ConflictException('У проведённого занятия не указана услуга');
+    // Final salary carries forward paid advance lines without repricing them.
+    const paidLessons = new Map<string, { nominalPrice: string; trainerPayout: string; commissionPercent: number }>();
+    for (const statement of paid) {
+      if (!Array.isArray(statement.lessonBreakdown)) continue;
+      for (const item of statement.lessonBreakdown) {
+        if (item && typeof item === 'object' && !Array.isArray(item) && typeof item.id === 'string'
+          && typeof item.nominalPrice === 'string' && typeof item.trainerPayout === 'string') {
+          paidLessons.set(item.id, { nominalPrice: item.nominalPrice, trainerPayout: item.trainerPayout,
+            commissionPercent: Number(item.commissionPercent ?? statement.commissionPercent ?? 30) });
+        }
+      }
+    }
     const lessonBreakdown = lessons.map(row => ({ id: row.id, startTime: row.startTime.toISOString(), serviceName: row.service!.name,
-      nominalPrice: row.service!.price.toFixed(2), trainerPayout: row.service!.price.mul('0.30').toDecimalPlaces(2).toFixed(2) }));
+      nominalPrice: row.service!.price.toFixed(2), commissionPercent: Number(commissionPercent), trainerPayout: row.service!.price.mul(commissionPercent).div(100).toDecimalPlaces(2).toFixed(2),
+      ...paidLessons.get(row.id) }));
     const nominalBase = lessonBreakdown.reduce((sum, row) => sum.plus(row.nominalPrice), new Prisma.Decimal(0));
     const accrued = lessonBreakdown.reduce((sum, row) => sum.plus(row.trainerPayout), new Prisma.Decimal(0));
     const advanceDeducted = dto.type === 'FINAL_SALARY' ? paid.reduce((sum, row) => sum.plus(row.totalAmount), new Prisma.Decimal(0)) : new Prisma.Decimal(0);
     if (accrued.lt(advanceDeducted)) throw new ConflictException('Выплаченные авансы превышают начисления. Требуется сверка');
-    return { lessonsCount: lessons.length, nominalBase, accrued, advanceDeducted, totalAmount: accrued.minus(advanceDeducted), lessonBreakdown };
+    return { commissionPercent: new Prisma.Decimal(commissionPercent), lessonsCount: lessons.length, nominalBase, accrued, advanceDeducted, totalAmount: accrued.minus(advanceDeducted), lessonBreakdown };
   }
   generate(dto: GenerateTrainerStatementDto, actor: { id: string; email: string }) {
     const range = statementPeriod(dto);
@@ -68,8 +81,8 @@ export class TrainerPayoutService {
         if (unresolved) throw new ConflictException('Исторические ведомости требуют сверки привязки тренера');
         const key = { trainerId: trainer.id, type: dto.type, periodStart: range.periodStart, periodEnd: range.periodEnd };
         const previous = await tx.trainerPayout.findUnique({ where: { trainerId_type_periodStart_periodEnd: key } });
-        if (previous?.status === 'PAID') { rows.push(previous); continue; }
-        const amounts = await this.compute(tx, trainer.id, dto);
+        if (previous && previous.status !== 'DRAFT') { rows.push(previous); continue; }
+        const amounts = await this.compute(tx, trainer.id, dto, trainer.commissionPercent);
         rows.push(await tx.trainerPayout.upsert({ where: { trainerId_type_periodStart_periodEnd: key }, create: { ...key, month: dto.month, ...amounts, createdById: actor.id }, update: { ...amounts, status: 'DRAFT' }, include }));
       }
       await this.audit(tx, 'TRAINER_STATEMENTS_GENERATED', actor, { month: dto.month, type: dto.type });
@@ -84,8 +97,8 @@ export class TrainerPayoutService {
       if (row.status === 'PAID' || (!pay && row.status === 'APPROVED')) return row;
       if (pay && row.status !== 'APPROVED') throw new ConflictException('Сначала утвердите ведомость');
       if (!row.trainerId) throw new ConflictException('Историческая ведомость требует привязки тренера');
-      const amounts = await this.compute(tx, row.trainerId, { month: row.month, type: row.type as TrainerPayoutType, periodStart: row.periodStart.toISOString().slice(0, 10), periodEnd: row.periodEnd.toISOString().slice(0, 10) });
-      if (!row.totalAmount.equals(amounts.totalAmount) || !row.accrued.equals(amounts.accrued) || !row.advanceDeducted.equals(amounts.advanceDeducted) || !isDeepStrictEqual(row.lessonBreakdown, amounts.lessonBreakdown)) throw new ConflictException('Начисления изменились. Сформируйте ведомость заново');
+      const amounts = await this.compute(tx, row.trainerId, { month: row.month, type: row.type as TrainerPayoutType, periodStart: row.periodStart.toISOString().slice(0, 10), periodEnd: row.periodEnd.toISOString().slice(0, 10) }, row.commissionPercent ?? 30);
+      if (!row.totalAmount.equals(amounts.totalAmount) || !row.accrued.equals(amounts.accrued) || !row.advanceDeducted.equals(amounts.advanceDeducted) || !isDeepStrictEqual(Array.isArray(row.lessonBreakdown) ? row.lessonBreakdown.map(item => item && typeof item === 'object' && !Array.isArray(item) ? { commissionPercent: Number(row.commissionPercent ?? 30), ...item } : item) : row.lessonBreakdown, amounts.lessonBreakdown)) throw new ConflictException('Начисления изменились. Сформируйте ведомость заново');
       const paidAt = new Date();
       const expense = pay && row.totalAmount.gt(0) ? await tx.expense.create({ data: { amount: row.totalAmount, category: 'SALARY', paymentMethod: 'CASH', date: paidAt, createdById: actor.id,
         description: `${row.type === 'ADVANCE' ? 'Аванс' : 'Зарплата'}: ${row.trainer?.name || row.trainer?.fullName || row.staff?.fullName}, ${row.month}` } }) : null;
