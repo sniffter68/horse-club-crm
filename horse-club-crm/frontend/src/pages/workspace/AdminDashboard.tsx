@@ -11,6 +11,7 @@ import './workspace.css'
 import { ClubIcon } from '../../components/ClubIcon'
 import { EquestrianMotif } from '../../components/EquestrianMotif'
 import { lessonAccent } from '../../components/lessonAccent'
+import { ShiftConditions } from './ShiftConditions'
 
 const rub = (value: number | string) => Number(value).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })
 const localTime = (value: string) => DateTime.fromISO(value, { zone: 'Europe/Moscow' }).toFormat('dd.MM HH:mm')
@@ -37,7 +38,7 @@ export function AdminDashboardPage() {
   const finance = data.finance
   const percent = finance && Number(finance.accrued) > 0 ? Math.min(100, Math.round(Number(finance.paid) / Number(finance.accrued) * 100)) : 0
   return <section aria-label="Рабочее место администратора">
-    <header className="workspace-toolbar shift-welcome"><EquestrianMotif /><div><Typography.Title level={2}>Хорошей смены!</Typography.Title><Typography.Text>{DateTime.fromISO(data.date).setLocale('ru').toFormat('cccc, d MMMM')} · Время московское</Typography.Text></div><Button onClick={refresh}>Обновить сводку</Button></header>
+    <header className="workspace-toolbar shift-welcome"><EquestrianMotif /><div><Typography.Title level={2}>Хорошей смены!</Typography.Title><ShiftConditions /></div><Button onClick={refresh}>Обновить сводку</Button></header>
     <div className="workspace-kpis">{([
       ['Занятий сегодня', data.kpi.lessonsToday], ['Активных всадников', data.kpi.activeRiders], ['Ожидают подтверждения', data.kpi.awaitingConfirmation], ['Новые заявки', data.kpi.newLeads],
     ] as const).map(([title, value], index) => <Card key={title}><Statistic title={<span className="club-icon-label"><ClubIcon name={index === 0 ? 'calendar' : index === 1 ? 'users' : 'bell'} />{title}</span>} value={value} />{title === 'Новые заявки' && <a href="#pending-leads">Открыть заявки</a>}</Card>)}</div>

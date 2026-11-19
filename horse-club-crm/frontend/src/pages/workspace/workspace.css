@@ -1,6 +1,9 @@
 .trainer-workspace { padding: max(16px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); color: var(--crm-ink); background: var(--crm-alabaster); min-height: 100dvh; }
 .trainer-workspace-header, .workspace-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .workspace-toolbar { justify-content: flex-start; }
+.shift-conditions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; color: var(--crm-beige); }
+.shift-weather { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.shift-conditions .tabular-nums { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .trainer-workspace-header h3 { margin: 0; }
 .workspace-loading { min-height: 240px; display: grid; place-items: center; }
 .trainer-date-popup { max-width: calc(100vw - 24px); }

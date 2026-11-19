@@ -121,6 +121,7 @@ for (const width of [1440, 390]) test(`cash card opens matching club balances wi
 
 async function setup(page: Page, role = 'ADMIN') {
   await page.clock.setFixedTime(new Date('2026-10-20T08:00:00Z'))
+  await page.route('https://api.open-meteo.com/**', route => route.fulfill({ json: {} }))
   await page.addInitScript(role => {
     localStorage.setItem('horsecrm.access_token', 'cookie-session')
     localStorage.setItem('horsecrm.role', role)
@@ -153,6 +154,54 @@ async function setup(page: Page, role = 'ADMIN') {
   })
   return state
 }
+
+for (const width of [1440, 390]) test(`shift banner shows live Moscow time and cached Tambov weather at ${width}px`, async ({ page }) => {
+  await setup(page)
+  await page.setViewportSize({ width, height: 844 })
+  await page.clock.install({ time: new Date('2026-10-20T08:00:00Z') })
+  let requests = 0
+  await page.route('https://api.open-meteo.com/**', route => {
+    requests++
+    const url = new URL(route.request().url())
+    expect(url.searchParams.get('timezone')).toBe('Europe/Moscow')
+    expect(url.searchParams.get('latitude')).toBe('52.7212')
+    expect(url.searchParams.get('longitude')).toBe('41.4523')
+    expect(url.searchParams.get('current')).toBe('temperature_2m,weather_code')
+    return route.fulfill({ json: { current: { temperature_2m: 4.2, weather_code: 3 } } })
+  })
+  await page.goto('/dashboard')
+  const banner = page.locator('.shift-welcome')
+  await expect(banner.locator('time')).toHaveText('11:00 МСК')
+  await expect(banner.getByLabel('Погода в Тамбове')).toHaveText('·+4°Cоблачно')
+  await expect(banner.locator('time')).toHaveCSS('font-variant-numeric', 'tabular-nums')
+  await expect(banner.locator('.shift-weather .tabular-nums')).toHaveCSS('font-variant-numeric', 'tabular-nums')
+  await expect(banner.locator('svg.lucide')).toHaveAttribute('stroke-width', '1.75')
+  await page.clock.fastForward(60_000)
+  await expect(banner.locator('time')).toHaveText('11:01 МСК')
+  // StrictMode may start and abort an initial request before mounting again.
+  const initialRequests = requests
+  await page.reload()
+  await expect(banner.getByLabel('Погода в Тамбове')).toContainText('+4°C')
+  expect(requests).toBe(initialRequests)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: `test-results/dashboard-weather-${width}.png` })
+  await page.clock.fastForward(20 * 60_000)
+  await expect.poll(() => requests).toBe(initialRequests + 1)
+})
+
+for (const failure of ['blocked', 'invalid', 'http'] as const) test(`shift banner tolerates ${failure} weather`, async ({ page }) => {
+  await setup(page)
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.route('https://api.open-meteo.com/**', route => failure === 'blocked'
+    ? route.abort('blockedbyclient')
+    : route.fulfill({ status: failure === 'http' ? 503 : 200, json: { current: { temperature_2m: null, weather_code: 0 } } }))
+  await page.goto('/dashboard')
+  await expect(page.locator('.shift-welcome time')).toHaveText('11:00 МСК')
+  await expect(page.getByLabel('Погода в Тамбове')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Обновить сводку' })).toBeVisible()
+  expect(errors).toEqual([])
+})
 
 for (const width of [1440, 390]) test(`quick booking shows nominal share, discounted cost and membership at ${width}px`, async ({ page }) => {
   await setup(page)
