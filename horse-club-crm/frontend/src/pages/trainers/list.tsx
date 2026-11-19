@@ -10,6 +10,7 @@ import type { TableColumnsType } from 'antd'
 import { CatalogList } from '../catalogs/shared'
 import type { Trainer } from '../catalogs/types'
 import { usePermissions } from '../../modulePermissions'
+import { TrainerAccount, TrainerAccessStatus } from './TrainerAccount'
 
 export function TrainerList() {
   const [selectedId, setSelectedId] = useState<string>()
@@ -18,6 +19,7 @@ export function TrainerList() {
   const columns: TableColumnsType<Trainer> = [
     { key: 'name', fixed: 'left', width: 180, title: 'ФИО', sorter: true, render: (_, row) => <CardLink onClick={() => setSelectedId(row.id)}>{row.name}</CardLink> },
     { key: 'phone', fixed: 'left', width: 145, dataIndex: 'phone', title: 'Телефон' },
+    { key: 'crmAccess', title: 'Доступ в CRM', width: 200, render: (_, row) => <TrainerAccessStatus trainer={row} /> },
     { key: 'vk', align: 'center', title: 'VK', hidden: !canManage, width: 210, render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name} kind="TRAINER" vkId={row.vkId} /> },
     { key: 'qualification', dataIndex: 'qualification', title: 'Квалификация', width: 170 },
     { key: 'maxDailyLoad', align: 'right', width: 115, dataIndex: 'maxDailyLoad', title: 'Дневная нагрузка, мин', sorter: true },
@@ -26,6 +28,7 @@ export function TrainerList() {
   return <><CatalogList<Trainer> resource="trainers" onSearchSelect={setSelectedId} storageKey="horse_crm_trainers_columns_v1" defaultHiddenColumns={['vk', 'qualification']} title="Тренеры" columns={columns} />
     <DetailsModal<Trainer> resource="trainers" id={selectedId} title="Карточка тренера" onClose={() => setSelectedId(undefined)}>
       {trainer => <><CatalogEditAction resource="trainers" id={trainer.id}><TrainerForm action="edit" /></CatalogEditAction>
+        <TrainerAccount trainer={trainer} />
         {canManage && <VkProfileLink id={trainer.id} name={trainer.name} kind="TRAINER" vkId={trainer.vkId} />}
         <Descriptions bordered column={1} style={{ marginTop: 16 }} items={[
           { key: 'name', label: 'ФИО', children: trainer.name },

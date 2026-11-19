@@ -24,7 +24,7 @@ function store() {
   const state = { account: null, profile: null, trainer: null, shift: null, trainerCreates: 0, transactions: 0 };
   const tx = {
     user: { findUnique: async () => state.account, create: async ({ data }) => state.account = { id: randomUUID(), trainerId: null, ...data }, update: async ({ data }) => state.account = { ...state.account, ...data } },
-    trainer: { create: async ({ data }) => { state.trainerCreates++; return state.trainer = { id: randomUUID(), ...data }; }, update: async ({ data }) => state.trainer = { ...state.trainer, ...data } },
+    trainer: { findMany: async () => state.candidates ?? [], create: async ({ data }) => { state.trainerCreates++; return state.trainer = { id: randomUUID(), ...data }; }, update: async ({ data }) => state.trainer = { ...state.trainer, ...data } },
     staffProfile: { findUnique: async ({ where }) => where.userId && where.userId !== state.account?.id ? null : state.profile, create: async ({ data }) => state.profile = { id: randomUUID(), isActive: true, ...data }, update: async ({ data }) => state.profile = { ...state.profile, ...data }, findMany: async args => { state.query = args; return []; }, count: async () => 0 },
     workShift: { findUnique: async () => state.shift, create: async ({ data }) => state.shift = { id: randomUUID(), status: 'SCHEDULED', endedAt: null, ...data }, update: async ({ data }) => state.shift = { ...state.shift, ...data }, updateMany: async args => { state.archiveShifts = args; return { count: 0 }; }, findMany: async args => { state.dutyQuery = args; return []; } },
     payrollCalculation: { findMany: async () => state.paid ? [{}] : [] },
@@ -46,6 +46,19 @@ test('employee creation atomically creates linked trainer, normalizes VK and has
   assert.deepEqual(state.vk, { id: state.account.id, vkId: '12345' });
   await service.saveProfile({ fullName: 'Анна Петрова' }, admin, row.id);
   assert.equal(state.trainerCreates, 1); assert.equal(state.trainer.fullName, 'Анна Петрова');
+});
+
+test('staff creation reuses an existing catalog trainer and rejects ambiguous or claimed matches', async () => {
+  const { service, state } = store();
+  const existing = { id: randomUUID(), user: null };
+  state.candidates = [existing];
+  await service.saveProfile({ fullName: 'Existing Trainer', role: 'TRAINER', trainerId: existing.id }, admin);
+  assert.equal(state.account.trainerId, existing.id); assert.equal(state.trainerCreates, 0);
+  for (const candidates of [[{ ...existing, user: { id: 'another-user' } }], [existing, { id: randomUUID(), user: null }]]) {
+    const f = store(); f.state.candidates = candidates;
+    await assert.rejects(f.service.saveProfile({ fullName: 'Existing Trainer', role: 'TRAINER' }, admin), e => e.status === 409);
+    assert.equal(f.state.trainerCreates, 0);
+  }
 });
 
 test('employee without CRM access remains a linked trainer; archiving disables account and trainer, preserving IDs', async () => {

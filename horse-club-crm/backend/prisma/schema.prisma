@@ -273,6 +273,7 @@ model Service {
 }
 
 model Trainer {
+  payouts TrainerPayout[]
   preferredByClients Client[] @relation("ClientPreferredTrainer")
   scheduleColor String? @db.VarChar(7)
   user User?
@@ -1153,8 +1154,11 @@ enum TrainerPayoutStatus {
 
 model TrainerPayout {
   id String @id @default(uuid()) @db.Uuid
-  staffId String @db.Uuid
-  staff StaffProfile @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  // Nullable only for unresolved historical statements; new statements require a trainer.
+  trainerId String? @db.Uuid
+  trainer Trainer? @relation(fields: [trainerId], references: [id], onDelete: Restrict)
+  staffId String? @db.Uuid
+  staff StaffProfile? @relation(fields: [staffId], references: [id], onDelete: Restrict)
   type TrainerPayoutType
   month String @db.VarChar(7)
   periodStart DateTime @db.Date
@@ -1173,6 +1177,8 @@ model TrainerPayout {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
   @@unique([staffId, type, periodStart, periodEnd])
+  @@unique([trainerId, type, periodStart, periodEnd])
+  @@index([trainerId, month, status])
   @@index([staffId, month, status])
 }
 

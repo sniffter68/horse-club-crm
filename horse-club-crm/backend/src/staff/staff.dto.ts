@@ -15,6 +15,7 @@ export class StaffProfileDto {
   @IsOptional() @Matches(/^#[0-9a-fA-F]{6}$/) scheduleColor?: string | null;
 
   @Transform(empty) @IsOptional() @IsUUID() userId?: string;
+  @Transform(empty) @IsOptional() @IsUUID() trainerId?: string;
   @Transform(empty) @IsOptional() @IsEnum(Role) role?: Role;
   @IsOptional() @IsString() @MinLength(1) @MaxLength(150) position?: string;
   @Transform(empty) @IsOptional() @IsEmail() email?: string;

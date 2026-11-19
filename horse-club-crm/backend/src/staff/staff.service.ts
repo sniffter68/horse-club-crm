@@ -78,7 +78,7 @@ export class StaffService {
     if (id && dto.userId !== undefined) throw new BadRequestException('Привязку учетной записи изменить нельзя');
     if (['fullName', 'roleTitle', 'position', 'role', 'email', 'isActive', 'createCrmAccess'].some(key => (dto as Record<string, unknown>)[key] === null)) throw new BadRequestException('Обязательные поля не могут быть null');
     if (dto.role === Role.ADMIN && user.role !== Role.ADMIN) throw new ForbiddenException('Назначать администратора может только администратор');
-    const { vkId, vkScreenName, email, role, position, createCrmAccess, temporaryPassword, ...profile } = dto;
+    const { vkId, vkScreenName, email, role, position, createCrmAccess, temporaryPassword, trainerId: selectedTrainerId, ...profile } = dto;
     const input = vkId !== undefined ? vkId : vkScreenName;
     const normalized = input !== undefined ? await this.identity.normalize(input) : undefined;
     const access = createCrmAccess ?? !!temporaryPassword;
@@ -100,7 +100,18 @@ export class StaffService {
       const active = dto.isActive ?? previous?.isActive ?? true;
       const fullName = dto.fullName ?? previous!.fullName;
       let trainerId = account.trainerId;
-      if (nextRole === Role.TRAINER && !trainerId) trainerId = (await tx.trainer.create({ data: { fullName, name: fullName, phone: dto.phone || undefined, scheduleColor: dto.scheduleColor, isActive: active, isPublic: false } })).id;
+      if (selectedTrainerId && trainerId && selectedTrainerId !== trainerId) throw new ConflictException('У сотрудника уже есть карточка тренера');
+      if (selectedTrainerId && nextRole !== Role.TRAINER) throw new BadRequestException('Карточка тренера доступна только для роли Тренер');
+      if (nextRole === Role.TRAINER && !trainerId) {
+        const candidates = await tx.trainer.findMany({ where: selectedTrainerId ? { id: selectedTrainerId } : { OR: [
+          { name: { equals: fullName.trim(), mode: 'insensitive' } }, { fullName: { equals: fullName.trim(), mode: 'insensitive' } },
+          ...(dto.phone ? [{ phone: dto.phone }] : []),
+        ] }, select: { id: true, user: { select: { id: true } } } });
+        if (selectedTrainerId && !candidates.length) throw new BadRequestException('Тренер не найден');
+        if (candidates.length > 1) throw new ConflictException('Найдено несколько тренеров. Выберите карточку тренера');
+        if (candidates[0]?.user && candidates[0].user.id !== account.id) throw new ConflictException('У тренера уже есть учётная запись');
+        trainerId = candidates[0]?.id ?? (await tx.trainer.create({ data: { fullName, name: fullName, phone: dto.phone || undefined, scheduleColor: dto.scheduleColor, isActive: active, isPublic: false } })).id;
+      }
       if (trainerId) await tx.trainer.update({ where: { id: trainerId }, data: { fullName, name: fullName, ...(dto.phone !== undefined ? { phone: dto.phone || null } : {}), ...(dto.scheduleColor !== undefined ? { scheduleColor: dto.scheduleColor } : {}), isActive: active && nextRole === Role.TRAINER } });
       const accessChanged = createCrmAccess !== undefined && createCrmAccess !== account.crmAccess;
       await tx.user.update({ where: { id: account.id }, data: { role: nextRole, trainerId, ...(email !== undefined ? { email: email.trim().toLowerCase() } : {}), ...(passwordHash ? { passwordHash } : {}), ...(!active ? { crmAccess: false } : createCrmAccess !== undefined ? { crmAccess: createCrmAccess } : {}), ...(nextRole !== account.role || !active || accessChanged || passwordHash ? { tokenVersion: { increment: 1 } } : {}) } });
@@ -178,9 +189,9 @@ export class StaffService {
       const select = { id: true, staffId: true, periodStart: true, periodEnd: true, createdAt: true };
       const [legacy, trainers] = await Promise.all([
         tx.payrollCalculation.findMany({ where: { staffId, isPaid: true }, select, orderBy: { periodStart: 'asc' } }),
-        tx.trainerPayout.findMany({ where: { staffId, status: 'PAID' }, select, orderBy: { periodStart: 'asc' } }),
+        tx.trainerPayout.findMany({ where: { OR: [{ staffId }, { trainer: { user: { staffProfile: { id: staffId } } } }], status: 'PAID' }, select, orderBy: { periodStart: 'asc' } }),
       ]);
-      return [...legacy, ...trainers].sort((a, b) => a.periodStart.getTime() - b.periodStart.getTime());
+      return [...legacy, ...trainers.map(row => ({ ...row, staffId }))].sort((a, b) => a.periodStart.getTime() - b.periodStart.getTime());
     });
   }
   reopenPayroll(id: string, user: AuthUser) {

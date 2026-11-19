@@ -1,5 +1,10 @@
 import { phoneSearchIds } from '../common/phone-search';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { hash } from 'bcrypt';
+import { randomUUID } from 'node:crypto';
+import { BCRYPT_ROUNDS } from '../auth/auth.config';
+import type { AuthUser } from '../auth/auth.types';
+import type { TrainerAccountDto } from './dto/trainer-account.dto';
 import { Prisma } from '@prisma/client';
 import type { Trainer } from '@prisma/client';
 import type { RefineQueryDto } from '../common/dto/refine-query.dto';
@@ -14,6 +19,40 @@ import type { UpdateTrainerDto } from './dto/update-trainer.dto';
 @Injectable()
 export class TrainersService {
   constructor(private readonly prisma: PrismaService, private readonly identity: VkIdentityService = new VkIdentityService(prisma)) {}
+
+  async setAccount(id: string, dto: TrainerAccountDto, actor: AuthUser) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException('Доступ выдаёт администратор');
+    if (dto.userId && (dto.email || dto.password)) throw new BadRequestException('Выберите создание или привязку учётной записи');
+    if (!dto.userId && (!dto.email || !dto.password)) throw new BadRequestException('Укажите email и пароль');
+    if (dto.password && Buffer.byteLength(dto.password, 'utf8') > 72) throw new BadRequestException('Пароль должен быть не длиннее 72 байт UTF-8');
+    const passwordHash = dto.password ? await hash(dto.password, BCRYPT_ROUNDS) : undefined;
+    try {
+      return await this.prisma.$transaction(async tx => {
+        const trainer = await tx.trainer.findUnique({ where: { id }, include: { user: { select: { id: true, crmAccess: true, role: true } } } });
+        if (!trainer) throw new NotFoundException('Тренер не найден');
+        if (!trainer.isActive) throw new BadRequestException('Тренер неактивен');
+        if (trainer.user && (dto.userId || trainer.user.crmAccess)) throw new ConflictException('У тренера уже есть учётная запись');
+        if (trainer.user && trainer.user.role !== 'TRAINER') throw new ConflictException('Проверьте роль привязанной учётной записи');
+        const select = { id: true, email: true, crmAccess: true } satisfies Prisma.UserSelect;
+        let account: { id: string; email: string; crmAccess: boolean };
+        if (dto.userId) {
+          const user = await tx.user.findUnique({ where: { id: dto.userId } });
+          if (!user || user.role !== 'TRAINER') throw new BadRequestException('Выберите учётную запись с ролью Тренер');
+          if (user.trainerId) throw new ConflictException('Учётная запись уже привязана к тренеру');
+          account = await tx.user.update({ where: { id: user.id }, data: { trainerId: id, tokenVersion: { increment: 1 } }, select });
+        } else if (trainer.user) {
+          account = await tx.user.update({ where: { id: trainer.user.id }, data: { email: dto.email!.trim().toLowerCase(), passwordHash: passwordHash!, crmAccess: true, tokenVersion: { increment: 1 } }, select });
+        } else {
+          account = await tx.user.create({ data: { email: dto.email!.trim().toLowerCase(), passwordHash: passwordHash!, role: 'TRAINER', trainerId: id, crmAccess: true }, select });
+        }
+        await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'TRAINER_ACCOUNT_LINKED', actorId: actor.id, actorName: actor.email, details: { trainerId: id, userId: account.id } } });
+        return account;
+      }, { isolationLevel: 'Serializable' });
+    } catch (error: unknown) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && ['P2002', 'P2034'].includes(error.code)) throw new ConflictException('Email или тренер уже привязаны. Обновите карточку');
+      throw error;
+    }
+  }
 
   async findAll(query: RefineQueryDto): Promise<PaginatedResult<Trainer>> {
     const options = parseRefineQuery(query, ['id', 'name', 'phone', 'baseRate', 'maxDailyLoad'], 'name');
@@ -35,13 +74,14 @@ export class TrainersService {
         orderBy: [orderBy, { id: 'asc' }],
         skip: options.skip,
         take: options.take,
+        include: { user: { select: { id: true, email: true, crmAccess: true } } },
       }),
     ]);
     return { data, total };
   }
 
   async findOne(id: string): Promise<Trainer> {
-    const trainer = await this.prisma.trainer.findUnique({ where: { id } });
+    const trainer = await this.prisma.trainer.findUnique({ where: { id }, include: { user: { select: { id: true, email: true, crmAccess: true } } } });
     if (!trainer) throw new NotFoundException('Тренер не найден');
     return trainer;
   }

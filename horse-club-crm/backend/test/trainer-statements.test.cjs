@@ -20,14 +20,15 @@ function payrollFixture() {
   let row, expenses = [], audit = [], paid = [], failAudit = false;
   const tx = {
     $queryRaw: async () => [],
-    staffProfile: { findMany: async () => [{ id: 'staff' }], findUnique: async () => ({ user: { trainerId: 'trainer' } }) },
+    trainer: { findMany: async query => { assert.equal(query.where.isActive, true); assert.equal(query.where.lessons.some.status, 'COMPLETED'); return [{ id: 'trainer' }]; } },
     payrollCalculation: { findFirst: async () => null },
-    lesson: { findMany: async query => { assert.equal(query.where.status, 'COMPLETED'); return [
+    lesson: { findMany: async query => { assert.equal(query.where.status, 'COMPLETED'); assert.equal(query.where.trainerId, 'trainer'); assert.equal(query.where.deletedAt, null); assert.equal(query.where.bookings, undefined); return [
       { id: 'lesson', startTime: new Date('2026-10-02T07:00Z'), service: { name: 'Урок', price: d('1000.50') }, costAmount: d(100) },
     ]; } },
     trainerPayout: {
+      findFirst: async () => null,
       findUnique: async () => row, findMany: async () => paid,
-      upsert: async ({ create }) => row = { id: 'statement', status: 'DRAFT', staff: { fullName: 'Тренер' }, ...create },
+      upsert: async ({ create }) => row = { id: 'statement', status: 'DRAFT', trainer: { name: 'Тренер' }, staff: null, ...create },
       update: async ({ data }) => { row = { ...row, ...data }; if (row.status === 'PAID') paid = [row]; return row; },
     },
     expense: { create: async ({ data }) => { const expense = { id: 'expense', ...data }; expenses.push(expense); return expense; } },
@@ -44,6 +45,7 @@ test('advance uses 30% nominal ignoring discount; approval and payout are atomic
   const f = payrollFixture();
   const [row] = await f.service.generate({ type: 'ADVANCE', month: '2026-10' }, actor);
   assert.equal(row.accrued.toFixed(2), '300.15'); assert.equal(row.nominalBase.toFixed(2), '1000.50');
+  assert.equal(row.trainerId, 'trainer'); assert.equal(row.staffId, undefined);
   await assert.rejects(() => f.service.transition(row.id, true, actor), /Сначала утвердите/);
   await f.service.transition(row.id, false, actor);
   const paid = await f.service.transition(row.id, true, actor);

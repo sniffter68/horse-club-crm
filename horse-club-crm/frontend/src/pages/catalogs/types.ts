@@ -52,6 +52,7 @@ export interface HorseDetails extends Horse {
 }
 export interface TrainerValues extends PublicationValues { name: string; vkId?: string | null; phone?: string | null; scheduleColor?: string | null; qualification?: string; maxDailyLoad: number; maxParallelLessons?: number; baseRate?: number }
 export interface Trainer extends Omit<TrainerValues, 'baseRate' | 'phone' | 'qualification'> {
+  user?: { id: string; email?: string; crmAccess: boolean } | null;
   fullName?: string; specializations?: string[]; isActive?: boolean;
   id: string; baseRate?: string | number; phone: string | null; qualification: string | null;
 }

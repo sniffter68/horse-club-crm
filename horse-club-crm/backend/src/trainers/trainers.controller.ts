@@ -2,7 +2,7 @@ import { VkIdentityService } from '../vk-bot/vk-identity.service';
 import { UpdateUserProfileDto } from '../users/dto/update-user-profile.dto';
 import {
   Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query,
-  Res, UseGuards, UseInterceptors,
+  Req, Res, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
@@ -18,6 +18,8 @@ import { setRefineTotalHeaders } from '../common/refine';
 import { CreateTrainerDto } from './dto/create-trainer.dto';
 import { UpdateTrainerDto } from './dto/update-trainer.dto';
 import { TrainersService } from './trainers.service';
+import { TrainerAccountDto } from './dto/trainer-account.dto';
+import type { AuthUser } from '../auth/auth.types';
 import { ModuleAccessGuard, RequireModule, RequireModuleForFields } from '../auth/module-access.guard';
 
 @ApiTags('Trainers')
@@ -29,6 +31,12 @@ import { ModuleAccessGuard, RequireModule, RequireModuleForFields } from '../aut
 @Controller('trainers')
 export class TrainersController {
   constructor(private readonly trainersService: TrainersService, private readonly identity: VkIdentityService) {}
+  @Post(':id/account')
+  @RequireModule('STAFF_PAYROLL')
+  @Roles(Role.ADMIN)
+  setAccount(@Param('id', ParseUUIDPipe) id: string, @Body() dto: TrainerAccountDto, @Req() req: { user: AuthUser }) {
+    return this.trainersService.setAccount(id, dto, req.user);
+  }
   @Patch(':id/vk')
   @RequireModule('SCHEDULE')
   @Roles(Role.ADMIN, Role.MANAGER)

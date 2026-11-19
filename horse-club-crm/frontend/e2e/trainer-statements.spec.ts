@@ -11,7 +11,7 @@ for (const width of [1440, 390]) test(`advance, final and closing reconciliation
   })
   type Statement = { id: string; type: string; status: string; totalAmount: string; advanceDeducted: string }
   let rows: Statement[] = [], failPay = true, payments = 0
-  const present = (row: Statement) => ({ ...row, staff: { fullName: 'Анна Иванова' }, lessonsCount: 2, nominalBase: '2000', accrued: '600',
+  const present = (row: Statement) => ({ ...row, trainerId: id, trainer: { id, name: 'Анна Иванова', fullName: 'Анна Иванова' }, staff: null, lessonsCount: 2, nominalBase: '2000', accrued: '600',
     periodStart: '2026-11-01', periodEnd: '2026-11-15', lessonBreakdown: [{ id, startTime: '2026-11-02T07:00Z', serviceName: 'Индивидуальное занятие', nominalPrice: '2000', trainerPayout: '600' }] })
   await page.route('**/api/payroll/statements?*', route => route.fulfill({ json: rows.map(present) }))
   await page.route('**/api/payroll/statements/generate', route => {

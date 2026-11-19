@@ -10,10 +10,11 @@ import { usePermissions } from '../../modulePermissions'
 
 type PayoutType = 'ADVANCE' | 'FINAL_SALARY'
 type Lesson = { id: string; startTime: string; serviceName: string; nominalPrice: string; trainerPayout: string }
-type Statement = { id: string; type: PayoutType; status: 'DRAFT' | 'APPROVED' | 'PAID'; staff: { fullName: string }; periodStart: string; periodEnd: string;
+type Statement = { id: string; type: PayoutType; status: 'DRAFT' | 'APPROVED' | 'PAID'; trainer?: { name: string; fullName: string } | null; staff?: { fullName: string } | null; periodStart: string; periodEnd: string;
   lessonsCount: number; nominalBase: string; accrued: string; advanceDeducted: string; totalAmount: string; lessonBreakdown: Lesson[] }
 const money = (value: string) => `${Number(value).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} руб.`
 const statuses = { DRAFT: 'Черновик', APPROVED: 'Утверждено', PAID: 'Выплачено' }
+const trainerName = (row: Statement) => row.trainer?.name || row.trainer?.fullName || row.staff?.fullName || 'Требуется привязка тренера'
 
 export function TrainerStatements() {
   const modules = usePermissions()
@@ -72,7 +73,7 @@ export function TrainerStatements() {
       {error && <Alert role="alert" type="error" showIcon message={error} action={<Button onClick={() => refresh(value => value + 1)}>Повторить</Button>} />}
       <ResponsiveTable<Statement> rowKey="id" loading={loading} dataSource={rows.filter(row => row.type === type)} pagination={{ pageSize: 10 }}
         locale={{ emptyText: <Empty description="Ведомостей пока нет. Выберите период и сформируйте расчёт." /> }} columns={[
-          { title: 'Тренер', render: (_, row) => <><strong>{row.staff.fullName}</strong><div>{dayjs(row.periodStart.slice(0, 10)).format('DD.MM')}–{dayjs(row.periodEnd.slice(0, 10)).format('DD.MM.YYYY')}</div></> },
+          { title: 'Тренер', render: (_, row) => <><strong>{trainerName(row)}</strong><div>{dayjs(row.periodStart.slice(0, 10)).format('DD.MM')}–{dayjs(row.periodEnd.slice(0, 10)).format('DD.MM.YYYY')}</div></> },
           { title: 'Занятия, шт.', dataIndex: 'lessonsCount' },
           ...(['nominalBase', 'accrued', 'advanceDeducted', 'totalAmount'] as const).map((key, index) => ({ key, title: ['База по номиналу, руб.', 'Начислено 30%, руб.', 'Удержано аванса, руб.', 'К выплате, руб.'][index], render: (_: unknown, row: Statement) => <span className="tabular-nums">{money(row[key])}</span> })),
           { title: 'Статус', render: (_, row) => <Tag color={row.status === 'PAID' ? 'success' : row.status === 'APPROVED' ? 'processing' : 'default'}>{statuses[row.status]}</Tag> },
@@ -84,7 +85,7 @@ export function TrainerStatements() {
     <Modal open={!!confirmation} title={confirmation?.pay ? 'Выплатить из основной кассы?' : 'Утвердить ведомость?'}
       closable={!busy} maskClosable={!busy} keyboard={!busy} onCancel={() => setConfirmation(undefined)}
       afterOpenChange={open => { if (open) cancelRef.current?.focus() }} footer={<Space><Button ref={cancelRef} disabled={busy} onClick={() => setConfirmation(undefined)}>Отмена</Button><Button aria-label={confirmation?.pay ? 'Выплатить' : 'Утвердить'} type="primary" loading={busy} onClick={() => { void confirm() }}>{confirmation?.pay ? 'Выплатить' : 'Утвердить'}</Button></Space>}>
-      {confirmation && <Typography.Paragraph>{confirmation.row.staff.fullName}: {money(confirmation.row.totalAmount)}. {confirmation.pay ? 'Будет создан расход основной кассы. Повторная выплата исключена.' : 'Проверьте детализацию занятий перед утверждением.'}</Typography.Paragraph>}
+      {confirmation && <Typography.Paragraph>{trainerName(confirmation.row)}: {money(confirmation.row.totalAmount)}. {confirmation.pay ? 'Будет создан расход основной кассы. Повторная выплата исключена.' : 'Проверьте детализацию занятий перед утверждением.'}</Typography.Paragraph>}
       {confirmationError && <Alert role="alert" type="error" showIcon message={confirmationError} />}
     </Modal>
   </>

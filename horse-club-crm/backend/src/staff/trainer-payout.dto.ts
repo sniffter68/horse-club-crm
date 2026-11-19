@@ -15,6 +15,11 @@ export class GenerateTrainerStatementDto extends TrainerStatementQueryDto {
   @IsUUID()
   staffId?: string;
 
+  @Transform(({ value }) => value === '' ? undefined : value)
+  @IsOptional()
+  @IsUUID()
+  trainerId?: string;
+
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   periodStart?: string;

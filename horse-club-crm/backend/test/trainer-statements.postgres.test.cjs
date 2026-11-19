@@ -75,5 +75,20 @@ test('PostgreSQL: nominal advance/final, atomic MAIN expense, concurrent pay, bo
       assert.equal(await p.cashAuditLog.count({ where: { action: 'FINANCIAL_PERIOD_CLOSED' } }), 2);
       await assert.rejects(() => closing.close(dto, actor), /уже закрыт/);
     });
+    await t.test('trainer without User or StaffProfile receives one statement; adding a login preserves payroll identity', async () => {
+      const standalone = await p.trainer.create({ data: { name: 'Without login', isActive: true } });
+      await p.lesson.create({ data: { trainerId: standalone.id, serviceId: offering.id, status: 'COMPLETED', startTime: new Date('2026-11-01T21:00Z'), endTime: new Date('2026-11-01T22:00Z') } });
+      const dto = { type: 'ADVANCE', month: '2026-11', trainerId: standalone.id };
+      const [first] = await payroll.generate(dto, actor);
+      assert.equal(first.trainerId, standalone.id); assert.equal(first.staffId, null); assert.equal(first.totalAmount.toFixed(2), '300.15');
+      const { TrainersService } = require('../dist/trainers/trainers.service');
+      await new TrainersService(p).setAccount(standalone.id, { email: `${randomUUID()}@trainer.test`, password: 'temporary-password-123' }, actor);
+      const [again] = await payroll.generate(dto, actor); assert.equal(again.id, first.id);
+      assert.equal(await p.trainerPayout.count({ where: { trainerId: standalone.id } }), 1);
+      await payroll.transition(first.id, false, actor); await payroll.transition(first.id, true, actor);
+      const profileUser = await p.user.findUniqueOrThrow({ where: { trainerId: standalone.id } });
+      const profile = await p.staffProfile.create({ data: { userId: profileUser.id, fullName: 'Without login', roleTitle: 'Trainer' } });
+      await assert.rejects(() => p.payrollCalculation.create({ data: { staffId: profile.id, periodStart: new Date('2026-11-01'), periodEnd: new Date('2026-11-15'), shiftsCount: 0, shiftsTotal: 0, lessonsCount: 1, lessonsTotal: '300.15', totalAmount: '300.15', createdById: actor.id } }), /уже оплачен/);
+    });
   } finally { await p.$disconnect(); }
 });

@@ -10,7 +10,7 @@ import { TelegramProfileLink } from '../../components/TelegramProfileLink'
 import { VkProfileField, VkProfileLink } from '../../components/VkProfileLink'
 import { PhoneField } from '../../components/PhoneField'
 import { phonePayload } from '../../components/formatPhone'
-import { usePermissions } from '@refinedev/core'
+import { useList, usePermissions } from '@refinedev/core'
 import type { Role } from '../../authStorage'
 import { staffRoles } from './types'
 import { isUuid } from '../../uuid'
@@ -23,6 +23,8 @@ export function ProfileModal({ staff, onClose, onSaved, onTelegramChanged }: { s
   const { data: role } = usePermissions<Role>({})
   const access = Form.useWatch('createCrmAccess', form)
   const linkedUser = Form.useWatch('userId', form)
+  const staffRole = Form.useWatch('role', form)
+  const { result: trainers } = useList<{ id: string; name: string; phone?: string | null }>({ resource: 'trainers', pagination: { pageSize: 200 }, queryOptions: { enabled: staffRole === 'TRAINER' && !staff?.user?.trainerId } })
   const [candidates, setCandidates] = useState<Array<{ id: string; role?: string; email: string; vkId?: string | null; trainer?: { fullName: string; name: string } }>>([])
   const [error, setError] = useState<string>()
   useEffect(() => {
@@ -33,7 +35,7 @@ export function ProfileModal({ staff, onClose, onSaved, onTelegramChanged }: { s
   }, [staff])
   return <StableEntryModal variant="drawer" title={staff ? `Редактирование сотрудника: ${staff.fullName}` : 'Добавить сотрудника'} form={form} submitLabel="Сохранить" resources={['staff', 'trainers', 'schedule', 'dashboard-stats']} onClose={onClose} onSaved={onSaved} successMessage="Данные сотрудника обновлены"
     save={values => {
-      if ((staff && !isUuid(staff.id)) || (values.userId && !isUuid(values.userId))) throw new Error('Некорректный идентификатор сотрудника')
+      if ((staff && !isUuid(staff.id)) || (values.userId && !isUuid(values.userId)) || (values.trainerId && !isUuid(values.trainerId))) throw new Error('Некорректный идентификатор сотрудника')
       const payload = { ...values, vkId: values.vkId?.trim() || null, phone: phonePayload(values.phone) }
       if (!values.createCrmAccess) delete payload.temporaryPassword
       if (values.userId) {
@@ -56,6 +58,7 @@ export function ProfileModal({ staff, onClose, onSaved, onTelegramChanged }: { s
     <VkProfileField initialValue={staff?.user?.vkId} />
     <Form.Item name="fullName" label="ФИО" initialValue={staff?.fullName} rules={required}><Input aria-label="ФИО" maxLength={150} /></Form.Item>
     <Form.Item name="role" label="Роль" initialValue={staff?.user?.role ?? 'OTHER'} rules={required}><Select aria-label="Роль" options={Object.entries(staffRoles).filter(([value]) => role === 'ADMIN' || value !== 'ADMIN').map(([value, label]) => ({ value, label }))} /></Form.Item>
+    {staffRole === 'TRAINER' && !staff?.user?.trainerId && <Form.Item name="trainerId" label="Существующая карточка тренера" extra="Выберите тренера из расписания, чтобы сохранить занятия и начисления."><Select aria-label="Существующая карточка тренера" virtual={false} allowClear showSearch optionFilterProp="label" options={(trainers?.data ?? []).map(trainer => ({ value: trainer.id, label: `${trainer.name}${trainer.phone ? ` · ${trainer.phone}` : ''}` }))} /></Form.Item>}
     {!linkedUser && <>
       <Form.Item name="createCrmAccess" valuePropName="checked" initialValue={staff?.user?.crmAccess ?? false}><Checkbox>Создать доступ в CRM</Checkbox></Form.Item>
       <Form.Item name="email" label="Email" initialValue={staff?.user?.email?.endsWith('@staff.invalid') ? undefined : staff?.user?.email} rules={[{ type: 'email', message: 'Укажите корректный email' }, ...(access ? required : [])]}><Input aria-label="Email" autoComplete="off" /></Form.Item>
