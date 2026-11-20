@@ -54,7 +54,7 @@ test('stall and pony require numbers, service requires name, null name persists 
     create: async ({ data }) => ({ id: 's', ...data }),
     findUnique: async () => current, findMany: async () => [],
     update: async ({ data }) => { current = { ...current, ...data }; return current; },
-  }, $transaction: work => work(prisma) };
+  }, cashAuditLog: { create: async ({ data }) => data }, $transaction: work => work(prisma) };
   const service = new StallsService(prisma);
   for (const type of ['STALL', 'PONY_PEN']) {
     await assert.rejects(service.create({ type, name: 'Имя без номера' }), e => e.status === 400);
@@ -62,10 +62,11 @@ test('stall and pony require numbers, service requires name, null name persists 
   }
   await assert.rejects(service.create({ type: 'SERVICE', number: '7' }), e => e.status === 400);
   assert.equal((await service.create({ type: 'SERVICE', name: ' Склад ' })).name, 'Склад');
-  await service.update('s', { name: null }); assert.equal(current.name, null);
+  const actor = { id: 'actor', email: 'admin@example.test' };
+  await service.update('s', { name: null }, actor); assert.equal(current.name, null);
   await assert.rejects(service.update('s', { type: 'SERVICE' }), e => e.status === 400);
-  await service.update('s', { type: 'SERVICE', name: 'Склад' });
-  await service.update('s', plainToInstance(UpdateStallDto, { notes: 'Обновить только заметку' }));
+  await service.update('s', { type: 'SERVICE', name: 'Склад' }, actor);
+  await service.update('s', plainToInstance(UpdateStallDto, { notes: 'Обновить только заметку' }), actor);
   await assert.rejects(service.update('s', { name: '' }), e => e.status === 400);
   await assert.rejects(service.assign('s', 'h'), e => e.status === 409);
 });

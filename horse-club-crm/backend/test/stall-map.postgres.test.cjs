@@ -53,7 +53,19 @@ test('PostgreSQL stall seed, relocation races, database invariants and rollback'
     const target = stallIds.find(id => id !== before.id && id !== stallIds[1]);
     await assert.rejects(faulty.assign(target, horseIds[0]), /injected final write failure/);
     assert.equal((await p.stall.findUniqueOrThrow({ where: { id: before.id } })).horseId, horseIds[0]);
+    const actor = { id: horseIds[2], email: 'stall-qa@example.test' };
+    await service.update(before.id, { name: 'Обновлённый денник', number: 'QA-NEW' }, actor);
+    assert.equal((await p.horse.findUniqueOrThrow({ where: { id: horseIds[0] } })).stallNumber, 'QA-NEW');
+    await assert.rejects(service.remove(before.id, actor), error => error.getStatus() === 400);
+    const free = stallIds.find(id => id !== before.id && id !== stallIds[1]);
+    const contract = await p.boardingContract.create({ data: { horseId: horseIds[2], stallId: free,
+      status: 'EXPIRED', startsAt: new Date('2020-01-01T00:00:00Z'), endsAt: new Date('2020-02-01T00:00:00Z') } });
+    await service.remove(free, actor);
+    assert.equal(await p.stall.findUnique({ where: { id: free } }), null);
+    assert.equal((await p.boardingContract.findUniqueOrThrow({ where: { id: contract.id } })).stallId, null);
+    assert.equal(await p.cashAuditLog.count({ where: { actorId: actor.id, action: { in: ['STALL_UPDATED', 'STALL_DELETED'] } } }), 2);
   } finally {
+    await p.boardingContract.deleteMany({ where: { horseId: { in: horseIds } } });
     await p.stallTransferLog.deleteMany({ where: { horseId: { in: horseIds } } });
     await p.stall.deleteMany({ where: { id: { in: stallIds } } });
     await p.horse.deleteMany({ where: { id: { in: horseIds } } });

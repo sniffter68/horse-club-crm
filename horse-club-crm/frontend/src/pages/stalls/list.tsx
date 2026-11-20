@@ -6,12 +6,16 @@ import type { Stall } from '../catalogs/types'
 import { dateOnly, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
 import { QuickBoardingActions } from '../boarding-contracts/quick'
+import { StallDeleteAction } from './delete'
+import { CatalogEditAction } from '../catalogs/EditDrawer'
+import { StallForm } from './form'
 
 export function StallList() {
   const [selectedId, setSelectedId] = useState<string>()
   return <>
-    <CatalogList<Stall> resource="stalls" title="Денники" columns={[
+    <CatalogList<Stall> resource="stalls" title="Денники" editAction={stall => <CatalogEditAction resource="stalls" id={stall.id}><StallForm action="edit" /></CatalogEditAction>} extraActions={stall => <StallDeleteAction id={stall.id} />} columns={[
       { key: 'name', title: 'Название', sorter: true, render: (_: unknown, row) => <CardLink onClick={() => setSelectedId(row.id)}>{row.name || `Денник ${row.number ?? 'без номера'}`}</CardLink> },
+      { key: 'number', title: 'Номер', render: (_: unknown, row) => row.type === 'SERVICE' ? null : row.number },
       { key: 'description', dataIndex: 'description', title: 'Описание', width: 420, ellipsis: true, render: (value: string | null) => value || '—' },
       { key: 'contracts', title: 'Постой', width: 360, render: (_: unknown, record) => {
         const contracts = record.contracts ?? []

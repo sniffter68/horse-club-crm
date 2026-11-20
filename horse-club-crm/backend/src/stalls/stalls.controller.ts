@@ -78,13 +78,13 @@ export class StallsController {
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
-  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateStallDto): Promise<StallWithContracts> {
-    return this.service.update(id, dto);
+  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateStallDto, @CurrentUser() user: AuthUser): Promise<StallWithContracts> {
+    return this.service.update(id, dto, user);
   }
 
   @Delete(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
-  remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<StallWithContracts> {
-    return this.service.remove(id);
+  remove(@Param('id', new ParseUUIDPipe()) id: string, @CurrentUser() user: AuthUser): Promise<StallWithContracts> {
+    return this.service.remove(id, user);
   }
 }

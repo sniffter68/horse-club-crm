@@ -1,5 +1,9 @@
 # UX Contract
 
+## Изменение и удаление денников (2026-11-21)
+
+Название и номер на карте редактируются в `StableEntryModal` (drawer), в списке — через `CatalogEditAction` / `CatalogDrawerForm`. Удалением в обоих местах владеет `StallDeleteAction`: подтверждение Ant Design, проверка UUID, блокировка повторного запроса, сохранение контекста при ошибке, русское сообщение и обновление данных после успеха. Уведомления — `App.useApp`, обновление списка — Refine invalidation, обновление карты — её refresh. READ_ONLY скрывает мутации. Занятый денник удалять нельзя; история свободного сохраняется. Проверки: `stall-mutations.test.cjs`, `stall-map.postgres.test.cjs`, `stall-map.spec.ts`.
+
 ## Индивидуальная ставка тренера (2026-11-19)
 
 Источник — задача владельца и `docs/trainer-commission.md`. Полем ставки владеет TrainerForm с Ant Design Form/InputNumber; создание и редактирование остаются в CatalogForm/EntryOverlay. Значение 0–100%, быстрые кнопки 30/50/100%, сохранение через существующую кнопку с защитой повторной отправки. Ошибка сохраняет ввод и допускает повтор. При отсутствии FULL STAFF_PAYROLL поле скрыто; просмотр ставки следует правам финансовых полей. В карточке и списке используется Ant Design Tag. TrainerStatements показывает сохранённую ставку ведомости и каждой строки; смена текущей ставки не меняет показанные исторические начисления. Проверки: trainer-commission.spec.ts, trainer-statements.spec.ts, trainer-commission.test.cjs и PostgreSQL integration.

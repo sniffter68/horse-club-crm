@@ -5,7 +5,7 @@ import { StallZone, StallSide, StallStatus, StallType } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 
 export class CreateStallDto {
-  @Transform(({ value }) => value === '' ? undefined : value) @ValidateIf((_object, value) => value !== undefined) @IsUUID() buildingId?: string;
+  @Transform(({ value }) => value === '' || value === null ? undefined : value) @ValidateIf((_object, value) => value !== undefined) @IsUUID() buildingId?: string;
   @Type(() => Number) @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(1) row?: number;
   @Type(() => Number) @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(1) col?: number;
   @Type(() => Number) @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(1) rowSpan?: number;

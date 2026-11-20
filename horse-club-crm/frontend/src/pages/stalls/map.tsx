@@ -14,6 +14,7 @@ import { sexes, statuses, type MapHorse, type MapStall } from './mapTypes'
 import { BuildingMap } from './buildings'
 import type { StableBuilding } from './gridLayout'
 import './map.css'
+import { StallDeleteAction } from './delete'
 
 const colors = { AVAILABLE: 'green', OCCUPIED: 'default', MAINTENANCE: 'orange', QUARANTINE: 'red' }
 
@@ -99,7 +100,7 @@ function StallDetails({ stall, horses, stalls, canManage, onClose, onSaved, onPr
   stall: MapStall; horses: MapHorse[]; stalls: MapStall[]; canManage: boolean;
   onClose: () => void; onSaved: () => void; onPrint: () => void;
 }) {
-  const [form] = Form.useForm<{ status: MapStall['status']; notes: string }>()
+  const [form] = Form.useForm<{ name: string; number: string; status: MapStall['status']; notes: string }>()
   const [horseId, setHorseId] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -107,10 +108,12 @@ function StallDetails({ stall, horses, stalls, canManage, onClose, onSaved, onPr
   const [transferOpen, setTransferOpen] = useState(false)
   const { message } = App.useApp()
   const { mutate: onError } = useOnError()
-  useEffect(() => { if (canManage) form.setFields([{ name: 'status', value: stall.status, touched: false }, { name: 'notes', value: stall.notes ?? '', touched: false }]) }, [canManage, form, stall])
+  useEffect(() => { if (canManage) form.setFields([{ name: 'name', value: stall.name ?? '', touched: false }, { name: 'number', value: stall.number ?? '', touched: false }, { name: 'status', value: stall.status, touched: false }, { name: 'notes', value: stall.notes ?? '', touched: false }]) }, [canManage, form, stall])
+  const draftName = Form.useWatch('name', form)
+  const draftNumber = Form.useWatch('number', form)
   const draftStatus = Form.useWatch('status', form)
   const draftNotes = Form.useWatch('notes', form)
-  const dirty = (draftStatus !== undefined && draftStatus !== stall.status) || (draftNotes !== undefined && draftNotes !== (stall.notes ?? ''))
+  const dirty = (draftName !== undefined && draftName !== (stall.name ?? '')) || (draftNumber !== undefined && draftNumber !== (stall.number ?? '')) || (draftStatus !== undefined && draftStatus !== stall.status) || (draftNotes !== undefined && draftNotes !== (stall.notes ?? ''))
   const assign = async (id: string | null) => {
     if (lock.current) return
     if (!isUuid(stall.id) || (id !== null && !isUuid(id))) { setError('Выберите корректного денника и лошадь'); return }
@@ -138,15 +141,18 @@ function StallDetails({ stall, horses, stalls, canManage, onClose, onSaved, onPr
       {error && <Alert type="error" showIcon message="Размещение не сохранено" description={error} />}
     </div>}
     {canManage ? <>
+      <Form.Item name="name" label="Название" rules={[{ required: stall.type === 'SERVICE', whitespace: true, message: 'Укажите название' }, { max: 150 }]}><Input aria-label="Название" maxLength={150} /></Form.Item>
+      {stall.type !== 'SERVICE' && <Form.Item name="number" label="Номер денника" rules={[{ required: true, whitespace: true, message: 'Укажите номер денника' }, { max: 30 }]}><Input aria-label="Номер денника" maxLength={30} /></Form.Item>}
       {stall.type !== 'SERVICE' && <Form.Item name="status" label="Статус денника"><Select options={Object.entries(statuses).filter(([key]) => stall.horse ? key === 'OCCUPIED' : key !== 'OCCUPIED').map(([value, label]) => ({ value, label }))} /></Form.Item>}
       <Form.Item name="notes" label="Заметки для конюха" rules={[{ max: 5000, message: 'Не более 5000 символов' }]}><Input.TextArea autoSize={{ minRows: 3, maxRows: 10 }} maxLength={5000} /></Form.Item>
+      <StallDeleteAction id={stall.id} disabled={busy} onDeleted={onSaved} />
     </> : <p className="stall-sign-notes">{stall.notes || 'Нет заметок'}</p>}
     {stall.horse?.feedingNotes && <><Typography.Title level={5}>Рацион кормления</Typography.Title><p className="stall-sign-notes">{stall.horse.feedingNotes}</p></>}
     {canManage && stall.horse && <StallTransfer open={transferOpen} source={stall} stalls={stalls} onClose={() => setTransferOpen(false)} onSaved={onSaved} />}
   </>
   const title = stall.type === 'SERVICE' ? stall.name ?? 'Служебное помещение' : `Денник № ${stall.number ?? stall.name}`
   if (!canManage) return <Modal open title={title} onCancel={onClose} footer={<Button onClick={onClose}>Закрыть</Button>}>{content}</Modal>
-  return <StableEntryModal variant="drawer" title={title} form={form} submitLabel="Сохранить денник"
+  return <StableEntryModal variant="drawer" title={title} form={form} submitLabel="Сохранить денник" submitDisabled={busy} resources={['stalls', 'horses']} successMessage="Денник сохранён"
     onClose={() => !lock.current && onClose()} onSaved={onSaved}
     save={values => { if (lock.current) return Promise.reject(new Error('Дождитесь завершения заселения')); if (!isUuid(stall.id)) throw new Error('Некорректный идентификатор помещения'); return httpClient.patch(`${API_URL}/stalls/${stall.id}`, values) }}>
     {content}

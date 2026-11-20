@@ -14,9 +14,10 @@ import { useCatalogPermissions } from './permissions'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { ConfigurableTable } from '../../components/ConfigurableTable'
 
-export function CatalogList<T extends BaseRecord>({ resource, title, columns, extraActions, layout, toolbar, storageKey, defaultHiddenColumns, onSearchSelect }: {
+export function CatalogList<T extends BaseRecord>({ resource, title, columns, extraActions, editAction, layout, toolbar, storageKey, defaultHiddenColumns, onSearchSelect }: {
   resource: string; title: string; columns: TableColumnsType<T>; extraActions?: (record: T) => ReactNode; layout?: 'clients'; toolbar?: ReactNode
   storageKey?: string; defaultHiddenColumns?: readonly string[]; onSearchSelect?: (id: string) => void
+  editAction?: (record: T) => ReactNode
 }) {
   const { canManage, role } = useCatalogPermissions(resource)
   const { tableProps, searchFormProps, tableQuery, sorters, filters, currentPage, pageSize, setCurrentPage } = useTable<T, HttpError, { q?: string; clientType?: string; archive?: string }>({
@@ -40,10 +41,10 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
   const actions: TableColumnsType<T> = canManage ? [{
     key: 'actions', title: 'Действия', width: layout === 'clients' ? 220 : storageKey ? 180 : 250, fixed: layout === 'clients' || storageKey ? 'right' : undefined, align: 'left',
     render: (_: unknown, record: T) => <Space wrap>
-      <EditButton resource={resource} recordItemId={record.id} size="small" aria-label="Редактировать">Редактировать</EditButton>
+      {editAction ? editAction(record) : <EditButton resource={resource} recordItemId={record.id} size="small" aria-label="Редактировать">Редактировать</EditButton>}
       {extraActions?.(record)}
       {resource === 'boarding-contracts' && <ServiceCancellationAction resource="boarding-contracts" id={String(record.id)} label="Отменить постой" />}
-      {resource !== 'boarding-contracts' && resource !== 'clients' && (resource !== 'horse-health-logs' || role !== 'TRAINER') && <DeleteButton resource={resource} recordItemId={record.id} size="small" aria-label="Удалить"
+      {resource !== 'stalls' && resource !== 'boarding-contracts' && resource !== 'clients' && (resource !== 'horse-health-logs' || role !== 'TRAINER') && <DeleteButton resource={resource} recordItemId={record.id} size="small" aria-label="Удалить"
         confirmTitle="Удалить запись?" confirmOkText="Удалить" confirmCancelText="Отмена">Удалить</DeleteButton>}
     </Space>,
   }] : []

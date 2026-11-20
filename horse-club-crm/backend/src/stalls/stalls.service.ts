@@ -10,6 +10,8 @@ import type { CreateStallDto } from './dto/create-stall.dto';
 import type { UpdateStallDto } from './dto/update-stall.dto';
 import { neighborhoodWarnings, stallRowPosition } from './neighborhood';
 import type { TransferStallDto } from './dto/transfer-stall.dto';
+import { randomUUID } from 'node:crypto';
+import type { AuthUser } from '../auth/auth.types';
 
 const stallInclude = Prisma.validator<Prisma.StallDefaultArgs>()({
   include: {
@@ -179,12 +181,15 @@ export class StallsService {
     }
   }
 
-  async update(id: string, dto: UpdateStallDto): Promise<StallWithContracts> {
+  async update(id: string, dto: UpdateStallDto, actor: Pick<AuthUser, 'id' | 'email'>): Promise<StallWithContracts> {
     try {
       await this.serializable(async tx => {
         const current = await tx.stall.findUnique({ where: { id } });
         if (!current) throw new NotFoundException('Денник не найден');
-        await this.validatePlacement(tx, { ...current, ...dto });
+        const placement = { ...current, ...dto };
+        if ((['buildingId', 'row', 'col', 'rowSpan', 'colSpan'] as const).some(key =>
+          dto[key] !== undefined && dto[key] !== current[key]))
+          await this.validatePlacement(tx, placement);
         this.validateRoom({ type: dto.type ?? current.type,
           name: dto.name === undefined ? current.name : dto.name,
           number: dto.number === undefined ? current.number : dto.number });
@@ -192,8 +197,12 @@ export class StallsService {
         const status = dto.status ?? (dto.isUnavailable === undefined ? current.status : dto.isUnavailable ? 'MAINTENANCE' : current.horseId ? 'OCCUPIED' : 'AVAILABLE');
         if ((status === 'OCCUPIED') !== Boolean(current.horseId))
           throw new ConflictException('Сначала измените размещение лошади');
-        await tx.stall.update({ where: { id }, data: { ...this.normalize(dto),
+        const updated = await tx.stall.update({ where: { id }, data: { ...this.normalize(dto),
           ...((dto.type ?? current.type) === 'SERVICE' ? { number: '' } : {}), status } });
+        if (current.horseId) await tx.horse.update({ where: { id: current.horseId }, data: { stallNumber: updated.number ?? updated.name } });
+        await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'STALL_UPDATED', actorId: actor.id,
+          actorName: actor.email, details: { stallId: id, before: { name: current.name, number: current.number },
+            after: { name: updated.name, number: updated.number } } } });
       });
       return this.findOne(id);
     } catch (error: unknown) {
@@ -201,9 +210,22 @@ export class StallsService {
     }
   }
 
-  async remove(id: string): Promise<StallWithContracts> {
+  async remove(id: string, actor: Pick<AuthUser, 'id' | 'email'>): Promise<StallWithContracts> {
     try {
-      return await this.prisma.stall.delete({ where: { id }, include: stallInclude.include });
+      return await this.serializable(async tx => {
+        const current = await tx.stall.findUnique({ where: { id } });
+        if (!current) throw new NotFoundException('Денник не найден');
+        const activePlacement = await tx.boardingContract.count({ where: { stallId: id,
+          status: { in: [BoardingContractStatus.ACTIVE, BoardingContractStatus.SUSPENDED] } } });
+        if (current.horseId || current.status === 'OCCUPIED' || activePlacement)
+          throw new BadRequestException('Нельзя удалить занятый денник. Сначала освободите его или переведите лошадь');
+        // Retain contracts and their financial history, including databases with a legacy restrictive FK.
+        await tx.boardingContract.updateMany({ where: { stallId: id }, data: { stallId: null } });
+        const deleted = await tx.stall.delete({ where: { id }, include: stallInclude.include });
+        await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'STALL_DELETED', actorId: actor.id,
+          actorName: actor.email, details: { stallId: id, name: current.name, number: current.number } } });
+        return deleted;
+      });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Денник');
     }

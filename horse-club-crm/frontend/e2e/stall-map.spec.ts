@@ -94,6 +94,91 @@ test('constructor moves a pen into the aisle, rejects collisions, retains failed
   await expect(page.getByRole('button', { name: 'Денник 1, Буран', exact: true }).locator('..')).toHaveCSS('grid-column-start', '3')
 })
 
+test('rename and delete a stall, retaining failed drafts and refreshing the map', async ({ page }) => {
+  const state = await setup(page)
+  let patches = 0, deletes = 0, rejectDelete = true
+  const id = initial[2].id
+  await page.route(`**/api/stalls/${id}`, async route => {
+    if (route.request().method() === 'DELETE') {
+      deletes++
+      if (rejectDelete) return route.fulfill({ status: 400, json: { message: 'Нельзя удалить занятый денник. Сначала освободите его или переведите лошадь' } })
+      state.stalls = state.stalls.filter(s => s.id !== id)
+      return route.fulfill({ json: { id } })
+    }
+    patches++
+    if (state.fail) return route.fulfill({ status: 400, json: { message: 'Изменения не сохранены' } })
+    const values = route.request().postDataJSON()
+    expect(values.name).toBe('Летний бокс'); expect(values.number).toBe('Л-12')
+    Object.assign(state.stalls[2], values)
+    return route.fulfill({ json: state.stalls[2] })
+  })
+  await page.getByRole('button', { name: 'Денник Л-1, Свободен', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Название', exact: true }).fill('Летний бокс')
+  await page.getByRole('textbox', { name: 'Номер денника', exact: true }).fill('Л-12')
+  await page.screenshot({ path: 'test-results/stall-edit-drawer.png', fullPage: true, animations: 'disabled' })
+  state.fail = true
+  await page.getByRole('button', { name: 'Сохранить денник', exact: true }).click()
+  await expect(page.getByText('Изменения не сохранены', { exact: true })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Номер денника', exact: true })).toHaveValue('Л-12')
+  state.fail = false
+  const patched = page.waitForResponse(r => r.url().endsWith(`/stalls/${id}`) && r.request().method() === 'PATCH' && r.status() === 200)
+  await page.getByRole('button', { name: 'Сохранить денник', exact: true }).dblclick()
+  await patched
+  await expect(page.getByRole('button', { name: 'Денник Л-12, Свободен', exact: true })).toContainText('Летний бокс')
+  expect(patches).toBe(2)
+  await page.getByRole('button', { name: 'Денник Л-12, Свободен', exact: true }).click()
+  await page.getByRole('button', { name: 'Удалить денник', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Удалить денник?' }).getByRole('button', { name: 'Отмена', exact: true }).click()
+  expect(deletes).toBe(0)
+  await page.getByRole('button', { name: 'Удалить денник', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Удалить денник?' }).getByRole('button', { name: 'Удалить', exact: true }).click()
+  await expect(page.getByText('Нельзя удалить занятый денник. Сначала освободите его или переведите лошадь')).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Номер денника', exact: true })).toHaveValue('Л-12')
+  rejectDelete = false
+  await page.getByRole('button', { name: 'Удалить денник', exact: true }).click()
+  const removed = page.waitForResponse(r => r.url().endsWith(`/stalls/${id}`) && r.request().method() === 'DELETE' && r.status() === 200)
+  await page.getByRole('dialog', { name: 'Удалить денник?' }).getByRole('button', { name: 'Удалить', exact: true }).dblclick()
+  await removed
+  await expect(page.getByRole('button', { name: 'Денник Л-12, Свободен', exact: true })).toHaveCount(0)
+  await expect(page.getByText('Денник удалён', { exact: true })).toBeVisible()
+  expect(deletes).toBe(2)
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Денник Л-12, Свободен', exact: true })).toHaveCount(0)
+})
+
+test('list edits labels in a drawer using PATCH and deletes without leaving the list', async ({ page }) => {
+  const state = await setup(page)
+  const id = initial[2].id
+  state.stalls = [state.stalls[2]]
+  await page.route('**/api/stalls?*', route => route.fulfill({ json: state.stalls, headers: { 'x-total-count': String(state.stalls.length) } }))
+  let patches = 0, deletes = 0
+  await page.route(`**/api/stalls/${id}`, route => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: state.stalls[0] })
+    if (route.request().method() === 'DELETE') {
+      deletes++; state.stalls = []; return route.fulfill({ json: { id } })
+    }
+    expect(route.request().method()).toBe('PATCH')
+    patches++
+    Object.assign(state.stalls[0], route.request().postDataJSON())
+    return route.fulfill({ json: state.stalls[0] })
+  })
+  await page.goto('/stalls')
+  await page.getByRole('button', { name: 'Редактировать', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: 'Редактирование денника' })
+  await expect(drawer).toBeVisible()
+  await drawer.getByRole('textbox', { name: 'Название', exact: true }).fill('Северный бокс')
+  await drawer.getByRole('textbox', { name: 'Номер денника', exact: true }).fill('С-5')
+  await drawer.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(drawer).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Северный бокс', exact: true })).toBeVisible()
+  expect(patches).toBe(1); expect(state.stalls[0].number).toBe('С-5')
+  await page.getByRole('button', { name: 'Удалить денник', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Удалить денник?' }).getByRole('button', { name: 'Удалить', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Северный бокс', exact: true })).toHaveCount(0)
+  expect(deletes).toBe(1)
+  await expect(page).toHaveURL(/\/stalls(?:\?|$)/)
+})
+
 test('building settings create, rename and delete an empty building with recoverable errors', async ({ page }) => {
   await setup(page)
   const data = structuredClone(buildings)
@@ -222,6 +307,8 @@ test('read-only manager can read rations and print but cannot mutate', async ({ 
   await page.getByRole('button', { name: 'Денник 1, Буран', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Рацион кормления' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Сохранить денник' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Удалить денник', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: 'Название', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Убрать лошадь из денника' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Перевести в денник', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Печать таблички на денник' }).click()
