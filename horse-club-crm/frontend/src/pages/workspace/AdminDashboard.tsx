@@ -3,7 +3,7 @@ import { Alert, Button, Card, Empty, List, Progress, Segmented, Space, Spin, Sta
 import { DateTime } from 'luxon'
 import { Activity, ChevronDown } from 'lucide-react'
 import { PendingLeads } from '../dashboard/PendingLeads'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { usePermissions } from '../../modulePermissions'
 import { QuickBookingModal } from '../../components/QuickBookingModal'
 import { useWorkspace } from './useWorkspace'
@@ -43,8 +43,13 @@ export function AdminDashboardPage() {
   return <section aria-label="Рабочее место администратора">
     <header className="workspace-toolbar shift-welcome"><EquestrianMotif /><div><Typography.Title level={2}>Хорошей смены!</Typography.Title><ShiftConditions /></div><Button onClick={refresh}>Обновить сводку</Button></header>
     <div className="workspace-kpis">{([
-      ['Занятий сегодня', data.kpi.lessonsToday], ['Активных всадников', data.kpi.activeRiders], ['Ожидают подтверждения', data.kpi.awaitingConfirmation], ['Новые заявки', data.kpi.newLeads],
-    ] as const).map(([title, value], index) => <Card key={title}><Statistic title={<span className="club-icon-label"><ClubIcon name={index === 0 ? 'calendar' : index === 1 ? 'users' : 'bell'} />{title}</span>} value={value} />{title === 'Новые заявки' && <a href="#pending-leads">Открыть заявки</a>}</Card>)}</div>
+      ['Занятий сегодня', data.kpi.lessonsToday, '/schedule', 'Открыть расписание'],
+      ['Активных всадников', data.kpi.activeRiders, '/clients', 'Открыть клиентов'],
+      ['Ожидают подтверждения', data.kpi.awaitingConfirmation, '/schedule', 'Проверить записи'],
+      ['Новые заявки', data.kpi.newLeads, '/leads', 'Открыть заявки'],
+    ] as const).map(([title, value, to, hint], index) => <Link key={title} to={to} className="crm-card-link workspace-kpi-link" aria-label={`${title} — ${hint}`}>
+      <Card><Statistic className="tabular-nums" title={<span className="club-icon-label"><ClubIcon name={index === 0 ? 'calendar' : index === 1 ? 'users' : 'bell'} />{title}</span>} value={value} /><span className="workspace-kpi-hint">{hint}</span></Card>
+    </Link>)}</div>
     <div className={`admin-workspace-columns${finance ? '' : ' admin-workspace-columns-single'}`}><Card className="workspace-main-card workspace-schedule-card" title={<span className="club-icon-label"><ClubIcon name="calendar" />Сегодня и неделя</span>} extra={permissions.canWrite('SCHEDULE') && <Button type="primary" onClick={() => setBooking(true)}>+ Создать запись</Button>}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Segmented options={['Сегодня', 'Неделя']} value={period} onChange={setPeriod} />

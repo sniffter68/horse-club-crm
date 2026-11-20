@@ -61,22 +61,63 @@ test.setTimeout(45000)
 const modules = ['SCHEDULE', 'CASHBOX', 'STABLES', 'VETERINARY', 'STAFF_PAYROLL']
 const client = { id: '00000001-1111-4111-8111-111111111111', name: 'Анна Орлова', phone: '+79991234567' }
 
-for (const width of [1440, 390]) test(`workspace KPIs and keyboard lead navigation at ${width}px`, async ({ page }) => {
+for (const width of [1440, 390]) test(`workspace KPI cards share layout and interaction styles at ${width}px`, async ({ page }) => {
   await setup(page)
-  await page.setViewportSize({ width, height: 900 })
-  await page.goto('/')
+  await page.setViewportSize({ width, height: 844 })
+  await page.goto('/dashboard')
   await expect(page.locator('.workspace-kpis .ant-statistic')).toHaveCount(4)
   for (const title of ['Занятий сегодня', 'Активных всадников', 'Ожидают подтверждения', 'Новые заявки']) {
     await expect(page.locator('.workspace-kpis').getByText(title, { exact: true })).toBeVisible()
   }
-  const leads = page.getByRole('link', { name: 'Открыть заявки', exact: true })
-  await leads.focus()
-  await expect(leads).toBeFocused()
-  await leads.press('Enter')
-  await expect(page).toHaveURL(/#pending-leads$/)
-  await expect(page.locator('#pending-leads').last()).toBeVisible()
+  const cards = page.locator('.workspace-kpis').getByRole('link')
+  await expect(cards).toHaveCount(4)
+  const heights = await cards.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height))
+  expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(1)
+  const hintHeights = await cards.locator('.workspace-kpi-hint').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height))
+  expect(Math.max(...hintHeights) - Math.min(...hintHeights)).toBeLessThanOrEqual(1)
+  for (const card of await cards.all()) {
+    await expect(card).toHaveCSS('cursor', 'pointer')
+    await expect(card.locator('.ant-statistic-content')).toHaveCSS('font-variant-numeric', 'tabular-nums')
+    await expect(card.locator('a, button')).toHaveCount(0)
+    await card.focus()
+    await expect(card).toBeFocused()
+    await expect(card).toHaveCSS('outline-style', 'solid')
+    await expect(card).toHaveCSS('outline-width', '2px')
+  }
+  await cards.first().hover()
+  await expect(cards.first()).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, -2)')
+  await page.screenshot({ path: `test-results/dashboard-kpi-cards-${width}.png`, fullPage: true })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await expect(cards.first()).toHaveCSS('transform', 'none')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
+
+for (const width of [1440, 390]) {
+  for (const interaction of ['click', 'keyboard'] as const) {
+    test(`workspace KPI ${interaction} opens every destination at ${width}px`, async ({ page }) => {
+      await setup(page)
+      await page.setViewportSize({ width, height: 844 })
+      for (const [title, path] of [
+        ['Занятий сегодня', '/schedule'], ['Активных всадников', '/clients'],
+        ['Ожидают подтверждения', '/schedule'], ['Новые заявки', '/leads'],
+      ] as const) {
+        await page.goto('/dashboard')
+        const card = page.locator('.workspace-kpis').getByRole('link', { name: new RegExp(`^${title} —`) })
+        await expect(card).toHaveAttribute('href', path)
+        if (interaction === 'keyboard') {
+          await card.focus()
+          await card.press('Enter')
+        } else {
+          // The corner is outside both the number and action hint: the entire card must navigate.
+          await card.click({ position: { x: 12, y: 12 } })
+        }
+        await expect(page).toHaveURL(new RegExp(`${path}$`))
+        await expect(page.locator('.workspace-kpis')).toHaveCount(0)
+        if (path === '/clients') await expect(page.getByRole('combobox', { name: 'Архив клиентов' })).toBeVisible()
+      }
+    })
+  }
+}
 
 for (const width of [1440, 390]) test(`cash card opens matching club balances without an open shift at ${width}px`, async ({ page }) => {
   await setup(page)

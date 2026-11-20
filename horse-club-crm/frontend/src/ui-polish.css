@@ -8,7 +8,7 @@ h1, h2, h3 { font-family: var(--crm-font-display); letter-spacing: -0.025em; }
 .ant-statistic-title .club-icon-label { align-items: flex-start; }
 .workspace-kpis .ant-statistic-content { font-size: clamp(30px, 3vw, 40px); font-weight: 700; letter-spacing: -0.035em; }
 .ant-tabs-tab .club-icon { margin-inline-end: 6px; }
-.ant-btn, .ant-tabs-tab-btn, .ant-segmented-item, .ant-tag-checkable, .cashbox-header-link {
+.ant-btn, .ant-tabs-tab-btn, .ant-segmented-item, .ant-tag-checkable, .crm-card-link {
   transition: transform var(--crm-motion-press) ease, background-color var(--crm-motion-press) ease,
     border-color var(--crm-motion-press) ease, color var(--crm-motion-press) ease,
     box-shadow var(--crm-motion-shadow) ease;
@@ -16,9 +16,12 @@ h1, h2, h3 { font-family: var(--crm-font-display); letter-spacing: -0.025em; }
 .ant-btn:not(:disabled):not(.ant-btn-loading):active,
 .ant-tabs-tab:not(.ant-tabs-tab-disabled) .ant-tabs-tab-btn:active,
 .ant-segmented:not(.ant-segmented-disabled) .ant-segmented-item:not(.ant-segmented-item-disabled):active,
-.ant-tag-checkable:active, .cashbox-header-link:active { transform: scale(var(--crm-press-scale)); }
-.cashbox-header-link { background: var(--crm-paper); box-shadow: var(--crm-shadow-card); }
-.cashbox-header-link:hover { box-shadow: var(--crm-shadow-card-hover); }
+.ant-tag-checkable:active { transform: scale(var(--crm-press-scale)); }
+.crm-card-link { color: inherit; cursor: pointer; box-shadow: var(--crm-shadow-card); }
+.crm-card-link:hover { color: var(--crm-saddle); border-color: var(--crm-saddle); box-shadow: var(--crm-shadow-card-hover); transform: translateY(-2px); }
+.crm-card-link:active { transform: scale(var(--crm-press-scale)); }
+.crm-card-link:focus-visible { outline: 2px solid var(--crm-saddle); outline-offset: 3px; }
+.cashbox-header-link { background: var(--crm-paper); }
 
 .equestrian-motif { position: absolute; width: 290px; height: 290px; inset-inline-end: 5%; top: -72px; opacity: 0.06; pointer-events: none; transform: rotate(-20deg); }
 .workspace-toolbar.shift-welcome { position: relative; isolation: isolate; overflow: hidden; justify-content: space-between; padding: 32px; border-radius: 24px; background: linear-gradient(120deg, var(--crm-chocolate), #42332b); color: #faf7f2; box-shadow: var(--crm-shadow-card); }
@@ -41,10 +44,10 @@ h1, h2, h3 { font-family: var(--crm-font-display); letter-spacing: -0.025em; }
 @media (max-width: 575px) { .workspace-toolbar.shift-welcome { padding: 24px; } .shift-welcome .equestrian-motif { inset-inline-end: -80px; } }
 @media (prefers-reduced-motion: reduce) {
   :root { --crm-press-scale: 1; --crm-motion-press: 0ms; --crm-motion-shadow: 0ms; }
-  .ant-btn, .ant-tabs-tab-btn, .ant-segmented-item, .ant-tag-checkable, .cashbox-header-link,
+  .ant-btn, .ant-tabs-tab-btn, .ant-segmented-item, .ant-tag-checkable, .crm-card-link,
   .ant-card, .trainer-board .board-lesson, .monthly-payment-progress .ant-progress-bg { transition: none; animation: none; }
   .ant-btn:not(:disabled):active, .ant-tabs-tab .ant-tabs-tab-btn:active,
-  .ant-segmented .ant-segmented-item:active, .ant-tag-checkable:active, .cashbox-header-link:active,
+  .ant-segmented .ant-segmented-item:active, .ant-tag-checkable:active, .crm-card-link:active, .crm-card-link:hover,
   .ant-card-hoverable:hover { transform: none; }
   .trainer-board .board-now-indicator { animation: none; }
 }

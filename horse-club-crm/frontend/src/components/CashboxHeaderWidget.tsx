@@ -44,7 +44,7 @@ export function CashboxHeaderWidget() {
     {([
       ['MAIN', 'Основная касса', data.mainBalance, data.mainOperationsCount],
       ['BOARDING', 'Касса постоя', data.boardingBalance, data.boardingOperationsCount],
-    ] as const).map(([type, label, balance, count]) => <Link key={type} className="cashbox-header-link" to={`/payments?cashboxType=${type}`}>
+    ] as const).map(([type, label, balance, count]) => <Link key={type} className="cashbox-header-link crm-card-link" to={`/payments?cashboxType=${type}`}>
       <span className="club-icon-label"><ClubIcon name="wallet" />{label}</span><strong>{balance.toLocaleString('ru-RU')} руб.</strong><span>{count.toLocaleString('ru-RU')} оп.</span>
     </Link>)}
   </Space>
