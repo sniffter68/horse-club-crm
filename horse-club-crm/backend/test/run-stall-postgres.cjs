@@ -35,7 +35,9 @@ function run(args) {
     const p = new PrismaClient({ datasources: { db: { url: testUrl.href } } });
     await p.clubSchedule.create({ data: { id: 1, openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] } });
     await p.$disconnect();
-    run(['--test', 'test/*.test.cjs']);
+    run(['--test', ...(process.env.STALL_TEST_FOCUSED === '1'
+      ? ['test/stall-map.postgres.test.cjs', 'test/stall-mutations.test.cjs', 'test/stable-buildings.test.cjs', 'test/stalls.test.cjs']
+      : ['test/*.test.cjs'])]);
   } finally {
     if (created) {
       if (schemaOnly) await admin.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);

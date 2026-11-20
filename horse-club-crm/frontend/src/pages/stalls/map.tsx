@@ -63,9 +63,9 @@ export function StallMap() {
     ...(stall.warnings ?? []).map(warning => warning.message),
     ...(stall.zone === 'QUARANTINE' || stall.status === 'QUARANTINE' ? ['Карантинная зона'] : []),
   ])]
-  const tile = (stall?: MapStall) => stall ? <Tooltip key={stall.id} trigger={['hover', 'focus']} title={riskReasons(stall).length ? <>{riskReasons(stall).map(reason => <div key={reason}>{reason}</div>)}</> : null}>
+  const tile = (stall?: MapStall, onSelect?: () => void) => stall ? <Tooltip key={stall.id} trigger={['hover', 'focus']} title={riskReasons(stall).length ? <>{riskReasons(stall).map(reason => <div key={reason}>{reason}</div>)}</> : null}>
     <button type="button" className={`stall-tile stall-tile--${stall.type === 'SERVICE' ? 'service' : stall.status.toLowerCase()}`}
-    key={stall.id} aria-disabled={constructing} onClick={event => { if (constructing) return; opener.current = event.currentTarget; setSelectedId(stall.id) }} aria-label={stall.type === 'SERVICE' ? `${stall.name}, служебное` : `Денник ${stall.number ?? stall.name}, ${stall.horse?.name ?? statuses[stall.status]}`}>
+    key={stall.id} onClick={event => { if (onSelect) { onSelect(); return } if (constructing) return; opener.current = event.currentTarget; setSelectedId(stall.id) }} aria-label={stall.type === 'SERVICE' ? `${stall.name}, служебное` : `Денник ${stall.number ?? stall.name}, ${stall.horse?.name ?? statuses[stall.status]}`}>
     {stall.type === 'SERVICE' ? <><strong>{stall.name}</strong><span>Служебное</span></> : <>
     <span className="stall-tile-heading"><strong>{stall.number ? `№ ${stall.number}` : stall.name}</strong><Tag color={colors[stall.status]}>{statuses[stall.status]}</Tag></span>
     {stall.name && stall.number && <span>{stall.name}</span>}
@@ -88,7 +88,7 @@ export function StallMap() {
         <Card><Statistic title="Ремонт / карантин" value={visible.filter(s => ['MAINTENANCE', 'QUARANTINE'].includes(s.status)).length} /></Card>
       </div>
       {!visible.length && <Empty description="Денников в этом корпусе пока нет" />}
-      <BuildingMap buildings={buildings} stalls={visible} canManage={canManage} tile={tile} onSaved={() => void refresh()} onEditingChange={setConstructing} />
+      <BuildingMap buildings={buildings} stalls={visible} canManage={canManage} tile={tile} onSaved={updated => { if (updated) setStalls(updated); void refresh() }} onEditingChange={setConstructing} />
     </>}
     {selected && <StallDetails key={selected.id} stall={selected} horses={horses} stalls={stalls} canManage={canManage}
       onClose={() => setSelectedId(undefined)} onSaved={saved} onPrint={() => setPrintId(selected.id)} />}
@@ -150,7 +150,7 @@ function StallDetails({ stall, horses, stalls, canManage, onClose, onSaved, onPr
     {stall.horse?.feedingNotes && <><Typography.Title level={5}>Рацион кормления</Typography.Title><p className="stall-sign-notes">{stall.horse.feedingNotes}</p></>}
     {canManage && stall.horse && <StallTransfer open={transferOpen} source={stall} stalls={stalls} onClose={() => setTransferOpen(false)} onSaved={onSaved} />}
   </>
-  const title = stall.type === 'SERVICE' ? stall.name ?? 'Служебное помещение' : `Денник № ${stall.number ?? stall.name}`
+  const title = stall.type === 'SERVICE' ? stall.name ?? 'Служебное помещение' : `Денник № ${stall.number ?? ''}${stall.name ? ` · ${stall.name}` : ''}`
   if (!canManage) return <Modal open title={title} onCancel={onClose} footer={<Button onClick={onClose}>Закрыть</Button>}>{content}</Modal>
   return <StableEntryModal variant="drawer" title={title} form={form} submitLabel="Сохранить денник" submitDisabled={busy} resources={['stalls', 'horses']} successMessage="Денник сохранён"
     onClose={() => !lock.current && onClose()} onSaved={onSaved}

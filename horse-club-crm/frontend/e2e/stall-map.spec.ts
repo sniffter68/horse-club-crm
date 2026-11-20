@@ -126,6 +126,8 @@ test('rename and delete a stall, retaining failed drafts and refreshing the map'
   await patched
   await expect(page.getByRole('button', { name: 'Денник Л-12, Свободен', exact: true })).toContainText('Летний бокс')
   expect(patches).toBe(2)
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Денник Л-12, Свободен', exact: true })).toContainText('Летний бокс')
   await page.getByRole('button', { name: 'Денник Л-12, Свободен', exact: true }).click()
   await page.getByRole('button', { name: 'Удалить денник', exact: true }).click()
   await page.getByRole('dialog', { name: 'Удалить денник?' }).getByRole('button', { name: 'Отмена', exact: true }).click()
@@ -150,6 +152,8 @@ test('list edits labels in a drawer using PATCH and deletes without leaving the 
   const state = await setup(page)
   const id = initial[2].id
   state.stalls = [state.stalls[2]]
+  Object.assign(state.stalls[0], { rowSpan: 4, colSpan: 3 })
+  await page.route('**/api/stable-buildings', route => route.fulfill({ json: buildings.map(b => ({ ...b, gridRows: 6, gridCols: 6 })) }))
   await page.route('**/api/stalls?*', route => route.fulfill({ json: state.stalls, headers: { 'x-total-count': String(state.stalls.length) } }))
   let patches = 0, deletes = 0
   await page.route(`**/api/stalls/${id}`, route => {
@@ -172,6 +176,11 @@ test('list edits labels in a drawer using PATCH and deletes without leaving the 
   await expect(drawer).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Северный бокс', exact: true })).toBeVisible()
   expect(patches).toBe(1); expect(state.stalls[0].number).toBe('С-5')
+  await page.reload()
+  await page.getByRole('button', { name: 'Северный бокс', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Карточка денника' })).toContainText('С-5')
+  await page.getByRole('dialog', { name: 'Карточка денника' }).getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Карточка денника' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Удалить денник', exact: true }).click()
   await page.getByRole('dialog', { name: 'Удалить денник?' }).getByRole('button', { name: 'Удалить', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Северный бокс', exact: true })).toHaveCount(0)
@@ -428,3 +437,64 @@ test('manager with READ_ONLY stables cannot transfer', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Перевести в денник', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Сохранить денник' })).toHaveCount(0)
 })
+
+
+for (const mode of ['immediate', 'layout', 'stall'] as const) {
+  const immediate = mode !== 'layout', service = mode !== 'stall'
+  test(`constructor edits room parameters and persists after reload (${mode})`, async ({ page }) => {
+    if (!immediate) await page.setViewportSize({ width: 390, height: 844 })
+    const state = await setup(page)
+    let saves = 0
+    await page.route('**/api/stalls/layout', route => {
+      saves++
+      if (state.fail) return route.fulfill({ status: 409, json: { message: 'Схема изменена, повторите сохранение' } })
+      const blocks: Array<Partial<FixtureStall> & { id: string }> = route.request().postDataJSON()
+      for (const block of blocks) Object.assign(state.stalls.find(s => s.id === block.id)!, block)
+      return route.fulfill({ json: state.stalls })
+    })
+    await page.getByRole('switch', { name: 'Режим конструктора' }).click()
+    await page.getByRole('button', { name: 'Денник Л-1, Свободен', exact: true }).click()
+    const drawer = page.getByRole('dialog', { name: 'Параметры помещения', exact: true })
+    await drawer.getByRole('textbox', { name: 'Название', exact: true }).fill('Мойка')
+    await drawer.getByRole('textbox', { name: 'Номер денника', exact: true }).fill('М-7')
+    await drawer.getByRole('combobox', { name: 'Корпус', exact: true }).focus()
+    await page.keyboard.press('ArrowDown')
+    await page.locator('.ant-select-dropdown:visible').getByText('Основная конюшня', { exact: true }).click()
+    await drawer.getByRole('spinbutton', { name: 'Ряд', exact: true }).fill('2')
+    await drawer.getByRole('spinbutton', { name: 'Колонка', exact: true }).fill('2')
+    await drawer.getByRole('spinbutton', { name: 'Высота в ячейках', exact: true }).fill('2')
+    await drawer.getByRole('spinbutton', { name: 'Ширина в ячейках', exact: true }).fill('2')
+    if (service) {
+      await drawer.getByRole('combobox', { name: 'Тип помещения', exact: true }).focus()
+      await page.keyboard.press('ArrowDown')
+      await page.locator('.ant-select-dropdown:visible').getByText('Служебное помещение', { exact: true }).click()
+    }
+    if (immediate) {
+      state.fail = true
+      await drawer.getByRole('button', { name: 'Сохранить изменения', exact: true }).click()
+      await expect(drawer.getByText('Схема изменена, повторите сохранение', { exact: true })).toBeVisible()
+      await expect(drawer.getByRole('textbox', { name: 'Название', exact: true })).toHaveValue('Мойка')
+      state.fail = false
+      await drawer.getByRole('button', { name: 'Сохранить изменения', exact: true }).click()
+      await expect(page.getByRole('switch', { name: 'Режим конструктора' })).toBeChecked()
+    } else {
+      await drawer.getByRole('button', { name: 'Применить к схеме', exact: true }).click()
+      expect(saves).toBe(0)
+      await expect(page.getByRole('button', { name: 'Мойка, служебное', exact: true })).toBeVisible()
+      await page.getByRole('button', { name: 'Сохранить схему', exact: true }).click()
+    }
+    await expect(drawer).toHaveCount(0)
+    expect(state.stalls[2]).toMatchObject({ name: 'Мойка', number: service ? '' : 'М-7', type: service ? 'SERVICE' : 'STALL', buildingId: mainBuilding, row: 2, col: 2, rowSpan: 2, colSpan: 2 })
+    await page.reload()
+    const room = page.getByRole('button', { name: service ? 'Мойка, служебное' : 'Денник М-7, Свободен', exact: true })
+    await expect(room).toBeVisible()
+    if (service) { await expect(room).not.toContainText('№'); await expect(room).not.toContainText('—') }
+    await expect(room.locator('..')).toHaveCSS('grid-row-start', '2')
+    await page.getByRole('switch', { name: 'Режим конструктора' }).click()
+    await room.click()
+    await expect(drawer.getByRole('textbox', { name: 'Название', exact: true })).toHaveValue('Мойка')
+    await expect(drawer.getByRole('spinbutton', { name: 'Высота в ячейках', exact: true })).toHaveValue('2')
+    await expect.poll(async () => { const box = await drawer.boundingBox(); return box !== null && box.x >= 0 && box.x + box.width <= page.viewportSize()!.width + 1 }).toBe(true)
+    await page.screenshot({ path: `test-results/constructor-room-${mode}.png`, fullPage: true, animations: 'disabled' })
+  })
+}

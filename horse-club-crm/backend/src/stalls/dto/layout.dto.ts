@@ -1,6 +1,8 @@
 import { Type } from 'class-transformer';
 import { IsInt, IsUUID, Min } from 'class-validator';
-export class LayoutBlockDto {
+import { PickType } from '@nestjs/swagger';
+import { UpdateStallDto } from './update-stall.dto';
+export class LayoutBlockDto extends PickType(UpdateStallDto, ['name', 'number', 'type'] as const) {
  @IsUUID() id!: string;
  @IsUUID() buildingId!: string;
  @Type(() => Number) @IsInt() @Min(1) row!: number;

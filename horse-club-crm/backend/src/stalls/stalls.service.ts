@@ -46,6 +46,7 @@ export class StallsService {
       ? {
           OR: [
             { name: { contains: options.search, mode: 'insensitive' } },
+            { number: { contains: options.search, mode: 'insensitive' } },
             { description: { contains: options.search, mode: 'insensitive' } },
           ],
         }
@@ -201,8 +202,8 @@ export class StallsService {
           ...((dto.type ?? current.type) === 'SERVICE' ? { number: '' } : {}), status } });
         if (current.horseId) await tx.horse.update({ where: { id: current.horseId }, data: { stallNumber: updated.number ?? updated.name } });
         await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'STALL_UPDATED', actorId: actor.id,
-          actorName: actor.email, details: { stallId: id, before: { name: current.name, number: current.number },
-            after: { name: updated.name, number: updated.number } } } });
+          actorName: actor.email, details: { stallId: id, before: this.auditRoom(current),
+            after: this.auditRoom(updated) } } });
       });
       return this.findOne(id);
     } catch (error: unknown) {
@@ -239,7 +240,7 @@ export class StallsService {
     validateGridBlock(block, building, others);
   }
 
-  async saveLayout(blocks: LayoutBlockDto[]) {
+  async saveLayout(blocks: LayoutBlockDto[], actor: Pick<AuthUser, 'id' | 'email'>) {
     if (!blocks.length || blocks.length > 10000 || new Set(blocks.map(b => b.id)).size !== blocks.length)
       throw new BadRequestException('Укажите непустой список помещений без повторений');
     await this.serializable(async tx => {
@@ -252,9 +253,26 @@ export class StallsService {
         if (!building) throw new BadRequestException('Корпус не найден');
         validateGridBlock(block, building, projected);
       }
-      for (const { id, ...data } of blocks) await tx.stall.update({ where: { id }, data });
+      for (const { id, ...data } of blocks) {
+        const current = all.find(s => s.id === id)!;
+        const before = this.auditRoom(current);
+        const room = { ...current, ...data };
+        // Coordinate-only saves also support legacy rooms without labels.
+        if (data.name !== undefined || data.number !== undefined || data.type !== undefined) this.validateRoom(room);
+        if (room.type === 'SERVICE' && current.horseId) throw new ConflictException('Сначала освободите денник');
+        const updated = await tx.stall.update({ where: { id }, data: { ...this.normalize(data),
+          ...(room.type === 'SERVICE' ? { number: '' } : {}) } });
+        if (current.horseId) await tx.horse.update({ where: { id: current.horseId }, data: { stallNumber: updated.number ?? updated.name } });
+        await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'STALL_UPDATED', actorId: actor.id,
+          actorName: actor.email, details: { stallId: id, source: 'layout', before, after: this.auditRoom(updated) } } });
+      }
     });
     return this.map();
+  }
+
+  private auditRoom(room: { name: string | null; number: string | null; type: string; buildingId: string | null; row: number; col: number; rowSpan: number; colSpan: number }) {
+    const { name, number, type, buildingId, row, col, rowSpan, colSpan } = room;
+    return { name, number, type, buildingId, row, col, rowSpan, colSpan };
   }
 
   private validateRoom(dto: { type?: string; name?: string | null; number?: string | null }) {

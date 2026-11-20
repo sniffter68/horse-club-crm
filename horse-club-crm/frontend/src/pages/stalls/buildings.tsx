@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Alert, App, Button, Empty, Form, Input, InputNumber, Modal, Select, Space, Switch, Tabs, Typography } from 'antd'
+import { useInvalidate } from '@refinedev/core'
 import { ClubIcon } from '../../components/ClubIcon'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { isUuid } from '../../uuid'
@@ -7,16 +8,22 @@ import { useSearchParams } from 'react-router-dom'
 import { StableEntryModal } from '../stable/shared'
 import type { MapStall } from './mapTypes'
 
-import { fits, type StableBuilding, type Placement } from './gridLayout'
+import { fits, type StableBuilding, type RoomDraft } from './gridLayout'
+
+function roomDraft(s: MapStall): RoomDraft {
+  return { id: s.id, buildingId: s.buildingId ?? '', row: s.row ?? 1, col: s.col ?? 1, rowSpan: s.rowSpan ?? 1, colSpan: s.colSpan ?? 1, name: s.name, number: s.number, type: s.type ?? 'STALL' }
+}
 
 export function BuildingMap({ buildings, stalls, canManage, tile, onSaved, onEditingChange }: {
-  buildings: StableBuilding[]; stalls: MapStall[]; canManage: boolean; tile: (stall: MapStall) => ReactNode; onSaved: () => void; onEditingChange: (editing: boolean) => void
+  buildings: StableBuilding[]; stalls: MapStall[]; canManage: boolean; tile: (stall: MapStall, onSelect?: () => void) => ReactNode; onSaved: (stalls?: MapStall[]) => void; onEditingChange: (editing: boolean) => void
 }) {
   const [params, setParams] = useSearchParams()
   const requestedBuilding = params.get('buildingId')
   const active = buildings.some(b => b.id === requestedBuilding) ? requestedBuilding! : 'ALL'
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<Placement[]>([])
+  const [draft, setDraft] = useState<RoomDraft[]>([])
+  const [selectedId, setSelectedId] = useState<string>()
+  const invalidate = useInvalidate()
   const [settings, setSettings] = useState(false)
   const [buildingForm, setBuildingForm] = useState<StableBuilding | 'new'>()
   const [slot, setSlot] = useState<{ buildingId: string; row: number; col: number }>()
@@ -25,9 +32,10 @@ export function BuildingMap({ buildings, stalls, canManage, tile, onSaved, onEdi
   const [dragged, setDragged] = useState<string>()
   const lock = useRef(false)
   const { modal, message } = App.useApp()
-  const placements = stalls.filter(s => s.buildingId).map(s => ({ id: s.id, buildingId: s.buildingId!, row: s.row ?? 1, col: s.col ?? 1, rowSpan: s.rowSpan ?? 1, colSpan: s.colSpan ?? 1 }))
+  const placements = stalls.filter(s => s.buildingId).map(roomDraft)
   const layout = editing ? draft : placements
-  const dirty = editing && JSON.stringify(draft) !== JSON.stringify(placements)
+  const ordered = (items: RoomDraft[]) => [...items].sort((a, b) => a.id.localeCompare(b.id))
+  const dirty = editing && JSON.stringify(ordered(draft)) !== JSON.stringify(ordered(placements))
   useEffect(() => { onEditingChange(editing); return () => onEditingChange(false) }, [editing, onEditingChange])
   useEffect(() => {
     if (!dirty) return
@@ -45,27 +53,35 @@ export function BuildingMap({ buildings, stalls, canManage, tile, onSaved, onEdi
     if (dirty) modal.confirm({ title: 'Отменить изменения схемы?', okText: 'Отменить изменения', cancelText: 'Продолжить', autoFocusButton: 'cancel', onOk: () => { setEditing(false); setFailure(undefined) } })
     else setEditing(false)
   }
-  const change = (block: Placement, values: Partial<Placement>) => {
+  const change = (block: RoomDraft, values: Partial<RoomDraft>) => {
     if (busy) return
     const next = { ...block, ...values }; const building = buildings.find(b => b.id === next.buildingId)
     if (!building || !fits(next, building, draft)) { setFailure('Недостаточно места: выберите свободные ячейки внутри корпуса.'); return }
     setFailure(undefined); setDraft(items => items.map(item => item.id === next.id ? next : item))
   }
-  const save = async () => {
+  const save = async (exit = true, blocks = draft) => {
     if (lock.current || !canManage) return
     lock.current = true; setBusy(true); setFailure(undefined)
     try {
-      if (draft.some(b => !isUuid(b.id) || !isUuid(b.buildingId))) throw new Error('Обновите карту: некорректный идентификатор помещения')
-      await httpClient.patch(`${API_URL}/stalls/layout`, draft)
-      setEditing(false); void message.success('Схема сохранена'); onSaved()
-    } catch (cause) { setFailure(toHttpError(cause).message) }
+      if (blocks.some(b => !isUuid(b.id) || !isUuid(b.buildingId))) throw new Error('Обновите карту: некорректный идентификатор помещения')
+      const payload = blocks.map(({ name, number, type, ...placement }) => {
+        const original = stalls.find(s => s.id === placement.id)
+        return { ...placement, ...(name !== original?.name ? { name } : {}),
+          ...(number !== original?.number ? { number } : {}), ...(type !== (original?.type ?? 'STALL') ? { type } : {}) }
+      })
+      const { data } = await httpClient.patch<MapStall[]>(`${API_URL}/stalls/layout`, payload)
+      setDraft(data.filter(s => s.buildingId).map(roomDraft)); onSaved(data)
+      await invalidate({ resource: 'stalls', invalidates: ['resourceAll'] })
+      await invalidate({ resource: 'horses', invalidates: ['resourceAll'] })
+      if (exit) { setSelectedId(undefined); setEditing(false); void message.success('Схема сохранена') }
+    } catch (cause) { setFailure(toHttpError(cause).message); throw cause }
     finally { lock.current = false; setBusy(false) }
   }
   return <>
     <Space wrap className="stall-map-toolbar">
       {canManage && <><Button disabled={editing} onClick={() => setSettings(true)}>Настроить корпуса</Button>
         <label><Switch aria-label="Режим конструктора" checked={editing} disabled={busy} onChange={checked => { if (checked) { setDraft(placements); setEditing(true) } else stop() }} /> Режим конструктора</label></>}
-      {editing && <><Button type="primary" aria-label="Сохранить схему" aria-busy={busy} loading={busy} disabled={!dirty || busy} onClick={() => void save()}>Сохранить схему</Button><Button disabled={busy} onClick={stop}>Отмена</Button></>}
+      {editing && <><Button type="primary" aria-label="Сохранить схему" aria-busy={busy} loading={busy} disabled={!dirty || busy} onClick={() => void save().catch(() => undefined)}>Сохранить схему</Button><Button disabled={busy} onClick={stop}>Отмена</Button></>}
     </Space>
     {failure && <Alert type="error" showIcon message="Схема не сохранена" description={failure} />}
     <Tabs activeKey={active} onChange={id => setParams(current => { if (id === 'ALL') current.delete('buildingId'); else current.set('buildingId', id); return current })} items={[{ key: 'ALL', icon: <ClubIcon name="stable" />, label: 'Все корпуса' }, ...buildings.map(b => ({ key: b.id, icon: <ClubIcon name="stable" />, label: `${b.name} · ${b.occupied}/${b.total}` }))]} />
@@ -85,9 +101,9 @@ export function BuildingMap({ buildings, stalls, canManage, tile, onSaved, onEdi
             : <div key={`${row}:${col}`} className={aisle ? 'stall-passage' : 'stall-grid-empty'} style={{ gridRow: row, gridColumn: col }} aria-hidden="true">{aisle && `Проход · ${row}`}</div>
         })}
         {layout.filter(b => b.buildingId === building.id).map(block => {
-          const stall = stalls.find(s => s.id === block.id)!
+          const stall = { ...stalls.find(s => s.id === block.id)!, ...block }
           return <div key={block.id} className="stall-grid-block" style={{ gridRow: `${block.row} / span ${block.rowSpan}`, gridColumn: `${block.col} / span ${block.colSpan}` }} draggable={editing && !busy} onDragStart={() => setDragged(block.id)} onDragEnd={() => setDragged(undefined)}>
-            {tile(stall)}
+            {tile(stall, editing ? () => { if (!busy) setSelectedId(block.id) } : undefined)}
             {editing && <div className="stall-grid-controls" aria-label={`Расположение ${stall.number || stall.name}`}>
               <Space wrap size={4}>{([[-1, 0, 'Вверх'], [1, 0, 'Вниз'], [0, -1, 'Влево'], [0, 1, 'Вправо']] as const).map(([r, c, label]) => <Button size="small" key={label} disabled={busy || !fits({ ...block, row: block.row + r, col: block.col + c }, building, draft)} onClick={() => change(block, { row: block.row + r, col: block.col + c })}>{label}</Button>)}</Space>
               <label>Высота <Select aria-label={`Высота ${stall.number || stall.name}`} value={block.rowSpan} disabled={busy} onChange={rowSpan => change(block, { rowSpan })} options={[1, 2, 3].map(value => ({ value, label: `${value}×`, disabled: !fits({ ...block, rowSpan: value }, building, draft) }))} /></label>
@@ -97,16 +113,47 @@ export function BuildingMap({ buildings, stalls, canManage, tile, onSaved, onEdi
         })}
       </div></div>
     </section>)}
-    {stalls.some(s => !s.buildingId) && <><Typography.Title level={3}>Без корпуса</Typography.Title><div className="stall-unplaced">{stalls.filter(s => !s.buildingId).map(s => <div key={s.id}>{tile(s)}{editing && <Button onClick={() => setSlot({ buildingId: buildings[0]?.id ?? '', row: 1, col: 1 })}>Разместить в корпусе</Button>}</div>)}</div></>}
+    {stalls.some(s => !s.buildingId && !layout.some(b => b.id === s.id)) && <><Typography.Title level={3}>Без корпуса</Typography.Title><div className="stall-unplaced">{stalls.filter(s => !s.buildingId && !layout.some(b => b.id === s.id)).map(s => <div key={s.id}>{tile(s, editing ? () => { if (!busy) setSelectedId(s.id) } : undefined)}{editing && <Button disabled={busy} onClick={() => setSlot({ buildingId: buildings[0]?.id ?? '', row: 1, col: 1 })}>Разместить в корпусе</Button>}</div>)}</div></>}
     {slot && <PlaceInSlot slot={slot} stalls={stalls} busy={busy} dirty={dirty} onClose={() => setSlot(undefined)} onPlace={id => {
-      const block = draft.find(b => b.id === id) ?? { id, ...slot, rowSpan: 1, colSpan: 1 }
+      const room = stalls.find(s => s.id === id)!
+      const block = draft.find(b => b.id === id) ?? { id, ...slot, rowSpan: 1, colSpan: 1, name: room.name, number: room.number, type: room.type ?? 'STALL' }
       const next = { ...block, ...slot }, building = buildings.find(b => b.id === slot.buildingId)
       if (!building || !fits(next, building, draft)) { setFailure('Помещение не помещается в выбранные ячейки'); setSlot(undefined); return }
       setDraft(items => [...items.filter(b => b.id !== id), next]); setSlot(undefined); setFailure(undefined)
     }} onCreate={() => { setSlot(undefined); setEditing(false); onSaved() }} />}
+    {editing && selectedId && <ConstructorRoomEditor key={selectedId}
+      room={draft.find(b => b.id === selectedId) ?? roomDraft(stalls.find(s => s.id === selectedId)!)}
+      buildings={buildings} busy={busy} onClose={() => setSelectedId(undefined)}
+      onApply={room => { const building = buildings.find(b => b.id === room.buildingId); if (!building || !fits(room, building, draft)) throw new Error('Недостаточно места: выберите свободные ячейки внутри корпуса.'); setDraft(items => [...items.filter(b => b.id !== room.id), room]); setSelectedId(undefined) }}
+      onPersist={room => save(false, [...draft.filter(b => b.id !== room.id), room])} />}
     {settings && !buildingForm && <BuildingSettings buildings={buildings} onEdit={setBuildingForm} onClose={() => setSettings(false)} onSaved={onSaved} />}
     {buildingForm && <BuildingForm key={typeof buildingForm === 'string' ? buildingForm : buildingForm.id} building={buildingForm} onClose={() => setBuildingForm(undefined)} onSaved={() => { setBuildingForm(undefined); onSaved() }} />}
   </>
+}
+
+function ConstructorRoomEditor({ room, buildings, busy, onClose, onApply, onPersist }: {
+  room: RoomDraft; buildings: StableBuilding[]; busy: boolean; onClose: () => void;
+  onApply: (room: RoomDraft) => void; onPersist: (room: RoomDraft) => Promise<void>
+}) {
+  const [form] = Form.useForm<RoomDraft>()
+  const type = Form.useWatch('type', form) ?? room.type
+  const [failure, setFailure] = useState<string>()
+  const values = (fields: RoomDraft): RoomDraft => ({ ...room, ...fields, number: fields.type === 'SERVICE' ? '' : fields.number })
+  return <StableEntryModal variant="drawer" title="Параметры помещения" form={form} initialValues={{ ...room }}
+    submitLabel="Сохранить изменения" submitDisabled={busy} resources={['stalls', 'horses']} successMessage="Схема и параметры помещений сохранены"
+    onClose={onClose} onSaved={onClose} save={fields => onPersist(values(fields))}>
+    <Form.Item name="type" label="Тип помещения" rules={[{ required: true }]}><Select aria-label="Тип помещения" options={[
+      { value: 'STALL', label: 'Денник' }, { value: 'PONY_PEN', label: 'Бокс пони' }, { value: 'SERVICE', label: 'Служебное помещение' },
+    ]} /></Form.Item>
+    <Form.Item name="name" label="Название" rules={[{ required: type === 'SERVICE', whitespace: true, message: 'Укажите название' }, { max: 150 }]}><Input aria-label="Название" maxLength={150} /></Form.Item>
+    {type !== 'SERVICE' && <Form.Item name="number" label="Номер денника" rules={[{ required: true, whitespace: true, message: 'Укажите номер денника' }, { max: 30 }]}><Input aria-label="Номер денника" maxLength={30} /></Form.Item>}
+    <Form.Item name="buildingId" label="Корпус" rules={[{ required: true, message: 'Выберите корпус' }, { validator: async (_, id: string) => { if (!isUuid(id)) throw new Error('Выберите корпус из списка') } }]}><Select aria-label="Корпус" options={buildings.map(b => ({ value: b.id, label: b.name }))} /></Form.Item>
+    {(['row', 'col', 'rowSpan', 'colSpan'] as const).map((field, index) => <Form.Item key={field} name={field} label={['Ряд', 'Колонка', 'Высота в ячейках', 'Ширина в ячейках'][index]}
+      rules={[{ required: true, type: 'integer', min: 1, max: 100, message: 'Введите целое число от 1 до 100' }]}><InputNumber aria-label={['Ряд', 'Колонка', 'Высота в ячейках', 'Ширина в ячейках'][index]} min={1} max={100} /></Form.Item>)}
+    <Button disabled={busy} onClick={() => { void form.validateFields().then(fields => { try { onApply(values(fields)) } catch (cause) { setFailure(toHttpError(cause).message) } }).catch(() => undefined) }}>Применить к схеме</Button>
+    <Typography.Paragraph type="secondary">«Применить к схеме» оставляет изменения в конструкторе до общего сохранения. «Сохранить изменения» записывает параметры и всю текущую раскладку.</Typography.Paragraph>
+    {failure && <Alert type="error" message={failure} />}
+  </StableEntryModal>
 }
 
 function PlaceInSlot({ slot, stalls, busy, dirty, onPlace, onClose, onCreate }: { slot: { buildingId: string; row: number; col: number }; stalls: MapStall[]; busy: boolean; dirty: boolean; onPlace: (id: string) => void; onClose: () => void; onCreate: () => void }) {

@@ -32,6 +32,7 @@ export function StallList() {
       {(stall, ready) => <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
           { key: 'name', label: 'Денник', children: stall.name || `Денник ${stall.number ?? 'без номера'}` },
+          ...(stall.type === 'SERVICE' ? [] : [{ key: 'number', label: 'Номер денника', children: stall.number }]),
           { key: 'status', label: 'Статус', children: <Tag color={stall.isUnavailable ? 'red' : 'green'}>{stall.isUnavailable ? 'Недоступен' : 'Доступен'}</Tag> },
           { key: 'description', label: 'Описание', span: 2, children: stall.description || '—' },
         ]} />

@@ -14,6 +14,7 @@ const block = (id, row, col, extra = {}) => ({ id, buildingId: 'b1', row, col, r
 function database(stalls = []) {
   const state = { buildings: [{ ...building }], stalls: structuredClone(stalls) };
   const tx = {
+    cashAuditLog: { create: async () => ({}) },
     stableBuilding: {
       findMany: async () => state.buildings.map(b => ({ ...b, stalls: state.stalls.filter(s => s.buildingId === b.id) })),
       findUnique: async ({ where }) => state.buildings.find(b => b.id === where.id) ?? null,
@@ -61,14 +62,14 @@ test('buildings CRUD, service-free counts, occupied deletion and shrink protecti
 test('batch layout validates final state, swaps coordinates and never partly saves invalid changes', async () => {
   const db = database([block('a', 1, 1), block('b', 1, 4), block('untouched', 3, 1)]);
   const service = new StallsService(db);
-  await service.saveLayout([block('a', 1, 4), block('b', 1, 1)]);
+  await service.saveLayout([block('a', 1, 4), block('b', 1, 1)], { id: 'actor', email: 'qa@test' });
   assert.equal(db.state.stalls[0].col, 4);
   const before = structuredClone(db.state.stalls);
-  await assert.rejects(service.saveLayout([block('a', 2, 1), block('b', 3, 1)]), /пересекается/);
+  await assert.rejects(service.saveLayout([block('a', 2, 1), block('b', 3, 1)], { id: 'actor', email: 'qa@test' }), /пересекается/);
   assert.deepEqual(db.state.stalls, before);
-  await assert.rejects(service.saveLayout([block('a', 2, 1), block('a', 3, 1)]), /повторений/);
-  await assert.rejects(service.saveLayout([block('missing', 2, 1)]), /не найдено/);
-  await assert.rejects(service.saveLayout([block('a', 2, 1, { buildingId: 'missing' })]), /не найден/);
+  await assert.rejects(service.saveLayout([block('a', 2, 1), block('a', 3, 1)], { id: 'actor', email: 'qa@test' }), /повторений/);
+  await assert.rejects(service.saveLayout([block('missing', 2, 1)], { id: 'actor', email: 'qa@test' }), /не найдено/);
+  await assert.rejects(service.saveLayout([block('a', 2, 1, { buildingId: 'missing' })], { id: 'actor', email: 'qa@test' }), /не найден/);
 });
 test('individual stall create and update validate bounds and collisions inside transactions', async () => {
   const db = database([block('a', 1, 1, { type: 'STALL', number: '1', status: 'AVAILABLE', horseId: null })]);

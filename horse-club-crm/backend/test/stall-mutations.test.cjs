@@ -26,6 +26,7 @@ function fixture(extra = {}, contracts = []) {
       count: async () => state.contracts.filter(c => ['ACTIVE', 'SUSPENDED'].includes(c.status)).length,
       updateMany: async () => { state.contracts.forEach(c => { c.stallId = null; }); },
     },
+    stableBuilding: { findMany: async () => [{ id, gridRows: 10, gridCols: 10 }], findUnique: async () => ({ id, gridRows: 10, gridCols: 10 }) },
     horse: { update: async ({ data }) => Object.assign(state.horse, data) },
     cashAuditLog: { create: async ({ data }) => { state.audit.push(data); } },
     $transaction: async fn => {
@@ -41,7 +42,7 @@ test('rename ignores unchanged legacy grid, normalizes labels, synchronizes occu
   assert.equal(state.stall.name, 'Новый денник'); assert.equal(state.stall.number, '12');
   assert.equal(state.horse.stallNumber, '12');
   assert.equal(state.audit[0].action, 'STALL_UPDATED'); assert.equal(state.audit[0].actorId, id);
-  assert.deepEqual(state.audit[0].details.before, { name: 'Старый', number: '1' });
+  assert.equal(state.audit[0].details.before.name, 'Старый'); assert.equal(state.audit[0].details.before.number, '1');
 });
 for (const contracts of [[], [{ stallId: id, status: 'EXPIRED', notes: 'История' }]]) {
   test(`free stall deletion retains history (${contracts.length} contracts) and audits`, async () => {
@@ -80,8 +81,21 @@ test('HTTP PATCH validates DTO, accepts legacy null building, persists labels; D
     const server = app.getHttpServer();
     await request(server).patch(`/stalls/${id}`).send({ name: 'Новый', number: '15', buildingId: null }).expect(200);
     assert.equal(state.stall.number, '15'); assert.equal(state.audit.length, 1);
+    await request(server).get(`/stalls/${id}`).expect(200).expect(res => { assert.equal(res.body.name, 'Новый'); assert.equal(res.body.number, '15'); });
+    await request(server).patch(`/stalls/${id}`).send({ type: 'SERVICE', name: 'Амуничник' }).expect(200);
+    await request(server).get(`/stalls/${id}`).expect(200).expect(res => { assert.equal(res.body.type, 'SERVICE'); assert.equal(res.body.name, 'Амуничник'); assert.equal(res.body.number, ''); });
+    await request(server).patch(`/stalls/${id}`).send({ type: 'STALL', number: '15' }).expect(200);
     for (const body of [{ number: '' }, { number: 123 }, { name: 'x'.repeat(151) }, { title: 'x' }])
       await request(server).patch(`/stalls/${id}`).send(body).expect(400);
+    const layout = { id, buildingId: id, row: 2, col: 3, rowSpan: 2, colSpan: 2, type: 'SERVICE', name: '  Склад   кормов ' };
+    await request(server).patch('/stalls/layout').send([layout]).expect(200);
+    await request(server).get(`/stalls/${id}`).expect(200).expect(res => {
+      assert.equal(res.body.name, 'Склад кормов'); assert.equal(res.body.number, ''); assert.equal(res.body.type, 'SERVICE');
+      assert.equal(res.body.row, 2); assert.equal(res.body.col, 3); assert.equal(res.body.rowSpan, 2); assert.equal(res.body.colSpan, 2);
+    });
+    assert.equal(state.audit.at(-1).details.source, 'layout');
+    assert.equal(state.audit.at(-1).details.before.row, 1);
+    await request(server).patch('/stalls/layout').send([{ ...layout, type: 'DEN' }]).expect(400);
     state.stall.horseId = id;
     await request(server).delete(`/stalls/${id}`).expect(400).expect(res => assert.match(res.body.message, /Сначала освободите/));
     state.stall.horseId = null;
@@ -89,4 +103,17 @@ test('HTTP PATCH validates DTO, accepts legacy null building, persists labels; D
     await request(server).delete(`/stalls/${id}`).expect(404);
     await request(server).patch('/stalls/invalid').send({ number: '3' }).expect(400);
   } finally { await app.close(); }
+});
+
+
+test('layout audit failure rolls back room parameters and geometry; occupied rooms cannot become SERVICE', async () => {
+  const { service, db, state } = fixture();
+  const layout = [{ id, buildingId: id, row: 2, col: 2, rowSpan: 2, colSpan: 2, name: 'Склад', type: 'SERVICE' }];
+  const before = structuredClone(state);
+  db.cashAuditLog.create = async () => { throw new Error('audit failed'); };
+  await assert.rejects(service.saveLayout(layout, actor), /audit failed/);
+  assert.deepEqual(state, before);
+  state.stall.horseId = id; state.stall.status = 'OCCUPIED';
+  await assert.rejects(service.saveLayout(layout, actor), /Сначала освободите/);
+  assert.equal(state.stall.type, 'STALL'); assert.equal(state.stall.row, 1);
 });

@@ -46,7 +46,7 @@ export class StallsController {
 
   @Patch('layout')
   @Roles(Role.ADMIN, Role.MANAGER)
-  layout(@Body(new ParseArrayPipe({ items: LayoutBlockDto, whitelist: true, forbidNonWhitelisted: true })) blocks: LayoutBlockDto[]) { return this.service.saveLayout(blocks); }
+  layout(@Body(new ParseArrayPipe({ items: LayoutBlockDto, whitelist: true, forbidNonWhitelisted: true })) blocks: LayoutBlockDto[], @CurrentUser() user: AuthUser) { return this.service.saveLayout(blocks, user); }
 
   @Patch(':id/assign')
   @Roles(Role.ADMIN, Role.MANAGER)

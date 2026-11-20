@@ -11,3 +11,5 @@ export function fits(block: Placement, building: StableBuilding, others: Placeme
       block.col < other.col + other.colSpan && other.col < block.col + block.colSpan)
 }
 
+
+export interface RoomDraft extends Placement { name?: string | null; number?: string | null; type?: 'STALL' | 'PONY_PEN' | 'SERVICE' }

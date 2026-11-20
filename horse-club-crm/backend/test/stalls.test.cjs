@@ -31,6 +31,7 @@ test('stall list supports Refine pagination, search and sorting', async () => {
   assert.deepEqual(findManyArgs.where, {
     OR: [
       { name: { contains: 'денник', mode: 'insensitive' } },
+      { number: { contains: 'денник', mode: 'insensitive' } },
       { description: { contains: 'денник', mode: 'insensitive' } },
     ],
   });

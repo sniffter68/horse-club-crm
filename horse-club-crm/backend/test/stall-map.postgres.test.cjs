@@ -4,6 +4,34 @@ const { test } = require('node:test');
 const { randomUUID } = require('node:crypto');
 const { PrismaClient } = require('@prisma/client');
 const { StallsService } = require('../dist/stalls/stalls.service');
+
+test('PostgreSQL persists room labels, type and constructor parameters across fresh service reads', { skip: process.env.RUN_STALL_TESTS !== '1' }, async () => {
+  const url = new URL(process.env.DATABASE_URL);
+  assert.ok(['localhost', '127.0.0.1'].includes(url.hostname) && /^cash_desk_check_stalls_\d+$/.test(url.searchParams.get('schema') ?? ''));
+  const p = new PrismaClient();
+  const service = new StallsService(p);
+  const actor = { id: randomUUID(), email: 'constructor-qa@example.test' };
+  const building = await p.stableBuilding.create({ data: { name: `Constructor QA ${randomUUID()}`, gridRows: 5, gridCols: 5, aisleCols: [] } });
+  let room;
+  try {
+    room = await service.create({ buildingId: building.id, row: 1, col: 1, number: 'QA-1', name: 'Исходный' });
+    await service.update(room.id, { name: 'Северный бокс', number: 'QA-17' }, actor);
+    const renamed = await new StallsService(p).findOne(room.id);
+    assert.equal(renamed.name, 'Северный бокс'); assert.equal(renamed.number, 'QA-17');
+    await service.update(room.id, { type: 'SERVICE', name: 'Амуничник' }, actor);
+    await service.saveLayout([{ id: room.id, buildingId: building.id, row: 2, col: 3, rowSpan: 2, colSpan: 2, type: 'SERVICE', name: '  Склад   кормов ' }], actor);
+    const saved = await p.stall.findUniqueOrThrow({ where: { id: room.id } });
+    assert.equal(saved.name, 'Склад кормов'); assert.equal(saved.type, 'SERVICE'); assert.equal(saved.number, '');
+    assert.equal(saved.row, 2); assert.equal(saved.col, 3); assert.equal(saved.rowSpan, 2); assert.equal(saved.colSpan, 2);
+    assert.equal((await new StallsService(p).map()).find(s => s.id === room.id).name, saved.name);
+    assert.equal((await new StallsService(p).findOne(room.id)).name, saved.name);
+    assert.equal(await p.cashAuditLog.count({ where: { actorId: actor.id, action: 'STALL_UPDATED' } }), 3);
+  } finally {
+    if (room) await p.stall.delete({ where: { id: room.id } });
+    await p.stableBuilding.delete({ where: { id: building.id } });
+    await p.$disconnect();
+  }
+});
 test('PostgreSQL stall seed, relocation races, database invariants and rollback', { skip: process.env.RUN_STALL_TESTS !== '1' }, async () => {
   const url = new URL(process.env.DATABASE_URL);
   assert.ok(['localhost', '127.0.0.1'].includes(url.hostname) &&

@@ -51,7 +51,7 @@ function BuildingFields({ required }: { required: boolean }) {
     <Form.Item name="buildingId" label="Корпус" rules={[{ required, message: 'Выберите корпус' }, { validator: async (_, id?: string) => { if (id && !isUuid(id)) throw new Error('Выберите корпус из списка') } }]}><Select loading={loading} options={buildings.map(b => ({ value: b.id, label: b.name }))} /></Form.Item>
     <NumberField name="row" label="Ряд" min={1} max={100} required={required} />
     <NumberField name="col" label="Колонка" min={1} max={100} required={required} />
-    <NumberField name="rowSpan" label="Высота в ячейках" min={1} max={3} required={required} />
-    <NumberField name="colSpan" label="Ширина в ячейках" min={1} max={2} required={required} />
+    <NumberField name="rowSpan" label="Высота в ячейках" min={1} max={100} required={required} />
+    <NumberField name="colSpan" label="Ширина в ячейках" min={1} max={100} required={required} />
   </>
 }
