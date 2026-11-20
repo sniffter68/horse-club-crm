@@ -14,7 +14,7 @@ const initial = [
   { id: '00000000-0000-4000-8000-000000000002', name: 'Денник 2', number: '2', zone: 'MAIN', side: 'RIGHT', position: 1, status: 'OCCUPIED', horseId: '00000000-0000-4000-8000-000000000012', horse: mare, notes: null, warnings: [] },
   { id: '00000000-0000-4000-8000-000000000003', name: 'Летник 1', number: 'Л-1', zone: 'SUMMER', side: 'LEFT', position: 1, status: 'AVAILABLE', horseId: null, horse: null, notes: null, warnings: [] },
 ].map(s => ({ ...s, buildingId: s.zone === 'SUMMER' ? summerBuilding : mainBuilding, row: 1, col: s.side === 'RIGHT' ? 4 : 1, rowSpan: 1, colSpan: 1, type: 'STALL' }))
-type FixtureStall = Omit<(typeof initial)[number], 'horse' | 'horseId' | 'notes'> & { horse: typeof horse | null; horseId: string | null; notes: string | null }
+type FixtureStall = Omit<(typeof initial)[number], 'horse' | 'horseId' | 'notes'> & { horse: typeof horse | null; horseId: string | null; notes: string | null; description?: string; contracts?: Array<{ status: string }> }
 async function setup(page: Page, role = 'ADMIN', empty = false, readOnly = false) {
   await page.addInitScript(role => {
     localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.role', role); localStorage.setItem('horsecrm.email', 'qa@example.com')
@@ -113,16 +113,18 @@ test('rename and delete a stall, retaining failed drafts and refreshing the map'
     return route.fulfill({ json: state.stalls[2] })
   })
   await page.getByRole('button', { name: 'Денник Л-1, Свободен', exact: true }).click()
+  await page.getByRole('button', { name: 'Редактировать', exact: true }).click()
   await page.getByRole('textbox', { name: 'Название', exact: true }).fill('Летний бокс')
   await page.getByRole('textbox', { name: 'Номер денника', exact: true }).fill('Л-12')
   await page.screenshot({ path: 'test-results/stall-edit-drawer.png', fullPage: true, animations: 'disabled' })
   state.fail = true
-  await page.getByRole('button', { name: 'Сохранить денник', exact: true }).click()
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
   await expect(page.getByText('Изменения не сохранены', { exact: true })).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'Номер денника', exact: true })).toHaveValue('Л-12')
   state.fail = false
   const patched = page.waitForResponse(r => r.url().endsWith(`/stalls/${id}`) && r.request().method() === 'PATCH' && r.status() === 200)
-  await page.getByRole('button', { name: 'Сохранить денник', exact: true }).dblclick()
+  await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).not.toHaveClass(/ant-btn-loading/)
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).dblclick()
   await patched
   await expect(page.getByRole('button', { name: 'Денник Л-12, Свободен', exact: true })).toContainText('Летний бокс')
   expect(patches).toBe(2)
@@ -135,7 +137,7 @@ test('rename and delete a stall, retaining failed drafts and refreshing the map'
   await page.getByRole('button', { name: 'Удалить денник', exact: true }).click()
   await page.getByRole('dialog', { name: 'Удалить денник?' }).getByRole('button', { name: 'Удалить', exact: true }).click()
   await expect(page.getByText('Нельзя удалить занятый денник. Сначала освободите его или переведите лошадь')).toBeVisible()
-  await expect(page.getByRole('textbox', { name: 'Номер денника', exact: true })).toHaveValue('Л-12')
+  await expect(page.getByRole('dialog', { name: 'Карточка денника' })).toContainText('Л-12')
   rejectDelete = false
   await page.getByRole('button', { name: 'Удалить денник', exact: true }).click()
   const removed = page.waitForResponse(r => r.url().endsWith(`/stalls/${id}`) && r.request().method() === 'DELETE' && r.status() === 200)
@@ -179,13 +181,143 @@ test('list edits labels in a drawer using PATCH and deletes without leaving the 
   await page.reload()
   await page.getByRole('button', { name: 'Северный бокс', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Карточка денника' })).toContainText('С-5')
-  await page.getByRole('dialog', { name: 'Карточка денника' }).getByRole('button', { name: 'Close', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Карточка денника' }).getByRole('button', { name: 'Закрыть шторку', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Карточка денника' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Удалить денник', exact: true }).click()
   await page.getByRole('dialog', { name: 'Удалить денник?' }).getByRole('button', { name: 'Удалить', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Северный бокс', exact: true })).toHaveCount(0)
   expect(deletes).toBe(1)
   await expect(page).toHaveURL(/\/stalls(?:\?|$)/)
+})
+
+for (const source of ['list', 'map'] as const) for (const occupied of [false, true]) {
+  test(`stall card edits details in place and persists after reload: ${source}, occupied=${occupied}`, async ({ page }) => {
+    if (source === 'list' && !occupied) await page.setViewportSize({ width: 390, height: 844 })
+    const state = await setup(page)
+    const room = state.stalls[occupied ? 0 : 2]
+    const placement = { horseId: room.horseId, status: room.status, buildingId: room.buildingId }
+    let patches = 0, deletes = 0, reject = true
+    await page.route('**/api/stalls?*', route => route.fulfill({ json: [room], headers: { 'x-total-count': '1' } }))
+    await page.route(`**/api/stalls/${room.id}`, route => {
+      if (route.request().method() === 'GET') return route.fulfill({ json: room })
+      if (route.request().method() === 'DELETE') { deletes++; state.stalls = state.stalls.filter(s => s.id !== room.id); return route.fulfill({ json: room }) }
+      expect(route.request().method()).toBe('PATCH')
+      patches++
+      const payload = route.request().postDataJSON() as Record<string, unknown>
+      expect(payload).not.toHaveProperty('horseId')
+      expect(payload).not.toHaveProperty('contracts')
+      if (reject) return route.fulfill({ status: 409, json: { message: 'Попробуйте сохранить ещё раз' } })
+      Object.assign(room, payload)
+      return route.fulfill({ json: room })
+    })
+    if (source === 'list') await page.goto('/stalls')
+    const open = () => source === 'list'
+      ? page.getByRole('button', { name: room.name, exact: true }).click()
+      : page.getByRole('button', { name: `Денник ${room.number}, ${occupied ? 'Буран' : 'Свободен'}`, exact: true }).click()
+    await open()
+    const card = page.getByRole('dialog', { name: 'Карточка денника' })
+    await expect(card.getByRole('textbox', { name: 'Название', exact: true })).toHaveCount(0)
+    await expect(card.getByRole('button', { name: 'Удалить денник', exact: true })).toHaveCount(occupied ? 0 : 1)
+    await card.getByRole('button', { name: 'Редактировать', exact: true }).click()
+    await card.getByRole('textbox', { name: 'Название', exact: true }).fill('Обновлённый бокс')
+    await card.getByRole('textbox', { name: 'Номер денника', exact: true }).fill('Б-27')
+    await card.getByRole('textbox', { name: 'Описание', exact: true }).fill('Светлый бокс\nНовая поилка')
+    await card.getByRole('button', { name: 'Сохранить', exact: true }).click()
+    await expect(card.getByText('Попробуйте сохранить ещё раз')).toBeVisible()
+    await expect(card.getByRole('textbox', { name: 'Описание', exact: true })).toHaveValue('Светлый бокс\nНовая поилка')
+    reject = false
+    const saved = page.waitForResponse(r => r.url().endsWith(`/stalls/${room.id}`) && r.request().method() === 'PATCH' && r.ok())
+    await expect(card.getByRole('button', { name: 'Сохранить', exact: true })).not.toHaveClass(/ant-btn-loading/)
+    await card.getByRole('button', { name: 'Сохранить', exact: true }).dblclick()
+    await saved
+    await expect(card.getByRole('button', { name: 'Редактировать', exact: true })).toBeVisible()
+    await expect(card).toContainText('Обновлённый бокс')
+    await expect(card).toContainText('Б-27')
+    await expect(card).toContainText('Новая поилка')
+    expect(patches).toBe(2)
+    expect({ horseId: room.horseId, status: room.status, buildingId: room.buildingId }).toEqual(placement)
+    await page.reload()
+    await open()
+    await expect(card).toContainText('Обновлённый бокс')
+    await expect(card).toContainText('Б-27')
+    await expect(card).toContainText('Новая поилка')
+    await card.getByRole('button', { name: 'Редактировать', exact: true }).click()
+    await card.getByRole('textbox', { name: 'Название', exact: true }).fill('Не сохранять')
+    await card.getByRole('button', { name: 'Отмена', exact: true }).click()
+    await page.getByRole('dialog', { name: 'Закрыть без сохранения?' }).getByRole('button', { name: 'Закрыть', exact: true }).click()
+    await expect(card).toContainText('Обновлённый бокс')
+    expect(patches).toBe(2)
+    if (!occupied) {
+      await card.getByRole('button', { name: 'Удалить денник', exact: true }).click()
+      await page.getByRole('dialog', { name: 'Удалить денник?' }).getByRole('button', { name: 'Удалить', exact: true }).click()
+      await expect(card).toHaveCount(0)
+      expect(deletes).toBe(1)
+    } else await page.screenshot({ path: `test-results/stall-card-${source}-occupied.png`, animations: 'disabled' })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  })
+}
+
+test('stall card hides mutations for READ_ONLY and deletion for a boarding contract without a horse', async ({ page }) => {
+  const state = await setup(page, 'MANAGER', false, true)
+  await page.getByRole('button', { name: 'Денник Л-1, Свободен', exact: true }).click()
+  const card = page.getByRole('dialog', { name: 'Карточка денника' })
+  await expect(card.getByRole('button', { name: 'Редактировать', exact: true })).toHaveCount(0)
+  await expect(card.getByRole('button', { name: 'Удалить денник', exact: true })).toHaveCount(0)
+  await card.getByRole('button', { name: 'Закрыть шторку' }).click()
+  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'MANAGER', modules: [{ module: 'STABLES', isEnabled: true, accessLevel: 'FULL' }] } }))
+  state.stalls[2].contracts = [{ status: 'ACTIVE' }]
+  await page.reload()
+  await page.getByRole('button', { name: 'Денник Л-1, Свободен', exact: true }).click()
+  await expect(card.getByRole('button', { name: 'Редактировать', exact: true })).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Удалить денник', exact: true })).toHaveCount(0)
+})
+
+test('stall card changes room type and building, validates and locks a pending save', async ({ page }) => {
+  const state = await setup(page)
+  const room = state.stalls[2]
+  let release = () => {}
+  const pending = new Promise<void>(resolve => { release = resolve })
+  let patches = 0
+  await page.route(`**/api/stalls/${room.id}`, async route => {
+    patches++
+    await pending
+    const payload = route.request().postDataJSON() as Record<string, unknown>
+    expect(payload.type).toBe('SERVICE'); expect(payload.number).toBe(''); expect(payload.buildingId).toBe(mainBuilding)
+    Object.assign(room, payload)
+    await route.fulfill({ json: room })
+  })
+  await page.getByRole('button', { name: 'Денник Л-1, Свободен', exact: true }).click()
+  const card = page.getByRole('dialog', { name: 'Карточка денника' })
+  await card.getByRole('button', { name: 'Редактировать', exact: true }).click()
+  await card.getByRole('textbox', { name: 'Номер денника', exact: true }).fill(' ')
+  await card.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(card.getByText('Укажите номер денника')).toBeVisible()
+  expect(patches).toBe(0)
+  await card.getByRole('combobox', { name: 'Тип помещения', exact: true }).focus()
+  await page.keyboard.press('ArrowDown')
+  await page.locator('.ant-select-dropdown:visible').getByText('Служебное помещение', { exact: true }).click()
+  await card.getByRole('textbox', { name: 'Название', exact: true }).fill('Склад сена')
+  await card.getByRole('combobox', { name: 'Корпус', exact: true }).focus()
+  await page.keyboard.press('ArrowDown')
+  await page.locator('.ant-select-dropdown:visible').getByText('Основная конюшня', { exact: true }).click()
+  await page.screenshot({ path: 'test-results/stall-card-service-edit.png', animations: 'disabled' })
+  const requested = page.waitForRequest(r => r.url().endsWith(`/stalls/${room.id}`) && r.method() === 'PATCH')
+  await card.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await requested
+  await expect(card.getByRole('button', { name: 'Сохранить', exact: true })).toBeDisabled()
+  await expect(card.getByRole('button', { name: 'Отмена', exact: true })).toBeDisabled()
+  await expect(card.getByRole('textbox', { name: 'Название', exact: true })).toBeDisabled()
+  const saved = page.waitForResponse(r => r.url().endsWith(`/stalls/${room.id}`) && r.ok())
+  release()
+  await saved
+  await expect(card.getByRole('button', { name: 'Редактировать', exact: true })).toBeVisible()
+  await expect(card).toContainText('Склад сена')
+  await expect(card).toContainText('Служебное помещение')
+  expect(patches).toBe(1)
+  await page.reload()
+  await page.getByRole('button', { name: 'Склад сена, служебное', exact: true }).click()
+  await expect(card).toContainText('Склад сена')
+  await expect(card).not.toContainText('Номер денника')
 })
 
 test('building settings create, rename and delete an empty building with recoverable errors', async ({ page }) => {
@@ -341,7 +473,7 @@ test('narrow layout, building filter, keyboard selection and focus restoration',
   const tile = page.getByRole('button', { name: 'Денник 1, Буран', exact: true })
   await tile.focus(); await page.keyboard.press('Enter')
   await expect(page.getByRole('dialog')).toBeVisible()
-  await page.getByRole('dialog').getByRole('button', { name: 'Закрыть', exact: true }).focus()
+  await page.getByRole('dialog').getByRole('button', { name: 'Закрыть шторку', exact: true }).focus()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(tile).toBeFocused()
@@ -355,13 +487,14 @@ test('narrow layout, building filter, keyboard selection and focus restoration',
 test('status and notes save, and unavailable stalls cannot be populated', async ({ page }) => {
   await setup(page)
   await page.getByRole('button', { name: 'Денник Л-1, Свободен' }).click()
+  await page.getByRole('button', { name: 'Редактировать', exact: true }).click()
   await page.getByRole('combobox', { name: 'Статус денника' }).focus()
   await page.keyboard.press('ArrowDown')
   await page.locator('.ant-select-dropdown').getByText('На ремонте', { exact: true }).click()
   await page.getByRole('textbox', { name: 'Заметки для конюха' }).fill('Починить поилку')
-  await page.getByRole('button', { name: 'Сохранить денник' }).click()
-  await page.getByRole('button', { name: 'Денник Л-1, На ремонте' }).click()
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Лошадь для заселения' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Редактировать', exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Заметки для конюха' })).toHaveValue('Починить поилку')
 })
 test('empty map and fetch error offer clear feedback and retry', async ({ page }) => {

@@ -68,7 +68,7 @@ export class StallsService {
   }
 
   async map() {
-    const stalls = await this.prisma.stall.findMany({ include: { horse: stallInclude.include.horse },
+    const stalls = await this.prisma.stall.findMany({ include: { horse: stallInclude.include.horse, contracts: { where: { status: { in: [BoardingContractStatus.ACTIVE, BoardingContractStatus.SUSPENDED] } }, select: { status: true } } },
       orderBy: [{ zone: 'asc' }, { position: 'asc' }, { side: 'asc' }] });
     return stalls.map(stall => ({ ...stall, rowPosition: stallRowPosition(stall, stalls), warnings: neighborhoodWarnings(stall, stalls) }));
   }

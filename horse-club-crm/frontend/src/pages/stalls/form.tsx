@@ -24,7 +24,7 @@ export function StallForm({ action }: { action: 'create' | 'edit' }) {
   </CatalogForm>
 }
 
-function BuildingFields({ required }: { required: boolean }) {
+export function BuildingFields({ required, placement = true }: { required: boolean; placement?: boolean }) {
   const [buildings, setBuildings] = useState<StableBuilding[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
@@ -49,9 +49,9 @@ function BuildingFields({ required }: { required: boolean }) {
   return <>
     {error && <Alert type="error" message="Не удалось загрузить корпуса" description={error} action={<Button disabled={loading} onClick={() => setAttempt(value => value + 1)}>Повторить</Button>} />}
     <Form.Item name="buildingId" label="Корпус" rules={[{ required, message: 'Выберите корпус' }, { validator: async (_, id?: string) => { if (id && !isUuid(id)) throw new Error('Выберите корпус из списка') } }]}><Select loading={loading} options={buildings.map(b => ({ value: b.id, label: b.name }))} /></Form.Item>
-    <NumberField name="row" label="Ряд" min={1} max={100} required={required} />
+    {placement && <><NumberField name="row" label="Ряд" min={1} max={100} required={required} />
     <NumberField name="col" label="Колонка" min={1} max={100} required={required} />
     <NumberField name="rowSpan" label="Высота в ячейках" min={1} max={100} required={required} />
-    <NumberField name="colSpan" label="Ширина в ячейках" min={1} max={100} required={required} />
+    <NumberField name="colSpan" label="Ширина в ячейках" min={1} max={100} required={required} /></>}
   </>
 }

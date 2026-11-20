@@ -11,7 +11,7 @@ export interface MapStall {
   position: number | null; status: keyof typeof statuses; horseId: string | null; horse: MapHorse | null;
   notes: string | null; warnings: Array<{ neighborId: string; neighborNumber: string; message: string }>;
   buildingId?: string | null; row?: number; col?: number; rowSpan?: number; colSpan?: number;
-  isUnavailable?: boolean;
+  isUnavailable?: boolean; description?: string | null; contracts?: Array<{ status: string }>;
   rowPosition?: number | null;
 }
 export function feedingRows(notes: string | null) {

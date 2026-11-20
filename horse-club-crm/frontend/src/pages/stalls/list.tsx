@@ -1,14 +1,15 @@
 import { useState } from 'react'
-import { Descriptions, Empty, List, Space, Tag } from 'antd'
+import { Empty, List, Space, Tag } from 'antd'
 import { money } from '../catalogs/format'
 import { CatalogList } from '../catalogs/shared'
 import type { Stall } from '../catalogs/types'
 import { dateOnly, personName } from '../cards/format'
-import { CardLink, DetailsModal } from '../cards/shared'
+import { CardLink } from '../cards/shared'
 import { QuickBoardingActions } from '../boarding-contracts/quick'
 import { StallDeleteAction } from './delete'
 import { CatalogEditAction } from '../catalogs/EditDrawer'
 import { StallForm } from './form'
+import { StallDetailsCard } from './card'
 
 export function StallList() {
   const [selectedId, setSelectedId] = useState<string>()
@@ -28,22 +29,16 @@ export function StallList() {
       { key: 'isUnavailable', dataIndex: 'isUnavailable', title: 'Статус', sorter: true,
         render: (value: boolean) => <Tag color={value ? 'red' : 'green'}>{value ? 'Недоступен' : 'Доступен'}</Tag> },
     ]} />
-    <DetailsModal<Stall> resource="stalls" id={selectedId} title="Карточка денника" onClose={() => setSelectedId(undefined)}>
-      {(stall, ready) => <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
-          { key: 'name', label: 'Денник', children: stall.name || `Денник ${stall.number ?? 'без номера'}` },
-          ...(stall.type === 'SERVICE' ? [] : [{ key: 'number', label: 'Номер денника', children: stall.number }]),
-          { key: 'status', label: 'Статус', children: <Tag color={stall.isUnavailable ? 'red' : 'green'}>{stall.isUnavailable ? 'Недоступен' : 'Доступен'}</Tag> },
-          { key: 'description', label: 'Описание', span: 2, children: stall.description || '—' },
-        ]} />
-        {stall.type !== 'SERVICE' && <QuickBoardingActions key={stall.id} context={{ kind: 'STALL', id: stall.id, name: stall.name || `Денник ${stall.number ?? 'без номера'}`, isUnavailable: stall.isUnavailable }} contracts={stall.contracts ?? []} disabled={!ready} />}
+    {selectedId && <StallDetailsCard key={selectedId} id={selectedId} onClose={() => setSelectedId(undefined)}>
+      {stall => <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        {stall.type !== 'SERVICE' && <QuickBoardingActions key={stall.id} context={{ kind: 'STALL', id: stall.id, name: stall.name || `Денник ${stall.number ?? 'без номера'}`, isUnavailable: stall.isUnavailable }} contracts={stall.contracts ?? []} />}
         {(stall.contracts ?? []).length ? <List dataSource={stall.contracts} renderItem={contract => {
           const pending = (contract.payments ?? []).filter(payment => payment.status === 'PENDING').reduce((sum, payment) => sum + Number(payment.amount), 0)
           return <List.Item><Space wrap><Tag color={contract.status === 'ACTIVE' ? 'green' : 'default'}>{contract.status}</Tag>
             <strong>{contract.horse.name}</strong><span>{contract.client ? personName(contract.client) : 'Лошадь клуба'}</span><span>с {dateOnly(contract.startsAt)}</span>
             {pending > 0 && <Tag color="gold">К оплате {money(pending)}</Tag>}</Space></List.Item>
-        }} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Денник свободен" />}
+        }} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={stall.type === 'SERVICE' ? 'Постой не предусмотрен' : stall.horseId ? 'Нет договора постоя' : 'Денник свободен'} />}
       </Space>}
-    </DetailsModal>
+    </StallDetailsCard>}
   </>
 }

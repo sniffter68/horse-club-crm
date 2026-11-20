@@ -44,6 +44,28 @@ test('rename ignores unchanged legacy grid, normalizes labels, synchronizes occu
   assert.equal(state.audit[0].action, 'STALL_UPDATED'); assert.equal(state.audit[0].actorId, id);
   assert.equal(state.audit[0].details.before.name, 'Старый'); assert.equal(state.audit[0].details.before.number, '1');
 });
+for (const occupied of [false, true]) {
+  test(`editing room details preserves placement and boarding contracts (occupied=${occupied})`, async () => {
+    const contracts = [{ stallId: id, status: 'ACTIVE', notes: 'Договор без изменений' }];
+    const { service, state } = fixture({ horseId: occupied ? id : null, status: occupied ? 'OCCUPIED' : 'AVAILABLE' }, contracts);
+    const before = structuredClone(state.contracts);
+    await service.update(id, { name: 'Новый бокс', number: '25', description: 'Новая поилка' }, actor);
+    assert.equal(state.stall.description, 'Новая поилка');
+    assert.equal(state.stall.horseId, occupied ? id : null);
+    assert.equal(state.stall.status, occupied ? 'OCCUPIED' : 'AVAILABLE');
+    assert.deepEqual(state.contracts, before);
+  });
+}
+test('map exposes active boarding status even without an assigned horse', async () => {
+  const { service, db } = fixture();
+  db.stall.findMany = async ({ include }) => {
+    assert.deepEqual(include.contracts.where.status.in, ['ACTIVE', 'SUSPENDED']);
+    assert.deepEqual(include.contracts.select, { status: true });
+    return [{ id, number: '1', horseId: null, contracts: [{ status: 'ACTIVE' }] }];
+  };
+  const rooms = await service.map();
+  assert.deepEqual(rooms[0].contracts, [{ status: 'ACTIVE' }]);
+});
 for (const contracts of [[], [{ stallId: id, status: 'EXPIRED', notes: 'История' }]]) {
   test(`free stall deletion retains history (${contracts.length} contracts) and audits`, async () => {
     const { service, state } = fixture({}, structuredClone(contracts));

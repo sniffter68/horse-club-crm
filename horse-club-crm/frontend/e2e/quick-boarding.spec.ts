@@ -2,12 +2,12 @@ import { test, expect, type Locator, type Page } from './fixtures'
 test.use({ timezoneId: 'America/New_York' })
 
 const horse = { id: 'h1', name: 'Кролик', breed: '', riderLevel: '', maxDailyMinutes: 240, minRestMinutes: 15, isUnavailable: false }
-const stall = { id: 's1', name: 'Денник №1', description: '', isUnavailable: false, createdAt: '2026-01-01T00:00:00Z' }
+const stall = { id: '00000000-0000-4000-8000-000000000001', name: 'Денник №1', description: '', isUnavailable: false, createdAt: '2026-01-01T00:00:00Z' }
 const client = { id: 'c1', name: 'Анна Орлова', firstName: 'Анна', lastName: 'Орлова', phone: '+79991234567' }
 const contract = { id: '11111111-1111-4111-8111-111111111111', status: 'ACTIVE', startsAt: '2026-01-01T09:00:00Z', endsAt: null,
   monthlyRate: 25000, horse, stall, client, payments: [{ id: 'p1', amount: 25000, status: 'PENDING' }] }
 const available = { horses: [{ id: 'h1', name: 'Кролик' }, { id: 'h2', name: 'Валдай' }],
-  stalls: [{ id: 's1', name: 'Денник №1' }, { id: 's2', name: 'Денник №2' }] }
+  stalls: [{ id: '00000000-0000-4000-8000-000000000001', name: 'Денник №1' }, { id: 's2', name: 'Денник №2' }] }
 
 async function setup(page: Page, { occupied = false, unavailable = false, role = 'ADMIN', privateHorse = false } = {}) {
   await page.route('**/api/boarding-contracts/*/refund-quote', route => route.fulfill({ json: { amount: '0', cancelled: false } }))
@@ -29,7 +29,7 @@ async function setup(page: Page, { occupied = false, unavailable = false, role =
     else state.horseReads++
     return route.fulfill({ json: horseDetails() })
   })
-  await page.route('**/api/stalls/s1', route => { state.stallReads++; return route.fulfill({ json: stallDetails() }) })
+  await page.route('**/api/stalls/00000000-0000-4000-8000-000000000001', route => { state.stallReads++; return route.fulfill({ json: stallDetails() }) })
   await page.route('**/api/clients?*', route => route.fulfill({ json: [client], headers: { 'x-total-count': '1' } }))
   await page.route('**/api/boarding-contracts/availability?*', route => route.fulfill({ json: available }))
   await page.route('**/api/boarding-contracts', async route => {
@@ -77,7 +77,7 @@ for (const width of [1280, 320]) test(`horse placement and confirmed release upd
   await expect(modal).not.toBeVisible()
   await expect(card.getByRole('button', { name: 'Освободить денник', exact: true })).toBeVisible()
   expect(state.horseReads).toBeGreaterThan(1)
-  expect(state.posts).toEqual([{ horseId: 'h1', stallId: 's1', clientId: 'c1', status: 'ACTIVE', monthlyRate: 25000, startsAt: '2026-10-08T09:00:00.000Z' }])
+  expect(state.posts).toEqual([{ horseId: 'h1', stallId: '00000000-0000-4000-8000-000000000001', clientId: 'c1', status: 'ACTIVE', monthlyRate: 25000, startsAt: '2026-10-08T09:00:00.000Z' }])
   await card.getByRole('button', { name: 'Освободить денник', exact: true }).click()
   const release = page.getByRole('dialog', { name: 'Освободить денник?', exact: true })
   await release.getByRole('button', { name: 'Отмена', exact: true }).click()
@@ -111,7 +111,7 @@ test('stall preselection, search and keyboard cancellation preserve the underlyi
   await select(page, modal, 'Владелец / клиент', 'Анна Орлова')
   await modal.getByRole('button', { name: 'Подтвердить', exact: true }).click()
   await expect(card.getByRole('button', { name: 'Освободить денник', exact: true })).toBeVisible()
-  expect(state.posts[0]).toMatchObject({ horseId: 'h2', stallId: 's1', monthlyRate: 0 })
+  expect(state.posts[0]).toMatchObject({ horseId: 'h2', stallId: '00000000-0000-4000-8000-000000000001', monthlyRate: 0 })
 })
 
 test('loading, API retry and empty availability keep placement disabled', async ({ page }) => {
@@ -183,7 +183,7 @@ test('STABLE_WORKER sees both cards without placement or release actions', async
   for (const kind of ['horse', 'stall'] as const) {
     const card = await openCard(page, kind)
     await expect(card.getByRole('button', { name: /Разместить|Заселить|Освободить/ })).toHaveCount(0)
-    await card.getByRole('button', { name: 'Close', exact: true }).click()
+    await card.getByRole('button', { name: kind === 'stall' ? 'Закрыть шторку' : 'Close', exact: true }).click()
   }
 })
 
@@ -208,7 +208,7 @@ for (const kind of ['horse', 'stall'] as const) test(`club ${kind} placement nee
   await select(page, modal, kind === 'horse' ? 'Денник' : 'Лошадь', kind === 'horse' ? 'Денник №1' : 'Кролик')
   await modal.getByRole('button', { name: kind === 'horse' ? 'Заселить' : 'Подтвердить', exact: true }).click()
   await expect(modal).not.toBeVisible()
-  expect(state.posts[0]).toMatchObject({ clientId: null, monthlyRate: 0, horseId: 'h1', stallId: 's1' })
+  expect(state.posts[0]).toMatchObject({ clientId: null, monthlyRate: 0, horseId: 'h1', stallId: '00000000-0000-4000-8000-000000000001' })
   expect(clientRequests).toBe(0)
   await expect(card.getByText('Лошадь клуба', { exact: true })).toBeVisible()
 })
@@ -307,7 +307,7 @@ test('full boarding form also creates club placement without leaking UI fields',
 test('full boarding edit preserves an existing private owner and decimal rate', async ({ page }) => {
   await setup(page)
   const saved: Record<string, unknown>[] = []
-  const privateContract = { ...contract, clientId: 'c1', horseId: 'h1', stallId: 's1', monthlyRate: '25000.00' }
+  const privateContract = { ...contract, clientId: 'c1', horseId: 'h1', stallId: '00000000-0000-4000-8000-000000000001', monthlyRate: '25000.00' }
   await page.route('**/api/boarding-contracts/bc1', route => {
     if (route.request().method() === 'PATCH') saved.push(route.request().postDataJSON())
     return route.fulfill({ json: privateContract })

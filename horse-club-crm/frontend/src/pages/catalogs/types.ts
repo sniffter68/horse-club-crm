@@ -73,5 +73,6 @@ export interface StallContractSummary {
   payments?: RelationPayment[];
 }
 export interface Stall extends Omit<StallValues, 'description'> {
+  horseId?: string | null; status?: 'AVAILABLE' | 'OCCUPIED' | 'MAINTENANCE' | 'QUARANTINE';
   id: string; description: string | null; createdAt: string; updatedAt: string; contracts?: StallContractSummary[];
 }
