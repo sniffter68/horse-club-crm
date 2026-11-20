@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Alert, Button, Card, Empty, List, Progress, Segmented, Space, Spin, Statistic, Tag, Typography } from 'antd'
 import { DateTime } from 'luxon'
+import { Activity, ChevronDown } from 'lucide-react'
 import { PendingLeads } from '../dashboard/PendingLeads'
 import { useSearchParams } from 'react-router-dom'
 import { usePermissions } from '../../modulePermissions'
@@ -29,6 +30,7 @@ export function AdminDashboardPage() {
   const setTrainer = (value?: string) => filter('trainer', value)
   const setArena = (value?: string) => filter('arena', value)
   const [booking, setBooking] = useState(false)
+  const [actionsExpanded, setActionsExpanded] = useState(false)
   const permissions = usePermissions()
   if (loading) return <div className="workspace-loading"><Spin aria-label="Загрузка сводки" /></div>
   if (error || !data) return <Alert type="error" showIcon message={error || 'Сводка недоступна'} action={<Button onClick={refresh}>Повторить</Button>} />
@@ -36,13 +38,14 @@ export function AdminDashboardPage() {
   const arenas = [...new Map(data.week.flatMap(row => row.arena ? [[row.arena.id, row.arena] as const] : [])).values()]
   const lessons = (period === 'Сегодня' ? data.today : data.week).filter(row => (!trainer || row.trainer.id === trainer) && (!arena || row.arena?.id === arena))
   const finance = data.finance
+  const latestAction = data.actions.reduce<AdminSummary['actions'][number] | undefined>((latest, row) => !latest || Date.parse(row.createdAt) > Date.parse(latest.createdAt) ? row : latest, undefined)
   const percent = finance && Number(finance.accrued) > 0 ? Math.min(100, Math.round(Number(finance.paid) / Number(finance.accrued) * 100)) : 0
   return <section aria-label="Рабочее место администратора">
     <header className="workspace-toolbar shift-welcome"><EquestrianMotif /><div><Typography.Title level={2}>Хорошей смены!</Typography.Title><ShiftConditions /></div><Button onClick={refresh}>Обновить сводку</Button></header>
     <div className="workspace-kpis">{([
       ['Занятий сегодня', data.kpi.lessonsToday], ['Активных всадников', data.kpi.activeRiders], ['Ожидают подтверждения', data.kpi.awaitingConfirmation], ['Новые заявки', data.kpi.newLeads],
     ] as const).map(([title, value], index) => <Card key={title}><Statistic title={<span className="club-icon-label"><ClubIcon name={index === 0 ? 'calendar' : index === 1 ? 'users' : 'bell'} />{title}</span>} value={value} />{title === 'Новые заявки' && <a href="#pending-leads">Открыть заявки</a>}</Card>)}</div>
-    <div className="admin-workspace-columns"><Card title={<span className="club-icon-label"><ClubIcon name="calendar" />Сегодня и неделя</span>} extra={permissions.canWrite('SCHEDULE') && <Button type="primary" onClick={() => setBooking(true)}>+ Создать запись</Button>}>
+    <div className={`admin-workspace-columns${finance ? '' : ' admin-workspace-columns-single'}`}><Card className="workspace-main-card workspace-schedule-card" title={<span className="club-icon-label"><ClubIcon name="calendar" />Сегодня и неделя</span>} extra={permissions.canWrite('SCHEDULE') && <Button type="primary" onClick={() => setBooking(true)}>+ Создать запись</Button>}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Segmented options={['Сегодня', 'Неделя']} value={period} onChange={setPeriod} />
         <Space wrap aria-label="Фильтр по тренерам"><Button aria-pressed={!trainer} type={!trainer ? 'primary' : 'default'} onClick={() => setTrainer(undefined)}>Все тренеры</Button>{trainers.map(row => <Button key={row.id} aria-pressed={trainer === row.id} onClick={() => setTrainer(trainer === row.id ? undefined : row.id)}>{row.name}</Button>)}</Space>
@@ -57,14 +60,24 @@ export function AdminDashboardPage() {
       </article>)}
       <Typography.Title level={5}>Без подтверждения в ближайшие 24 часа</Typography.Title>
       {data.unconfirmed.length ? data.unconfirmed.map(row => <p key={row.id}>{localTime(row.startTime)} · {row.trainer.name} · {row.bookings.filter(b => !b.clientConfirmed).map(b => b.client?.name).join(', ')}</p>) : <Typography.Text type="secondary">Все ближайшие занятия подтверждены</Typography.Text>}
-    </Card><Space direction="vertical" size="large" style={{ width: '100%' }}>
-      {finance && <Card title={<span className="club-icon-label"><ClubIcon name="wallet" />Финансы за месяц</span>}><Typography.Text>Собрано оплат</Typography.Text><Progress className="monthly-payment-progress" percent={percent} />
+    </Card>
+      {finance && <Card className="workspace-main-card workspace-finance-card" title={<span className="club-icon-label"><ClubIcon name="wallet" />Финансы за месяц</span>}><Typography.Text>Собрано оплат</Typography.Text><Progress className="monthly-payment-progress" percent={percent} />
         <dl className="workspace-finance">{([
           ['Начислено', finance.accrued], ['Оплачено', finance.paid], ['Задолженность', finance.debt], ['Основная касса', finance.mainBalance], ['Касса постоя', finance.boardingBalance], ['Признанная выручка по абонементам', finance.recognizedMembershipRevenue],
         ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{rub(value)}</dd></div>)}</dl>
       </Card>}
-      <Card title={<span className="club-icon-label"><ClubIcon name="activity" />Журнал действий смены</span>}><List dataSource={data.actions} locale={{ emptyText: 'Действий пока нет' }} renderItem={row => <List.Item><div><strong>{actionNames[row.action] || row.action}</strong><div>{localTime(row.createdAt)} · {row.actorName}</div></div></List.Item>} /></Card>
-    </Space></div>
+    </div>
+    <Card className="workspace-actions-card">
+      <h3 className="workspace-actions-heading"><button type="button" id="shift-actions-toggle" className="workspace-actions-toggle" aria-expanded={actionsExpanded} aria-controls="shift-actions-list" onClick={() => setActionsExpanded(expanded => !expanded)}>
+        <span className="workspace-actions-summary"><span className="club-icon-label"><Activity size={18} strokeWidth={1.75} aria-hidden="true" />Журнал действий смены<Tag className="tabular-nums">{data.actions.length}</Tag></span>
+          {latestAction && <span className="workspace-actions-preview">{actionNames[latestAction.action] || latestAction.action} · {localTime(latestAction.createdAt)} · {latestAction.actorName}</span>}
+        </span>
+        <span className="workspace-actions-indicator">{actionsExpanded ? 'Свернуть' : 'Развернуть'}<ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" style={{ transform: actionsExpanded ? 'rotate(180deg)' : undefined }} /></span>
+      </button></h3>
+      <div id="shift-actions-list" role="region" aria-labelledby="shift-actions-toggle" hidden={!actionsExpanded} className="workspace-actions-list max-h-80 overflow-y-auto" tabIndex={0}>
+        <List dataSource={data.actions} locale={{ emptyText: 'Действий пока нет' }} renderItem={row => <List.Item><div><strong>{actionNames[row.action] || row.action}</strong><div className="tabular-nums">{localTime(row.createdAt)} · {row.actorName}</div></div></List.Item>} />
+      </div>
+    </Card>
     <div id="pending-leads"><PendingLeads leads={data.leadRequests} loading={loading} onProcessed={refresh} /></div>
     {booking && <QuickBookingModal onClose={() => setBooking(false)} onSaved={() => { setBooking(false); refresh() }} />}
   </section>

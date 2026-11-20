@@ -549,11 +549,55 @@ test('workspace refresh shows an externally completed lesson and its audit entry
     actions: completed ? [{ id: '00000000-0000-4000-8000-000000000701', action: 'LESSON_COMPLETED', actorName: 'trainer@example.com', createdAt: '2026-10-20T09:00:00Z' }] : [],
   }) }))
   await page.goto('/')
+  await page.getByRole('button', { name: /Журнал действий смены/ }).click()
   await expect(page.getByText('Действий пока нет', { exact: true })).toBeVisible()
   completed = true
   await page.getByRole('button', { name: 'Обновить сводку', exact: true }).click()
-  await expect(page.getByText('Занятие проведено', { exact: true })).toBeVisible()
-  await expect(page.getByText(/trainer@example.com/)).toBeVisible()
+  const journal = page.getByRole('region', { name: /Журнал действий смены/ })
+  await expect(journal.getByText('Занятие проведено', { exact: true })).toBeVisible()
+  await expect(journal.getByText(/trainer@example.com/)).toBeVisible()
+})
+
+for (const width of [1440, 1024, 390]) test(`dashboard shift journal toggles independently of main cards at ${width}px`, async ({ page }) => {
+  await setup(page)
+  await page.setViewportSize({ width, height: 844 })
+  const actions = Array.from({ length: 20 }, (_, index) => ({ id: `action-${index}`, action: 'LESSON_COMPLETED', actorName: `Администратор ${index}`, createdAt: `2026-10-20T09:${String(index).padStart(2, '0')}:00Z` }))
+  await page.route('**/api/workspace/admin-summary', route => route.fulfill({ json: workspaceSummary({
+    finance: { accrued: '3000', paid: '1000', debt: '2000', mainBalance: 1000, boardingBalance: 2000, recognizedMembershipRevenue: '500' }, actions,
+  }) }))
+  await page.goto('/dashboard')
+  const toggle = page.getByRole('button', { name: /Журнал действий смены/ })
+  const list = page.locator('#shift-actions-list')
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(toggle).toContainText('20')
+  await expect(toggle).toContainText('Администратор 19')
+  await expect(list).toBeHidden()
+  const mainCards = page.locator('.admin-workspace-columns > .workspace-main-card')
+  const initialRects = await mainCards.evaluateAll(cards => cards.map(card => {
+    const { top, bottom } = card.getBoundingClientRect()
+    return { top, bottom }
+  }))
+  expect(initialRects).toHaveLength(2)
+  if (width > 800) {
+    expect(Math.abs(initialRects[0].bottom - initialRects[1].bottom)).toBeLessThanOrEqual(2)
+    expect(Math.abs(initialRects[0].top - initialRects[1].top)).toBeLessThanOrEqual(2)
+  }
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(list).toBeVisible()
+  expect(await list.evaluate(node => node.clientHeight <= 320 && node.scrollHeight > node.clientHeight && getComputedStyle(node).overflowY === 'auto')).toBe(true)
+  const mainBottom = await mainCards.evaluateAll(cards => Math.max(...cards.map(card => card.getBoundingClientRect().bottom + window.scrollY)))
+  expect(await page.locator('.workspace-actions-card').evaluate(node => node.getBoundingClientRect().top + window.scrollY)).toBeGreaterThanOrEqual(mainBottom)
+  if (width > 800) expect(await mainCards.evaluateAll(cards => Math.abs(cards[0].getBoundingClientRect().bottom - cards[1].getBoundingClientRect().bottom))).toBeLessThanOrEqual(2)
+  await page.screenshot({ path: `test-results/dashboard-journal-${width}.png`, fullPage: true })
+  await toggle.focus()
+  await toggle.press('Enter')
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(list).toBeHidden()
+  await expect(toggle).toBeFocused()
+  await toggle.press('Space')
+  await expect(list).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 
 test('narrow workspace drawers close by keyboard without losing page width', async ({ page }) => {
