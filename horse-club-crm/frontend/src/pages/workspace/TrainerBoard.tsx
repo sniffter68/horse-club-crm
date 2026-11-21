@@ -1,4 +1,5 @@
-import { LessonDrawer } from '../schedule/LessonDrawer'
+import { QuickTrainerBookingDrawer } from './QuickTrainerBookingDrawer'
+import { useQuickBookingPermissions } from './useQuickBookingPermissions'
 import { ReplaceHorseAction } from '../schedule/ReplaceHorseAction'
 import { useRoleAccess } from '../../access'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -68,7 +69,9 @@ export function TrainerBoardPage() {
 }
 
 export function TrainerBoardView({ canWrite, canCreate = false, ownTrainerId, onExit, tmaToken, date: selectedDate, onDateChange }: { canWrite: boolean; canCreate?: boolean; ownTrainerId?: string; onExit: () => void; tmaToken?: string; date?: string; onDateChange?: (date: string) => void }) {
-  const [booking, setBooking] = useState(false)
+  const [booking, setBooking] = useState<{ time?: string; trainerId?: string }>()
+  const tmaPermissions = useQuickBookingPermissions(tmaToken)
+  const createAllowed = tmaToken ? Boolean(tmaPermissions?.lessonCreateAny || tmaPermissions?.lessonCreateOwn && ownTrainerId) : canCreate
   const [localDate, setLocalDate] = useState(() => DateTime.now().setZone(zone).toISODate()!)
   const date = selectedDate ?? localDate
   const setDate = onDateChange ?? setLocalDate
@@ -94,8 +97,8 @@ export function TrainerBoardView({ canWrite, canCreate = false, ownTrainerId, on
     <header className="trainer-workspace-header"><div><Typography.Title level={3}><ClubIcon name="calendar" /> Расписание клуба</Typography.Title><span>{data?.trainers.find(row => row.id === data.trainerId)?.name || 'Рабочее место тренера'}</span></div><Button onClick={onExit}>{tmaToken ? 'Назад' : 'Выйти'}</Button></header>
     <div className="workspace-toolbar"><label htmlFor="trainer-board-date">Дата</label><DatePicker id="trainer-board-date" locale={ruDatePicker} placement="bottomRight" classNames={{ popup: { root: 'trainer-date-popup' } }} allowClear={false} value={dayjs(date).locale('ru')} onChange={value => { if (value) setDate(value.format('YYYY-MM-DD')) }} />
       <Segmented value={mine ? 'Только мои' : 'Все тренеры'} options={['Все тренеры', 'Только мои']} onChange={value => setMine(value === 'Только мои')} /><Button onClick={refresh}>Обновить</Button>
-      {canWrite && canCreate && !tmaToken && <Button type="primary" onClick={() => setBooking(true)}>Записать на тренировку</Button>}</div>
-    {booking && canWrite && canCreate && !tmaToken && <LessonDrawer initialTrainerId={ownTrainerId} initialDateTime={`${date}T10:00:00+03:00`} onClose={() => setBooking(false)} onSaved={start => { setBooking(false); setDate(start.slice(0, 10)); refresh() }} />}
+      {canWrite && createAllowed && <Button type="primary" onClick={() => setBooking({})}>+ Записать</Button>}</div>
+    {booking && canWrite && createAllowed && <QuickTrainerBookingDrawer ownTrainerId={ownTrainerId ?? data?.trainerId ?? ''} initialTrainerId={booking.trainerId} initialDate={date} initialTime={booking.time} tmaToken={tmaToken} onClose={() => setBooking(undefined)} onSaved={start => { setBooking(undefined); setDate(start.slice(0, 10)); refresh() }} />}
     <p>Время московское · Свои занятия выделены. Остальные показывают занятость площадок и лошадей.</p>
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={refresh}>Повторить</Button>} />}
     {loading ? <div className="workspace-loading"><Spin aria-label="Загрузка расписания" /></div> : data && <>
@@ -106,7 +109,7 @@ export function TrainerBoardView({ canWrite, canCreate = false, ownTrainerId, on
             const at = DateTime.fromISO(date, { zone }).plus({ minutes: minute }).toMillis()
             const starting = lessons.filter(lesson => lesson.trainerId === trainer.id && (+new Date(lesson.startTime) >= at || minute === 0) && +new Date(lesson.startTime) < at + 1800000)
             const continuing = lessons.filter(lesson => lesson.trainerId === trainer.id && +new Date(lesson.startTime) < at && +new Date(lesson.endTime) > at && lesson.status !== 'CANCELLED')
-            return <td key={trainer.id}>{starting.map(lesson => <LessonCard key={lesson.id} lesson={lesson} canWrite={canWrite} onSaved={refresh} tmaToken={tmaToken} />)}{continuing.map(lesson => <span className="board-continuation" key={lesson.id}>↳ до {clock(lesson.endTime)} · {lesson.bookings.map(row => row.horse?.name).filter(Boolean).join(', ')}</span>)}</td>
+            return <td key={trainer.id}>{canWrite && createAllowed && !starting.length && !continuing.length && <Button block type="text" aria-label={`Записать ${trainer.name} ${DateTime.fromISO(date, { zone }).plus({ minutes: minute }).toFormat('HH:mm')}`} style={{ minHeight: 44 }} onClick={() => setBooking({ time: DateTime.fromISO(date, { zone }).plus({ minutes: minute }).toFormat('HH:mm'), trainerId: trainer.id })}>+ Записать</Button>}{starting.map(lesson => <LessonCard key={lesson.id} lesson={lesson} canWrite={canWrite} onSaved={refresh} tmaToken={tmaToken} />)}{continuing.map(lesson => <span className="board-continuation" key={lesson.id}>↳ до {clock(lesson.endTime)} · {lesson.bookings.map(row => row.horse?.name).filter(Boolean).join(', ')}</span>)}</td>
           })}</tr>)}</tbody></table>
       </div></>}
   </main>

@@ -42,6 +42,7 @@ async function mock(page: Page, options: { admin?: boolean; noTrainer?: boolean;
     }
     expect(route.request().headers().authorization).toBe('Bearer trainer-memory-session')
     if (expire) return route.fulfill({ status: 401, json: { message: 'Сессия истекла' } })
+    if (path.endsWith('/quick-booking/permissions')) return route.fulfill({ json: { lessonCreateOwn: false, lessonCreateAny: false } })
     if (path.endsWith('/trainer-board')) return route.fulfill({ json: { date: new URL(route.request().url()).searchParams.get('date'), trainerId: bookingId, trainers: [], lessons: [], openTime: '08:00', closeTime: '22:00' } })
     if (path.endsWith('/schedule')) {
       if (options.scheduleFailure) return route.fulfill({ status: 503, json: { message: 'Нет соединения с сервером' } })

@@ -4,7 +4,7 @@
     "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "types": ["node"],
+    "types": ["node", "vite/client"],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
@@ -12,5 +12,5 @@
     "noUnusedParameters": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["playwright.config.ts", "playwright.crm.config.ts", "playwright.tma.config.ts", "e2e/landing.spec.ts", "e2e/trainer-tma.spec.ts", "e2e/cash-desk.spec.ts", "e2e/stall-map.spec.ts", "e2e/workspace.spec.ts", "e2e/role-access.spec.ts"]
+  "include": ["playwright.config.ts", "playwright.crm.config.ts", "playwright.tma.config.ts", "playwright.quick-booking.config.ts", "e2e/quick-trainer-booking.spec.ts", "e2e/landing.spec.ts", "e2e/trainer-tma.spec.ts", "e2e/cash-desk.spec.ts", "e2e/stall-map.spec.ts", "e2e/workspace.spec.ts", "e2e/role-access.spec.ts"]
 }

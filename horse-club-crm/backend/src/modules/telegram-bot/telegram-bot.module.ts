@@ -1,3 +1,6 @@
+import { ClientsModule } from '../../clients/clients.module';
+import { QuickTrainerBookingService } from './quick-trainer-booking.service';
+import { QuickTrainerBookingController, QuickTrainerBookingTmaController } from './trainer-tma.controller';
 import { ClientMiniappService } from './client-miniapp.service';
 import { MembershipsModule } from '../../memberships/memberships.module';
 import { Logger, Module, type OnModuleInit } from '@nestjs/common';
@@ -21,11 +24,11 @@ import { TrainerTmaService } from './trainer-tma.service';
 import { WorkspaceModule } from '../../workspace/workspace.module';
 import { TrainerBoardTmaController, TrainerTmaAuthController, TrainerTmaController, TrainerTmaGuard } from './trainer-tma.controller';
 
-@Module({ imports: [MembershipsModule, BotScheduleModule, WorkspaceModule, PrismaModule, BookingsModule, LessonsModule, AuthModule, TelegramDeliveryModule,
+@Module({ imports: [ClientsModule, MembershipsModule, BotScheduleModule, WorkspaceModule, PrismaModule, BookingsModule, LessonsModule, AuthModule, TelegramDeliveryModule,
   JwtModule.registerAsync({ imports: [AuthConfigModule], inject: [AUTH_OPTIONS],
     useFactory: (options: AuthOptions) => ({ secret: options.secret, signOptions: { algorithm: 'HS256' as const } }) })],
-  controllers: [TrainerBoardTmaController, TelegramBotController, ClientTelegramLinkController, UserTelegramLinkController, TrainerTmaAuthController, TrainerTmaController],
-  providers: [ClientMiniappService, TelegramBotService, TelegramAuthGuard, TmaBookingService, TelegramLinkService, TelegramPersonalService, TrainerTmaService, TrainerTmaGuard] })
+  controllers: [QuickTrainerBookingController, QuickTrainerBookingTmaController, TrainerBoardTmaController, TelegramBotController, ClientTelegramLinkController, UserTelegramLinkController, TrainerTmaAuthController, TrainerTmaController],
+  providers: [QuickTrainerBookingService, ClientMiniappService, TelegramBotService, TelegramAuthGuard, TmaBookingService, TelegramLinkService, TelegramPersonalService, TrainerTmaService, TrainerTmaGuard] })
 export class TelegramBotModule implements OnModuleInit {
   private readonly logger = new Logger(TelegramBotModule.name);
 

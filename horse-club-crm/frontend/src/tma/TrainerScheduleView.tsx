@@ -1,3 +1,4 @@
+import { QuickTrainerBookingAction } from '../pages/workspace/QuickTrainerBookingDrawer'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, ConfigProvider, Drawer, Input, Select as AntSelect, Spin, Tag, theme } from 'antd'
 import ruRU from 'antd/locale/ru_RU'
@@ -29,7 +30,7 @@ export function TrainerScheduleView() {
       </nav>}
       {state.kind === 'ready' ? (state.session.role === 'ADMIN' || state.session.role === 'STAFF')
         ? <AdminTmaView session={state.session} onExpired={expire} />
-        : board ? <><header className="trainer-header"><h1>{state.session.trainer.name}</h1></header><TrainerBoardView date={date} onDateChange={setDate} canWrite={state.session.accessLevel === 'FULL'} tmaToken={state.session.access_token} onExit={() => setBoard(false)} /></> : <TrainerSchedule date={date} onDateChange={setDate} session={state.session} onExpired={expire} /> : <section className="trainer-gate">
+        : board ? <><header className="trainer-header"><h1>{state.session.trainer.name}</h1></header><TrainerBoardView date={date} onDateChange={setDate} canWrite={state.session.accessLevel === 'FULL'} ownTrainerId={state.session.trainer.trainerId} tmaToken={state.session.access_token} onExit={() => setBoard(false)} /></> : <TrainerSchedule date={date} onDateChange={setDate} session={state.session} onExpired={expire} /> : <section className="trainer-gate">
         <img src="/horse-crm.svg" alt="КСК «СЛКС»" width={64} height={64} />
         <p className="trainer-eyebrow">HORSE CLUB · КСК «СЛКС»</p>
         <h1>Кабинет клуба</h1>
@@ -143,6 +144,7 @@ function TrainerSchedule({ session, onExpired, all = false, date, onDateChange: 
   const selected = days[date]
   const title = DateTime.fromISO(date).setLocale('ru').toFormat('d MMMM, cccc')
   return <>
+    {full && <QuickTrainerBookingAction date={date} ownTrainerId={session.trainer.trainerId} tmaToken={session.access_token} onExpired={onExpired} onSaved={start => { setDate(start.slice(0, 10)); setRevision(value => value + 1) }} />}
     <header className="trainer-header">
       <p className="trainer-eyebrow">HORSE CLUB · {all ? 'АДМИНИСТРАТОР' : 'ТРЕНЕР'}</p>
       <h1>{session.trainer.name}</h1>

@@ -373,7 +373,7 @@ export class LessonsService {
           participantsCount,
           pricePerPerson,
           cost: totalCost, prepaymentAmount: prepayment, prepaymentMethod: prepayment.gt(0) ? dto.prepaymentMethod : undefined,
-          paymentStatus: paymentStatus(totalCost, prepayment),
+          paymentStatus: actor?.role === 'TRAINER' && !participants.some(row => row.membershipId) ? 'UNPAID' : paymentStatus(totalCost, prepayment),
           ...(participants.length
             ? {
                 bookings: {

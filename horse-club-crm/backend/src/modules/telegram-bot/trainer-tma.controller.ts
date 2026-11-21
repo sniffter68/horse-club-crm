@@ -1,3 +1,7 @@
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { QuickCreateClientDto } from '../../clients/dto/quick-create-client.dto';
+import { CreateLessonDto } from '../../lessons/dto/create-lesson.dto';
+import { QuickTrainerBookingService, QuickTrainerClientQuery } from './quick-trainer-booking.service';
 import { Body, Controller, Get, Header, HttpCode, Injectable, Param, ParseUUIDPipe, Patch, Post, Query, Req, UnauthorizedException, UseGuards, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
 import { telegramInitData } from './telegram-config';
@@ -62,4 +66,34 @@ export class TrainerTmaController {
   horse(@Req() req: TrainerTmaRequest, @Param('id', new ParseUUIDPipe()) id: string, @Body() dto: TrainerTmaHorseDto) { return this.service.horse(req.user, id, dto); }
   @Get('horses') @Header('Cache-Control', 'no-store')
   horses() { return this.service.horses(); }
+}
+
+@Controller('workspace/quick-booking')
+@RequireModule('SCHEDULE')
+@UseGuards(JwtAuthGuard, ModuleAccessGuard)
+export class QuickTrainerBookingController {
+  constructor(private readonly quick: QuickTrainerBookingService) {}
+  @Get('permissions') @Header('Cache-Control', 'no-store')
+  permissions(@Req() req: TrainerTmaRequest) { return this.quick.permissions(req.user); }
+  @Get('context') @Header('Cache-Control', 'no-store')
+  context(@Req() req: TrainerTmaRequest, @Query() query: TrainerTmaScheduleQuery) { return this.quick.context(req.user, query.date); }
+  @Get('clients') @Header('Cache-Control', 'no-store')
+  clients(@Req() req: TrainerTmaRequest, @Query() query: QuickTrainerClientQuery) { return this.quick.search(req.user, query.search); }
+}
+
+@Controller('tma/quick-booking')
+@RequireModule('SCHEDULE')
+@UseGuards(TrainerTmaGuard, ModuleAccessGuard)
+export class QuickTrainerBookingTmaController {
+  constructor(private readonly quick: QuickTrainerBookingService) {}
+  @Get('permissions') @Header('Cache-Control', 'no-store')
+  permissions(@Req() req: TrainerTmaRequest) { return this.quick.permissions(req.user); }
+  @Get('context') @Header('Cache-Control', 'no-store')
+  context(@Req() req: TrainerTmaRequest, @Query() query: TrainerTmaScheduleQuery) { return this.quick.context(req.user, query.date); }
+  @Get('clients') @Header('Cache-Control', 'no-store')
+  clients(@Req() req: TrainerTmaRequest, @Query() query: QuickTrainerClientQuery) { return this.quick.search(req.user, query.search); }
+  @Post('clients/quick')
+  client(@Req() req: TrainerTmaRequest, @Body() dto: QuickCreateClientDto) { return this.quick.quickClient(req.user, dto); }
+  @Post('lessons')
+  create(@Req() req: TrainerTmaRequest, @Body() dto: CreateLessonDto) { return this.quick.create(req.user, dto); }
 }
