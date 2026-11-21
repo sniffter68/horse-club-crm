@@ -4,10 +4,11 @@ const assert = require('node:assert/strict');
 const { Prisma } = require('@prisma/client');
 const { FinanceService } = require('../dist/payments/finance.service');
 const { DashboardService } = require('../dist/dashboard/dashboard.service');
+const { CashboxService } = require('../dist/cashbox/cashbox.service');
 
 test('dashboard and cash desk share current club balances regardless of period, cashier or shift', async () => {
   const queries = [];
-  const tx = {
+  const tx = { $queryRaw: async () => [],
     payment: {
       groupBy: async ({ where }) => {
         queries.push(['payment', where]);
@@ -43,6 +44,9 @@ test('dashboard and cash desk share current club balances regardless of period, 
   const now = new Date();
   const summary = await dashboard.cashboxSummary(new Date('2020-01-01'), new Date('2020-01-02'), now);
   assert.deepEqual(summary, { cash: '52500.00', card: '16350.00', revenueToday: '0.00', expensesToday: '0.00' });
+  const header = await new CashboxService(prisma).summary();
+  assert.equal(header.balanceCash, summary.cash);
+  assert.equal(header.balanceCard, summary.card);
   for (const query of [
     { from: '2020-01-01', to: '2020-01-01' },
     { from: '2021-01-01', to: '2021-02-01', shiftId: 'shift', cashierId: 'cashier' },
@@ -55,7 +59,7 @@ test('dashboard and cash desk share current club balances regardless of period, 
     assert.equal(result.operationsCount, 0);
   }
   const currentFilters = queries.filter(([model, where]) => model === 'payment' && !where.OR[0].paidAt.gte);
-  assert.equal(currentFilters.length, 3);
+  assert.equal(currentFilters.length, 4);
   assert.equal(currentFilters[0][1].OR[0].paidAt.lt, now);
   for (const [, where] of currentFilters.slice(1)) assert.ok(where.OR[0].paidAt.lt >= now);
 });

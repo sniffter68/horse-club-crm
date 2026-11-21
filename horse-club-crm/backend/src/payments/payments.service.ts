@@ -1,4 +1,7 @@
 import { archiveTransaction } from '../common/archive-transaction';
+import { randomUUID } from 'node:crypto';
+import { cashShiftAt } from './cash-shift-boundary';
+import { rethrowFinancialPeriod } from './financial-period-error';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PaymentStatus, Prisma } from '@prisma/client';
 import type { PaymentQueryDto } from './dto/payment-query.dto';
@@ -78,23 +81,40 @@ export class PaymentsService {
     });
   }
 
-  async create(dto: CreatePaymentDto): Promise<PaymentWithRelations> {
+  async create(dto: CreatePaymentDto, actor?: { id: string; email: string }): Promise<PaymentWithRelations> {
     try {
       return await archiveTransaction(this.prisma, async tx => {
         const data = await this.resolveData(dto, tx);
-        return tx.payment.create({ data, include: paymentInclude.include });
+        if (data.status === 'PAID' && (!actor || !dto.requestId)) throw new BadRequestException('Для проведения оплаты нужны автор и ключ операции');
+        if (dto.requestId) {
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${dto.requestId}, 0))::text`;
+          const previous = await tx.payment.findUnique({ where: { requestId: dto.requestId }, include: paymentInclude.include });
+          if (previous) {
+            if (previous.cashierId !== (data.status === 'PAID' ? actor?.id ?? null : null) || previous.clientId !== data.clientId || !previous.amount.equals(data.amount)
+              || previous.method !== data.method || previous.status !== data.status || previous.bookingId !== data.bookingId
+              || previous.membershipId !== data.membershipId || previous.boardingContractId !== data.boardingContractId
+              || previous.description !== data.description || (dto.paidAt && previous.paidAt?.getTime() !== data.paidAt?.getTime())) {
+              throw new ConflictException('Ключ операции уже использован для другого платежа');
+            }
+            return previous;
+          }
+        }
+        const shift = data.status === 'PAID' && actor ? await cashShiftAt(tx, actor.id, data.paidAt ?? new Date()) : null;
+        const payment = await tx.payment.create({ data: { ...data, requestId: dto.requestId, cashierId: data.status === 'PAID' ? actor?.id : undefined, shiftId: shift?.id }, include: paymentInclude.include });
+        if (data.status === 'PAID' && actor) await this.auditReceipt(tx, payment, actor);
+        return payment;
       });
     } catch (error: unknown) {
-      return rethrowCatalogMutation(error, 'Платёж');
+      return rethrowFinancialPeriod(error, cause => rethrowCatalogMutation(cause, 'Платёж'));
     }
   }
 
-  async update(id: string, dto: UpdatePaymentDto): Promise<PaymentWithRelations> {
+  async update(id: string, dto: UpdatePaymentDto, actor?: { id: string; email: string }): Promise<PaymentWithRelations> {
     try {
       return await archiveTransaction(this.prisma, async tx => {
         const current = await tx.payment.findUnique({ where: { id }, include: { refundExpense: { select: { id: true } } } });
         if (!current) throw new NotFoundException('Платёж не найден');
-        if (current.archivedAt || current.cashierId || current.refundExpense || current.status === 'PAID' || current.status === 'REFUNDED') throw new ConflictException('Проведённый кассовый платёж нельзя редактировать');
+        if (current.archivedAt || current.cashierId || current.refundExpense || current.status === 'PAID' || current.status === 'REFUNDED' || current.status === 'CANCELLED') throw new ConflictException('Проведённый или отменённый платёж нельзя редактировать');
         const data = await this.resolveData({
           clientId: dto.clientId ?? current.clientId,
           bookingId: dto.bookingId === undefined ? current.bookingId : dto.bookingId,
@@ -106,22 +126,35 @@ export class PaymentsService {
           paidAt: dto.paidAt === undefined ? current.paidAt?.toISOString() ?? null : dto.paidAt,
           description: dto.description === undefined ? current.description : dto.description,
         }, tx);
-        return await tx.payment.update({ where: { id }, data, include: paymentInclude.include });
+        if (data.status === 'PAID' && !actor) throw new BadRequestException('Для проведения оплаты нужен автор');
+        const shift = data.status === 'PAID' && actor ? await cashShiftAt(tx, actor.id, data.paidAt ?? new Date()) : null;
+        const payment = await tx.payment.update({ where: { id }, data: { ...data, ...(data.status === 'PAID' ? { cashierId: actor?.id, shiftId: shift?.id } : {}) }, include: paymentInclude.include });
+        if (data.status === 'PAID' && actor) await this.auditReceipt(tx, payment, actor);
+        return payment;
       });
     } catch (error: unknown) {
-      return rethrowCatalogMutation(error, 'Платёж');
+      return rethrowFinancialPeriod(error, cause => rethrowCatalogMutation(cause, 'Платёж'));
     }
   }
 
-  async remove(id: string): Promise<PaymentWithRelations> {
+  private async auditReceipt(tx: Prisma.TransactionClient, payment: PaymentWithRelations, actor: { id: string; email: string }) {
+    await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'PAYMENT_RECEIVED', actorId: actor.id, actorName: actor.email,
+      details: { paymentId: payment.id, amount: String(payment.amount), source: 'payments' } } });
+  }
+
+  async remove(id: string, actor?: { id: string; email: string }): Promise<PaymentWithRelations> {
     try {
       return await archiveTransaction(this.prisma, async tx => {
         const current = await tx.payment.findUnique({ where: { id }, include: { refundExpense: { select: { id: true } } } });
         if (current?.archivedAt || current?.cashierId || current?.refundExpense || current?.status === 'PAID' || current?.status === 'REFUNDED') throw new ConflictException('Проведённый кассовый платёж нельзя удалить');
+        if (!current) throw new NotFoundException('Платёж не найден');
+        if (!actor) throw new BadRequestException('Для удаления начисления нужен автор');
+        await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'PAYMENT_DELETED', actorId: actor.id, actorName: actor.email,
+          details: { paymentId: id, clientId: current.clientId, amount: String(current.amount), status: current.status, method: current.method } } });
         return await tx.payment.delete({ where: { id }, include: paymentInclude.include });
       });
     } catch (error: unknown) {
-      return rethrowCatalogMutation(error, 'Платёж');
+      return rethrowFinancialPeriod(error, cause => rethrowCatalogMutation(cause, 'Платёж'));
     }
   }
 
@@ -129,6 +162,9 @@ export class PaymentsService {
     const linkedRecords = [dto.bookingId, dto.boardingContractId, dto.membershipId].filter(Boolean);
     if (linkedRecords.length > 1) {
       throw new BadRequestException('Платёж можно связать только с одним основанием');
+    }
+    if (dto.status === PaymentStatus.PAID && (dto.bookingId || dto.membershipId)) {
+      throw new ConflictException('Оплата занятия или абонемента проводится через кассу');
     }
     let clientId = dto.clientId;
     let amount = dto.amount;
@@ -171,6 +207,7 @@ export class PaymentsService {
     const client = await tx.client.findUnique({ where: { id: clientId }, select: { id: true } });
     if (!client) throw new NotFoundException('Клиент не найден');
     const status = dto.status ?? PaymentStatus.PENDING;
+    if (status === PaymentStatus.REFUNDED) throw new BadRequestException('Возврат проводится через отмену услуги с записью расхода');
     return {
       clientId,
       bookingId: dto.bookingId ?? null,

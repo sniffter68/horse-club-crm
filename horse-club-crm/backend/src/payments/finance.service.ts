@@ -4,8 +4,13 @@ import { DateTime } from 'luxon';
 import { PrismaService } from '../prisma/prisma.service';
 import { isSerializationFailure } from '../common/serialization-failure';
 import { CreateExpenseDto, ExpenseQueryDto } from './dto/expense.dto';
-import { CashSummaryQueryDto } from './dto/cash-desk.dto';
+import { CashJournalQueryDto, CashSummaryQueryDto } from './dto/cash-desk.dto';
+import { cashJournal } from './cash-journal';
+import { randomUUID } from 'node:crypto';
+import { rethrowFinancialPeriod } from './financial-period-error';
+import { cashShiftAt } from './cash-shift-boundary';
 import { aggregatePaymentMethods } from './cash-desk.math';
+import { cashboxBalances } from './cashbox-balances';
 
 // Date-only values are Moscow business days; timestamps must carry an explicit offset.
 export function financeDate(value: string, endOfDay = false): Date {
@@ -45,7 +50,7 @@ export class FinanceService {
   private async atomic<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       try { return await this.prisma.$transaction(work, { isolationLevel: 'Serializable' }); }
-      catch (error) { if (isSerializationFailure(error) && attempt < 4) continue; throw error; }
+      catch (error) { if (isSerializationFailure(error) && attempt < 4) continue; rethrowFinancialPeriod(error); }
     }
   }
   create(dto: CreateExpenseDto, createdById: string) {
@@ -65,8 +70,11 @@ export class FinanceService {
           return existing;
         }
       }
-      const shift = await tx.cashShift.findFirst({ where: { cashierId: createdById, closedAt: null, openedAt: { lte: date } } });
-      return tx.expense.create({ data: { ...dto, date, description: dto.description.trim(), createdById, shiftId: shift?.id }, include: author });
+      const shift = await cashShiftAt(tx, createdById, date);
+      const expense = await tx.expense.create({ data: { ...dto, date, description: dto.description.trim(), createdById, shiftId: shift?.id }, include: author });
+      await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'EXPENSE_CREATED', actorId: createdById,
+        actorName: expense.createdBy?.email ?? createdById, details: { expenseId: expense.id, amount: String(dto.amount), date: date.toISOString() } } });
+      return expense;
     });
   }
   private range(from?: string, to?: string) {
@@ -88,11 +96,21 @@ export class FinanceService {
       if (!existing) throw new NotFoundException('Расход не найден');
       if (existing.archivedAt || existing.isEncashment || existing.refundPaymentId) throw new ConflictException('Архивные расходы и инкассацию нельзя отменить');
       if (existing.cancelledAt) return existing;
+      if (existing.shiftId && await tx.cashShift.findFirst({ where: { id: existing.shiftId, closedAt: { not: null } } })) {
+        throw new ConflictException('Нельзя отменить расход закрытой смены');
+      }
       if (existing.category === 'SALARY' && await tx.payrollCalculation.findUnique({ where: { expenseId: id } })) {
         throw new ConflictException('Расход связан с выплаченной ведомостью. Отмена зарплаты через кассу недоступна');
       }
-      return tx.expense.update({ where: { id }, data: { cancelledAt: new Date(), cancelledById: user.id } });
+      const expense = await tx.expense.update({ where: { id }, data: { cancelledAt: new Date(), cancelledById: user.id } });
+      await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'EXPENSE_CANCELLED', actorId: user.id, actorName: user.id,
+        details: { expenseId: id, amount: String(existing.amount) } } });
+      return expense;
     });
+  }
+  journal(query: CashJournalQueryDto) {
+    const range = this.range(query.from, query.to);
+    return this.prisma.$transaction(tx => cashJournal(tx, query, range), { isolationLevel: 'RepeatableRead' });
   }
   summary(query: CashSummaryQueryDto) {
     const { gte, lt } = this.range(query.from, query.to);
@@ -106,7 +124,9 @@ export class FinanceService {
     return this.prisma.$transaction(async tx => {
       const incomeGroups = await tx.payment.groupBy({ by: ['method'], where: paymentWhere(gte), _sum: { amount: true }, _count: { _all: true } });
       const expenseGroups = await tx.expense.groupBy({ by: ['paymentMethod'], where: expenseWhere(gte), _sum: { amount: true } });
-      const balance = await currentCashBalance(tx);
+      const asOf = new Date();
+      const balance = await currentCashBalance(tx, asOf);
+      const cashboxes = await cashboxBalances(tx, asOf);
       const income = aggregatePaymentMethods(incomeGroups), expenses = expenseTotals(expenseGroups);
       const operations = await tx.payment.findMany({ where: paymentWhere(gte), include: {
         client: { select: { id: true, name: true, firstName: true, lastName: true, phone: true } }, cashier: { select: { id: true, email: true } }, service: true,
@@ -114,7 +134,7 @@ export class FinanceService {
       }, orderBy: [{ paidAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.pageSize, take: query.pageSize });
       return { ...income, totalExpensesCash: expenses.cash, totalExpensesCard: expenses.card, totalExpenses: expenses.total,
         netCash: income.totalCash.minus(expenses.cash), netCard: income.totalCard.minus(expenses.card), netTotal: income.totalRevenue.minus(expenses.total),
-        ...balance,
+        ...balance, cashboxes,
         operations, page: query.page, pageSize: query.pageSize };
     }, { isolationLevel: 'RepeatableRead' });
   }

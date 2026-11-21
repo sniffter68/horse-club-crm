@@ -1,5 +1,6 @@
 import { LiveSearch } from '../../components/LiveSearch'
 import { PeriodClosingButton } from '../cash-desk/PeriodClosingModal'
+import { CashDeskPaymentModal } from '../cash-desk/CashDeskPaymentModal'
 import { recordSuggestion } from '../../components/searchText'
 import { usePermissions } from '../../modulePermissions'
 import { useEffect, useState } from 'react'
@@ -30,6 +31,7 @@ export function PaymentList() {
   const writable = canWrite('CASHBOX')
   const [updatingId, setUpdatingId] = useState<string>()
   const [selectedId, setSelectedId] = useState<string>()
+  const [collecting, setCollecting] = useState<Payment>()
   const { mutate: update } = useUpdate()
   const { tableProps, searchFormProps, tableQuery, setCurrentPage } = useTable<Payment, HttpError, { q?: string }>({
     resource: 'payments', pagination: { pageSize: 20 }, sorters: { initial: [{ field: 'createdAt', order: 'desc' }] },
@@ -38,12 +40,13 @@ export function PaymentList() {
   })
   useEffect(() => { setCurrentPage(1) }, [cashboxType, setCurrentPage])
   const setPaid = (payment: Payment, paid: boolean) => {
+    if (paid && (payment.bookingId || payment.membershipId)) { setCollecting(payment); return }
     setUpdatingId(payment.id)
     update({
       resource: 'payments', id: payment.id,
       values: { status: paid ? 'PAID' : 'PENDING', paidAt: paid ? new Date().toISOString() : null },
       successNotification: { message: paid ? 'Оплата отмечена' : 'Отметка оплаты снята', type: 'success' },
-    }, { onSettled: () => setUpdatingId(undefined) })
+    }, { onSuccess: () => window.dispatchEvent(new Event('cash-desk-paid')), onSettled: () => setUpdatingId(undefined) })
   }
 
   return <>
@@ -68,13 +71,14 @@ export function PaymentList() {
         { key: 'amount', dataIndex: 'amount', title: 'Сумма', sorter: true, render: money },
         { key: 'status', dataIndex: 'status', title: 'Оплата', sorter: true, render: (_: PaymentStatus, record) => <Space>
           <Tag color={colors[record.status]}>{statuses[record.status]}</Tag>
-          {record.cashierId ? <Tag>Проведено в кассе</Tag> : record.status === 'PAID'
-            ? <Button disabled={!writable} size="small" loading={updatingId === record.id} onClick={() => setPaid(record, false)}>Снять отметку</Button>
-            : <Button disabled={!writable} type="primary" size="small" loading={updatingId === record.id} onClick={() => setPaid(record, true)}>Оплачено</Button>}
+          {record.cashierId || record.status === 'PAID' ? <Tag>Проведено в кассе</Tag>
+            : record.status === 'PENDING' && <Button disabled={!writable} type="primary" size="small" loading={updatingId === record.id} onClick={() => setPaid(record, true)}>Оплачено</Button>}
         </Space> },
         { key: 'paidAt', dataIndex: 'paidAt', title: 'Дата оплаты', sorter: true, render: dateTime },
       ]} />
     </List>
+    {collecting && <CashDeskPaymentModal variant="drawer" initialClientId={collecting.clientId} initialBookingId={collecting.bookingId || undefined} initialMembershipId={collecting.membershipId || undefined}
+      onClose={() => setCollecting(undefined)} onPaid={() => { void tableQuery.refetch() }} />}
     <DetailsModal<Payment> resource="payments" id={selectedId} title="Карточка начисления" onClose={() => setSelectedId(undefined)}>
       {payment => <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
         { key: 'client', label: 'Клиент', children: personName(payment.client) },

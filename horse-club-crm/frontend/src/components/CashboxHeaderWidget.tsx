@@ -5,9 +5,11 @@ import { ClubIcon } from './ClubIcon'
 import { usePermissions } from '../modulePermissions'
 import { getIdentity } from '../authStorage'
 import { API_URL, httpClient, toHttpError } from '../httpClient'
+import { currency } from '../pages/cash-desk/shared'
 
 interface CashboxSummary {
   mainBalance: number; boardingBalance: number; mainOperationsCount: number; boardingOperationsCount: number
+  balanceCash?: string; balanceCard?: string; balanceTotal?: string
 }
 
 export function CashboxHeaderWidget() {
@@ -47,5 +49,6 @@ export function CashboxHeaderWidget() {
     ] as const).map(([type, label, balance, count]) => <Link key={type} className="cashbox-header-link crm-card-link" to={`/payments?cashboxType=${type}`}>
       <span className="club-icon-label"><ClubIcon name="wallet" />{label}</span><strong>{balance.toLocaleString('ru-RU')} руб.</strong><span>{count.toLocaleString('ru-RU')} оп.</span>
     </Link>)}
+    {data.balanceCash !== undefined && <span className="cashbox-header-funds">Наличные <strong data-testid="header-cash">{currency(data.balanceCash)}</strong> · Безнал <strong data-testid="header-bank">{currency(data.balanceCard)}</strong></span>}
   </Space>
 }

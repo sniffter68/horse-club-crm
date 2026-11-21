@@ -14,17 +14,19 @@ test('payments module imports authentication providers for its guards', () => {
 test('boarding payment derives client and monthly rate without fiscal integrations', async () => {
   let createArgs;
   const prisma = {
+    cashShift: { findFirst: async () => null },
+    $queryRaw: async () => [], cashAuditLog: { create: async () => ({}) },
     boardingContract: { findUnique: async () => ({ clientId: 'client-1', monthlyRate: { toNumber: () => 25000 } }) },
     client: { findUnique: async () => ({ id: 'client-1' }) },
-    payment: { create: async args => { createArgs = args; return { id: 'payment-1', ...args.data }; } },
+    payment: { findUnique: async () => null, create: async args => { createArgs = args; return { id: 'payment-1', ...args.data }; } },
   };
   prisma.$transaction = async fn => fn(prisma);
   await new PaymentsService(prisma).create({
     boardingContractId: '8e5e03af-cb29-4689-be60-a07188174e26',
     method: 'TRANSFER',
-    status: 'PAID',
+    status: 'PAID', requestId: require('node:crypto').randomUUID(),
     description: '  Постой за сентябрь  ',
-  });
+  }, { id: 'actor', email: 'actor@test' });
   assert.equal(createArgs.data.clientId, 'client-1');
   assert.equal(createArgs.data.amount, 25000);
   assert.equal(createArgs.data.description, 'Постой за сентябрь');

@@ -19,14 +19,16 @@ const { RolesGuard } = require('../dist/auth/guards/roles.guard');
 const { ModuleAccessGuard } = require('../dist/auth/module-access.guard');
 
 test('cashbox maps SQL decimal/bigint and missing groups into JSON-safe numbers', async () => {
-  const service = new CashboxService({ $queryRaw: async () => [
-    { cashbox_type: 'MAIN', current_balance_rub: new Prisma.Decimal('1234.56'), operations_count: 12n },
-    { cashbox_type: 'BOARDING', current_balance_rub: '-40.25', operations_count: 3n },
-  ] });
+  const tx = { $queryRaw: async () => [
+    { cashbox: 'MAIN', balance: new Prisma.Decimal('1234.56'), count: 12n },
+    { cashbox: 'BOARDING', balance: new Prisma.Decimal('-40.25'), count: 3n },
+  ], payment: { groupBy: async () => [] }, expense: { groupBy: async () => [] } };
+  const service = new CashboxService({ $transaction: async (work, options) => { assert.equal(options.isolationLevel, 'RepeatableRead'); return work(tx); } });
   const summary = await service.summary();
-  assert.deepEqual(summary, { mainBalance: 1234.56, boardingBalance: -40.25, mainOperationsCount: 12, boardingOperationsCount: 3 });
+  assert.deepEqual(summary, { mainBalance: 1234.56, boardingBalance: -40.25, mainOperationsCount: 12, boardingOperationsCount: 3, balanceCash: '0.00', balanceCard: '0.00', balanceTotal: '0.00' });
   assert.doesNotThrow(() => JSON.stringify(summary));
-  assert.deepEqual(await new CashboxService({ $queryRaw: async () => [] }).summary(), { mainBalance: 0, boardingBalance: 0, mainOperationsCount: 0, boardingOperationsCount: 0 });
+  tx.$queryRaw = async () => [];
+  assert.deepEqual(await service.summary(), { mainBalance: 0, boardingBalance: 0, mainOperationsCount: 0, boardingOperationsCount: 0, balanceCash: '0.00', balanceCard: '0.00', balanceTotal: '0.00' });
 });
 
 test('cashbox filter validates enum, empty value, numeric pagination and partitions both count and rows', async () => {

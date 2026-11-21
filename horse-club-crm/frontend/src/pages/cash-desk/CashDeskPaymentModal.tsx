@@ -24,10 +24,10 @@ export function CashDeskProvider({ children }: { children: ReactNode }) {
   const [revision, setRevision] = useState(0)
   return <CashDeskContext.Provider value={() => { setRevision(value => value + 1); setOpen(true) }}>
     {children}
-    {open && <CashDeskPaymentModal key={revision} onClose={() => setOpen(false)} />}
+    {open && <CashDeskPaymentModal variant="drawer" key={revision} onClose={() => setOpen(false)} />}
   </CashDeskContext.Provider>
 }
-export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClientId, initialBookingId, oneOffPrice, onPaid }: { onClose: () => void; variant?: 'modal' | 'drawer'; initialClientId?: string; initialBookingId?: string; oneOffPrice?: number; onPaid?: () => void }) {
+export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClientId, initialBookingId, initialMembershipId, oneOffPrice, onPaid }: { onClose: () => void; variant?: 'modal' | 'drawer'; initialClientId?: string; initialBookingId?: string; initialMembershipId?: string; oneOffPrice?: number; onPaid?: () => void }) {
   const [form] = Form.useForm<Values>()
   const { message, modal } = App.useApp()
   const invalidate = useInvalidate()
@@ -59,14 +59,14 @@ export function CashDeskPaymentModal({ onClose, variant = 'modal', initialClient
       options.push({ value: 'manual', label: 'Другая услуга — указать сумму', price: 0, serviceType: 'Другая услуга' })
       setChoices(options)
       if (oneOffPrice != null && initialBookingId && !options.some(row => row.bookingId === initialBookingId)) options.unshift({ value: `booking:${initialBookingId}`, label: 'Разовое занятие', price: oneOffPrice, bookingId: initialBookingId })
-      if (initialBookingId && clientId === initialClientId && !form.isFieldTouched('choice')) {
-        const selected = options.find(row => row.bookingId === initialBookingId)
+      if ((initialBookingId || initialMembershipId) && clientId === initialClientId && !form.isFieldTouched('choice')) {
+        const selected = options.find(row => initialBookingId ? row.bookingId === initialBookingId : row.membershipId === initialMembershipId)
         if (selected) form.setFieldsValue({ choice: selected.value, amount: oneOffPrice ?? selected.price })
       }
     }).catch(cause => { if (!controller.signal.aborted) setError(toHttpError(cause).message) })
       .finally(() => { if (!controller.signal.aborted) setOptionsLoading(false) })
     return () => controller.abort()
-  }, [clientId, form, initialBookingId, initialClientId, oneOffPrice])
+  }, [clientId, form, initialBookingId, initialMembershipId, initialClientId, oneOffPrice])
   const close = () => {
     if (pending.current) return
     if (form.isFieldsTouched()) modal.confirm({ title: 'Закрыть кассу?', content: 'Введённые данные платежа будут потеряны.', okText: 'Закрыть', cancelText: 'Продолжить', onOk: onClose })

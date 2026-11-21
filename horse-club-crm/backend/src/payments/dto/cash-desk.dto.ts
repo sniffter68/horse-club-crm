@@ -3,10 +3,10 @@ import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max,
 
 export class CashDeskPaymentDto {
   @IsUUID() clientId!: string;
-  @IsOptional() @IsUUID() requestId?: string;
-  @IsOptional() @IsUUID() bookingId?: string;
-  @IsOptional() @IsUUID() membershipId?: string;
-  @IsOptional() @IsUUID() serviceId?: string;
+  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID() requestId?: string;
+  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID() bookingId?: string;
+  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID() membershipId?: string;
+  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID() serviceId?: string;
   @IsOptional() @IsString() @MaxLength(150) serviceType?: string;
   @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(9999999999.99) amount!: number;
   @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(9999999999.99) lessonCost?: number;
@@ -21,6 +21,11 @@ export class CashSummaryQueryDto {
   @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID() shiftId?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize = 20;
+}
+export class CashJournalQueryDto extends CashSummaryQueryDto {
+  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsIn(['CASH', 'BANK']) paymentMethod?: 'CASH' | 'BANK';
+  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsIn(['INCOME', 'EXPENSE']) operationType?: 'INCOME' | 'EXPENSE';
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() || undefined : value) @IsOptional() @IsString() @MaxLength(150) search?: string;
 }
 export class OpenCashShiftDto {
   @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(9999999999.99) startingCash = 0;

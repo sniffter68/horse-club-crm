@@ -44,7 +44,7 @@ for (const now of ['2026-10-19T21:05:00Z', '2026-10-20T20:59:59.999Z']) {
     const saved = [];
     const service = new FinanceService({ $transaction: async (work, options) => {
       assert.equal(options.isolationLevel, 'Serializable');
-      return work({
+      return work({ $queryRaw: async () => [], cashAuditLog: { create: async () => ({}) },
         cashShift: { findFirst: async () => null },
         expense: { create: async ({ data }) => { saved.push(data); return { id: randomUUID(), ...data }; } },
       });
@@ -73,7 +73,7 @@ test('summary subtracts CASH/CARD expenses exactly and keeps cumulative balance 
   const queries = [];
   const service = new FinanceService({ $transaction: async (work, options) => {
     assert.equal(options.isolationLevel, 'RepeatableRead');
-    return work({
+    return work({ $queryRaw: async () => [], cashAuditLog: { create: async () => ({}) },
       payment: { groupBy: async args => { queries.push(args); return args.where.OR[0].paidAt.gte ? [group('CASH', '5000.10'), group('CARD_TERMINAL', '3000.20'), group('SBP', '100')] : [group('CASH', '10000.10'), group('CARD', '5000.20')]; }, findMany: async args => { assert.equal(args.skip, 20); assert.equal(args.take, 20); return []; } },
       expense: { groupBy: async args => { queries.push(args); assert.equal(args.where.cancelledAt, null); return args.where.date.gte ? [expenseGroup('CASH', '1500'), expenseGroup('CARD', '200.10')] : [expenseGroup('CASH', '2500'), expenseGroup('CARD', '400.10')]; } },
     });
@@ -90,7 +90,7 @@ test('create attaches authenticated author, shift and amount in serializable tra
   let saved, writes = 0;
   const service = new FinanceService({ $transaction: async (work, options) => {
     assert.equal(options.isolationLevel, 'Serializable');
-    return work({ $queryRaw: async () => [], cashShift: { findFirst: async () => ({ id: 'shift' }) }, expense: {
+    return work({ $queryRaw: async () => [], cashAuditLog: { create: async () => ({}) }, cashShift: { findFirst: async ({ where }) => where.closedAt === null ? { id: 'shift' } : null }, expense: {
       findUnique: async () => saved,
       create: async ({ data }) => { writes++; return saved = { ...data, id: randomUUID(), amount: new Prisma.Decimal(data.amount), receiptUrl: null }; },
     } });
@@ -105,7 +105,7 @@ test('create attaches authenticated author, shift and amount in serializable tra
 test('cancel preserves financial record and actor, is idempotent and blocks MANAGER at service boundary', async () => {
   const row = { id: randomUUID(), ...valid, cancelledAt: null };
   let writes = 0;
-  const service = new FinanceService({ $transaction: async work => work({ expense: { findUnique: async () => row, update: async ({ data }) => { writes++; return Object.assign(row, data); } } }) });
+  const service = new FinanceService({ $transaction: async work => work({ cashAuditLog: { create: async () => ({}) }, expense: { findUnique: async () => row, update: async ({ data }) => { writes++; return Object.assign(row, data); } } }) });
   assert.throws(() => service.cancel(row.id, { id: 'manager', role: 'MANAGER' }), e => e.status === 403);
   await service.cancel(row.id, { id: 'admin', role: 'ADMIN' });
   assert.equal(row.cancelledById, 'admin'); assert.ok(row.cancelledAt); assert.equal(row.amount, 1500);

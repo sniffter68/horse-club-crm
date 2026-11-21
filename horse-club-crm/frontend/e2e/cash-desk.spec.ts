@@ -1,5 +1,131 @@
 import { test, expect, type Page } from './fixtures'
 
+for (const width of [1440, 1280, 1024, 390]) test(`balances and turnover contain long money at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 })
+  await setup(page)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const queries: URL[] = []
+  await page.route('**/api/finance/summary?*', route => {
+    queries.push(new URL(route.request().url()))
+    return route.fulfill({ json: { balanceCash: '99999999.99', balanceCard: '1250000', balanceTotal: '101249999.99',
+      cashboxes: { mainBalance: '100000000', boardingBalance: '1249999.99' }, totalCash: '99999999.99', totalCard: '1250000', totalRevenue: '101249999.99', totalExpenses: '211610', operationsCount: 0, operations: [] } })
+  })
+  await page.route('**/api/cashbox/summary', route => route.fulfill({ json: { mainBalance: 100000000, boardingBalance: 1249999.99, mainOperationsCount: 1, boardingOperationsCount: 1, balanceCash: '99999999.99', balanceCard: '1250000' } }))
+  await page.goto('/cash-desk')
+  const cards = page.getByTestId('cash-metric-card')
+  await expect(cards).toHaveCount(7)
+  await expect(cards.first()).toContainText(/99\s999\s999,99/)
+  await expect(cards.nth(1)).toContainText(/1\s250\s000,00/)
+  await expect(page.getByTestId('header-cash')).toHaveText(await cards.first().locator('.ant-statistic-content').innerText())
+  await expect(page.getByTestId('header-bank')).toHaveText(await cards.nth(1).locator('.ant-statistic-content').innerText())
+  for (const label of ['Вчера', 'Текущая неделя', 'Текущий месяц', 'Текущая смена', 'Сегодня']) {
+    await page.getByText(label, { exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Обновить', exact: true })).not.toHaveClass(/ant-btn-loading/)
+    await expect(cards.first()).toContainText(/99\s999\s999,99/)
+  }
+  expect(queries.some(url => url.searchParams.get('shiftId') === '00000000-0000-4000-8000-000000000005')).toBe(true)
+  for (const card of await cards.all()) {
+    await card.scrollIntoViewIfNeeded()
+    expect(await card.evaluate(element => {
+      const content = element.querySelector('.ant-statistic-content')!
+      const range = document.createRange(); range.selectNodeContents(content)
+      const text = range.getBoundingClientRect(), bounds = element.getBoundingClientRect()
+      return { fits: text.left >= bounds.left && text.right <= bounds.right, noClip: content.scrollWidth <= content.clientWidth + 1, nowrap: getComputedStyle(content).whiteSpace, numerals: getComputedStyle(content).fontVariantNumeric }
+    })).toEqual({ fits: true, noClip: true, nowrap: 'nowrap', numerals: 'tabular-nums' })
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await cards.first().scrollIntoViewIfNeeded()
+  await page.screenshot({ path: `../docs/reports/cash-metrics-${width}.png`, animations: 'disabled' })
+})
+
+for (const width of [1440, 390]) test(`journal filters, empty state, retry and read only at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 })
+  await setup(page, 'MANAGER')
+  await page.route('**/api/settings/my-permissions*', route => route.fulfill({ json: { role: 'MANAGER', modules: [{ module: 'CASHBOX', isEnabled: true, accessLevel: 'READ_ONLY' }] } }))
+  let fail = false
+  const queries: URL[] = []
+  await page.route('**/api/payments/shifts', route => route.fulfill({ json: [{ id: '00000000-0000-4000-8000-000000000007', openedAt: '2026-10-08T07:00:00Z', closedAt: '2026-10-08T17:00:00Z', cashier: { email: 'manager@test' } }] }))
+  await page.route('**/api/finance/journal?*', route => {
+    const url = new URL(route.request().url()); queries.push(url)
+    if (fail) return route.fulfill({ status: 500, json: { message: 'Ошибка журнала' } })
+    return route.fulfill({ json: { total: url.searchParams.has('search') ? 0 : 1, data: url.searchParams.has('search') ? [] : [{ id: 'expense:x', kind: 'EXPENSE', at: '2026-10-09T09:00:00Z', amount: '1500', method: 'CASH', description: 'Возврат за отмену', clientName: 'Анна Орлова' }] } })
+  })
+  await page.goto('/cash-desk')
+  await expect(page.getByText('Возврат за отмену', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Принять платёж', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Внести расход', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Закрыть смену', exact: true })).toBeDisabled()
+  for (const [name, option] of [['Способ оплаты журнала', 'Безналичные'], ['Тип операции', 'Расход']]) {
+    await page.getByRole('combobox', { name, exact: true }).focus()
+    await page.getByRole('combobox', { name, exact: true }).press('ArrowDown')
+    await page.locator('.ant-select-dropdown:visible').getByText(option, { exact: true }).click()
+  }
+  await expect.poll(() => queries.at(-1)?.searchParams.get('paymentMethod')).toBe('BANK')
+  await expect.poll(() => queries.at(-1)?.searchParams.get('operationType')).toBe('EXPENSE')
+  const shiftFilter = page.getByRole('combobox', { name: 'Смена журнала', exact: true })
+  await shiftFilter.focus(); await shiftFilter.press('ArrowDown')
+  await page.locator('.ant-select-dropdown:visible').getByText(/manager@test/).click()
+  await expect.poll(() => queries.at(-1)?.searchParams.get('shiftId')).toBe('00000000-0000-4000-8000-000000000007')
+  const search = page.getByRole('combobox', { name: 'Поиск по клиенту или комментарию' })
+  await search.fill('Нет клиента'); await search.press('Enter')
+  await expect(page.getByText('По выбранным фильтрам операций нет', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Очистить поиск', exact: true }).click()
+  await expect(search).toBeFocused()
+  await expect(page.getByText('Возврат за отмену', { exact: true })).toBeVisible()
+  fail = true
+  await page.getByRole('button', { name: 'Обновить', exact: true }).click()
+  await expect(page.getByText('Не удалось загрузить журнал', { exact: true })).toBeVisible()
+  fail = false
+  await page.getByRole('button', { name: 'Повторить', exact: true }).click()
+  await expect(page.getByText('Возврат за отмену', { exact: true })).toBeVisible()
+})
+
+test('invalid journal shift UUID is never sent and can be cleared', async ({ page }) => {
+  await setup(page)
+  const requests: string[] = []
+  await page.route('**/api/finance/journal?*', route => { requests.push(route.request().url()); return route.fulfill({ json: { data: [], total: 0 } }) })
+  await page.goto('/cash-desk?journalShift=invalid')
+  await expect(page.getByText('Некорректная смена', { exact: true })).toBeVisible()
+  expect(requests).toHaveLength(0)
+  await page.getByRole('button', { name: 'Сбросить смену' }).click()
+  await expect.poll(() => requests.length).toBe(1)
+  expect(new URL(requests[0]).searchParams.has('shiftId')).toBe(false)
+})
+
+for (const source of ['lesson', 'membership']) test(`payment list settles ${source} through cash drawer rather than generic status update`, async ({ page }) => {
+  const state = await setup(page)
+  const bookingId = '00000000-0000-4000-8000-000000000008'
+  const membership = source === 'membership'
+  const link = membership ? { membershipId: bookingId, membership: { id: bookingId, pricingPlan: { name: '8 занятий' } } }
+    : { bookingId, booking: { id: bookingId, lesson: { service: { title: 'Тренировка' } } } }
+  let patches = 0
+  await page.route('**/api/payments?*', route => route.fulfill({ json: [{ ...link, id: '00000000-0000-4000-8000-000000000009', clientId: '00000000-0000-4000-8000-000000000001', amount: '1200.10', method: 'CASH', status: state.paid ? 'PAID' : 'PENDING',
+    client: { id: '00000000-0000-4000-8000-000000000001', name: 'Анна Орлова' } }], headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/payments/00000000-0000-4000-8000-000000000009', route => { patches++; return route.fulfill({ json: {} }) })
+  await page.route('**/api/clients/00000000-0000-4000-8000-000000000001', route => route.fulfill({ json: { id: '00000000-0000-4000-8000-000000000001', name: 'Анна Орлова' } }))
+  await page.route('**/api/payments/cash-desk/options/*', route => route.fulfill({ json: { bookings: membership ? [] : [{ id: bookingId, startTime: '2026-10-09T09:00:00Z', remainingAmount: '1200.10', lesson: { service: { title: 'Тренировка' } } }], memberships: membership ? [{ id: bookingId, type: 'fixed_lessons', status: 'active', title: '8 занятий', payments: [{ status: 'PENDING', amount: '1200.10' }] }] : [] } }))
+  await page.goto('/payments')
+  await page.getByRole('button', { name: 'Оплачено', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: 'Принять оплату / Касса', exact: true })
+  await expect(drawer.getByRole('spinbutton', { name: 'Сумма чека, ₽' })).toHaveValue('1200.10')
+  await drawer.getByRole('button', { name: 'Без сдачи', exact: true }).click()
+  await drawer.getByRole('button', { name: 'Провести платёж', exact: true }).click()
+  await expect(drawer).not.toBeVisible()
+  expect(patches).toBe(0)
+  expect(state.posts).toHaveLength(1)
+  expect(state.posts[0][membership ? 'membershipId' : 'bookingId']).toBe(bookingId)
+  await expect(page.getByRole('button', { name: 'Оплачено', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Снять отметку', exact: true })).toHaveCount(0)
+})
+
+test('cash audit overview capture', async ({ page }) => {
+  await setup(page)
+  await page.goto('/cash-desk')
+  await expect(page.getByText('Остаток в кассе (наличные)', { exact: true })).toBeVisible()
+  await expect(page.locator('.cash-desk-page .ant-spin-spinning')).toHaveCount(0)
+  await page.screenshot({ path: '../docs/reports/cash-audit-after.png', fullPage: true, animations: 'disabled' })
+})
+
 async function setup(page: Page, role = 'ADMIN') {
   await page.clock.setFixedTime(new Date('2026-10-09T09:00:00Z'))
   await page.addInitScript(role => {
@@ -8,6 +134,7 @@ async function setup(page: Page, role = 'ADMIN') {
     localStorage.setItem('horsecrm.role', sessionStorage.getItem('qa.role') || role)
   }, role)
   const state = { posts: [] as Record<string, unknown>[], summaries: [] as string[], fail: false, paid: false, expenses: [] as Record<string, unknown>[], expensePosts: [] as Record<string, unknown>[], expenseFail: false }
+  await page.route('**/api/finance/journal?*', route => route.fulfill({ json: { total: state.paid ? 1 : 0, data: state.paid ? [{ id: 'payment:test', kind: 'INCOME', at: '2026-10-09T09:00:00Z', amount: '1200.10', method: 'CASH', clientName: 'Анна Орлова', description: 'Индивидуальная тренировка', cashier: 'qa@example.com' }] : [] } }))
   await page.route('**/api/finance/monthly-closing/status?*', route => route.fulfill({ json: {
     year: 2026, month: 10, isClosed: false, closedAt: null, cashFlowIncome: '8000', cashFlowExpense: '500',
     recognizedRevenue: '1000', deferredRevenueCarriedOver: '7000', activeMembershipsCarriedOver: 1,
@@ -171,6 +298,7 @@ for (const width of [1440, 390]) test(`owner reset requires exact word, preserve
     totalExpenses: 0, operationsCount: reset ? 0 : 1,
     operations: reset ? [] : [{ id: '00000000-0000-4000-8000-000000000004', amount: '1000', method: 'CASH', paidAt: '2026-10-09T09:00:00Z', client: { name: 'Тестовый платёж' } }],
   } }))
+  await page.route('**/api/finance/journal?*', route => route.fulfill({ json: { total: reset ? 0 : 1, data: reset ? [] : [{ id: 'payment:test', kind: 'INCOME', at: '2026-10-09T09:00:00Z', amount: '1000', method: 'CASH', clientName: 'Тестовый платёж' }] } }))
   await page.route('**/api/payments/shifts/current', route => route.fulfill({ json: reset ? null : { id: '00000000-0000-4000-8000-000000000005', openedAt: '2026-10-09T07:00:00Z', startingCash: '1000' } }))
   await page.goto('/cash-desk')
   await expect(page.getByText('Тестовый платёж', { exact: true })).toBeVisible()
@@ -193,7 +321,7 @@ for (const width of [1440, 390]) test(`owner reset requires exact word, preserve
   expect(posts[0].confirmation).toBe('RESET_CASH')
   await expect(page.getByText('Тестовый платёж', { exact: true })).not.toBeVisible()
   await expect(page.getByText('Нет открытой смены', { exact: true })).toBeVisible()
-  await expect(page.locator('.kpi-card').filter({ hasText: 'Остаток в кассе (наличные)' })).toContainText('0,00')
+  await expect(page.getByTestId('cash-metric-card').filter({ hasText: 'Остаток в кассе (наличные)' })).toContainText('0,00')
   await expect(page.getByText('Касса успешно обнулена', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
@@ -233,7 +361,7 @@ for (const width of [1440, 390]) test(`expense 1500 reduces cash balance, filter
   await page.setViewportSize({ width, height: 900 })
   const state = await setup(page)
   await page.goto('/cash-desk')
-  const balance = page.locator('.kpi-card').filter({ hasText: 'Остаток в кассе (наличные)' })
+  const balance = page.getByTestId('cash-metric-card').filter({ hasText: 'Остаток в кассе (наличные)' })
   await expect(balance).toContainText(/5\s*000,00/)
   await page.getByRole('button', { name: 'Внести расход', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Внесение расхода', exact: true })

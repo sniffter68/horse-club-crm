@@ -12,6 +12,8 @@ export const test = base.extend<{ modulePolicy: void }>({
       trainerId: '00000000-0000-4000-8000-000000000998', trainers: [], lessons: [], horses: [], openTime: '09:00', closeTime: '21:00',
     } }))
     await page.route('**/api/cashbox/summary', route => route.fulfill({ json: { mainBalance: 0, boardingBalance: 0, mainOperationsCount: 0, boardingOperationsCount: 0 } }))
+    await page.route('**/api/finance/journal?*', route => route.fulfill({ json: { data: [], total: 0 } }))
+    await page.route('**/api/payments/shifts', route => route.fulfill({ json: [] }))
     await page.route('**/api/settings/access/me*', async route => {
       const role = await page.evaluate(() => localStorage.getItem('horsecrm.role')).catch(() => null)
       if (!role) return route.abort('aborted')

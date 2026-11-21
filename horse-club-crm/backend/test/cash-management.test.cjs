@@ -43,6 +43,7 @@ function fixture(failAudit = false) {
     };
   }
   tx.$executeRaw = async () => 0;
+  tx.$queryRaw = async () => [];
   tx.user = { findUniqueOrThrow: async () => ({ ...user, staffProfile: { fullName: 'Владелец клуба' } }) };
   tx.cashAuditLog = {
     findUnique: async ({ where }) => state.audits.find(row => row.requestId === where.requestId),

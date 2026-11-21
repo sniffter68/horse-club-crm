@@ -5,6 +5,7 @@ import type { AuthUser } from '../auth/auth.types';
 import { isSerializationFailure } from '../common/serialization-failure';
 import { PrismaService } from '../prisma/prisma.service';
 import { ResetCashDto, WithdrawCashDto } from './dto/cash-management.dto';
+import { currentCashBalance } from './finance.service';
 
 @Injectable()
 export class CashManagementService {
@@ -59,9 +60,7 @@ export class CashManagementService {
         if (!previous.isEncashment || previous.createdById !== user.id || !previous.amount.equals(dto.amount)) throw new ConflictException('Ключ операции уже использован');
         return previous;
       }
-      const income = await tx.payment.aggregate({ where: { archivedAt: null, status: 'PAID', method: 'CASH' }, _sum: { amount: true } });
-      const expenses = await tx.expense.aggregate({ where: { archivedAt: null, cancelledAt: null, paymentMethod: 'CASH' }, _sum: { amount: true } });
-      const balance = new Prisma.Decimal(income._sum.amount ?? 0).minus(expenses._sum.amount ?? 0);
+      const { balanceCash: balance } = await currentCashBalance(tx);
       if (balance.lt(dto.amount)) throw new BadRequestException('Недостаточно наличных в кассе');
       const shift = await tx.cashShift.findFirst({ where: { cashierId: user.id, closedAt: null, archivedAt: null } });
       const expense = await tx.expense.create({ data: { requestId: dto.requestId, amount: dto.amount, paymentMethod: 'CASH', category: 'OTHER',

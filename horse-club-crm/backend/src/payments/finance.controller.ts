@@ -10,7 +10,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateExpenseDto, ExpenseQueryDto } from './dto/expense.dto';
-import { CashSummaryQueryDto } from './dto/cash-desk.dto';
+import { CashJournalQueryDto, CashSummaryQueryDto } from './dto/cash-desk.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('Finance')
@@ -44,4 +44,6 @@ export class FinanceController {
   cancel(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: { id: string; role: Role } }) { return this.service.cancel(id, req.user); }
   @Get('summary')
   summary(@Query() query: CashSummaryQueryDto) { return this.service.summary(query); }
+  @Get('journal')
+  journal(@Query() query: CashJournalQueryDto) { return this.service.journal(query); }
 }

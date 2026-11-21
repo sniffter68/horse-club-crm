@@ -51,6 +51,8 @@ export class PaymentsController {
 
   @Get('shifts/current')
   currentShift(@Req() req: { user: { id: string } }) { return this.cashDesk.currentShift(req.user.id); }
+  @Get('shifts')
+  listShifts(@Req() req: { user: { id: string; role: Role } }) { return this.cashDesk.listShifts(req.user.role === Role.ADMIN ? undefined : req.user.id); }
 
   @Post('shifts')
   openShift(@Body() dto: OpenCashShiftDto, @Req() req: { user: { id: string } }) { return this.cashDesk.openShift(dto, req.user.id); }
@@ -62,13 +64,13 @@ export class PaymentsController {
   findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<PaymentWithRelations> { return this.service.findOne(id); }
 
   @Post()
-  create(@Body() dto: CreatePaymentDto): Promise<PaymentWithRelations> { return this.service.create(dto); }
+  create(@Body() dto: CreatePaymentDto, @Req() req: { user: { id: string; email: string } }): Promise<PaymentWithRelations> { return this.service.create(dto, req.user); }
 
   @Patch(':id')
-  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdatePaymentDto): Promise<PaymentWithRelations> {
-    return this.service.update(id, dto);
+  update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdatePaymentDto, @Req() req: { user: { id: string; email: string } }): Promise<PaymentWithRelations> {
+    return this.service.update(id, dto, req.user);
   }
 
   @Delete(':id')
-  remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<PaymentWithRelations> { return this.service.remove(id); }
+  remove(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: { user: { id: string; email: string } }): Promise<PaymentWithRelations> { return this.service.remove(id, req.user); }
 }

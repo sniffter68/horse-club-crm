@@ -7,6 +7,7 @@ import { CashDeskPaymentDto, CashSummaryQueryDto, OpenCashShiftDto } from './dto
 import { aggregatePaymentMethods, calculateCashChange } from './cash-desk.math';
 import { defaultModuleAccess } from '../settings/module-access.service';
 import { money, paymentStatus } from '../lessons/lesson-finance';
+import { rethrowFinancialPeriod } from './financial-period-error';
 
 const include = {
   client: { select: { id: true, name: true, firstName: true, lastName: true, phone: true } },
@@ -22,7 +23,7 @@ export class CashDeskService {
   private async atomic<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       try { return await this.prisma.$transaction(work, { isolationLevel: 'Serializable' }); }
-      catch (error) { if ((isSerializationFailure(error) || (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) && attempt < 4) continue; throw error; }
+      catch (error) { if ((isSerializationFailure(error) || (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) && attempt < 4) continue; rethrowFinancialPeriod(error); }
     }
   }
 
@@ -160,18 +161,27 @@ export class CashDeskService {
   }
 
   currentShift(cashierId: string) { return this.prisma.cashShift.findFirst({ where: { cashierId, archivedAt: null, closedAt: null } }); }
+  listShifts(cashierId?: string) {
+    return this.prisma.cashShift.findMany({ where: { archivedAt: null, ...(cashierId ? { cashierId } : {}) },
+      include: { cashier: { select: { email: true } } }, orderBy: [{ openedAt: 'desc' }, { id: 'desc' }], take: 100 });
+  }
   openShift(dto: OpenCashShiftDto, cashierId: string) {
     return this.atomic(async tx => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${cashierId}, 0))::text`;
       if (await tx.cashShift.findFirst({ where: { cashierId, archivedAt: null, closedAt: null } })) throw new ConflictException('Смена уже открыта');
-      return tx.cashShift.create({ data: { cashierId, startingCash: dto.startingCash, notes: dto.notes?.trim() } });
+      const shift = await tx.cashShift.create({ data: { cashierId, startingCash: dto.startingCash, notes: dto.notes?.trim() } });
+      await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'SHIFT_OPENED', actorId: cashierId, actorName: cashierId,
+        details: { shiftId: shift.id, startingCash: String(dto.startingCash) } } });
+      return shift;
     });
   }
   closeShift(id: string, cashierId: string) {
     return this.atomic(async tx => {
       const shift = await tx.cashShift.findFirst({ where: { id, cashierId, archivedAt: null, closedAt: null } });
       if (!shift) throw new ConflictException('Открытая смена не найдена');
-      return tx.cashShift.update({ where: { id }, data: { closedAt: new Date() } });
+      const closed = await tx.cashShift.update({ where: { id }, data: { closedAt: new Date() } });
+      await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'SHIFT_CLOSED', actorId: cashierId, actorName: cashierId, details: { shiftId: id } } });
+      return closed;
     });
   }
 

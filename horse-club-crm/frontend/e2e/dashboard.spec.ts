@@ -137,8 +137,8 @@ for (const width of [1440, 390]) test(`cash card opens matching club balances wi
   await expect(link).toContainText(/2\s*000,00/)
   await page.goto('/cash-desk')
   await expect(page).toHaveURL(/\/cash-desk$/)
-  const cash = page.locator('.kpi-card').filter({ hasText: 'Остаток в кассе (наличные)' })
-  const bank = page.locator('.kpi-card').filter({ hasText: 'Остаток на счете (безнал)' })
+  const cash = page.getByTestId('cash-metric-card').filter({ hasText: 'Остаток в кассе (наличные)' })
+  const bank = page.getByTestId('cash-metric-card').filter({ hasText: 'Остаток на счёте (безнал)' })
   for (const period of ['Сегодня', 'Вчера', 'Текущая смена', 'Выбрать даты']) {
     await page.getByText(period, { exact: true }).click()
     await expect(page.getByRole('button', { name: 'Обновить', exact: true })).not.toHaveClass(/ant-btn-loading/)
@@ -149,7 +149,7 @@ for (const width of [1440, 390]) test(`cash card opens matching club balances wi
   await page.getByText('Текущая смена', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Обновить', exact: true })).not.toHaveClass(/ant-btn-loading/)
   await expect(page.getByText('Откройте смену, чтобы учитывать её платежи отдельно')).toBeVisible()
-  await expect(page.getByText('За выбранный период платежей нет', { exact: true })).toBeVisible()
+  await expect(page.getByText('За выбранный период операций нет', { exact: true })).toBeVisible()
   await page.screenshot({ path: `test-results/cash-balance-no-shift-${width}.png` })
   fail = true
   await page.getByRole('button', { name: 'Обновить', exact: true }).click()
@@ -667,7 +667,7 @@ test('narrow workspace drawers close by keyboard without losing page width', asy
     const drawer = page.getByRole('dialog', { name: title, exact: true })
     await expect(drawer).toBeVisible()
     await expect(drawer).not.toHaveClass(/ant-zoom-(enter|appear)/)
-    await drawer.getByRole('button', { name: /^(Закрыть|Close)$/ }).focus()
+    await drawer.getByRole('button', { name: 'Закрыть шторку', exact: true }).focus()
     await page.keyboard.press('Escape')
     await expect(drawer).not.toBeVisible()
   }
