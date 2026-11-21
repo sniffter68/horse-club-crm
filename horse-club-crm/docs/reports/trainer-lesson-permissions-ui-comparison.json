@@ -1,0 +1,6 @@
+{
+  "baselineFindings": 13,
+  "currentFindings": 13,
+  "addedFindings": [],
+  "note": "Existing scanner findings include Ant Design Form.Item and Select misidentified as native controls."
+}

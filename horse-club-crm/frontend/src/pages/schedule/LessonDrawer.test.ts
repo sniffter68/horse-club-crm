@@ -9,6 +9,7 @@ vi.mock('../stable/shared', () => ({ StableEntryModal: (props: { initialValues: 
   return null
 } }))
 vi.mock('@refinedev/core', () => ({ useInvalidate: () => vi.fn() }))
+vi.mock('../../access', () => ({ useRoleAccess: () => ({ role: 'ADMIN', permissions: { lessonCreateOwn: true, lessonCreateAny: true }, loading: false }) }))
 vi.mock('../dashboard/useLeadLessonCatalogs', () => ({ useLeadLessonCatalogs: () => ({ loading: false, horses: [], trainers: [], services: [], arenas: [] }) }))
 vi.mock('./useTriadAvailability', () => ({ useTriadAvailability: () => ({ loading: false }) }))
 

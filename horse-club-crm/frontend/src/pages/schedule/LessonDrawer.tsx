@@ -1,4 +1,4 @@
-import { getIdentity } from '../../authStorage'
+import { useRoleAccess } from '../../access'
 import { SearchSelect } from '../../components/SearchSelect'
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Checkbox, Descriptions, Form, InputNumber, Select, Typography } from 'antd'
@@ -34,7 +34,11 @@ export interface LessonDrawerProps {
 }
 
 export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId, initialHorseId, initialDurationMinutes = 60, onClose, onSaved }: LessonDrawerProps) {
-  const isTrainer = typeof localStorage !== 'undefined' && getIdentity()?.role === 'TRAINER'
+  const access = useRoleAccess()
+  const isTrainer = access.role === 'TRAINER'
+  const ownTrainerId = access.snapshot?.trainerId ?? undefined
+  const ownOnly = isTrainer && !access.permissions.lessonCreateAny
+  const canCreate = !isTrainer || access.permissions.lessonCreateOwn || access.permissions.lessonCreateAny
   const invalidate = useInvalidate()
   const [form] = Form.useForm<LessonValues>()
   const [revision, retry] = useState(0)
@@ -42,6 +46,10 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
   const [failure, setFailure] = useState<string>()
   const report = useCallback((cause: unknown) => setFailure(toHttpError(cause).message), [])
   const catalogs = useLeadLessonCatalogs(true, revision, report)
+  useEffect(() => {
+    if (ownOnly) form.setFieldValue('trainerId', ownTrainerId)
+    else if (isTrainer && ownTrainerId && !form.getFieldValue('trainerId')) form.setFieldValue('trainerId', ownTrainerId)
+  }, [form, isTrainer, ownOnly, ownTrainerId])
   const start = Form.useWatch('startTime', form) as Dayjs | undefined
   const duration = Form.useWatch('durationMinutes', form) as number | undefined
   const serviceId = Form.useWatch('serviceId', form) as string | undefined
@@ -113,7 +121,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
     return !load || load.status !== 'AVAILABLE' || load.currentWorkloadMinutes + (duration ?? 0) > load.maxDailyWorkloadMinutes
       || Boolean(horse?.healthStatus && horse.healthStatus !== 'HEALTHY')
   }
-  const unavailable = (isTrainer && (!isUuid(initialTrainerId ?? '') || membershipsLoading)) || catalogs.loading || catalogs.error || availability.loading || availability.error || !availability.data || !from || (horseId && blockedHorse(horseId)) || horseConflict || conflicts.loading || trainerFull
+  const unavailable = !canCreate || access.loading || (isTrainer && (ownOnly && !isUuid(ownTrainerId ?? '') || membershipsLoading)) || catalogs.loading || catalogs.error || availability.loading || availability.error || !availability.data || !from || (horseId && blockedHorse(horseId)) || horseConflict || conflicts.loading || trainerFull
   const required = [{ required: true, message: 'Заполните поле' }]
   return <StableEntryModal variant="drawer" title="Записать на тренировку" form={form} submitLabel="Записать на тренировку" submitDisabled={Boolean(unavailable)}
     initialValues={{ startTime: dayjs(initialDateTime ? DateTime.fromISO(initialDateTime, { zone: CLUB_TIME_ZONE }).setZone(CLUB_TIME_ZONE).toFormat("yyyy-MM-dd'T'HH:mm") : DateTime.now().setZone(CLUB_TIME_ZONE).startOf('hour').plus({ hours: 1 }).toFormat("yyyy-MM-dd'T'HH:mm")), trainerId: initialTrainerId, arenaId: initialArenaId, horseId: initialHorseId, durationMinutes: initialDurationMinutes }}
@@ -129,7 +137,8 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
       if (unavailable) throw new Error('Проверьте доступность лошади и загрузку справочников')
       if (values.membershipId && (!allowMembership || !(isTrainer ? trainerMemberships : eligibleMemberships).some(membership => membership.id === values.membershipId))) throw new Error('Выберите действующий абонемент с остатком занятий на дату тренировки')
       if ([values.clientId, values.serviceId, values.trainerId, values.horseId, values.arenaId, values.membershipId].filter(Boolean).some(id => !isUuid(id!))) throw new Error('Выберите корректные записи из справочников')
-      if (isTrainer) { values.trainerId = initialTrainerId!; delete values.cost; delete values.pricePerPerson; delete values.prepaymentAmount; delete values.prepaymentMethod }
+      if (ownOnly && values.trainerId !== ownTrainerId) throw new Error('Тренер может создавать записи только в своё расписание')
+      if (isTrainer) { delete values.cost; delete values.pricePerPerson; delete values.prepaymentAmount; delete values.prepaymentMethod }
       if (values.membershipId) { delete values.cost; delete values.prepaymentAmount; delete values.prepaymentMethod }
       try {
         await httpClient.post(`${API_URL}/lessons`, { ...values, startTime: toInstant(values.startTime.format('YYYY-MM-DDTHH:mm')) })
@@ -150,8 +159,8 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
       onChange={id => form.setFieldsValue({ participantsCount: 1, pricePerPerson: isPerPersonService(catalogs.services.find(row => row.id === id)) ? Number(catalogs.services.find(row => row.id === id)?.price ?? 0) : undefined, durationMinutes: catalogs.services.find(row => row.id === id)?.durationMinutes ?? 60, cost: Number(catalogs.services.find(row => row.id === id)?.price ?? 0), prepaymentAmount: 0, prepaymentMethod: undefined })} /></Form.Item>
     <Form.Item name="durationMinutes" label="Длительность, мин" rules={[...required, { type: 'number', min: 1, max: 480 }]}><InputNumber min={1} max={480} precision={0} /></Form.Item>
     {to && <Typography.Paragraph aria-live="polite">Окончание: {DateTime.fromISO(to).setZone(CLUB_TIME_ZONE).toFormat('dd.MM.yyyy HH:mm')} (Москва)</Typography.Paragraph>}
-    <Form.Item name="trainerId" label="Тренер" rules={required}><Select disabled={isTrainer} onChange={preferences.trainerChanged} onInputKeyDown={stopPopupEscape} aria-label="Тренер" loading={catalogs.loading || conflicts.loading} showSearch optionFilterProp="label"
-      options={catalogs.trainers.filter(row => !isTrainer || row.id === initialTrainerId).map(row => ({ value: row.id, label: `${row.fullName || row.name} (занято ${conflicts.trainerOccupancy(row.id) ?? '…'}/${row.maxParallelLessons ?? 4})` }))} /></Form.Item>
+    <Form.Item name="trainerId" label="Тренер" rules={required}><Select disabled={ownOnly || access.loading} onChange={preferences.trainerChanged} onInputKeyDown={stopPopupEscape} aria-label="Тренер" loading={catalogs.loading || conflicts.loading} showSearch optionFilterProp="label"
+      options={catalogs.trainers.filter(row => !ownOnly || row.id === ownTrainerId).map(row => ({ value: row.id, label: `${row.fullName || row.name} (занято ${conflicts.trainerOccupancy(row.id) ?? '…'}/${row.maxParallelLessons ?? 4})` }))} /></Form.Item>
     {occupiedTrainerPlaces !== undefined && <Typography.Paragraph role="status">Тренер: занято {occupiedTrainerPlaces}/{trainerLimit}, свободно {Math.max(0, trainerLimit - occupiedTrainerPlaces)} мест на выбранный интервал.</Typography.Paragraph>}
     {trainerFull && <Alert type="error" showIcon message={`У тренера достигнут максимум одновременных всадников (${trainerLimit})`} />}
     {!trainerFull && occupiedTrainerPlaces !== undefined && occupiedTrainerPlaces > 0 && <Alert type="warning" showIcon message="У тренера есть пересечение по времени" description="Параллельная запись разрешена в пределах вместимости тренера." />}

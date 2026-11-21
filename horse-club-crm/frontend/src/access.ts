@@ -5,12 +5,13 @@ import type { Role } from './authStorage'
 import { API_URL } from './httpClient'
 
 export interface RolePermissions {
+  lessonCreateOwn: boolean; lessonCreateAny: boolean;
   horseReplaceOwn: boolean; horseReplaceAny: boolean; healthRead: boolean;
   healthWrite: boolean; financeRead: boolean; boardingAccess: boolean;
 }
 export interface AccessSnapshot { userId: string; trainerId: string | null; role: Role; permissions: RolePermissions }
-export const fullAccess: RolePermissions = { horseReplaceOwn: true, horseReplaceAny: true, healthRead: true, healthWrite: true, financeRead: true, boardingAccess: true }
-const noAccess: RolePermissions = { horseReplaceOwn: false, horseReplaceAny: false, healthRead: false, healthWrite: false, financeRead: false, boardingAccess: false }
+export const fullAccess: RolePermissions = { lessonCreateOwn: true, lessonCreateAny: true, horseReplaceOwn: true, horseReplaceAny: true, healthRead: true, healthWrite: true, financeRead: true, boardingAccess: true }
+const noAccess: RolePermissions = { lessonCreateOwn: false, lessonCreateAny: false, horseReplaceOwn: false, horseReplaceAny: false, healthRead: false, healthWrite: false, financeRead: false, boardingAccess: false }
 export function mayReplaceHorse(role: Role | undefined, snapshot: AccessSnapshot | undefined, trainerId: string | undefined) {
   if (role === 'ADMIN' || role === 'MANAGER') return true
   return role === 'TRAINER' && snapshot?.role === role && snapshot.permissions.horseReplaceOwn && Boolean(trainerId)
@@ -31,5 +32,5 @@ export function useRoleAccess() {
   const base = role === 'STABLE_WORKER' ? { ...noAccess, healthRead: true, boardingAccess: true } : role === 'ADMIN' || role === 'MANAGER' ? fullAccess : snapshot && snapshot.role === role ? snapshot.permissions : noAccess
   const permissions = { ...base, healthRead: base.healthRead && modules.canRead('VETERINARY'), healthWrite: base.healthWrite && modules.canWrite('VETERINARY'), financeRead: base.financeRead && modules.canRead('CASHBOX'), boardingAccess: base.boardingAccess && modules.canRead('STABLES') }
   const canReplaceHorse = useCallback((trainerId?: string) => modules.canWrite('SCHEDULE') && mayReplaceHorse(role, snapshot, trainerId), [role, snapshot, modules])
-  return { role, permissions, canReplaceHorse, loading: modules.loading || role === 'TRAINER' && query.isLoading, error: query.error, refresh: refetch }
+  return { role, snapshot, permissions, canReplaceHorse, loading: modules.loading || role === 'TRAINER' && query.isLoading, error: query.error, refresh: refetch }
 }

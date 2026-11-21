@@ -3,6 +3,8 @@ import { Transform } from 'class-transformer';
 import type { RolePermissions } from '../../auth/role-access';
 
 export class UpdateRoleAccessDto implements RolePermissions {
+  @Transform(({ obj, key }) => obj[key]) @IsBoolean() lessonCreateOwn!: boolean;
+  @Transform(({ obj, key }) => obj[key]) @IsBoolean() lessonCreateAny!: boolean;
   // Keep the original JSON value: implicit conversion must not turn "false" into true.
   @Transform(({ obj, key }) => obj[key]) @IsBoolean() horseReplaceOwn!: boolean;
   @Transform(({ obj, key }) => obj[key]) @IsBoolean() horseReplaceAny!: boolean;

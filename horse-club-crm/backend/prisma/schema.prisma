@@ -588,6 +588,8 @@ model BookingHorseChange {
 }
 
 model RoleAccess {
+  lessonCreateOwn   Boolean @default(true)
+  lessonCreateAny   Boolean @default(true)
   role              Role @id
   horseReplaceOwn   Boolean @default(false)
   horseReplaceAny   Boolean @default(false)

@@ -1,0 +1,3 @@
+ALTER TABLE "RoleAccess"
+ADD COLUMN "lessonCreateOwn" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "lessonCreateAny" BOOLEAN NOT NULL DEFAULT true;

@@ -127,6 +127,18 @@ test('HTTP role settings enforce health, boarding and report permissions without
   const report = '/payments/summary?from=2026-10-15T00:00:00Z&to=2026-10-16T00:00:00Z';
   try {
     assert.equal((await request('/settings/role-access')).status, 403);
+    const disabledCreation = await update({ lessonCreateOwn: false, lessonCreateAny: false });
+    assert.equal(disabledCreation.status, 200);
+    assert.equal((await disabledCreation.json()).lessonCreateOwn, false);
+    const anyCreation = await update({ lessonCreateOwn: false, lessonCreateAny: true });
+    assert.equal(anyCreation.status, 200);
+    const normalized = await anyCreation.json();
+    assert.equal(normalized.lessonCreateAny, true);
+    assert.equal(normalized.lessonCreateOwn, true);
+    const adminAccess = await request('/settings/role-access', 'admin');
+    const adminPolicy = (await adminAccess.json()).find(row => row.role === 'ADMIN');
+    assert.equal(adminPolicy.lessonCreateOwn, true);
+    assert.equal(adminPolicy.lessonCreateAny, true);
     assert.equal((await request('/settings/role-access/TRAINER', 'trainer', policy)).status, 403);
     assert.equal((await update({ healthRead: false, boardingAccess: false })).status, 200);
     assert.equal((await request('/vet/events')).status, 403);

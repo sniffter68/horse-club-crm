@@ -3,10 +3,12 @@ import type { Role } from '@prisma/client';
 import type { AuthUser } from './auth.types';
 
 export interface RolePermissions {
+  lessonCreateOwn: boolean; lessonCreateAny: boolean;
   horseReplaceOwn: boolean; horseReplaceAny: boolean;
   healthRead: boolean; healthWrite: boolean; financeRead: boolean; boardingAccess: boolean;
 }
 export const defaultRolePermissions = (role: Role): RolePermissions => ({
+  lessonCreateOwn: role !== 'STABLE_WORKER', lessonCreateAny: role !== 'STABLE_WORKER',
   horseReplaceOwn: role !== 'STABLE_WORKER', horseReplaceAny: (role === 'ADMIN' || role === 'MANAGER'), healthRead: true,
   healthWrite: (role === 'ADMIN' || role === 'MANAGER'), financeRead: (role === 'ADMIN' || role === 'MANAGER'), boardingAccess: true,
 });

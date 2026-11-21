@@ -13,6 +13,7 @@ import { queueVkNotification } from '../vk-bot/vk-delivery.module';
 import { queueTrainingConfirmation } from '../vk-bot/vk-training-notifications';
 import { queueTelegram, queueTelegramAdmins } from '../modules/telegram-bot/telegram-delivery';
 import { defaultModuleAccess } from '../settings/module-access.service';
+import { RoleAccessService } from '../auth/role-access.service';
 import {
   BadRequestException,
   ConflictException,
@@ -214,12 +215,16 @@ export class LessonsService {
 
   async createLesson(dto: CreateLessonDto, transaction?: Prisma.TransactionClient, actor?: AuthUser): Promise<LessonDetails> {
     if (actor?.role === 'TRAINER') {
-      if (!actor.trainerId) throw new ForbiddenException('Профиль пользователя не привязан к тренеру');
-      if (dto.trainerId && dto.trainerId !== actor.trainerId) throw new ForbiddenException('Тренер может создавать записи только в своё расписание');
+      const policy = await new RoleAccessService(this.prisma).permissions('TRAINER', transaction ?? this.prisma);
+      if (!policy.lessonCreateOwn && !policy.lessonCreateAny) throw new ForbiddenException('Создание записей в расписании запрещено настройками роли');
+      if (!policy.lessonCreateAny) {
+        if (!actor.trainerId) throw new ForbiddenException('Профиль пользователя не привязан к тренеру');
+        if (dto.trainerId && dto.trainerId !== actor.trainerId) throw new ForbiddenException('Тренер может создавать записи только в своё расписание');
+      }
       if ([dto.cost, dto.pricePerPerson, dto.prepaymentAmount, dto.prepaymentMethod].some(value => value !== undefined)) {
         throw new ForbiddenException('Тренер не может указывать финансовые параметры оплаты при записи');
       }
-      dto = { ...dto, trainerId: actor.trainerId };
+      dto = { ...dto, trainerId: dto.trainerId || actor.trainerId || '' };
     }
     if (!dto.trainerId) throw new BadRequestException('Укажите тренера');
     if (dto.participants && (dto.clientId || dto.horseId || dto.membershipId)) {

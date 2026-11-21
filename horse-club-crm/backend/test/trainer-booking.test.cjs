@@ -17,27 +17,29 @@ const dto = { trainerId: id(2), serviceId: id(3), clientId: id(4), startTime: '2
 
 function setup() {
   const audits = [], writes = [];
+  let policy = { lessonCreateOwn: true, lessonCreateAny: false };
   let membership = { id: id(5), clientId: id(4), status: 'active', type: 'fixed_lessons', serviceId: id(3), remainedLessons: 2, validFrom: new Date('2026-11-01'), validUntil: new Date('2026-12-01') };
   let shared = false, failAudit = false;
   const tx = {
+    roleAccess: { findUnique: async () => policy },
     service: { findUnique: async () => ({ durationMinutes: 60, price: 1500, name: 'Тренировка', title: 'Тренировка', maxCapacity: 4, allowMembership: true }) },
     clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] }) },
     membership: { findUnique: async () => membership },
     membershipMember: { findUnique: async () => shared ? { client: { deletedAt: null } } : null },
     lesson: { findMany: async () => [], create: async ({ data }) => {
       writes.push(data);
-      return { ...data, id: id(6), trainer: { id: id(2), name: 'Тренер', commissionPercent: 30 }, service: { id: id(3), name: 'Тренировка', price: 1500 }, arena: null,
+      return { ...data, id: id(6), trainer: { id: data.trainerId, name: 'Тренер', commissionPercent: 30 }, service: { id: id(3), name: 'Тренировка', price: 1500 }, arena: null,
         bookings: data.bookings.create.map(b => ({ ...b, id: id(7), client: { id: b.clientId, name: 'Новый клиент', medicalNotes: 'secret' }, horse: null, membership: membership, payments: [{ amount: 1500 }] })) };
     } },
     cashAuditLog: { create: async ({ data }) => { if (failAudit) throw new Error('audit unavailable'); audits.push(data); } },
   };
-  const prisma = { $transaction: async (run, options) => {
+  const prisma = { roleAccess: tx.roleAccess, $transaction: async (run, options) => {
     assert.equal(options.isolationLevel, 'Serializable');
     const before = writes.length;
     try { return await run(tx); } catch (error) { writes.splice(before); throw error; }
   } };
   const lessons = new LessonsService(prisma, {}, { validate: async () => {} });
-  return { lessons, audits, writes, setMembership: value => { membership = value; }, membership: () => membership, share: () => { shared = true; }, failAudit: () => { failAudit = true; } };
+  return { lessons, audits, writes, setPolicy: value => { policy = value; }, setMembership: value => { membership = value; }, membership: () => membership, share: () => { shared = true; }, failAudit: () => { failAudit = true; } };
 }
 
 test('trainer booking HTTP: ownership, safe responses, quick client, finance and module RBAC', async t => {
@@ -85,6 +87,26 @@ test('trainer booking HTTP: ownership, safe responses, quick client, finance and
     await api.post('/clients/quick').send({ name: 'Гость' }).expect(403);
   }
   assert.equal(state.writes.length, 2);
+  level = 'FULL';
+  state.setPolicy({ lessonCreateOwn: true, lessonCreateAny: true });
+  const foreign = await api.post('/lessons').send({ ...dto, trainerId: id(99) }).expect(201);
+  assert.equal(foreign.body.isOwn, false);
+  assert.equal(foreign.body.trainerId, id(99));
+  assert.equal(foreign.body.bookings[0].client, null);
+  for (const field of ['cost', 'pricePerPerson', 'prepaymentAmount', 'paymentStatus']) assert.equal(field in foreign.body, false);
+  assert.equal(state.writes.at(-1).status, 'SCHEDULED');
+  assert.equal(state.writes.at(-1).paymentStatus, 'UNPAID');
+  assert.equal(state.audits.at(-1).actorId, actor.id);
+  assert.equal(state.audits.at(-1).actorName, actor.email);
+  assert.equal(state.audits.at(-1).details.trainerId, id(99));
+  user = { ...actor, trainerId: null };
+  await api.post('/lessons').send({ ...dto, trainerId: id(99) }).expect(201);
+  await api.post('/lessons').send({ ...dto, trainerId: undefined }).expect(400);
+  user = actor;
+  await api.post('/lessons').send({ ...dto, trainerId: undefined }).expect(201);
+  state.setPolicy({ lessonCreateOwn: false, lessonCreateAny: false });
+  const denied = await api.post('/lessons').send(dto).expect(403);
+  assert.equal(denied.body.message, 'Создание записей в расписании запрещено настройками роли');
 });
 
 test('trainer memberships: owner/family, active interval, service, type and atomic audit', async () => {

@@ -7,7 +7,6 @@ import { PayWithMembershipDto } from './dto/pay-with-membership.dto';
 import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import {
   Body,
-  ForbiddenException,
   Controller,
   Delete,
   Get,
@@ -87,11 +86,6 @@ export class LessonsController {
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
   @ApiCreatedResponse({ description: 'Занятие создано.' })
   async create(@Body() dto: CreateLessonDto, @CurrentUser() actor: AuthUser) {
-    if (actor.role === Role.TRAINER) {
-      if (!actor.trainerId) throw new ForbiddenException('Профиль пользователя не привязан к тренеру');
-      if (dto.trainerId && dto.trainerId !== actor.trainerId) throw new ForbiddenException('Тренер может создавать записи только в своё расписание');
-      dto.trainerId = actor.trainerId;
-    }
     const created = await this.lessonsService.createLesson(dto, undefined, actor);
     return actor.role === Role.TRAINER ? trainerLessonView(created, actor) : created;
   }

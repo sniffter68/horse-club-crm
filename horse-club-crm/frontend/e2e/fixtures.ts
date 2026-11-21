@@ -18,6 +18,7 @@ export const test = base.extend<{ modulePolicy: void }>({
       const role = await page.evaluate(() => localStorage.getItem('horsecrm.role')).catch(() => null)
       if (!role) return route.abort('aborted')
       await route.fulfill({ json: { role, userId: '00000000-0000-4000-8000-000000000999', trainerId: null, permissions: {
+        lessonCreateOwn: true, lessonCreateAny: true,
         horseReplaceOwn: false, horseReplaceAny: false, healthRead: true, healthWrite: false, financeRead: false, boardingAccess: true,
       } } })
     })

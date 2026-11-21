@@ -9,6 +9,27 @@ const trainers = [{ id: '00000000-0000-4000-8000-000000000001', name: 'Мари�
 const lesson = { id, trainerId: '00000000-0000-4000-8000-000000000001', startTime: '2026-11-17T07:00:00Z', endTime: '2026-11-17T08:00:00Z', status: 'SCHEDULED', isOwn: true, trainerNote: null,
   trainer: trainers[0], arena: { id: '00000000-0000-4000-8000-000000000003', name: 'Манеж' }, bookings: [{ id: '00000000-0000-4000-8000-000000000004', client: { id: '00000000-0000-4000-8000-000000000005', name: 'Анна' }, horse: { id: '00000000-0000-4000-8000-000000000006', name: 'Валдай' }, clientConfirmed: false }] }
 
+test('trainer creation permissions refresh after a role change and fail closed', async ({ page }) => {
+  await page.addInitScript(() => { localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.email', 'trainer@test.local'); localStorage.setItem('horsecrm.role', 'TRAINER') })
+  let allowed = false, failure = false
+  await page.route('**/api/settings/access/me*', route => failure ? route.fulfill({ status: 500, json: { message: 'Не удалось загрузить права' } }) : route.fulfill({ json: {
+    role: 'TRAINER', userId: id, trainerId: trainers[0].id, permissions: { lessonCreateOwn: allowed, lessonCreateAny: allowed, horseReplaceOwn: false, horseReplaceAny: false, healthRead: true, healthWrite: false, financeRead: false, boardingAccess: true },
+  } }))
+  await page.goto('/trainer')
+  const create = page.getByRole('button', { name: 'Записать на тренировку', exact: true })
+  await expect(page.getByRole('heading', { name: 'Расписание клуба' })).toBeVisible()
+  await expect(create).toHaveCount(0)
+  allowed = true
+  await page.evaluate(() => window.dispatchEvent(new Event('role-access-changed')))
+  await expect(create).toBeVisible()
+  allowed = false
+  await page.evaluate(() => window.dispatchEvent(new Event('role-access-changed')))
+  await expect(create).toHaveCount(0)
+  failure = true
+  await page.evaluate(() => window.dispatchEvent(new Event('role-access-changed')))
+  await expect(create).toHaveCount(0)
+})
+
 for (const statusToSave of ['COMPLETED', 'NO_SHOW'] as const) for (const width of [390, 1440]) test(`trainer shared board, ownership, retry and duplicate prevention ${statusToSave} ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 844 })
   await page.addInitScript(() => { localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.email', 'trainer@test.local'); localStorage.setItem('horsecrm.role', 'TRAINER') })
@@ -146,12 +167,14 @@ for (const path of ['/', '/login', '/schedule', '/stable', '/cash-desk', '/payme
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
-for (const width of [390, 1440]) test(`trainer creates own lesson with quick client, membership and retry ${width}`, async ({ page }) => {
+for (const width of [390, 1440]) for (const createAny of [false, true]) test(`trainer creates lesson any=${createAny} with quick client, membership and retry ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 })
   await page.addInitScript(() => { localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.email', 'trainer@test.local'); localStorage.setItem('horsecrm.role', 'TRAINER') })
   const serviceId = '00000000-0000-4000-8000-000000000030'
   const membershipId = '00000000-0000-4000-8000-000000000031'
   const clientId = '00000000-0000-4000-8000-000000000032'
+  await page.route('**/api/settings/access/me*', route => route.fulfill({ json: { role: 'TRAINER', userId: id, trainerId: trainers[0].id,
+    permissions: { lessonCreateOwn: true, lessonCreateAny: createAny, horseReplaceOwn: true, horseReplaceAny: false, healthRead: true, healthWrite: false, financeRead: false, boardingAccess: true } } }))
   let saved = false, fail = true, posts = 0, boardReads = 0
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
@@ -179,7 +202,7 @@ for (const width of [390, 1440]) test(`trainer creates own lesson with quick cli
     if (route.request().method() !== 'POST') return route.fulfill({ json: [] })
     posts++
     const payload = route.request().postDataJSON() as Record<string, unknown>
-    expect(payload).toMatchObject({ trainerId: trainers[0].id, serviceId, clientId, membershipId })
+    expect(payload).toMatchObject({ trainerId: trainers[createAny ? 1 : 0].id, serviceId, clientId, membershipId })
     for (const field of ['cost', 'pricePerPerson', 'prepaymentAmount', 'prepaymentMethod']) expect(payload).not.toHaveProperty(field)
     if (fail) return route.fulfill({ status: 409, json: { message: 'Обновите доступность' } })
     saved = true
@@ -189,7 +212,15 @@ for (const width of [390, 1440]) test(`trainer creates own lesson with quick cli
   await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
   const drawer = page.getByRole('dialog', { name: 'Записать на тренировку' })
   await expect(drawer).toBeVisible()
-  await expect(drawer.getByRole('combobox', { name: 'Тренер', exact: true })).toBeDisabled()
+  const trainerSelect = drawer.getByRole('combobox', { name: 'Тренер', exact: true })
+  if (createAny) {
+    await expect(trainerSelect).toBeEnabled()
+    await trainerSelect.fill('Иван')
+    await expect(page.locator('.ant-select-dropdown:visible').getByText(/Иван \(занято/)).toBeVisible()
+    await trainerSelect.press('ArrowDown')
+    await trainerSelect.press('Enter')
+    await expect(drawer.locator('.ant-select-selection-item').filter({ hasText: 'Иван' })).toBeVisible()
+  } else await expect(trainerSelect).toBeDisabled()
   await expect(drawer.getByText('Финансовая сводка')).toHaveCount(0)
   await expect(drawer.getByLabel('Стоимость', { exact: true })).toHaveCount(0)
   await drawer.getByRole('combobox', { name: 'Услуга', exact: true }).click()

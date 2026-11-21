@@ -1,4 +1,5 @@
 import { LessonDrawer } from '../schedule/LessonDrawer'
+import { useRoleAccess } from '../../access'
 import { useEffect, useRef, useState } from 'react'
 import { useLogout } from '@refinedev/core'
 import { Alert, App, Button, DatePicker, Empty, Input, Segmented, Spin, Tag, Typography } from 'antd'
@@ -56,10 +57,12 @@ function LessonCard({ lesson, canWrite, onSaved, tmaToken }: { lesson: BoardLess
 export function TrainerBoardPage() {
   const { mutate: logout } = useLogout()
   const permissions = usePermissions()
-  return <TrainerBoardView canWrite={permissions.canWrite('SCHEDULE')} onExit={() => logout()} />
+  const access = useRoleAccess()
+  const canCreate = !access.loading && Boolean(access.permissions.lessonCreateAny || access.permissions.lessonCreateOwn && access.snapshot?.trainerId)
+  return <TrainerBoardView canWrite={permissions.canWrite('SCHEDULE')} canCreate={canCreate} ownTrainerId={access.snapshot?.trainerId ?? undefined} onExit={() => logout()} />
 }
 
-export function TrainerBoardView({ canWrite, onExit, tmaToken, date: selectedDate, onDateChange }: { canWrite: boolean; onExit: () => void; tmaToken?: string; date?: string; onDateChange?: (date: string) => void }) {
+export function TrainerBoardView({ canWrite, canCreate = false, ownTrainerId, onExit, tmaToken, date: selectedDate, onDateChange }: { canWrite: boolean; canCreate?: boolean; ownTrainerId?: string; onExit: () => void; tmaToken?: string; date?: string; onDateChange?: (date: string) => void }) {
   const [booking, setBooking] = useState(false)
   const [localDate, setLocalDate] = useState(() => DateTime.now().setZone(zone).toISODate()!)
   const date = selectedDate ?? localDate
@@ -86,8 +89,8 @@ export function TrainerBoardView({ canWrite, onExit, tmaToken, date: selectedDat
     <header className="trainer-workspace-header"><div><Typography.Title level={3}><ClubIcon name="calendar" /> Расписание клуба</Typography.Title><span>{data?.trainers.find(row => row.id === data.trainerId)?.name || 'Рабочее место тренера'}</span></div><Button onClick={onExit}>{tmaToken ? 'Назад' : 'Выйти'}</Button></header>
     <div className="workspace-toolbar"><label htmlFor="trainer-board-date">Дата</label><DatePicker id="trainer-board-date" locale={ruDatePicker} placement="bottomRight" classNames={{ popup: { root: 'trainer-date-popup' } }} allowClear={false} value={dayjs(date).locale('ru')} onChange={value => { if (value) setDate(value.format('YYYY-MM-DD')) }} />
       <Segmented value={mine ? 'Только мои' : 'Все тренеры'} options={['Все тренеры', 'Только мои']} onChange={value => setMine(value === 'Только мои')} /><Button onClick={refresh}>Обновить</Button>
-      {canWrite && !tmaToken && data?.trainerId && <Button type="primary" onClick={() => setBooking(true)}>Записать на тренировку</Button>}</div>
-    {booking && canWrite && !tmaToken && data?.trainerId && <LessonDrawer initialTrainerId={data.trainerId} initialDateTime={`${date}T10:00:00+03:00`} onClose={() => setBooking(false)} onSaved={start => { setBooking(false); setDate(start.slice(0, 10)); refresh() }} />}
+      {canWrite && canCreate && !tmaToken && <Button type="primary" onClick={() => setBooking(true)}>Записать на тренировку</Button>}</div>
+    {booking && canWrite && canCreate && !tmaToken && <LessonDrawer initialTrainerId={ownTrainerId} initialDateTime={`${date}T10:00:00+03:00`} onClose={() => setBooking(false)} onSaved={start => { setBooking(false); setDate(start.slice(0, 10)); refresh() }} />}
     <p>Время московское · Свои занятия выделены. Остальные показывают занятость площадок и лошадей.</p>
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={refresh}>Повторить</Button>} />}
     {loading ? <div className="workspace-loading"><Spin aria-label="Загрузка расписания" /></div> : data && <>

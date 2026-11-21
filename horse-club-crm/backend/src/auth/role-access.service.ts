@@ -10,7 +10,7 @@ export class RoleAccessService {
     // ADMIN and MANAGER retain their existing authority; the TRAINER policy is configurable.
     if (role !== 'TRAINER') return defaultRolePermissions(role);
     const saved = await tx.roleAccess.findUnique({ where: { role } });
-    return saved ? { horseReplaceOwn: saved.horseReplaceOwn, horseReplaceAny: false,
+    return saved ? { lessonCreateOwn: saved.lessonCreateOwn || saved.lessonCreateAny, lessonCreateAny: saved.lessonCreateAny, horseReplaceOwn: saved.horseReplaceOwn, horseReplaceAny: false,
       healthRead: saved.healthRead, healthWrite: saved.healthRead && saved.healthWrite,
       financeRead: saved.financeRead, boardingAccess: saved.boardingAccess } : defaultRolePermissions(role);
   }
@@ -21,6 +21,7 @@ export class RoleAccessService {
     if (role !== 'TRAINER') throw new BadRequestException('Права администратора и менеджера закреплены системной политикой');
     if (permissions.horseReplaceAny) throw new BadRequestException('Заменять лошадей в любых занятиях могут только администратор и менеджер');
     if (permissions.healthWrite && !permissions.healthRead) throw new BadRequestException('Редактирование журнала требует права просмотра');
-    return this.prisma.roleAccess.upsert({ where: { role }, create: { role, ...permissions }, update: permissions });
+    const normalized = { ...permissions, lessonCreateOwn: permissions.lessonCreateOwn || permissions.lessonCreateAny };
+    return this.prisma.roleAccess.upsert({ where: { role }, create: { role, ...normalized }, update: normalized });
   }
 }

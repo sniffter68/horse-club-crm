@@ -8,7 +8,7 @@ const replacement = { ...horse, id: '00000000-0000-4000-8000-000000000005', name
 const client = { id: '00000000-0000-4000-8000-000000000006', firstName: 'Анна', name: 'Анна', weightKg: 70 }
 const own = { id: ownId, name: 'Мария', isActive: true }, other = { id: otherId, name: 'Ольга', isActive: true }
 const arena = { id: '00000000-0000-4000-8000-000000000007', name: 'Манеж', isActive: true }
-const permissions = { horseReplaceOwn: true, horseReplaceAny: false, healthRead: true, healthWrite: false, financeRead: false, boardingAccess: true }
+const permissions = { lessonCreateOwn: true, lessonCreateAny: true, horseReplaceOwn: true, horseReplaceAny: false, healthRead: true, healthWrite: false, financeRead: false, boardingAccess: true }
 const adminPermissions = { ...permissions, horseReplaceAny: true, healthWrite: true, financeRead: true }
 const bookings = [own, other].map((trainer, index) => ({
   id: `00000000-0000-4000-8000-00000000001${index}`, clientId: client.id, client, horseId: horse.id, horse, trainerId: trainer.id, trainer, arenaId: arena.id, arena,
@@ -103,7 +103,7 @@ async function setupRoles(page: Page) {
   await page.route('**/api/settings/role-access/TRAINER', route => {
     trainerPolicy = route.request().postDataJSON()
     expect(trainerPolicy.horseReplaceAny).toBe(false)
-    expect(Object.keys(trainerPolicy)).toHaveLength(6)
+    expect(Object.keys(trainerPolicy)).toHaveLength(8)
     return route.fulfill({ json: { role: 'TRAINER', ...trainerPolicy } })
   })
   await page.goto('/settings'); await page.getByRole('tab', { name: 'Роли и доступ' }).click()
@@ -116,6 +116,13 @@ for (const width of [1280, 375]) test(`administrator configures persistent role 
   const ownSwitch = page.getByRole('switch', { name: 'Тренер: Замена лошади в своих занятиях' })
   await expect(ownSwitch).toBeChecked()
   await expect(page.getByRole('switch', { name: 'Тренер: Замена лошади в любых занятиях' })).toBeDisabled()
+  const createOwn = page.getByRole('switch', { name: 'Тренер: Создание записей в своё расписание' })
+  const createAny = page.getByRole('switch', { name: 'Тренер: Создание записей для любого тренера' })
+  await expect(createAny).toBeEnabled()
+  await createOwn.click()
+  await expect(createAny).not.toBeChecked()
+  await createAny.click()
+  await expect(createOwn).toBeChecked()
   await ownSwitch.click()
   await page.getByRole('button', { name: 'Сохранить права', exact: true }).click()
   const confirm = page.getByRole('dialog')

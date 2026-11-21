@@ -10,6 +10,8 @@ import type { Trainer } from '../catalogs/types'
 type Policy = RolePermissions & { role: 'ADMIN' | 'TRAINER' }
 type User = { id: string; email: string; role: Role; trainerId: string | null }
 const permissions: [keyof RolePermissions, string][] = [
+  ['lessonCreateOwn', 'Создание записей в своё расписание'],
+  ['lessonCreateAny', 'Создание записей для любого тренера'],
   ['horseReplaceOwn', 'Замена лошади в своих занятиях'], ['horseReplaceAny', 'Замена лошади в любых занятиях'],
   ['healthRead', 'Просмотр журнала здоровья'], ['healthWrite', 'Редактирование журнала здоровья'],
   ['financeRead', 'Доступ к финансовым отчётам'], ['boardingAccess', 'Доступ к разделу постоя'],
@@ -73,10 +75,14 @@ function RoleAccessEditor() {
         </Card></Col>
         <Col xs={24} lg={12}><Card title="Тренер">
           <Form noValidate form={form} layout="vertical" disabled={busy || loading || !policies.length}
+            onValuesChange={(changed: Partial<RolePermissions>) => {
+              if (changed.lessonCreateAny) form.setFieldValue('lessonCreateOwn', true)
+              if (changed.lessonCreateOwn === false) form.setFieldValue('lessonCreateAny', false)
+            }}
             onFinish={values => modal.confirm({ title: 'Изменить права роли «Тренер»?', content: 'Изменения распространятся на все учётные записи тренеров.', okText: 'Сохранить права', cancelText: 'Отмена',
               onOk: () => write(() => httpClient.patch(`${API_URL}/settings/role-access/TRAINER`, values), 'Права роли сохранены') })}>
             {permissions.map(([key, label]) => <Form.Item key={key} name={key} label={label} valuePropName="checked"
-              rules={key === 'healthWrite' ? [{ validator: (_, value) => !value || form.getFieldValue('healthRead') ? Promise.resolve() : Promise.reject(new Error('Сначала включите просмотр журнала здоровья')) }] : []} dependencies={key === 'healthWrite' ? ['healthRead'] : []}>
+              rules={key === 'lessonCreateAny' ? [{ validator: (_, value: boolean) => !value || form.getFieldValue('lessonCreateOwn') ? Promise.resolve() : Promise.reject(new Error('Сначала включите создание записей в своё расписание')) }] : key === 'healthWrite' ? [{ validator: (_, value) => !value || form.getFieldValue('healthRead') ? Promise.resolve() : Promise.reject(new Error('Сначала включите просмотр журнала здоровья')) }] : []} dependencies={key === 'lessonCreateAny' ? ['lessonCreateOwn'] : key === 'healthWrite' ? ['healthRead'] : []}>
               <Switch aria-label={`Тренер: ${label}`} disabled={key === 'horseReplaceAny' || busy || loading} />
             </Form.Item>)}
             <Button type="primary" htmlType="submit" loading={busy}>Сохранить права</Button>
