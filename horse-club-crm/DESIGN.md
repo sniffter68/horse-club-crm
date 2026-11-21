@@ -217,3 +217,8 @@ Telegram в контактах клиента, пользователях и ш�
 Кассы и быстрая запись (15.11.2026) сохраняют текущие токены CRM и Ant Design. CashboxHeaderWidget использует компактные ссылки с видимым фокусом, переносом на узком экране и явной ошибкой с повтором; финансовые сводки — Descriptions. QuickBookingModal переиспользует LessonDrawer и StableEntryModal, HorseSexSelect — Ant Design Select. Новые цвета и шрифты не добавляются. Контракт: docs/crm-update-2026-11-15.md.
 
 Карточка денника из списка и карты использует общий `StallCard` и правую шторку `EntryOverlay`. Кнопка «Редактировать» с Pencil наследует скругления Ant Design; просмотр и форма переключаются внутри той же шторки. Поля используют Ant Design Form/Input/Select, состояния — Alert/Tag и App feedback. Палитра, шрифты и runtime-токены остаются прежними. Проверки: `docs/stall-card-verification.md`.
+
+
+## Кабинет всадника Mini App (21.11.2026)
+
+По задаче владельца Mini App использует единую тёмную тему независимо от темы Telegram. Палитра клиентского runtime — `tma/src/styles.css`: фон #1c2420, поверхность #28332c, текст #edf2ed, вторичный #b3bdb6, акцент #a4d5b8 с текстом #163326. `frontend/src/tma/useTelegramWebApp.ts` адаптирует те же значения для отдельного runtime персонала. Типографика и знак СЛКС сохраняются; `font-variant-numeric: tabular-nums` задаётся корнем клиента. Отступ сверху — максимум из 20px, CSS safe-area и Telegram safeAreaInset/contentSafeAreaInset. На ширине 360–430px кнопки и карточки переносят текст, прокрутка страницы только вертикальная. Кабинет и история используют общий ClientDashboardView/MembershipCard; остаток показывается в шт. Источник бизнес-правил и проверки: docs/miniapp-rider.md.

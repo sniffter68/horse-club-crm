@@ -1,21 +1,31 @@
+import { TelegramBotService } from './telegram-bot.service';
 import { Body, Controller, Get, Header, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { RequireModule } from '../../auth/module-access.guard';
 import { TelegramAuthGuard, type TelegramRequest } from './telegram-auth.guard';
 import { TmaBookingsQuery, TmaCreateBookingDto, TmaSlotsQuery } from './telegram-bot.dto';
+import { ClientMiniappService } from './client-miniapp.service';
 import { TmaBookingService } from './tma-booking.service';
 
 @Controller('tma')
 @RequireModule('SCHEDULE')
 @UseGuards(TelegramAuthGuard)
 export class TelegramBotController {
-  constructor(private readonly service: TmaBookingService) {}
+  constructor(private readonly service: TmaBookingService, private readonly clients: ClientMiniappService, private readonly bot: TelegramBotService) {}
+  @Post('client/request-contact')
+  requestContact(@Req() req: TelegramRequest) { return this.bot.requestOwnContact(req.telegram.telegramUserId); }
+  @Get('client/overview') @Header('Cache-Control', 'no-store')
+  overview(@Req() req: TelegramRequest) { return this.clients.overview(req.telegram.clientId); }
+  @Post('client/lessons/:id/confirm')
+  confirm(@Req() req: TelegramRequest, @Param('id', new ParseUUIDPipe()) id: string) { return this.clients.action(req.telegram.clientId, id, 'confirm'); }
+  @Post('client/lessons/:id/cancel')
+  cancelLesson(@Req() req: TelegramRequest, @Param('id', new ParseUUIDPipe()) id: string) { return this.clients.action(req.telegram.clientId, id, 'cancel'); }
   @Get('dashboard') @Header('Cache-Control', 'no-store')
   dashboard(@Req() req: TelegramRequest) { return this.service.dashboard(req.telegram.clientId); }
   @Get('services') @Header('Cache-Control', 'no-store')
   services() { return this.service.services(); }
-  @Get('slots')
+  @Get(['slots', 'client/booking/slots'])
   slots(@Req() req: TelegramRequest, @Query() query: TmaSlotsQuery) { return this.service.slots(req.telegram.clientId, query); }
-  @Post('bookings')
+  @Post(['bookings', 'client/booking'])
   create(@Req() req: TelegramRequest, @Body() dto: TmaCreateBookingDto) { return this.service.create(req.telegram.clientId, dto); }
   @Get('my-bookings') @Header('Cache-Control', 'no-store')
   bookings(@Req() req: TelegramRequest, @Query() query: TmaBookingsQuery) { return this.service.myBookings(req.telegram.clientId, query); }

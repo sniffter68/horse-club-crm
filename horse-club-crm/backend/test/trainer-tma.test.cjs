@@ -37,7 +37,7 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
       client: { name: 'Всадник', firstName: 'Анна', lastName: 'Тест' }, horse: { id: horseId, name: 'Гром' } }] };
   let client = null;
   const membership = { id, title: 'Абонемент', remainingLessons: 5, totalLessons: 8, validUntil: '2026-12-31T00:00:00Z' };
-  const prisma = { user: { findUnique: async () => linked ? user : null, findFirst: async () => null },
+  const prisma = { clubModuleSettings: { findUnique: async () => null }, user: { findUnique: async () => linked ? user : null, findFirst: async () => null },
     client: { findUnique: async query => {
       assert.deepEqual(query.where, { telegramUserId: '12345' });
       assert.deepEqual(query.select, { id: true, name: true, deletedAt: true });

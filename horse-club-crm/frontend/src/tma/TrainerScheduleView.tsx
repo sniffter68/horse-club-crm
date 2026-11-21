@@ -21,13 +21,13 @@ export function TrainerScheduleView() {
   const [board, setBoard] = useState(false)
   const [date, setDate] = useState(tmaDay)
   return <ConfigProvider locale={ruRU} theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm,
-    token: { colorPrimary: window.Telegram?.WebApp?.themeParams.button_color ?? '#724C39', borderRadius: 12, controlHeight: 44 } }}>
+    token: { colorPrimary: '#a4d5b8', borderRadius: 12, controlHeight: 44 } }}>
     <App><main className="trainer-tma">
       {state.kind === 'ready' && state.session.role === 'TRAINER' && <nav className="trainer-view-switch" aria-label="Режим расписания">
         <Button aria-pressed={!board} type={!board ? 'primary' : 'default'} onClick={() => setBoard(false)}>Моё расписание</Button>
         <Button aria-pressed={board} type={board ? 'primary' : 'default'} onClick={() => setBoard(true)}>Общее расписание</Button>
       </nav>}
-      {state.kind === 'ready' ? state.session.role === 'ADMIN'
+      {state.kind === 'ready' ? (state.session.role === 'ADMIN' || state.session.role === 'STAFF')
         ? <AdminTmaView session={state.session} onExpired={expire} />
         : board ? <><header className="trainer-header"><h1>{state.session.trainer.name}</h1></header><TrainerBoardView date={date} onDateChange={setDate} canWrite={state.session.accessLevel === 'FULL'} tmaToken={state.session.access_token} onExit={() => setBoard(false)} /></> : <TrainerSchedule date={date} onDateChange={setDate} session={state.session} onExpired={expire} /> : <section className="trainer-gate">
         <img src="/horse-crm.svg" alt="КСК «СЛКС»" width={64} height={64} />

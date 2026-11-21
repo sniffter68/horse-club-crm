@@ -24,7 +24,7 @@ export class TrainerTmaGuard implements CanActivate {
 @Controller('tma')
 export class TrainerTmaAuthController {
   constructor(private readonly service: TrainerTmaService) {}
-  @Post('bootstrap') @Header('Cache-Control', 'no-store')
+  @Post(['bootstrap', 'auth/telegram']) @Header('Cache-Control', 'no-store')
   bootstrap(@Body() dto: TrainerTmaAuthDto) { return this.service.bootstrap(dto.initData); }
   @Post('auth') @Header('Cache-Control', 'no-store')
   auth(@Body() dto: TrainerTmaAuthDto) { return this.service.authenticate(dto.initData); }

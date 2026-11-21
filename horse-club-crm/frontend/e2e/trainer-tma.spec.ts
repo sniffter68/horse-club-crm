@@ -143,7 +143,7 @@ test('READ_ONLY, dark theme and 320px layout', async ({ page }) => {
     window.dispatchEvent(new Event('themeChanged'))
   })
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-  expect(await page.locator('main').evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(24, 19, 17)')
+  expect(await page.locator('main').evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(28, 36, 32)')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path: '../test-results/tma-mobile-dark.png', fullPage: true })
 })

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 import type { TelegramWebApp } from '../src/telegram';
 
 declare global {
@@ -14,9 +14,15 @@ const service = { id: serviceId, title: 'Первое знакомство', nam
 const booking = { id: bookingId, status: 'scheduled', startTime: start, endTime: start, clientConfirmed: false,
   clientCancellationRequested: false, costAmount: '1500', trainer: { name: 'Анна' },
   lesson: { status: 'SCHEDULED', deletedAt: null, startTime: start, endTime: start, service } };
+function dashboardResponse(route: Route, options: { status?: number; json: Record<string, unknown> }) {
+  return route.fulfill({ ...options, json: { ...options.json,
+    client: { id: serviceId, name: 'Елена Всадник', phone: '+79991234567' },
+    bookings: options.json.nextBooking ? [options.json.nextBooking] : [],
+  } });
+}
 async function setup(page: Page) {
   await page.route('**/api/tma/bootstrap', route => route.fulfill({ json: { role: 'CLIENT', clientId: null } }));
-  await page.route('**/api/tma/dashboard', route => route.fulfill({ json: { isEstablished: false, membership: null, nextBooking: null } }));
+  await page.route(/\/api\/tma\/(?:dashboard|client\/overview)$/, route => dashboardResponse(route, { json: { isEstablished: false, membership: null, nextBooking: null } }));
   await page.route('https://telegram.org/js/telegram-web-app.js', route => route.fulfill({ body: '', contentType: 'text/javascript' }));
   await page.addInitScript(() => {
     let main = () => {}, back = () => {}, theme = () => {}, enabled = false, backActive = false, haptics = 0;
@@ -47,26 +53,26 @@ test('linked client opens dashboard despite empty profile classification and ret
   await page.route('**/api/tma/bootstrap', route => route.fulfill({ json: { role: 'CLIENT', clientId: serviceId } }));
   let catalogs = 0;
   page.on('request', request => { if (request.url().endsWith('/services')) catalogs++; });
-  await page.route('**/api/tma/dashboard', route => route.fulfill({ json: {
+  await page.route(/\/api\/tma\/(?:dashboard|client\/overview)$/, route => dashboardResponse(route, { json: {
     isEstablished: false, nextBooking: { ...booking, clientConfirmed: true },
     membership: { id: serviceId, title: 'Абонемент 8 занятий', remainingLessons: 5, totalLessons: 8,
       validUntil: '2026-12-09T21:30:00Z', isExpiringSoon: false },
   } }));
   await page.goto('');
-  await expect(page.getByRole('heading', { name: 'Личный кабинет' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Мой абонемент' })).toContainText('5 / 8 занятий');
+  await expect(page.getByRole('heading', { name: 'Кабинет всадника' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Мой абонемент' })).toContainText('5 шт. из 8 шт.');
   await expect(page.getByRole('progressbar')).toHaveAttribute('value', '5');
   await expect(page.getByRole('region', { name: 'Мой абонемент' })).toContainText('10.12.2026');
-  await expect(page.getByRole('region', { name: 'Ближайшая тренировка' })).toContainText('Анна');
+  await expect(page.getByRole('region', { name: 'Предстоящие занятия' })).toContainText('Анна');
   await expect(page.getByText('Подтверждена', { exact: true })).toBeVisible();
   expect(catalogs).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/client-dashboard.png', fullPage: true });
-  await page.getByRole('button', { name: '+ Записаться на занятие', exact: true }).click();
+  await page.getByRole('button', { name: '+ Записаться на тренировку', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Каталог услуг' })).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__tmaTest.backActive())).toBe(true);
   await page.evaluate(() => window.__tmaTest.back());
-  await expect(page.getByRole('heading', { name: 'Личный кабинет' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Кабинет всадника' })).toBeVisible();
 });
 
 test('linked client without membership stays on dashboard and can choose a lesson', async ({ page }) => {
@@ -75,10 +81,10 @@ test('linked client without membership stays on dashboard and can choose a lesso
     role: 'CLIENT', clientId: serviceId, activeMembership: null, nextLesson: null,
   } }));
   await page.goto('');
-  await expect(page.getByRole('heading', { name: 'Личный кабинет' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Кабинет всадника' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Мой абонемент' })).toContainText('нет активного абонемента');
   await expect(page.getByRole('region', { name: 'Каталог услуг' })).toHaveCount(0);
-  await page.getByRole('button', { name: '+ Записаться на занятие', exact: true }).focus();
+  await page.getByRole('button', { name: '+ Записаться на тренировку', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('region', { name: 'Каталог услуг' })).toBeVisible();
 });
@@ -86,7 +92,7 @@ test('linked client without membership stays on dashboard and can choose a lesso
 test('dashboard supports remainedLessons and preserves zero in remainingLessons', async ({ page }) => {
   await setup(page);
   for (const remainingLessons of [undefined, 0]) {
-    await page.route('**/api/tma/dashboard', route => route.fulfill({ json: {
+    await page.route(/\/api\/tma\/(?:dashboard|client\/overview)$/, route => dashboardResponse(route, { json: {
       isEstablished: true, nextBooking: null, membership: { id: serviceId, title: 'Абонемент',
         remainedLessons: 5, remainingLessons, totalLessons: 8, validUntil: '2026-12-09T21:30:00Z', isExpiringSoon: false },
     } }));
@@ -98,7 +104,7 @@ test('dashboard supports remainedLessons and preserves zero in remainingLessons'
 test('dashboard failure retries without classifying the client as new', async ({ page }) => {
   await setup(page);
   let fail = true;
-  await page.route('**/api/tma/dashboard', route => route.fulfill(fail
+  await page.route(/\/api\/tma\/(?:dashboard|client\/overview)$/, route => dashboardResponse(route, fail
     ? { status: 503, json: { message: 'Нет соединения' } }
     : { json: { isEstablished: true, membership: null, nextBooking: null } }));
   await page.goto('');
@@ -106,7 +112,7 @@ test('dashboard failure retries without classifying the client as new', async ({
   await expect(page.getByRole('region', { name: 'Каталог услуг' })).toHaveCount(0);
   fail = false;
   await page.getByRole('button', { name: 'Повторить загрузку' }).click();
-  await expect(page.getByRole('heading', { name: 'Личный кабинет' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Кабинет всадника' })).toBeVisible();
   await expect(page.getByText('Предстоящих тренировок пока нет.', { exact: false })).toBeVisible();
 });
 
@@ -120,10 +126,10 @@ test('membership appears above bookings with Moscow date and expiry warning, inc
   await page.getByRole('button', { name: 'Мои записи', exact: true }).click();
   const card = page.getByRole('region', { name: 'Мой абонемент', exact: true });
   await expect(card.getByRole('heading')).toHaveText('Семейный абонемент на занятия в манеже');
-  await expect(card).toContainText('Осталось: 1 из 8');
+  await expect(card).toContainText('Осталось: 1 шт. из 8 шт.');
   await expect(card).toContainText('10.12.2026');
   await expect(card).toContainText('Абонемент скоро закончится');
-  await expect(page.getByText('У вас пока нет активных записей')).toBeVisible();
+  await expect(page.getByText('Предстоящих тренировок пока нет.', { exact: false })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/tma-membership-dark.png', fullPage: true });
   await page.evaluate(() => {
@@ -168,13 +174,13 @@ test('regular membership has no warning and stays above booking list after pagin
   await page.goto('');
   await page.getByRole('button', { name: 'Мои записи', exact: true }).click();
   const card = page.getByRole('region', { name: 'Мой абонемент', exact: true });
-  await expect(card).toContainText('Осталось: 5 из 8');
+  await expect(card).toContainText('Осталось: 5 шт. из 8 шт.');
   await expect(page.getByText('Абонемент скоро закончится')).toHaveCount(0);
   const list = page.getByRole('region', { name: 'Предстоящие тренировки', exact: true });
   expect((await card.boundingBox())!.y).toBeLessThan((await list.boundingBox())!.y);
   await page.getByRole('button', { name: 'Загрузить ещё' }).click();
   await expect(page.getByRole('button', { name: 'Загрузить ещё' })).toHaveCount(0);
-  await expect(card).toContainText('Осталось: 5 из 8');
+  await expect(card).toContainText('Осталось: 5 шт. из 8 шт.');
 });
 async function checkout(page: Page) {
   await page.goto('');
@@ -275,23 +281,24 @@ test('SDK without requestContact leaves manual phone entry available', async ({ 
 });
 test('native Telegram flow creates once, shows success and requests cancellation at narrow width', async ({ page }) => {
   await setup(page); let writes = 0, cancellations = 0;
+  await page.route('**/api/tma/my-bookings?**', route => route.fulfill({ json: { bookings: [{ ...booking, status: cancellations ? 'cancelled_client' : 'scheduled' }], hasMore: false, membership: null } }));
   await page.route('**/api/tma/bookings', async route => {
     writes++; const body: unknown = route.request().postDataJSON();
     expect(body).toMatchObject({ serviceId, trainerId, consentAccepted: true });
     expect(route.request().headers()['x-telegram-init-data']).toBe('signed-data-test');
     await new Promise(resolve => setTimeout(resolve, 100)); await route.fulfill({ json: booking, status: 201 });
   });
-  await page.route(`**/bookings/${bookingId}/cancel-request`, route => { cancellations++; return route.fulfill({ json: { ...booking, clientCancellationRequested: true } }); });
+  await page.route(`**/client/lessons/${bookingId}/cancel`, route => { cancellations++; return route.fulfill({ json: { ...booking, status: 'cancelled_client' } }); });
   await checkout(page);
   await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(false);
   await page.getByLabel('Телефон', { exact: true }).fill('+79991234567'); await page.getByRole('checkbox').check();
   await advance(page); await page.evaluate(() => window.__tmaTest.main());
   await expect(page.getByRole('heading', { name: 'Ждём вас в клубе' })).toBeVisible(); expect(writes).toBe(1);
   await page.getByRole('region', { name: 'Информация о записи' }).getByRole('button', { name: 'Мои записи', exact: true }).click();
-  await expect(page.getByText('Ожидает', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Отменить занятие' }).click();
-  await page.getByRole('button', { name: 'Запросить отмену' }).click();
-  await expect(page.getByText('Запрошена отмена', { exact: true })).toBeVisible(); expect(cancellations).toBe(1);
+  await expect(page.getByText('Ожидает подтверждения', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Отменить', exact: true }).click();
+  await page.getByRole('button', { name: 'Подтвердить отмену' }).click();
+  await expect(page.getByText('Отменена', { exact: true })).toBeVisible(); expect(cancellations).toBe(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/tma-my-bookings.png', fullPage: true });
 });
@@ -320,7 +327,7 @@ test('empty slots, loading, error retry, native back and dynamic theme', async (
   await expect.poll(() => page.evaluate(() => window.__tmaTest.active())).toBe(false);
   await page.evaluate(() => window.__tmaTest.back()); await expect(page.getByRole('heading', { name: 'Время для лошадей' })).toBeVisible();
   await page.evaluate(() => window.__tmaTest.theme());
-  expect(await page.evaluate(() => document.documentElement.style.getPropertyValue('--tma-bg'))).toBe('#f7f4f0');
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--tma-bg').trim())).toBe('#1c2420');
   expect(await page.evaluate(() => window.__tmaTest.haptics())).toBeGreaterThan(0);
 });
 test('outside Telegram shows clear entry guidance and makes no unauthenticated API calls', async ({ page }) => {
@@ -369,7 +376,7 @@ test('my bookings sends TMA authorization and renders missing relations, statuse
   await page.keyboard.press('Enter');
   await expect(page.getByRole('status').filter({ hasText: 'Загружаем ваши записи' })).toBeVisible();
   const future = page.getByRole('region', { name: 'Предстоящие тренировки' });
-  await expect(future.getByText('Ожидает', { exact: true })).toBeVisible();
+  await expect(future.getByText('Ожидает подтверждения', { exact: true })).toBeVisible();
   await expect(future.getByText('Подтверждена', { exact: true })).toBeVisible();
   await expect(future.getByText('Тренер: Уточнит администратор')).toBeVisible();
   const past = page.getByRole('region', { name: 'Прошедшие тренировки' });
@@ -388,8 +395,8 @@ test('my bookings shows errors with retry, empty state and a working booking act
   await page.goto(''); await page.getByRole('button', { name: 'Мои записи', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Нет соединения');
   await page.getByRole('button', { name: 'Обновить записи' }).click();
-  await expect(page.getByText('У вас пока нет активных записей')).toBeVisible();
-  await page.getByRole('button', { name: 'Записаться', exact: true }).click();
+  await expect(page.getByText('Предстоящих тренировок пока нет.', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: '+ Записаться на тренировку', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Время для лошадей' })).toBeVisible();
   expect(calls).toBe(2);
 });

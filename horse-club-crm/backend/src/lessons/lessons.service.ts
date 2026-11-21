@@ -551,7 +551,7 @@ export class LessonsService {
         select: {
           trainerId: true, status: true, cancelledAt: true, cost: true, prepaymentAmount: true, finalPaymentAmount: true, startTime: true, serviceId: true,
           service: { select: { allowMembership: true } },
-          bookings: { select: { id: true, clientId: true, membership: { select: { clientId: true } }, membershipId: true, costAmount: true, prepaymentAmount: true, finalPaymentAmount: true, isPaid: true, client: { select: { name: true } }, payments: { where: { status: 'PAID' }, select: { amount: true } } } },
+          bookings: { where: { status: { in: ['scheduled', 'completed', 'no_show'] } }, select: { id: true, clientId: true, membership: { select: { clientId: true } }, membershipId: true, costAmount: true, prepaymentAmount: true, finalPaymentAmount: true, isPaid: true, client: { select: { name: true } }, payments: { where: { status: 'PAID' }, select: { amount: true } } } },
           operations: {
             where: {
               type: { in: [MembershipOpType.DEBIT, MembershipOpType.REFUND] },

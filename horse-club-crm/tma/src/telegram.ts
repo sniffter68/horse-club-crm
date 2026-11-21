@@ -6,6 +6,8 @@ interface TelegramButton {
   onClick(callback: () => void): void; offClick(callback: () => void): void;
 }
 export interface TelegramWebApp {
+  safeAreaInset?: { top: number; bottom: number; left: number; right: number };
+  contentSafeAreaInset?: { top: number; bottom: number; left: number; right: number };
   initData: string;
   initDataUnsafe: { user?: TelegramUser };
   themeParams: { bg_color?: string; text_color?: string; button_color?: string; button_text_color?: string; hint_color?: string; secondary_bg_color?: string };
@@ -16,8 +18,8 @@ export interface TelegramWebApp {
   requestContact?(callback: (ok: boolean, response?: TelegramContactResponse) => void): void;
   ready(): void; expand(): void;
   enableClosingConfirmation(): void; disableClosingConfirmation(): void;
-  onEvent(event: 'themeChanged', callback: () => void): void;
-  offEvent(event: 'themeChanged', callback: () => void): void;
+  onEvent(event: 'themeChanged' | 'safeAreaChanged' | 'contentSafeAreaChanged', callback: () => void): void;
+  offEvent(event: 'themeChanged' | 'safeAreaChanged' | 'contentSafeAreaChanged', callback: () => void): void;
 }
 declare global { interface Window { Telegram?: { WebApp: TelegramWebApp } } }
 export const telegram = (): TelegramWebApp | undefined => typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
@@ -44,10 +46,18 @@ export function canRequestContact(app: TelegramWebApp | undefined): boolean {
 }
 
 export function applyTheme(): void {
-  const theme = telegram()?.themeParams;
-  const tokens = { bg: theme?.bg_color, text: theme?.text_color, button: theme?.button_color,
-    'button-text': theme?.button_text_color, hint: theme?.hint_color, surface: theme?.secondary_bg_color };
-  for (const [key, value] of Object.entries(tokens)) {
-    if (value && /^#[\da-f]{6}$/i.test(value)) document.documentElement.style.setProperty(`--tma-${key}`, value);
+  const app = telegram();
+  document.documentElement.style.colorScheme = 'dark';
+  const top = Math.max(20, app?.safeAreaInset?.top ?? 0, app?.contentSafeAreaInset?.top ?? 0);
+  document.documentElement.style.setProperty('--tma-safe-top', `${top}px`);
+  document.documentElement.style.setProperty('--tma-safe-bottom', `${Math.max(0, app?.safeAreaInset?.bottom ?? 0, app?.contentSafeAreaInset?.bottom ?? 0)}px`);
+}
+
+export async function waitForTelegram(signal: AbortSignal): Promise<TelegramWebApp | undefined> {
+  const deadline = Date.now() + 2000;
+  while (!signal.aborted && Date.now() < deadline) {
+    if (telegram()?.initData) return telegram();
+    await new Promise<void>(resolve => window.setTimeout(resolve, 50));
   }
+  return telegram();
 }

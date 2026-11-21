@@ -1,0 +1,22 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["tma/src"],
+  "locale": "ru-RU",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": ["Select/Listbox", "Date", "Form", "Scrollbar", "Toast", "CRUD"],
+  "ownership": {
+    "Select/Listbox": "native",
+    "Date": "native"
+  },
+  "requiredCommands": ["unit", "typecheck", "build", "e2e"],
+  "commands": {
+    "unit": "npm --prefix tma test",
+    "typecheck": "npm --prefix tma run typecheck",
+    "build": "npm --prefix tma run build",
+    "e2e": "npm --prefix tma run test:e2e"
+  },
+  "evidence": {
+    "crudFullFlow": "tma/e2e/rider.spec.ts",
+    "failurePaths": "tma/e2e/booking.spec.ts"
+  }
+}

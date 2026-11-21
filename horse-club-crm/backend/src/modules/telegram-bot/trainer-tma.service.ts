@@ -11,14 +11,14 @@ import { validateTelegramInitData } from './telegram-init-data';
 import type { TrainerTmaHorseDto, TrainerTmaStatusDto } from './trainer-tma.dto';
 import { TmaBookingService } from './tma-booking.service';
 
-export enum TmaRole { ADMIN = 'ADMIN', TRAINER = 'TRAINER', CLIENT = 'CLIENT' }
+export enum TmaRole { ADMIN = 'ADMIN', TRAINER = 'TRAINER', CLIENT = 'CLIENT', STAFF = 'STAFF' }
 export type TmaBootstrapResponse =
-  | { role: TmaRole.CLIENT; token: null; user: { telegramId: string; firstName: string };
+  | { role: TmaRole.CLIENT; token: string | null; user: { telegramId: string; firstName: string };
       clientId: string | null; clientName: string | null;
       activeMembership: Awaited<ReturnType<TmaBookingService['dashboard']>>['membership'];
       nextLesson: Awaited<ReturnType<TmaBookingService['dashboard']>>['nextBooking'] }
   | { role: TmaRole.TRAINER; token: string; trainerId: string; user: { id: string; name: string }; accessLevel: 'FULL' | 'READ_ONLY' }
-  | { role: TmaRole.ADMIN; token: string; trainerId: string | null; user: { id: string; name: string }; accessLevel: 'FULL' };
+  | { role: TmaRole.ADMIN | TmaRole.STAFF; token: string; trainerId: string | null; user: { id: string; name: string }; accessLevel: 'FULL' | 'READ_ONLY' };
 
 export const TRAINER_TMA_AUDIENCE = 'trainer-tma';
 export interface TrainerTmaActor extends AuthUser { telegramUserId: string; trainerId: string | null }
@@ -33,7 +33,7 @@ export class TrainerTmaService {
     const user = await this.prisma.user.findUnique({ where: { telegramUserId }, include: { trainer: true, staffProfile: true } });
     const linked = user ?? await this.prisma.user.findFirst({ where: { telegramUserId: null, trainer: { telegramId: telegramUserId } }, include: { trainer: true, staffProfile: true } });
     if (!linked) return null;
-    if (!linked.crmAccess || linked.staffProfile?.isActive === false || (linked.role !== Role.ADMIN && (!linked.trainerId || !linked.trainer?.isActive)))
+    if (!linked.crmAccess || linked.staffProfile?.isActive === false || (linked.role === Role.TRAINER && (!linked.trainerId || !linked.trainer?.isActive)))
       throw new ForbiddenException('Доступ тренера отключён или карточка тренера не привязана');
     return linked;
   }
@@ -45,13 +45,16 @@ export class TrainerTmaService {
     // A directly linked User takes precedence over the legacy Trainer binding.
     const direct = await this.prisma.user.findUnique({ where: { telegramUserId: identity.telegramUserId }, include: { trainer: true, staffProfile: true } });
     const candidate = direct ?? await this.prisma.user.findFirst({ where: { telegramUserId: null, trainer: { telegramId: identity.telegramUserId } }, include: { trainer: true, staffProfile: true } });
-    if (!candidate || candidate.role !== Role.ADMIN && candidate.role !== Role.TRAINER && !candidate.trainerId) {
+    if (!candidate) {
+      const settings = await this.prisma.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
+      if (settings?.isEnabled === false) throw new ForbiddenException('Онлайн-запись временно отключена');
       // Client/User IDs are String in Prisma; Trainer retains the legacy telegramId field.
       const client = await this.prisma.client.findUnique({ where: { telegramUserId: identity.telegramUserId },
         select: { id: true, name: true, deletedAt: true } });
       const linked = client && !client.deletedAt ? client : null;
       const dashboard = linked ? await this.clientBookings.dashboard(linked.id) : null;
-      return { role: TmaRole.CLIENT, token: null, user: { telegramId: identity.telegramUserId, firstName: identity.firstName },
+      const clientToken = linked ? await this.jwt.signAsync({ sub: linked.id, telegramUserId: identity.telegramUserId, tokenType: 'client-tma' }, { audience: 'client-tma', expiresIn: '1h' }) : null;
+      return { role: TmaRole.CLIENT, token: clientToken, user: { telegramId: identity.telegramUserId, firstName: identity.firstName },
         clientId: linked?.id ?? null, clientName: linked?.name ?? null,
         activeMembership: dashboard?.membership ?? null, nextLesson: dashboard?.nextBooking ?? null };
     }
@@ -64,6 +67,7 @@ export class TrainerTmaService {
     { audience: TRAINER_TMA_AUDIENCE, expiresIn: '1h' });
     const profile = { id: user.id, name: user.staffProfile?.fullName || user.trainer?.name || user.trainer?.fullName || identity.firstName };
     const trainerId = user.trainer?.isActive ? user.trainerId : null;
+    if (user.role !== Role.ADMIN && !user.trainerId) return { role: TmaRole.STAFF, token, trainerId: null, user: profile, accessLevel: permission.accessLevel };
     return user.role === Role.ADMIN
       ? { role: TmaRole.ADMIN, token, trainerId, user: profile, accessLevel: 'FULL' }
       : { role: TmaRole.TRAINER, token, trainerId: user.trainerId!, user: profile, accessLevel: permission.accessLevel };
@@ -91,7 +95,7 @@ export class TrainerTmaService {
   }
 
   async schedule(actor: TrainerTmaActor, date: string, all = false) {
-    if (all && actor.role !== Role.ADMIN) throw new ForbiddenException('Доступно только администратору');
+    if (all && actor.role === Role.TRAINER) throw new ForbiddenException('Доступно только администратору');
     if (!all && !actor.trainerId) throw new ForbiddenException('Карточка тренера не привязана');
     const day = DateTime.fromISO(date, { zone: 'Europe/Moscow' });
     if (!day.isValid || day.toISODate() !== date) throw new BadRequestException('Некорректная дата');

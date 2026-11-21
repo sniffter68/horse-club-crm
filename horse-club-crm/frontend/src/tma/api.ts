@@ -13,7 +13,7 @@ export interface TrainerLesson {
   participants: { bookingId: string; clientName: string; horseId: string | null; horseName: string | null }[]
 }
 export interface TrainerSession {
-  role?: 'ADMIN' | 'TRAINER'
+  role?: 'ADMIN' | 'TRAINER' | 'STAFF'
   authenticated: true
   access_token: string
   trainer: { trainerId: string; name: string }
@@ -41,5 +41,5 @@ export async function tmaRequest<T>(path: string, token: string | null, options:
 }
 
 export type TmaBootstrapResponse =
-  | { role: 'CLIENT'; token: null; user: { telegramId: string; firstName: string }; clientId: string | null; clientName: string | null }
-  | { role: 'TRAINER' | 'ADMIN'; token: string; trainerId: string | null; user: { id: string; name: string }; accessLevel: 'FULL' | 'READ_ONLY' }
+  | { role: 'CLIENT'; token: string | null; user: { telegramId: string; firstName: string }; clientId: string | null; clientName: string | null }
+  | { role: 'TRAINER' | 'ADMIN' | 'STAFF'; token: string; trainerId: string | null; user: { id: string; name: string }; accessLevel: 'FULL' | 'READ_ONLY' }

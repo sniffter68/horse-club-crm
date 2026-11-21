@@ -5,6 +5,8 @@ export class TmaSlotsQuery {
   @Matches(/^\d{4}-\d{2}-\d{2}$/) date!: string;
   @Transform(({ value }: { value: unknown }) => value === '' ? undefined : value)
   @IsOptional() @IsUUID() serviceId?: string;
+  @Transform(({ value }: { value: unknown }) => value === '' ? undefined : value)
+  @IsOptional() @IsUUID() trainerId?: string;
 }
 export class TmaBookingsQuery {
   @Type(() => Number) @IsInt() @Min(0) @IsOptional() offset = 0;

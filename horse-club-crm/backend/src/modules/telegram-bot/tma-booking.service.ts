@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, HttpException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { BadRequestException, ConflictException, HttpException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { BookingRulesService } from '../../bookings/booking-rules.service';
@@ -22,7 +23,6 @@ const bookingView = {
 
 @Injectable()
 export class TmaBookingService {
-  private readonly logger = new Logger(TmaBookingService.name);
   constructor(private readonly prisma: PrismaService, private readonly rules: BookingRulesService,
     private readonly lessons: LessonsService) {}
 
@@ -73,7 +73,7 @@ export class TmaBookingService {
     return this.prisma.$transaction(async tx => {
       const client = await tx.client.findUnique({ where: { id: clientId } });
       const service = await this.service(tx, query.serviceId);
-      const trainers = await tx.trainer.findMany({ where: { isPublic: true, isActive: true },
+      const trainers = await tx.trainer.findMany({ where: { isPublic: true, isActive: true, ...(query.trainerId ? { id: query.trainerId } : {}) },
         orderBy: [{ order: 'asc' }, { id: 'asc' }], take: 50, select: { id: true, name: true } });
       const schedule = await this.schedule(tx);
       if (schedule.daysOfWeekOff.includes(day.weekday % 7)) return { slots: [] };
@@ -86,8 +86,8 @@ export class TmaBookingService {
         const available: typeof trainers = [];
         for (const trainer of trainers) {
           try {
-            await this.rules.validate(tx, { trainerId: trainer.id, participants: client?.deletedAt ? [] : [{ clientId }],
-              start: start.toJSDate(), end: end.toJSDate(), lockResources: false });
+            if (!client || client.deletedAt) continue;
+            await this.availableHorse(tx, trainer.id, clientId, start.toJSDate(), end.toJSDate(), false);
             available.push(trainer);
           } catch (error: unknown) {
             if (!(error instanceof HttpException) || ![400, 409].includes(error.getStatus())) throw error;
@@ -97,6 +97,27 @@ export class TmaBookingService {
       }
       return { slots };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30_000 });
+  }
+
+  private async availableHorse(tx: Prisma.TransactionClient, trainerId: string, clientId: string, start: Date, end: Date, lock: boolean) {
+    const day = DateTime.fromJSDate(start, { zone: ZONE });
+    const shifts = await tx.workShift.findMany({ where: { staff: { user: { trainerId } },
+      date: { gte: day.startOf('day').toJSDate(), lt: day.plus({ days: 1 }).startOf('day').toJSDate() } } });
+    if (shifts.length && !shifts.some(shift => ['SCHEDULED', 'COMPLETED'].includes(shift.status)
+      && shift.startTime <= day.toFormat('HH:mm') && shift.endTime >= DateTime.fromJSDate(end, { zone: ZONE }).toFormat('HH:mm'))) {
+      throw new ConflictException('Тренер не работает в это время');
+    }
+    const horses = await tx.horse.findMany({ where: { status: 'active', healthStatus: 'HEALTHY',
+      isUnavailable: false, isPublic: true, ownerType: 'club' }, orderBy: [{ order: 'asc' }, { id: 'asc' }], take: 100 });
+    for (const horse of horses) {
+      try {
+        await this.rules.validate(tx, { trainerId, participants: [{ clientId, horseId: horse.id }], start, end, lockResources: lock });
+        return horse.id;
+      } catch (error: unknown) {
+        if (!(error instanceof HttpException) || ![400, 409].includes(error.getStatus())) throw error;
+      }
+    }
+    throw new ConflictException('Для этого времени нет свободной лошади с допустимой нагрузкой');
   }
 
   private async serializable<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
@@ -114,9 +135,7 @@ export class TmaBookingService {
 
   async create(clientId: string, dto: TmaCreateBookingDto) {
     if (!dto.consentAccepted || dto.consentVersion !== currentLeadConsentVersion()) throw new BadRequestException('Обновите приложение и подтвердите актуальное согласие');
-    let restoredClientId: string | undefined;
     const booking = await this.serializable(async tx => {
-      restoredClientId = undefined;
       const previous = await tx.booking.findUnique({ where: { telegramRequestId: dto.requestId }, select: { ...bookingView, clientId: true } });
       if (previous) {
         if (previous.clientId !== clientId) throw new ConflictException('Повторите оформление записи');
@@ -141,30 +160,19 @@ export class TmaBookingService {
         throw new BadRequestException('Этот номер привязан к другому Telegram-аккаунту. Обратитесь в клуб');
       }
       if (client.deletedAt && phoneOwner?.id !== clientId) throw new BadRequestException('Для восстановления профиля укажите его номер телефона или обратитесь в клуб');
-      let bookingClientId = clientId;
-      if (phoneOwner && phoneOwner.id !== clientId) {
-        // The guard already created a Telegram profile. Release the unique ID first;
-        // retain that profile and all its history, and link the existing CRM card atomically.
-        await tx.client.update({ where: { id: clientId }, data: { telegramUserId: null, telegramUsername: null } });
-        await tx.client.update({ where: { id: phoneOwner.id }, data: {
-          telegramUserId: client.telegramUserId, telegramUsername: client.telegramUsername,
-          ...(phoneOwner.deletedAt ? { deletedAt: null, name: dto.name?.trim() || phoneOwner.name } : {}),
-        } });
-        bookingClientId = phoneOwner.id;
-      } else {
-        await tx.client.update({ where: { id: clientId }, data: { phone,
-          ...(phoneOwner?.deletedAt ? { deletedAt: null, telegramUserId: client.telegramUserId,
-            name: dto.name?.trim() || phoneOwner.name } : {}),
-        } });
-      }
-      if (phoneOwner?.deletedAt) restoredClientId = phoneOwner.id;
+      // Typed phone numbers are not proof of ownership. Existing CRM cards are
+      // linked only by a self-contact received directly from the Telegram Bot API.
+      if (phoneOwner && phoneOwner.id !== clientId) throw new BadRequestException('Подтвердите собственный телефон в боте и повторно откройте кабинет');
+      const bookingClientId = clientId;
+      await tx.client.update({ where: { id: clientId }, data: { phone } });
+      const horseId = await this.availableHorse(tx, trainer.id, clientId, start.toJSDate(), start.plus({ minutes: service.durationMinutes }).toJSDate(), true);
       const lesson = await this.lessons.createLesson({ serviceId: service.id, trainerId: trainer.id,
-        startTime: start.toISO()!, participants: [{ clientId: bookingClientId }] }, tx);
+        startTime: start.toISO()!, participants: [{ clientId: bookingClientId, horseId }] }, tx);
+      await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'CLIENT_LESSON_BOOK', actorId: bookingClientId, actorName: 'Клиент Telegram', details: { lessonId: lesson.id, clientId: bookingClientId, source: 'telegram-miniapp' } } });
       await queueTelegramAdmins(tx, `admin:tma:${dto.requestId}`, `Новая онлайн-запись из TMA\n${start.toFormat('dd.MM.yyyy HH:mm')} (Москва)\n${client.name || client.firstName}, ${phone}\n${service.title || service.name}`);
       return tx.booking.update({ where: { id: lesson.bookings[0].id }, data: { telegramRequestId: dto.requestId,
         telegramConsentVersion: dto.consentVersion, telegramConsentedAt: new Date() }, select: bookingView });
     });
-    if (restoredClientId) this.logger.log(`[TMA Booking] Client ${restoredClientId} automatically restored from archive`);
     return booking;
   }
 

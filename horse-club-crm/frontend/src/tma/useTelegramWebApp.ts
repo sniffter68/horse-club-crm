@@ -35,7 +35,7 @@ type AuthState = { kind: 'loading' } | { kind: 'ready'; session: TrainerSession 
 export function useTelegramWebApp() {
   const [state, setState] = useState<AuthState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
-  const [dark, setDark] = useState(false)
+  const [dark, setDark] = useState(true)
   useEffect(() => {
     document.title = 'Кабинет клуба · Horse Club'
     const controller = new AbortController()
@@ -45,6 +45,12 @@ export function useTelegramWebApp() {
         await loadTelegramSdk()
         if (controller.signal.aborted) return
         const app = window.Telegram?.WebApp
+        // WebView may install the bridge before signed launch data becomes available.
+        if (app && !app.initData) await new Promise<void>(resolve => {
+          const deadline = Date.now() + 1500;
+          const poll = () => { if (controller.signal.aborted || app.initData || Date.now() >= deadline) resolve(); else window.setTimeout(poll, 50) };
+          poll();
+        });
         if (!app || !app.initData) { setState({ kind: 'outside' }); return }
         app.ready()
         app.expand()
@@ -61,11 +67,9 @@ export function useTelegramWebApp() {
           }
         }
         const syncTheme = () => {
-          setDark(app.colorScheme === 'dark')
-          root.dataset.theme = app.colorScheme
-          const values = { bg: app.themeParams.bg_color, text: app.themeParams.text_color,
-            surface: app.themeParams.secondary_bg_color, hint: app.themeParams.hint_color,
-            button: app.themeParams.button_color, 'button-text': app.themeParams.button_text_color }
+          setDark(true)
+          root.dataset.theme = 'dark'
+          const values = { bg: '#1c2420', text: '#edf2ed', surface: '#28332c', hint: '#b3bdb6', button: '#a4d5b8', 'button-text': '#163326' }
           for (const [key, value] of Object.entries(values)) {
             if (value && /^#[0-9a-f]{6}$/i.test(value)) root.style.setProperty(`--trainer-${key}`, value)
             else root.style.removeProperty(`--trainer-${key}`)

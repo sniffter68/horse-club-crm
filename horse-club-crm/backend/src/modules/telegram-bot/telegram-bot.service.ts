@@ -1,4 +1,4 @@
-import { HttpException, Injectable, Logger, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
+import { HttpException, Injectable, Logger, ServiceUnavailableException, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
 import { Bot, Context, HttpError, InlineKeyboard } from 'grammy';
 import AbortController from 'abort-controller';
 import { scheduleNavigation, type ScheduleMode } from '../../common/bot-schedule/trainer-schedule-bot.service';
@@ -58,6 +58,11 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const sender = String(ctx.from!.id);
       const message = 'Добро пожаловать в КСК «СЛКС», Тамбов! 🐎\nВыберите занятие и удобное время. Ждём вас: ул. Бастионная, 22АС2.';
       await ctx.reply(message, { reply_markup: await menu(sender) });
+    });
+    bot.on('message:contact', async ctx => {
+      const contact = ctx.msg.contact;
+      await this.links.bindOwnContact(String(ctx.from!.id), String(contact.user_id ?? ''), contact.phone_number);
+      await ctx.reply('Телефон подтверждён. Вернитесь в Mini App и нажмите «Проверить привязку».', { reply_markup: { remove_keyboard: true } });
     });
     bot.command('help', async ctx => { await ctx.reply('Укажите ваш Telegram username или ID в CRM. Выберите нужный раздел:', { reply_markup: await menu(String(ctx.from!.id)) }); });
     bot.command('balance', async ctx => {
@@ -128,6 +133,14 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       if (this.stopping) return;
       this.logger.error(`Telegram polling failed\n${this.describeError(error, token)}`);
     });
+  }
+
+  async requestOwnContact(sender: string) {
+    if (!this.bot) throw new ServiceUnavailableException('Бот временно недоступен');
+    await this.bot.api.sendMessage(sender, 'Подтвердите свой номер телефона для безопасного входа в кабинет всадника.', {
+      reply_markup: { keyboard: [[{ text: 'Поделиться моим телефоном', request_contact: true }]], resize_keyboard: true, one_time_keyboard: true },
+    });
+    return { pending: true };
   }
 
   private async startPolling(bot: Bot, token: string): Promise<void> {

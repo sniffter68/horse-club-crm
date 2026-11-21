@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { normalizePhone } from '../../vk-bot/vk-link.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AuthUser } from '../../auth/auth.types';
@@ -69,6 +71,26 @@ export class TelegramLinkService {
         if (users.length === 1 && users[0].staffProfile?.isActive !== false && users[0].trainer?.isActive !== false)
           await tx.user.updateMany({ where: { id: users[0].id, ...where }, data: { telegramUserId: sender } });
       }
+    });
+  }
+
+  /** Only called for a private Bot API contact whose user_id equals the update sender. */
+  async bindOwnContact(sender: string, contactUserId: string, phoneInput: string) {
+    if (sender !== contactUserId) throw new ForbiddenException('Отправьте собственный контакт Telegram');
+    const phone = normalizePhone(phoneInput);
+    return this.transaction(async tx => {
+      const target = await tx.client.findUnique({ where: { phone } });
+      if (!target || target.deletedAt) throw new NotFoundException('Обратитесь к администратору для привязки карточки');
+      if (target.telegramUserId && target.telegramUserId !== sender) throw new ConflictException('Карточка уже привязана. Обратитесь в клуб');
+      const current = await tx.client.findUnique({ where: { telegramUserId: sender } });
+      if (current && current.id !== target.id) {
+        if (current.phone) throw new ConflictException('Telegram уже привязан к другой карточке. Обратитесь в клуб');
+        await tx.client.update({ where: { id: current.id }, data: { telegramUserId: null, telegramUsername: null } });
+      }
+      await tx.client.update({ where: { id: target.id }, data: { telegramUserId: sender } });
+      await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'CLIENT_TELEGRAM_PHONE_LINK',
+        actorId: target.id, actorName: 'Telegram contact', details: { clientId: target.id, telegramUserId: sender } } });
+      return { linked: true };
     });
   }
 

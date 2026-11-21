@@ -10,11 +10,14 @@ export interface Membership {
   validUntil: string; isExpiringSoon: boolean;
 }
 export interface MyBookingsResponse { bookings: Booking[]; hasMore: boolean; membership: Membership | null }
-export interface ClientDashboard { isEstablished: boolean; membership: Membership | null; nextBooking: Booking | null }
-export type BootstrapResponse = { role: 'CLIENT'; clientId: string | null; clientName: string | null;
-  activeMembership: Membership | null; nextLesson: Booking | null } | { role: 'ADMIN' | 'TRAINER' };
+export interface ClientOverview { client: { id: string; name: string; firstName: string; lastName: string; phone: string | null }; membership: Membership | null; bookings: Booking[] }
+let sessionToken: string | null = null;
+export function setClientSession(token: string | null): void { sessionToken = token; }
+export interface ClientDashboard { client?: ClientOverview['client']; bookings?: Booking[]; isEstablished: boolean; membership: Membership | null; nextBooking: Booking | null }
+export type BootstrapResponse = { role: 'CLIENT'; token: string | null; clientId: string | null; clientName: string | null;
+  activeMembership: Membership | null; nextLesson: Booking | null } | { role: 'ADMIN' | 'TRAINER' | 'STAFF' };
 export interface Booking {
-  id: string; startTime: string; endTime: string; status: string; clientConfirmed: boolean;
+  id: string; canCancel?: boolean; canConfirm?: boolean; horse?: { name: string } | null; startTime: string; endTime: string; status: string; clientConfirmed: boolean;
   clientCancellationRequested: boolean; costAmount: string; trainer?: { name?: string } | null;
   lesson?: { status: string; deletedAt: string | null; startTime: string; endTime: string; service?: { title?: string; name?: string } | null } | null;
 }
@@ -25,9 +28,9 @@ export function requireUuid(value: string): string {
 }
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const initData = telegram()?.initData;
-  if (!initData) throw new Error('Откройте запись через Telegram-бота');
+  if (!initData && !sessionToken) throw new Error('Откройте запись через Telegram-бота');
   const response = await fetch(`/api/tma/${path}`, { ...options, credentials: 'omit',
-    headers: { 'Content-Type': 'application/json', Authorization: `tma ${initData}`, 'X-Telegram-Init-Data': initData, ...options.headers } });
+    headers: { 'Content-Type': 'application/json', Authorization: sessionToken ? `Bearer ${sessionToken}` : `tma ${initData}`, ...(initData ? { 'X-Telegram-Init-Data': initData } : {}), ...options.headers } });
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
     const message = body && typeof body === 'object' && 'message' in body ? body.message : undefined;

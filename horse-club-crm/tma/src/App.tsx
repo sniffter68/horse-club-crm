@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { api, dateTime, money, moscowDate, requireUuid, time, upcoming, type Booking, type Membership, type MyBookingsResponse, type Service, type Slot } from './api';
+import { api, setClientSession, dateTime, money, moscowDate, requireUuid, time, upcoming, type Booking, type MyBookingsResponse, type Service, type Slot } from './api';
 import { ClientDashboardView } from './ClientDashboardView';
 import { ClientBookingCatalog } from './ClientBookingCatalog';
-import { MembershipCard } from './MembershipCard';
-import type { BootstrapResponse, ClientDashboard } from './api';
-import { applyTheme, canRequestContact, haptic, telegram, withTelegram } from './telegram';
+import type { BootstrapResponse, ClientDashboard, ClientOverview } from './api';
+import { applyTheme, waitForTelegram, canRequestContact, haptic, telegram, withTelegram } from './telegram';
 import { useTelegramNavigation } from './useTelegramNavigation';
 
 const _h = React.createElement;
@@ -18,6 +17,8 @@ const bookingTitle = (booking: Booking): string => booking.lesson?.service?.titl
 export function App() {
   const [screen, setScreen] = useState<Screen>('loading');
   const [dashboard, setDashboard] = useState<ClientDashboard>();
+  const [linked, setLinked] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [home, setHome] = useState<'catalog' | 'dashboard'>('catalog');
   const [services, setServices] = useState<Service[]>([]);
   const [consentVersion, setConsentVersion] = useState('');
@@ -53,14 +54,16 @@ export function App() {
     withTelegram(app => app.ready());
     withTelegram(app => app.expand());
     withTelegram(app => app.onEvent('themeChanged', applyTheme));
-    return () => withTelegram(app => app.offEvent('themeChanged', applyTheme));
+    withTelegram(app => app.onEvent('safeAreaChanged', applyTheme));
+    withTelegram(app => app.onEvent('contentSafeAreaChanged', applyTheme));
+    return () => withTelegram(app => { app.offEvent('themeChanged', applyTheme); app.offEvent('safeAreaChanged', applyTheme); app.offEvent('contentSafeAreaChanged', applyTheme); });
   }, [tg]);
 
   useEffect(() => {
     withTelegram(app => {
       if (screen === 'checkout') app.enableClosingConfirmation(); else app.disableClosingConfirmation();
     });
-    document.title = `${({ loading: 'Кабинет клуба', dashboard: 'Личный кабинет', catalog: 'Выбор занятия', slots: 'Дата и время', checkout: 'Оформление записи', success: 'Запись создана', 'my-bookings': 'Мои записи' })[screen]} · КСК «СЛКС»`;
+    document.title = `${({ loading: 'Кабинет клуба', dashboard: 'Кабинет всадника', catalog: 'Выбор занятия', slots: 'Дата и время', checkout: 'Оформление записи', success: 'Запись создана', 'my-bookings': 'Мои записи' })[screen]} · КСК «СЛКС»`;
     heading.current?.focus();
   }, [screen, tg]);
 
@@ -70,16 +73,31 @@ export function App() {
     setLoading(true); setError('');
     if (screen === 'loading' || screen === 'dashboard') {
       const loadDashboard = async () => {
+        const app = await waitForTelegram(controller.signal);
+        if (controller.signal.aborted) throw new Error('Загрузка отменена');
+        setAuthChecked(true);
+        if (!app?.initData) throw new Error('Откройте запись через Telegram-бота');
         const bootstrap = screen === 'loading' ? await api<BootstrapResponse>('bootstrap', {
-          method: 'POST', body: JSON.stringify({ initData: tg?.initData }), signal: controller.signal,
+          method: 'POST', body: JSON.stringify({ initData: app.initData }), signal: controller.signal,
         }) : undefined;
-        const result = await api<ClientDashboard>('dashboard', { signal: controller.signal });
+        if (bootstrap && bootstrap.role !== 'CLIENT') {
+          window.location.replace(`/tma${window.location.search}${window.location.hash}`);
+          throw new Error('Открываем расписание…');
+        }
+        if (bootstrap?.role === 'CLIENT') { setClientSession(bootstrap.token ?? null); setLinked(Boolean(bootstrap.clientId)); }
+        const isLinked = bootstrap?.role === 'CLIENT' ? Boolean(bootstrap.clientId) : linked;
+        let result: ClientDashboard;
+        if (isLinked) {
+          const overview = await api<ClientOverview>('client/overview', { signal: controller.signal });
+          result = { ...overview, isEstablished: true, nextBooking: overview.bookings.find(item => upcoming(item)) ?? null };
+        } else result = await api<ClientDashboard>('dashboard', { signal: controller.signal });
         return { result, linked: bootstrap?.role === 'CLIENT' && Boolean(bootstrap.clientId) };
       };
       loadDashboard()
         .then(({ result, linked }) => {
           if (controller.signal.aborted) return;
           setDashboard(result);
+          if (result.client?.phone) setPhone(result.client.phone);
           const target = linked || result.isEstablished || screen === 'dashboard' ? 'dashboard' : 'catalog';
           setHome(target);
           if (screen === 'loading') setScreen(target);
@@ -153,17 +171,18 @@ export function App() {
     finally { submitting.current = false; setBusy(false); }
   }
 
-  const titles: Record<Screen, string> = { loading: 'Кабинет клуба', dashboard: 'Личный кабинет', catalog: 'Время для лошадей', slots: 'Когда приедете?', checkout: 'Всё готово к записи', success: 'Ждём вас в клубе', 'my-bookings': 'Мои записи' };
+  const titles: Record<Screen, string> = { loading: 'Кабинет клуба', dashboard: 'Кабинет всадника', catalog: 'Время для лошадей', slots: 'Когда приедете?', checkout: 'Всё готово к записи', success: 'Ждём вас в клубе', 'my-bookings': 'Мои записи' };
   return <main className="mx-auto max-w-xl px-5">
     <header className="mb-6 flex items-center justify-between gap-3">
       <span className="club-mark" aria-label="КСК СЛКС">СЛКС<span>КОННЫЙ КЛУБ · ТАМБОВ</span></span>
       <button className="quiet" disabled={busy || screen === 'my-bookings'} onClick={() => navigate('my-bookings')}>Мои записи</button>
     </header>
-    {!native && <p className="notice">Откройте запись через Telegram-бота клуба.</p>}
+    {authChecked && !native && <p className="notice">Откройте запись через Telegram-бота клуба.</p>}
     {back && !native && <button className="quiet mb-4" disabled={busy} onClick={back}>← Назад</button>}
     <p className="eyebrow">{screen === 'catalog' ? 'В седле — ближе к природе' : screen === 'slots' ? 'Шаг 2 из 3' : screen === 'checkout' ? 'Шаг 3 из 3' : 'КСК «СЛКС»'}</p>
     <h1 ref={heading} tabIndex={-1}>{titles[screen]}</h1>
-    {screen === 'dashboard' && dashboard && <ClientDashboardView data={dashboard} onBook={newBooking} />}
+    {screen === 'dashboard' && dashboard && <ClientDashboardView data={dashboard} onBook={newBooking} onRefresh={() => setRetry(value => value + 1)} />}
+    {screen === 'catalog' && !linked && <section className="summary stack" aria-label="Загрузка отменена"><h2>Уже занимаетесь в клубе?</h2><p>Подтвердите свой телефон в чате бота, чтобы открыть абонемент и записи.</p><button className="quiet" disabled={busy} onClick={async () => { if (submitting.current) return; submitting.current = true; setBusy(true); try { await api('client/request-contact', { method: 'POST' }); setContactNotice('Перейдите в чат бота и поделитесь собственным контактом.'); } catch (failure: unknown) { setError(errorText(failure)); } finally { submitting.current = false; setBusy(false); } }}>Привязать по телефону</button>{contactNotice && <p role="status">{contactNotice}</p>}<button className="quiet" onClick={() => { setClientSession(null); setScreen('loading'); }}>Проверить привязку</button></section>}
     {screen === 'catalog' && <ClientBookingCatalog services={services} serviceId={service?.id} format={format}
       loading={loading} error={error} onFormat={value => { setFormat(value); setService(undefined); }} onSelect={setService} />}
     {screen === 'slots' && <>
@@ -194,7 +213,7 @@ export function App() {
         <label className="consent mt-4"><input type="checkbox" checked={consent} disabled={busy} onChange={event => { setConsent(event.target.checked); haptic(); }} />
           <span>Даю <a href="https://club.horseclub68.ru/#consent" target="_blank" rel="noreferrer">согласие на обработку персональных данных</a> для записи в клуб (152-ФЗ). <a href="https://club.horseclub68.ru/#privacy" target="_blank" rel="noreferrer">Политика обработки данных</a>.</span></label>
       </form>
-      <p className="notice">Лошадь подберёт администратор. Детали уточнит клуб.</p>
+      <p className="notice">Свободная лошадь назначается при записи. Детали уточнит клуб.</p>
     </>}
     {screen === 'success' && <section className="summary my-5" aria-label="Информация о записи">
       <span className="badge">Заявка принята</span><h2 className="mt-4">{booking ? bookingTitle(booking) : 'Занятие в клубе'}</h2>
@@ -215,72 +234,25 @@ export function App() {
 }
 
 export function MyBookings({ onBook }: { onBook: () => void }) {
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [membership, setMembership] = useState<Membership | null | undefined>(undefined);
-  const [hasMore, setHasMore] = useState(false);
+  const [data, setData] = useState<MyBookingsResponse>();
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState('');
-  const [confirmId, setConfirmId] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [retry, setRetry] = useState(0);
-  const active = useRef(true);
-  const pending = useRef(false);
-
-  async function load(offset: number, signal?: AbortSignal) {
-    setLoading(true); setError('');
-    try {
-      const result = await api<MyBookingsResponse>(`my-bookings?offset=${offset}&limit=20`, { signal });
-      if (active.current && !signal?.aborted) { setBookings(previous => offset ? [...previous, ...result.bookings] : result.bookings); setHasMore(result.hasMore); setMembership(result.membership ?? null); }
-    } catch (failure: unknown) { if (active.current && !signal?.aborted) setError(errorText(failure)); }
-    finally { if (active.current && !signal?.aborted) setLoading(false); }
-  }
+  const [offset, setOffset] = useState(0);
   useEffect(() => {
-    active.current = true;
-    const controller = new AbortController(); void load(0, controller.signal);
-    return () => { active.current = false; controller.abort(); };
-  }, [retry]);
-
-  async function cancel(booking: Booking) {
-    if (pending.current) return;
-    pending.current = true; setBusy(booking.id); setError(''); haptic();
-    try {
-      const updated = await api<Booking>(`bookings/${requireUuid(booking.id)}/cancel-request`, { method: 'POST' });
-      if (active.current) {
-        setBookings(previous => previous.map(item => item.id === updated.id ? updated : item));
-        setConfirmId(''); setNotice('Запрос на отмену сохранён. Администратор уточнит условия.');
-      }
-    } catch (failure: unknown) { if (active.current) setError(errorText(failure)); }
-    finally { pending.current = false; if (active.current) setBusy(''); }
-  }
-  const now = Date.now();
-  const isFuture = (booking: Booking) => new Date(booking.lesson?.startTime ?? booking.startTime).getTime() >= now;
-  const groups = [
-    { title: 'Предстоящие тренировки', rows: bookings.filter(isFuture) },
-    { title: 'Прошедшие тренировки', rows: bookings.filter(booking => !isFuture(booking)) },
-  ];
+    const controller = new AbortController();
+    setLoading(true); setError('');
+    api<MyBookingsResponse>(`my-bookings?offset=${offset}&limit=20`, { signal: controller.signal })
+      .then(result => { if (!controller.signal.aborted) setData(previous => ({ ...result, bookings: offset ? [...(previous?.bookings ?? []), ...result.bookings] : result.bookings })); })
+      .catch((failure: unknown) => { if (!controller.signal.aborted) setError(errorText(failure)); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [offset, retry]);
+  const refresh = () => { setOffset(0); setRetry(value => value + 1); };
   return <section className="stack mt-4" aria-label="Список записей">
-    {membership !== undefined && <MembershipCard membership={membership} />}
-    {groups.filter(group => group.rows.length > 0).map(group => <section className="stack" key={group.title} aria-label={group.title}>
-      <h2>{group.title}</h2>
-      {group.rows.map(booking => {
-      const cancelled = booking.status === 'cancelled' || booking.lesson?.status === 'CANCELLED' || Boolean(booking.lesson?.deletedAt);
-      const status = cancelled ? 'Отменена' : booking.status === 'completed' || booking.lesson?.status === 'COMPLETED' ? 'Завершено'
-        : booking.clientCancellationRequested ? 'Запрошена отмена' : booking.clientConfirmed ? 'Подтверждена' : 'Ожидает';
-      return <article className="summary" key={booking.id}><span className="badge">{status}</span>
-        <h2 className="mt-3">{bookingTitle(booking)}</h2><p>{dateTime(booking.lesson?.startTime ?? booking.startTime)}</p>
-        <p>Тренер: {booking.trainer?.name || 'Уточнит администратор'}</p><p className="hint">{ADDRESS}</p>
-        {upcoming(booking) && !booking.clientCancellationRequested && (confirmId === booking.id
-          ? <div className="mt-4"><p>Запросить отмену? Запись сохранится до решения администратора.</p>
-              <div className="mt-3 flex flex-wrap gap-3"><button disabled={Boolean(busy)} className="quiet" onClick={() => setConfirmId('')}>Оставить запись</button>
-              <button disabled={Boolean(busy)} className="quiet danger" onClick={() => void cancel(booking)}>{busy === booking.id ? 'Отправляем…' : 'Запросить отмену'}</button></div></div>
-          : <button className="quiet mt-4" disabled={Boolean(busy)} onClick={() => { haptic(); setConfirmId(booking.id); }}>Отменить занятие</button>)}
-      </article>;
-    })}</section>)}
+    {data && <ClientDashboardView data={{ ...data, membership: data.membership ?? null, isEstablished: true, nextBooking: null }} history onBook={onBook} onRefresh={refresh} />}
     {loading && <p role="status">Загружаем ваши записи…</p>}
-    {!loading && !error && bookings.length === 0 && <div className="notice"><p>У вас пока нет активных записей</p><button className="primary mt-3 w-full" onClick={onBook}>Записаться</button></div>}
-    {error && <div role="alert"><p>{error}</p><button className="quiet mt-2" onClick={() => setRetry(value => value + 1)}>Обновить записи</button></div>}
-    <p role="status">{notice}</p>
-    {hasMore && <button className="quiet w-full" disabled={loading} onClick={() => void load(bookings.length)}>Загрузить ещё</button>}
+    {error && <div role="alert"><p>{error}</p><button className="quiet mt-2" onClick={refresh}>Обновить записи</button></div>}
+    {data?.hasMore && <button className="quiet w-full" disabled={loading} onClick={() => setOffset(data.bookings.length)}>Загрузить ещё</button>}
   </section>;
 }

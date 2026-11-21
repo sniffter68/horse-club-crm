@@ -139,7 +139,7 @@ export class BookingRulesService {
       deletedAt: null, status: { in: ['SCHEDULED', 'COMPLETED'] }, startTime: { lt: end }, endTime: { gt: start },
       ...(input.excludeLessonId ? { id: { not: input.excludeLessonId } } : {}),
       OR: [{ bookings: { some: { clientId: { in: clientIds } } } }, { trainerId: input.trainerId }, ...(input.arenaId ? [{ arenaId: input.arenaId }] : []), { bookings: { some: { horseId: { in: horseIds } } } }],
-    }, include: { bookings: { select: { horseId: true, clientId: true } } } });
+    }, include: { bookings: { where: { status: { in: ['scheduled', 'completed', 'no_show'] } }, select: { horseId: true, clientId: true } } } });
     return [
       ...direct.map(b => ({ trainerId: b.trainerId, arenaId: b.arenaId, clientIds: [b.clientId], horseIds: b.horseId ? [b.horseId] : [], riders: 1, start: b.startTime, end: b.endTime })),
       ...lessons.map(l => ({ trainerId: l.trainerId, arenaId: l.arenaId, clientIds: l.bookings.map(b => b.clientId), horseIds: [...new Set(l.bookings.flatMap(b => b.horseId ? [b.horseId] : []))], riders: l.bookings.length, start: l.startTime, end: l.endTime })),

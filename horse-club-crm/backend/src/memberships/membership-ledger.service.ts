@@ -273,9 +273,12 @@ export class MembershipLedgerService {
     }
 
     attendeeClientId ??= membership.clientId ?? undefined;
-    const priorDebit = await tx.membershipOp.findFirst({
+    let priorDebit = await tx.membershipOp.findFirst({
       where: { membershipId, lessonId, type: 'DEBIT', attendeeClientId: attendeeClientId ?? null },
       select: { id: true },
+    });
+    if (!priorDebit && membership.clientId === attendeeClientId) priorDebit = await tx.membershipOp.findFirst({
+      where: { membershipId, lessonId, type: 'DEBIT', attendeeClientId: null }, select: { id: true },
     });
     if (!priorDebit) {
       if (throwOnDuplicate) {
@@ -286,9 +289,12 @@ export class MembershipLedgerService {
       return;
     }
 
-    const priorRefund = await tx.membershipOp.findFirst({
+    let priorRefund = await tx.membershipOp.findFirst({
       where: { membershipId, lessonId, type: 'REFUND', attendeeClientId: attendeeClientId ?? null },
       select: { id: true },
+    });
+    if (!priorRefund && membership.clientId === attendeeClientId) priorRefund = await tx.membershipOp.findFirst({
+      where: { membershipId, lessonId, type: 'REFUND', attendeeClientId: null }, select: { id: true },
     });
     if (priorRefund) {
       if (throwOnDuplicate) {

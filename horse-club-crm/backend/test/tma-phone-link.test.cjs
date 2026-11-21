@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { DateTime } = require('luxon');
+const { TelegramLinkService } = require('../dist/modules/telegram-bot/telegram-link.service');
 const { TmaBookingService } = require('../dist/modules/telegram-bot/tma-booking.service');
 const { DEFAULT_LEAD_CONSENT_VERSION } = require('../dist/common/lead-consent');
 
@@ -30,66 +31,36 @@ function fixture(owner) {
   return { service, client, dto, writes, tx };
 }
 
-test('TMA normalizes phone, releases unique Telegram ID and books with existing unlinked CRM card', async () => {
-  const f = fixture({ id: 'crm-client', telegramUserId: null });
-  await f.service.create(f.client.id, f.dto);
-  assert.deepEqual(f.writes[0], { where: { id: f.client.id }, data: { telegramUserId: null, telegramUsername: null } });
-  assert.deepEqual(f.writes[1], { where: { id: 'crm-client' }, data: { telegramUserId: '123', telegramUsername: 'anna' } });
-  assert.deepEqual(f.writes[2].participants, [{ clientId: 'crm-client' }]);
-});
-
-test('TMA accepts own phone and fills the Telegram profile when phone has no owner', async () => {
-  for (const owner of [null, { id: 'telegram-profile', telegramUserId: '123' }]) {
-    const f = fixture(owner); await f.service.create(f.client.id, f.dto);
-    assert.deepEqual(f.writes[0], { where: { id: f.client.id }, data: { phone: '+79991234567' } });
-    assert.deepEqual(f.writes[1].participants, [{ clientId: f.client.id }]);
-  }
-});
-
-test('TMA rejects another Telegram account on active and archived CRM cards without mutations', async () => {
-  for (const deletedAt of [null, new Date()]) {
-    const owner = { id: 'crm-client', telegramUserId: '456', deletedAt };
+test('typed phone cannot take over an existing CRM card, including unlinked or archived cards', async () => {
+  for (const owner of [{ id: 'crm-client', telegramUserId: null }, { id: 'crm-client', telegramUserId: '456' },
+    { id: 'crm-client', telegramUserId: null, deletedAt: new Date() }]) {
     const f = fixture(owner);
-    await assert.rejects(f.service.create(f.client.id, f.dto), error => error.getStatus() === 400 && /Обратитесь в клуб/.test(error.message));
+    await assert.rejects(f.service.create(f.client.id, f.dto), error => error.getStatus() === 400);
     assert.equal(f.writes.length, 0);
   }
 });
 
-test('TMA restores an unlinked archived phone owner and creates a booking in the same transaction', async () => {
-  for (const name of [undefined, '   ', '  Новое имя  ']) {
-    const f = fixture({ id: 'crm-client', telegramUserId: null, deletedAt: new Date(), name: 'Прежнее имя' });
-    const result = await f.service.create(f.client.id, { ...f.dto, name });
-    assert.deepEqual(f.writes[0], { where: { id: f.client.id }, data: { telegramUserId: null, telegramUsername: null } });
-    assert.deepEqual(f.writes[1], { where: { id: 'crm-client' }, data: {
-      telegramUserId: '123', telegramUsername: 'anna', deletedAt: null, name: name?.trim() || 'Прежнее имя',
-    } });
-    assert.deepEqual(f.writes[2].participants, [{ clientId: 'crm-client' }]);
-    assert.equal(result.where.id, 'booking');
-    assert.equal(result.data.telegramRequestId, f.dto.requestId);
-  }
+test('verified own Telegram contact links the normalized phone in one audited transaction', async () => {
+  const changes = [];
+  const target = { id: 'target', telegramUserId: null, deletedAt: null };
+  const tx = { client: {
+    findUnique: async ({ where }) => { if (where.phone) { assert.equal(where.phone, '+79991234567'); return target; } return { id: 'temporary', phone: null }; },
+    update: async input => changes.push(input),
+  }, cashAuditLog: { create: async input => changes.push(input) } };
+  const service = new TelegramLinkService({ $transaction: async (cb, options) => { assert.equal(options.isolationLevel, 'Serializable'); return cb(tx); } });
+  assert.deepEqual(await service.bindOwnContact('123', '123', '8 (999) 123-45-67'), { linked: true });
+  assert.equal(changes[0].data.telegramUserId, null);
+  assert.equal(changes[1].where.id, 'target');
+  assert.equal(changes[1].data.telegramUserId, '123');
+  assert.equal(changes[2].data.action, 'CLIENT_TELEGRAM_PHONE_LINK');
+  assert.equal(changes[2].data.actorId, 'target');
 });
 
-test('TMA restores its own archived Telegram profile only when the normalized phone matches', async () => {
-  const f = fixture({ id: 'telegram-profile', telegramUserId: '123', deletedAt: new Date(), name: 'Анна' });
-  f.client.deletedAt = new Date();
-  await f.service.create(f.client.id, f.dto);
-  assert.deepEqual(f.writes[0], { where: { id: f.client.id }, data: {
-    phone: '+79991234567', deletedAt: null, telegramUserId: '123', name: 'Анна',
-  } });
-  assert.deepEqual(f.writes[1].participants, [{ clientId: f.client.id }]);
-  const mismatch = fixture(null); mismatch.client.deletedAt = new Date();
-  await assert.rejects(mismatch.service.create(mismatch.client.id, mismatch.dto), error => error.getStatus() === 400);
-  assert.equal(mismatch.writes.length, 0);
-});
-
-test('TMA logs restoration only after the booking transaction succeeds', async t => {
-  const f = fixture({ id: 'crm-client', telegramUserId: null, deletedAt: new Date(), name: 'Анна' });
-  const log = t.mock.method(f.service.logger, 'log', () => {});
-  f.tx.booking.update = async () => { throw new Error('booking write failed'); };
-  await assert.rejects(f.service.create(f.client.id, f.dto), /booking write failed/);
-  assert.equal(log.mock.calls.length, 0);
-  f.tx.booking.update = async input => input;
-  await f.service.create(f.client.id, f.dto);
-  assert.equal(log.mock.calls.length, 1);
-  assert.equal(log.mock.calls[0].arguments[0], '[TMA Booking] Client crm-client automatically restored from archive');
+test('foreign contact and an already linked phone never change identity', async () => {
+  let writes = 0;
+  const tx = { client: { findUnique: async () => ({ id: 'target', telegramUserId: '456' }), update: async () => writes++ } };
+  const service = new TelegramLinkService({ $transaction: cb => cb(tx) });
+  await assert.rejects(service.bindOwnContact('123', '456', '+79991234567'), e => e.getStatus() === 403);
+  await assert.rejects(service.bindOwnContact('123', '123', '+79991234567'), e => e.getStatus() === 409);
+  assert.equal(writes, 0);
 });

@@ -95,6 +95,9 @@ function fixture() {
     clientCancellationRequested: false, lesson: null };
   const writes = [], options = [];
   const tx = {
+    cashAuditLog: { create: async () => ({}) },
+    workShift: { findMany: async () => [] },
+    horse: { findMany: async () => [{ id: 'horse' }] },
     user: { findMany: async () => [] },
     service: { findFirst: async () => ({ id: serviceId, isPublic: true, durationMinutes: 60 }) },
     clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] }) },
@@ -104,7 +107,7 @@ function fixture() {
       findUniqueOrThrow: async () => saved, update: async input => { writes.push(input); return { ...saved, ...input.data }; } },
   };
   const prisma = { ...tx, $transaction: async (operation, config) => { options.push(config); return operation(tx); } };
-  const lessons = { createLesson: async (input, transaction) => { assert.equal(transaction, tx); assert.deepEqual(input.participants, [{ clientId }]); writes.push(input); return { bookings: [saved] }; } };
+  const lessons = { createLesson: async (input, transaction) => { assert.equal(transaction, tx); assert.deepEqual(input.participants, [{ clientId, horseId: 'horse' }]); writes.push(input); return { bookings: [saved] }; } };
   const rules = { validate: async () => {} };
   const service = new TmaBookingService(prisma, rules, lessons);
   const dto = { serviceId, trainerId, requestId, startTime: start.toISO(), phone: '+79991234567', consentAccepted: true, consentVersion: DEFAULT_LEAD_CONSENT_VERSION };
@@ -143,7 +146,7 @@ test('slots honor Moscow date, day off, trainer capacity conflicts and do not sw
   f.tx.clubSchedule.findUnique = async () => null;
   await assert.rejects(f.service.slots(clientId, { date, serviceId }), status(503));
 });
-test('archived profile can preview trainer slots without restoring the client', async () => {
+test('archived profile has no offered slots and is never restored by a preview', async () => {
   const f = fixture();
   f.tx.client.findUnique = async () => ({ id: clientId, deletedAt: new Date() });
   let validations = 0;
@@ -152,8 +155,8 @@ test('archived profile can preview trainer slots without restoring the client', 
     assert.equal(input.lockResources, false);
     assert.deepEqual(input.participants, []);
   };
-  assert.ok((await f.service.slots(clientId, { date: f.start.toISODate(), serviceId })).slots.length > 0);
-  assert.ok(validations > 0);
+  assert.deepEqual((await f.service.slots(clientId, { date: f.start.toISODate(), serviceId })).slots, []);
+  assert.equal(validations, 0);
   assert.equal(f.writes.length, 0);
 });
 
@@ -270,6 +273,9 @@ test('HTTP routes require signed Telegram auth, reject invalid UUIDs, staff fiel
   const service = { services: async () => ({ services: [] }), create: async (owner, dto) => ({ owner, requestId: dto.requestId }), cancelRequest: async () => ({}),
     myBookings: async (owner, query) => { assert.equal(owner, clientId); assert.equal(query.offset, 0); assert.equal(query.limit, 20); return { bookings: [], hasMore: false }; } };
   const module = await Test.createTestingModule({ controllers: [TelegramBotController], providers: [TelegramAuthGuard,
+    { provide: require('@nestjs/jwt').JwtService, useValue: { verifyAsync: async () => { throw new Error('invalid'); } } },
+    { provide: require('../dist/modules/telegram-bot/client-miniapp.service').ClientMiniappService, useValue: {} },
+    { provide: require('../dist/modules/telegram-bot/telegram-bot.service').TelegramBotService, useValue: {} },
     { provide: TelegramLinkService, useValue: { bindUsername: async () => {} } },
     { provide: TmaBookingService, useValue: service }, { provide: PrismaService, useValue: {
       clubModuleSettings: { findUnique: async () => null }, client: { upsert: async () => ({ id: clientId }) },
