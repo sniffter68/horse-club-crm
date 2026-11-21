@@ -23,10 +23,16 @@ import type { Client, RelationBooking, RelationPayment } from '../catalogs/types
 import { dateOnly, dateTime } from '../cards/format'
 import { useCatalogPermissions } from '../catalogs/permissions'
 import { ClientLedger, MembershipBalance, type ActiveMembership } from './membership'
+import { disciplines } from '../schedule/triad'
 
 type ClientRow = Client & { membership: ActiveMembership | null }
 
 type ClientMembership = {
+  type?: string; remainingUnits?: string | number; initialUnits?: string | number; validFrom?: string; validTo?: string;
+  operations?: Array<{ id: string; type: 'DEBIT' | 'REFUND'; amount: number; reason: string; createdAt: string;
+    lesson: { id: string; startTime: string; trainer: { name: string }; service: { title?: string; name?: string } } | null }>
+  transactions?: Array<{ id: string; transactionType: string; amount: string | number; description?: string | null; createdAt: string;
+    booking: { startTime: string; serviceType?: string | null; trainer: { name: string } } | null }>
   totalPrice?: string | number; pricePerLesson?: string | number; recognizedRevenue?: string | number;
   ownerClientId?: string | null; isShared?: boolean; ownerName?: string; members?: SharedMember[]
   deletedAt?: string | null
@@ -85,7 +91,7 @@ export function ClientList() {
   const { result: client, query } = useOne<ClientDetails, HttpError>({
     resource: 'clients',
     id: selectedClientId,
-    queryOptions: { enabled: Boolean(selectedClientId) },
+    queryOptions: { enabled: isUuid(selectedClientId || ''), retry: false },
   })
 
   const columns: TableColumnsType<ClientRow> = [
@@ -125,7 +131,8 @@ export function ClientList() {
       </>} /> : 'Карточка клиента'} open={Boolean(selectedClientId)} footer={null} width={960} className="profile-modal" aria-label="Карточка клиента"
       destroyOnHidden onCancel={() => setSelectedClientId(undefined)}>
       {query.isLoading && <Skeleton active />}
-      {query.error && <Alert type="error" showIcon message="Не удалось загрузить карточку клиента" description={query.error.message} />}
+      {query.error && <Alert type="error" showIcon message="Не удалось загрузить карточку клиента" description={query.error.message}
+        action={<Button onClick={() => void query.refetch()}>Повторить</Button>} />}
       {client && !query.isLoading && <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {canManage && !client.deletedAt && <MembershipBalance clientId={client.id} membership={(() => {
           const active = client.memberships.filter(item => item.isActive)
@@ -169,12 +176,29 @@ export function ClientList() {
                   <ArchiveAction resource="memberships" id={membership.id} archived={Boolean(membership.deletedAt)} />
                   <SharedMembershipAccess membershipId={membership.id} ownerClientId={client.id} members={membership.members} active={membership.isActive} onChanged={() => void query.refetch()} />
                 </>}
-                <Progress
+                {membership.type === 'deposit' ? <Typography.Paragraph>Остаток депозита: {money(membership.remainingUnits)}</Typography.Paragraph> : <Progress
                   percent={membership.totalLessons > 0 ? Math.round(membership.remainedLessons / membership.totalLessons * 100) : 0}
-                  format={() => `${membership.remainedLessons} / ${membership.totalLessons} занятий`}
+                  format={() => `${membership.remainedLessons} / ${membership.totalLessons} шт.`}
                   status={membership.isActive ? 'active' : 'normal'}
-                />
-                <Typography.Text type="secondary">Действует до {dateFormatter.format(new Date(membership.validUntil))}</Typography.Text>
+                />}
+                <Typography.Text type="secondary">{membership.validFrom && `Действует с ${dateOnly(membership.validFrom)} · `}Действует до {dateFormatter.format(new Date(membership.validTo || membership.validUntil))}</Typography.Text>
+                <Typography.Title level={5}>История списаний и возвратов</Typography.Title>
+                <List aria-label="История занятий абонемента" size="small" pagination={{ pageSize: 5, size: 'small' }} locale={{ emptyText: 'Списаний и возвратов пока нет' }}
+                  dataSource={[
+                    ...(membership.operations ?? []).map(op => ({ id: op.id, createdAt: op.createdAt,
+                      label: op.type === 'REFUND' ? 'Возврат' : 'Списание', amount: `${op.amount} шт.`, reason: op.reason,
+                      service: op.lesson?.service.title || op.lesson?.service.name || 'Занятие удалено', trainer: op.lesson?.trainer.name,
+                      startTime: op.lesson?.startTime })),
+                    ...(membership.transactions ?? []).map(op => ({ id: op.id, createdAt: op.createdAt,
+                      label: op.transactionType === 'refund' ? 'Возврат' : 'Списание', amount: membership.type === 'deposit' ? money(Math.abs(Number(op.amount))) : `${Math.abs(Number(op.amount))} шт.`,
+                      reason: op.description, service: disciplines[op.booking?.serviceType as keyof typeof disciplines] || 'Тренировка', trainer: op.booking?.trainer.name,
+                      startTime: op.booking?.startTime })),
+                  ].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))}
+                  renderItem={op => <List.Item><Space direction="vertical" size={0}>
+                    <Space wrap><Tag className={`crm-tag crm-tag--${op.label === 'Возврат' ? 'success' : 'accent'}`}>{op.label} · {op.amount}</Tag>
+                      <span>{dateTime(op.createdAt)} (Москва)</span><strong>{op.service}</strong><span>{op.trainer || 'Тренер не указан'}</span></Space>
+                    <Typography.Text type="secondary">{op.reason}{op.startTime && ` · Занятие ${dateTime(op.startTime)}`}</Typography.Text>
+                  </Space></List.Item>} />
                 <Descriptions size="small" column={1} items={[
                   { key: 'price', label: 'Стоимость 1 занятия', children: money(membership.pricePerLesson) },
                   { key: 'earned', label: 'Отзанимался на сумму', children: money(membership.recognizedRevenue) },

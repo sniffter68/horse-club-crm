@@ -44,6 +44,8 @@ export interface RelationBooking {
   lesson: RelationLesson; payments: RelationPayment[]; membership: { id: string } | null;
 }
 export interface HorseDetails extends Horse {
+  owner?: { id: string; name: string; firstName: string; lastName: string } | null;
+  stall?: { id: string; number?: string | null; name?: string | null; status: string; building?: { id: string; name: string } | null } | null;
   currentBoardingContract?: HorseDetails['boardingContracts'][number] | null;
   healthLogs: Array<{ id: string; type: 'VACCINATION' | 'FARRIER' | 'DEWORMING' | 'INSPECTION'; occurredAt: string; nextDueAt: string | null; notes: string | null }>;
   boardingContracts: Array<{ id: string; status: string; startsAt: string; endsAt: string | null; monthlyRate: string | number;

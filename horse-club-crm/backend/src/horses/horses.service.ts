@@ -11,6 +11,8 @@ import type { UpdateHorseDto } from './dto/update-horse.dto';
 
 const horseDetailsInclude = Prisma.validator<Prisma.HorseDefaultArgs>()({
   include: {
+    owner: { select: { id: true, name: true, firstName: true, lastName: true } },
+    stall: { include: { building: { select: { id: true, name: true } } } },
     healthLogs: { orderBy: [{ occurredAt: 'desc' }, { id: 'asc' }], take: 20 },
     boardingContracts: {
       include: {

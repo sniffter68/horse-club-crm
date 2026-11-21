@@ -120,14 +120,15 @@ test('standalone booking refuses a stranger and rolls back a failed audit', asyn
   assert.equal(f.state.booking.status, 'scheduled');
 });
 
-test('client details combine owned and active shared memberships with owner labels', async () => {
+test('client details preserve active and completed shared memberships with owner labels', async () => {
   const active = { id: 'family', clientId: 'mother', client: { name: 'Елена Смирнова' }, status: 'active', remainingUnits: new Prisma.Decimal(4), remainedLessons: 4,
     validFrom: new Date('2020-01-01'), validTo: new Date('2099-01-01'), validUntil: new Date('2099-01-01') };
   const prisma = { client: { findUnique: async () => ({ id: 'daughter', memberships: [], sharedMemberships: [
-    { membership: active }, { membership: { ...active, id: 'expired', validTo: new Date('2000-01-01') } },
+    { membership: active }, { membership: { ...active, id: 'expired', status: 'expired', validTo: new Date('2000-01-01'), validUntil: new Date('2000-01-01') } },
   ] }) } };
   const result = await new ClientsService(prisma).findOne('daughter');
-  assert.equal(result.memberships.length, 1);
+  assert.equal(result.memberships.length, 2);
   assert.equal(result.memberships[0].isShared, true);
   assert.equal(result.memberships[0].ownerName, 'Елена Смирнова');
+  assert.equal(result.memberships[1].isActive, false);
 });

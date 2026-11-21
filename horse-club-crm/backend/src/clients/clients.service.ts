@@ -29,6 +29,10 @@ const paymentSummarySelect = {
 } satisfies Prisma.PaymentSelect;
 
 const clientMembershipSelect = {
+  operations: { where: { type: { in: ['DEBIT', 'REFUND'] } }, include: { lesson: { select: { id: true, startTime: true, trainer: { select: { name: true } }, service: { select: { title: true, name: true } } } } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+  transactions: { where: { sourceMembershipOpId: null, bookingId: { not: null }, transactionType: { in: ['usage', 'refund', 'penalty_cancellation'] } },
+    include: { booking: { select: { startTime: true, serviceType: true, trainer: { select: { name: true } } } } },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
   pricePerLesson: true, revenueRecognitions: { select: { amount: true } },
   clientId: true, client: { select: { name: true, firstName: true, lastName: true } },
   members: { include: { client: { select: { id: true, name: true, firstName: true, lastName: true } } } },
@@ -186,15 +190,15 @@ export class ClientsService {
     const now = new Date();
     return {
       ...client,
-      memberships: [...client.memberships, ...(client.deletedAt ? [] : client.sharedMemberships ?? [])
-        .map(member => member.membership)
-        .filter(m => !m.deletedAt && m.status === 'active' && Number(m.remainingUnits) > 0 && m.validFrom <= now && m.validTo >= now)].map((membership) => ({
+      memberships: [...client.memberships, ...(client.sharedMemberships ?? []).map(member => member.membership)].map((membership) => ({
         ...membership,
         recognizedRevenue: (membership.revenueRecognitions ?? []).reduce((sum, row) => sum.plus(row.amount), new Prisma.Decimal(0)),
         ownerClientId: membership.clientId,
         isShared: membership.clientId !== id,
         ownerName: membership.client?.name || [membership.client?.firstName, membership.client?.lastName].filter(Boolean).join(' '),
-        isActive: !membership.deletedAt && membership.status === 'active' && membership.remainedLessons > 0 && membership.validUntil >= now,
+        isActive: !membership.deletedAt && membership.status === 'active'
+          && (membership.type === 'deposit' ? Number(membership.remainingUnits) > 0 : membership.remainedLessons > 0)
+          && membership.validFrom <= now && membership.validUntil >= now,
       })),
     };
   }

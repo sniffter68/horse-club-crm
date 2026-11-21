@@ -5,7 +5,6 @@ require('reflect-metadata');
 const { PrismaClient } = require('@prisma/client');
 const { BookingLifecycleService } = require('../dist/bookings/booking-lifecycle.service');
 const { MembershipLedgerService } = require('../dist/memberships/membership-ledger.service');
-const { MembershipsService } = require('../dist/memberships/memberships.service');
 const { ClientsService } = require('../dist/clients/clients.service');
 const hasCode = code => e => e.getStatus?.() === 409 && e.getResponse().code === code;
 
@@ -23,6 +22,7 @@ test('PostgreSQL lifecycle, journal bridge and concurrent financial outcomes', {
     const [{ now }] = await p.$queryRaw`SELECT clock_timestamp() AS now`;
     const membership = noMembership ? null : await p.membership.create({ data: {
       clientId: client.id, type, title: 'Lifecycle QA', initialUnits: units, remainingUnits: units,
+      ...(type === 'fixed_lessons' ? { totalPrice: Number(units) * 1500, pricePerLesson: 1500 } : {}),
       validFrom: new Date(+now - 86400000), validTo: new Date(+now + 30 * 86400000),
     } });
     const data = { clientId: client.id, trainerId: trainer.id, horseId: horse.id, arenaId: arena.id,
@@ -33,6 +33,19 @@ test('PostgreSQL lifecycle, journal bridge and concurrent financial outcomes', {
   const balance = id => p.membership.findUniqueOrThrow({ where: { id } });
   const journal = id => p.ledgerTransaction.findMany({ where: { bookingId: id } });
   try {
+    await t.test('concurrent club cancellation of a completed visit refunds exact units once', async () => {
+      for (const type of ['fixed_lessons', 'deposit']) {
+        const f = await fixture({ type, units: type === 'deposit' ? '2000.50' : '8', cost: '1250.75' });
+        await lifecycle.transition(f.booking.id, 'complete');
+        const actorId = randomUUID();
+        await Promise.all([1, 2].map(() => lifecycle.transition(f.booking.id, 'cancel', { cancelledBy: 'club', reason: 'Ошибка отметки' }, actorId)));
+        assert.equal((await balance(f.membership.id)).remainingUnits.toString(), type === 'deposit' ? '2000.5' : '8');
+        assert.equal((await journal(f.booking.id)).filter(row => row.transactionType === 'refund').length, 1);
+        assert.equal((await p.booking.findUniqueOrThrow({ where: { id: f.booking.id } })).status, 'cancelled_club');
+        const revenue = await p.revenueRecognition.aggregate({ where: { bookingId: f.booking.id }, _sum: { amount: true } });
+        assert.equal(revenue._sum.amount.toNumber(), 0);
+      }
+    });
     await t.test('completion atomically debits one fixed unit and both representations agree', async () => {
       const f = await fixture();
       assert.equal((await lifecycle.transition(f.booking.id, 'complete')).status, 'completed');
@@ -144,7 +157,9 @@ test('PostgreSQL lifecycle, journal bridge and concurrent financial outcomes', {
     });
     await t.test('legacy issuance and debit share balance and canonical history with new completion', async () => {
       const f = await fixture({ noMembership: true });
-      const m = await new MembershipsService(p).create({ clientId: f.booking.clientId, totalLessons: 3, validUntil: new Date(Date.now() + 86400000).toISOString() });
+      const m = await p.membership.create({ data: { clientId: f.booking.clientId, totalLessons: 3, remainedLessons: 3,
+        totalPrice: 4500, pricePerLesson: 1500, validUntil: new Date(Date.now() + 86400000),
+        operations: { create: { type: 'CREDIT', amount: 3, reason: 'Legacy fixture issuance' } } } });
       assert.equal(m.remainingUnits.toString(), '3'); assert.equal(+m.validTo, +m.validUntil);
       const service = await p.service.create({ data: { name: 'Lifecycle legacy', durationMinutes: 30, maxCapacity: 1 } }); services.push(service.id);
       const lesson = await p.lesson.create({ data: { trainerId: f.booking.trainerId, serviceId: service.id, startTime: f.booking.startTime, endTime: f.booking.endTime } }); lessons.push(lesson.id);
@@ -184,15 +199,8 @@ test('PostgreSQL lifecycle, journal bridge and concurrent financial outcomes', {
     });
   } finally {
     if (app) await app.close();
-    await p.ledgerTransaction.deleteMany({ where: { clientId: { in: clients } } });
-    await p.payment.deleteMany({ where: { clientId: { in: clients } } });
-    await p.membershipOp.deleteMany({ where: { membership: { clientId: { in: clients } } } });
-    await p.booking.deleteMany({ where: { clientId: { in: clients } } });
-    await p.membership.deleteMany({ where: { clientId: { in: clients } } });
-    await p.lesson.deleteMany({ where: { id: { in: lessons } } });
-    await p.service.deleteMany({ where: { id: { in: services } } });
-    await p.horse.deleteMany({ where: { id: { in: horses } } }); await p.trainer.deleteMany({ where: { id: { in: trainers } } });
-    await p.arena.deleteMany({ where: { id: { in: arenas } } }); await p.client.deleteMany({ where: { id: { in: clients } } });
+    // Financial journals are immutable. The runner drops this entire disposable
+    // database (guarded by horse_os_triad_check_ above), rather than deleting rows.
     await p.$disconnect();
   }
 });

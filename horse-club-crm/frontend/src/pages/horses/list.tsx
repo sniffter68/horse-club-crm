@@ -1,4 +1,5 @@
 import { ProfileHeader, ProfileSection, ProfileFields } from '../cards/ProfileDetails'
+import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { HorseForm } from './form'
 import { CatalogEditAction } from '../catalogs/EditDrawer'
@@ -49,6 +50,12 @@ export function HorseList() {
           { label: 'Масть', value: horse.coat || 'Не указана' },
           { label: 'Год рождения', value: horse.birthYear || 'Не указан' },
           { label: 'Тип принадлежности', value: horse.ownerType === 'private' ? 'Частная' : 'Клубная' },
+          { label: 'Владелец', value: horse.owner ? personName(horse.owner) : horse.ownerType === 'private' ? 'Не указан' : 'Клуб' },
+          { label: 'Текущий денник и корпус', value: permissions.boardingAccess && horse.stall
+            ? <Link to={`/stable?stallId=${horse.stall.id}`}>{horse.stall.building?.name || 'Корпус не указан'} · Денник {horse.stall.number || horse.stall.name}</Link>
+            : 'Не назначен' },
+          { label: 'Статус постоя', value: horse.currentBoardingContract
+            ? horse.currentBoardingContract.status === 'ACTIVE' ? 'Активен' : 'Приостановлен' : 'Нет действующего договора' },
         ]} /></ProfileSection>
         <ProfileSection title="Рабочие нормативы"><ProfileFields items={[
           { label: 'Лимит дневной нагрузки', value: `${horse.maxDailyMinutes ?? '—'} мин/день` },
@@ -56,7 +63,7 @@ export function HorseList() {
           { label: 'Рекомендуемый уровень всадника', value: horse.riderLevel || 'Не указан' },
         ]} /></ProfileSection>
         {permissions.boardingAccess && <section><Typography.Title level={5}>Постой</Typography.Title>
-          <QuickBoardingActions key={horse.id} context={{ kind: 'HORSE', id: horse.id, name: horse.name, ownerClientId: horse.boardingContracts[0]?.client?.id }}
+          <QuickBoardingActions key={horse.id} context={{ kind: 'HORSE', id: horse.id, name: horse.name, ownerClientId: horse.owner?.id ?? horse.currentBoardingContract?.client?.id }}
             contracts={horse.boardingContracts} currentContract={horse.currentBoardingContract} disabled={!ready} />
           {horse.boardingContracts.length ? <List dataSource={horse.boardingContracts} renderItem={contract => <List.Item>
             <Space wrap><Tag color={contract.status === 'ACTIVE' ? 'green' : 'default'}>{contract.status}</Tag>

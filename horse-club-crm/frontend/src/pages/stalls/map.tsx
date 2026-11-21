@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Alert, App, Button, Card, Empty, Select, Space, Spin, Statistic, Tag, Tooltip, Typography } from 'antd'
 import { PrinterOutlined, WarningOutlined } from '@ant-design/icons'
 import { useOnError } from '@refinedev/core'
@@ -18,6 +18,7 @@ import { StallCard } from './card'
 const colors = { AVAILABLE: 'green', OCCUPIED: 'default', MAINTENANCE: 'orange', QUARANTINE: 'red' }
 
 export function StallMap() {
+  const [search, setSearch] = useSearchParams()
   const [buildings, setBuildings] = useState<StableBuilding[]>([])
   const [stalls, setStalls] = useState<MapStall[]>([])
   const [horses, setHorses] = useState<MapHorse[]>([])
@@ -25,7 +26,7 @@ export function StallMap() {
   const [loaded, setLoaded] = useState(false)
   const [constructing, setConstructing] = useState(false)
   const [error, setError] = useState<string>()
-  const [selectedId, setSelectedId] = useState<string>()
+  const [selectedId, setSelectedId] = useState<string | undefined>(() => isUuid(search.get('stallId') || '') ? search.get('stallId')! : undefined)
   const [printId, setPrintId] = useState<string>()
   const { canManage } = useCatalogPermissions('stalls')
   const { mutate: onError } = useOnError()
@@ -90,7 +91,7 @@ export function StallMap() {
       <BuildingMap buildings={buildings} stalls={visible} canManage={canManage} tile={tile} onSaved={updated => { if (updated) setStalls(updated); void refresh() }} onEditingChange={setConstructing} />
     </>}
     {selected && <StallDetails key={selected.id} stall={selected} horses={horses} stalls={stalls} canManage={canManage}
-      onClose={() => setSelectedId(undefined)} onUpdated={refresh} onSaved={saved} onPrint={() => setPrintId(selected.id)} />}
+      onClose={() => { setSelectedId(undefined); setSearch(previous => { previous.delete('stallId'); return previous }) }} onUpdated={refresh} onSaved={saved} onPrint={() => setPrintId(selected.id)} />}
     {printed && <StallSign stall={printed} onClose={() => setPrintId(undefined)} />}
   </section>
 }

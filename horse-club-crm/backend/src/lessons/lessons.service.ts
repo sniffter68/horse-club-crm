@@ -294,11 +294,11 @@ export class LessonsService {
         if (!participant.membershipId) continue;
         if (!service.allowMembership) throw new BadRequestException('Услуга не допускает оплату абонементом');
         const membership = await tx.membership.findUnique({ where: { id: participant.membershipId },
-          select: { id: true, clientId: true, remainedLessons: true, validUntil: true, deletedAt: true, status: true } });
+          select: { id: true, clientId: true, remainedLessons: true, validFrom: true, validUntil: true, deletedAt: true, status: true } });
         if (!membership || !await canUseMembership(tx, membership, participant.clientId)) {
           throw new BadRequestException('Абонемент не принадлежит участнику');
         }
-        if (membership.deletedAt || membership.status !== 'active' || membership.remainedLessons <= 0 || membership.validUntil < end) {
+        if (membership.deletedAt || membership.status !== 'active' || membership.remainedLessons <= 0 || membership.validFrom > start || membership.validUntil < end) {
           throw new BadRequestException('Абонемент недоступен на время занятия');
         }
       }
@@ -474,6 +474,7 @@ export class LessonsService {
       const membership = await tx.membership.findUnique({ where: { id: membershipId } });
       if (!membership || membership.clientId !== booking.clientId) throw new BadRequestException('Абонемент не принадлежит клиенту занятия');
       if (membership.deletedAt || membership.status !== 'active' || membership.type !== 'fixed_lessons' || membership.remainedLessons <= 0
+        || membership.validFrom > new Date() || membership.validFrom > lesson.startTime
         || membership.validUntil < new Date() || membership.validUntil < lesson.endTime) throw new BadRequestException('Абонемент недоступен для занятия');
       if (membership.serviceId && membership.serviceId !== lesson.serviceId) throw new BadRequestException('Абонемент предназначен для другой услуги');
       // The ledger owns the atomic decrement and audited DEBIT. Completion and
@@ -485,6 +486,46 @@ export class LessonsService {
         await tx.$queryRaw`SELECT post_late_membership_revenue(${booking.id}::uuid, ${lesson.startTime}::timestamptz, ${membershipId}::uuid, ${actor.id}::uuid)::text`;
       }
       return tx.lesson.update({ where: { id: lessonId }, data: { cost: 0, paymentStatus: 'PAID_BY_MEMBERSHIP', financialActorId: actor.id }, ...lessonDetails });
+    });
+  }
+
+  /** Unlinking is an explicit audited settlement, never a generic Booking PATCH. */
+  async unlinkMembership(lessonId: string, bookingId: string, reason: string, actor: AuthUser): Promise<LessonDetails> {
+    reason = reason.trim();
+    if (!reason) throw new BadRequestException('Укажите причину отвязки абонемента');
+    return this.runSerializable(async tx => {
+      const lesson = await tx.lesson.findUnique({ where: { id: lessonId }, ...lessonDetails });
+      if (!lesson || lesson.deletedAt || lesson.status === 'CANCELLED') throw new NotFoundException('Занятие не найдено');
+      const booking = lesson.bookings.find(row => row.id === bookingId);
+      if (!booking) throw new NotFoundException('Участник занятия не найден');
+      if (!booking.membershipId) return lesson;
+      if (booking.payments.some(row => row.status === 'PAID')) throw new ConflictException('Участник также оплачен деньгами. Сначала согласуйте способ оплаты');
+      const membershipId = booking.membershipId;
+      const debit = await tx.membershipOp.findFirst({ where: { membershipId, lessonId, type: 'DEBIT',
+        OR: [{ attendeeClientId: booking.clientId }, ...(booking.membership?.clientId === booking.clientId ? [{ attendeeClientId: null }] : [])] } });
+      const refund = await tx.membershipOp.findFirst({ where: { membershipId, lessonId, type: 'REFUND',
+        OR: [{ attendeeClientId: booking.clientId }, ...(booking.membership?.clientId === booking.clientId ? [{ attendeeClientId: null }] : [])] } });
+      if (debit && !refund) await this.membershipLedgerService.refundLesson(membershipId, lessonId, reason, tx, debit.attendeeClientId ?? undefined);
+      if (lesson.status === 'COMPLETED') {
+        // Keep recognition append-only; transfer only the outstanding membership revenue.
+        const earned = await tx.revenueRecognition.aggregate({ where: { bookingId, membershipId }, _sum: { amount: true } });
+        await tx.revenueRecognition.create({ data: { bookingId, membershipId, type: 'UNLINK_MEMBERSHIP_REVERSAL',
+          amount: (earned._sum.amount ?? new Prisma.Decimal(0)).negated(), recognizedAt: lesson.startTime, createdById: actor.id } });
+        const oneOff = await tx.revenueRecognition.aggregate({ where: { bookingId, membershipId: null }, _sum: { amount: true } });
+        await tx.revenueRecognition.create({ data: { bookingId, type: 'UNLINK_ONE_OFF_RECOGNITION',
+          amount: money(lesson.service.price).minus(oneOff._sum.amount ?? 0), recognizedAt: lesson.startTime, createdById: actor.id } });
+      }
+      await tx.booking.update({ where: { id: bookingId }, data: { membershipId: null, isPaid: money(booking.costAmount).lte(0), financialActorId: actor.id } });
+      const cost = lesson.bookings.filter(row => row.id === bookingId || !row.membershipId)
+        .reduce((sum, row) => sum.plus(row.costAmount), new Prisma.Decimal(0));
+      const paid = lesson.bookings.filter(row => !row.membershipId)
+        .reduce((sum, row) => sum.plus(row.prepaymentAmount).plus(row.finalPaymentAmount), new Prisma.Decimal(0));
+      await tx.lesson.update({ where: { id: lessonId }, data: { cost, paymentStatus: paymentStatus(cost, paid), financialActorId: actor.id } });
+      if (money(booking.costAmount).gt(0)) await tx.payment.create({ data: { bookingId, clientId: booking.clientId,
+        amount: booking.costAmount, method: 'UNSPECIFIED', status: 'PENDING', description: 'Оплата после отвязки абонемента' } });
+      await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'LESSON_MEMBERSHIP_UNLINKED', actorId: actor.id,
+        actorName: actor.email, details: { lessonId, bookingId, membershipId, reason } } });
+      return tx.lesson.findUniqueOrThrow({ where: { id: lessonId }, ...lessonDetails });
     });
   }
 
@@ -569,6 +610,7 @@ export class LessonsService {
               deletedAt: null,
               remainedLessons: { gt: 0 },
               validUntil: { gte: new Date() },
+              validFrom: { lte: new Date() },
             },
             orderBy: [{ validUntil: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
             select: { id: true },

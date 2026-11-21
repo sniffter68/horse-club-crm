@@ -8,6 +8,50 @@ const { MembershipLedgerService } = require('../dist/memberships/membership-ledg
 const { LessonsService } = require('../dist/lessons/lessons.service');
 const { CashDeskService } = require('../dist/payments/cash-desk.service');
 
+test('PostgreSQL concurrent completion/unlink refunds once and cancellation reverses the append-only settlement', {
+  skip: process.env.RUN_MEMBERSHIP_SALE_TESTS !== '1', timeout: 60000,
+}, async () => {
+  const url = new URL(process.env.DATABASE_URL);
+  assert.ok(['localhost', '127.0.0.1'].includes(url.hostname));
+  assert.match(url.searchParams.get('schema'), /^membership_sale_check_\d+$/);
+  const p = new PrismaClient();
+  try {
+    const actor = await p.user.create({ data: { email: `${randomUUID()}@unlink.test`, passwordHash: 'test', role: 'ADMIN' } });
+    const client = await p.client.create({ data: { name: 'Unlink payer' } });
+    const trainer = await p.trainer.create({ data: { name: 'Unlink trainer' } });
+    const service = await p.service.create({ data: { name: 'Unlink training', durationMinutes: 60, price: 1500, allowMembership: true } });
+    const membership = await new MembershipsService(p).create({ clientId: client.id, serviceId: service.id, totalLessons: 4, totalPrice: 4000,
+      paymentMethod: 'CARD', validUntil: '2099-12-31T20:59:59Z', requestId: randomUUID() }, actor);
+    const startTime = new Date(), endTime = new Date(+startTime + 3600000);
+    const lesson = await p.lesson.create({ data: { trainerId: trainer.id, serviceId: service.id, startTime, endTime,
+      bookings: { create: { trainerId: trainer.id, clientId: client.id, membershipId: membership.id, startTime, endTime, costAmount: 1200, legacyLessonBinding: true } } }, include: { bookings: true } });
+    const lessons = new LessonsService(p, new MembershipLedgerService(p));
+    await Promise.all([1, 2].map(() => lessons.updateLessonStatus(lesson.id, 'COMPLETED', {}, actor)));
+    assert.equal((await p.membership.findUniqueOrThrow({ where: { id: membership.id } })).remainedLessons, 3);
+    const failing = p.$extends({ query: { cashAuditLog: { async create({ args, query }) {
+      if (args.data.action === 'LESSON_MEMBERSHIP_UNLINKED') throw new Error('audit unavailable');
+      return query(args);
+    } } } });
+    await assert.rejects(new LessonsService(failing, new MembershipLedgerService(failing))
+      .unlinkMembership(lesson.id, lesson.bookings[0].id, 'Ошибка оплаты', actor), /audit unavailable/);
+    assert.equal((await p.membership.findUniqueOrThrow({ where: { id: membership.id } })).remainedLessons, 3);
+    assert.equal((await p.booking.findUniqueOrThrow({ where: { id: lesson.bookings[0].id } })).membershipId, membership.id);
+    assert.equal(await p.membershipOp.count({ where: { lessonId: lesson.id, type: 'REFUND' } }), 0);
+    assert.equal(await p.revenueRecognition.count({ where: { bookingId: lesson.bookings[0].id, type: { startsWith: 'UNLINK_' } } }), 0);
+    await Promise.all([1, 2].map(() => lessons.unlinkMembership(lesson.id, lesson.bookings[0].id, 'Ошибка оплаты', actor)));
+    assert.equal((await p.membership.findUniqueOrThrow({ where: { id: membership.id } })).remainedLessons, 4);
+    assert.equal(await p.membershipOp.count({ where: { lessonId: lesson.id, type: 'REFUND' } }), 1);
+    const earned = await p.revenueRecognition.findMany({ where: { bookingId: lesson.bookings[0].id } });
+    assert.equal(earned.reduce((sum, r) => sum + Number(r.amount), 0), 1500);
+    assert.equal(earned.filter(r => r.membershipId).reduce((sum, r) => sum + Number(r.amount), 0), 0);
+    assert.equal(await p.cashAuditLog.count({ where: { action: 'LESSON_MEMBERSHIP_UNLINKED', details: { path: ['lessonId'], equals: lesson.id } } }), 1);
+    await lessons.updateLessonStatus(lesson.id, 'CANCELLED', {}, actor, { refund: false, reason: 'Отмена после отвязки' });
+    const cancelled = await p.revenueRecognition.aggregate({ where: { bookingId: lesson.bookings[0].id }, _sum: { amount: true } });
+    assert.equal(cancelled._sum.amount.toNumber(), 0);
+    assert.equal((await p.membership.findUniqueOrThrow({ where: { id: membership.id } })).remainedLessons, 4);
+  } finally { await p.$disconnect(); }
+});
+
 test('PostgreSQL one-off settlement preserves revenue history and cancellation reverses revised price', {
   skip: process.env.RUN_MEMBERSHIP_SALE_TESTS !== '1', timeout: 60000,
 }, async () => {
@@ -36,7 +80,7 @@ test('PostgreSQL one-off settlement preserves revenue history and cancellation r
       const updated = await p.lesson.findUniqueOrThrow({ where: { id: lesson.id } });
       assert.equal(updated.paymentStatus, 'PAID'); assert.equal(updated.cost.toString(), '1750.5');
       const journal = await p.revenueRecognition.findMany({ where: { bookingId } });
-      assert.equal(journal.find(row => row.type === 'REVENUE_RECOGNITION').amount.toString(), String(originalCost));
+      assert.equal(journal.find(row => row.type === 'REVENUE_RECOGNITION').amount.toString(), service.price.toString());
       assert.equal(journal.reduce((sum, row) => sum + Number(row.amount), 0), 1750.5);
       const lessons = new LessonsService(p, new MembershipLedgerService(p));
       await lessons.updateLessonStatus(lesson.id, 'CANCELLED', {}, actor, { refund: false, reason: 'Settlement cancellation test' });

@@ -8,17 +8,24 @@ import { applyCastration } from './vet-horse-sex';
 
 const include = { horse: { select: { id: true, name: true, status: true } } } satisfies Prisma.VetEventInclude;
 export const vetStatus = (event: { status: string; eventDate: Date }, now: Date) => event.status === 'completed' ? 'completed'
-  : DateTime.fromJSDate(event.eventDate, { zone: process.env.CLUB_TIME_ZONE || 'Europe/Moscow' }).startOf('day')
-    < DateTime.fromJSDate(now, { zone: process.env.CLUB_TIME_ZONE || 'Europe/Moscow' }).startOf('day') ? 'overdue' : 'scheduled';
+  : DateTime.fromJSDate(event.eventDate, { zone: 'Europe/Moscow' }).startOf('day')
+    < DateTime.fromJSDate(now, { zone: 'Europe/Moscow' }).startOf('day') ? 'overdue' : 'scheduled';
 
 @Injectable()
 export class VetCalendarService {
   constructor(private readonly prisma: PrismaService) {}
   async list(query: VetQueryDto, upcoming = false) {
     const now = new Date();
-    const horizon = DateTime.fromJSDate(now, { zone: process.env.CLUB_TIME_ZONE || 'Europe/Moscow' }).plus({ days: 14 }).endOf('day').toJSDate();
+    const horizon = DateTime.fromJSDate(now, { zone: 'Europe/Moscow' }).plus({ days: 14 }).endOf('day').toJSDate();
     const where: Prisma.VetEventWhereInput = { horseId: query.horseId, type: query.type,
       ...(upcoming ? { status: { not: 'completed' }, eventDate: { lte: horizon } } : { eventDate: period(query) }) };
+    const today = DateTime.fromJSDate(now, { zone: 'Europe/Moscow' }).startOf('day').toJSDate();
+    if (query.status === 'completed') where.status = 'completed';
+    if (query.status === 'overdue' || query.status === 'scheduled') {
+      where.status = { not: 'completed' };
+      // Derived statuses must be filtered in SQL before pagination/counting.
+      where.AND = [{ eventDate: query.status === 'overdue' ? { lt: today } : { gte: today, lte: horizon } }];
+    }
     const [data, total] = await this.prisma.$transaction([
       this.prisma.vetEvent.findMany({ where, include, orderBy: [{ eventDate: upcoming ? 'asc' : 'desc' }, { id: 'asc' }], skip: query.offset, take: query.limit }),
       this.prisma.vetEvent.count({ where }),

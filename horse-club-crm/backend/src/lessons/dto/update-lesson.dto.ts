@@ -1,12 +1,17 @@
 import { CancelServiceDto } from '../../payments/dto/cancel-service.dto';
 import { ApiProperty, PartialType, IntersectionType } from '@nestjs/swagger';
 import { LessonStatus } from '@prisma/client';
-import { IsIn, IsISO8601, IsInt, Min, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsISO8601, IsInt, Min, IsOptional, IsUUID, IsString, Length } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { CreateLessonDto } from './create-lesson.dto';
 import { CompleteLessonDto } from './lesson-payment.dto';
 
 export class UpdateLessonDto extends PartialType(CreateLessonDto) {}
+
+export class UnlinkLessonMembershipDto {
+  @Transform(({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value)
+  @IsString() @Length(1, 1000) reason!: string;
+}
 
 export class RescheduleLessonDto {
   @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID()

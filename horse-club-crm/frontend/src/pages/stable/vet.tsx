@@ -63,6 +63,8 @@ function LegacyVetJournal({ horseId, scope = 'horse' }: { horseId?: string; scop
   const [horsePage, setHorsePage] = useState(1)
   const [horseType, setHorseType] = useState<VetType>()
   const [showHistory, setShowHistory] = useState(false)
+  const [horseStatus, setHorseStatus] = useState<string>('all')
+  const status = horseScoped ? horseStatus : search.get('eventStatus') || 'all'
   const [editor, setEditor] = useState<VetEvent | 'new'>()
   const type = horseScoped ? horseType : (search.get('type') && search.get('type')! in vetTypes ? search.get('type') as VetType : undefined)
   const { page, offset, limit } = stablePagination(horseScoped ? horsePage : search.get('page'))
@@ -74,7 +76,8 @@ function LegacyVetJournal({ horseId, scope = 'horse' }: { horseId?: string; scop
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
   if (horseScoped && validHorseId) params.set('horseId', horseId)
   if (type) params.set('type', type)
-  const query = useStableList<VetEvent>(`vet/${horseScoped || showHistory ? 'events' : 'upcoming'}?${params}`, {
+  if (['overdue', 'scheduled', 'completed'].includes(status)) params.set('status', status)
+  const query = useStableList<VetEvent>(`vet/${horseScoped || showHistory || status !== 'all' ? 'events' : 'upcoming'}?${params}`, {
     enabled: permissions.healthRead && (!horseScoped || validHorseId), horseIdRequired: horseScoped,
   })
   if (!permissions.healthRead) return <Alert type="info" showIcon message="Просмотр журнала здоровья недоступен вашей роли" />
@@ -88,7 +91,13 @@ function LegacyVetJournal({ horseId, scope = 'horse' }: { horseId?: string; scop
           if (horseScoped) { setHorseType(next); setHorsePage(1) }
           else setSearch(previous => { if (next) previous.set('type', next); else previous.delete('type'); previous.delete('page'); return previous })
         }} />
-      {!horseScoped && <Select aria-label="Период веткалендаря" value={showHistory ? 'history' : 'upcoming'} style={{ minWidth: 190 }}
+      <Select aria-label="Статус ветпроцедур" value={status} style={{ minWidth: 160 }}
+        options={[{ value: 'all', label: 'Все статусы' }, { value: 'overdue', label: 'Просрочено' }, { value: 'scheduled', label: 'Ближайшие 14 дней' }, { value: 'completed', label: 'Выполнено' }]}
+        onChange={(value: string) => {
+          if (horseScoped) { setHorseStatus(value); setHorsePage(1) }
+          else setSearch(previous => { if (value === 'all') previous.delete('eventStatus'); else previous.set('eventStatus', value); previous.delete('page'); return previous })
+        }} />
+      {!horseScoped && status === 'all' && <Select aria-label="Период веткалендаря" value={showHistory ? 'history' : 'upcoming'} style={{ minWidth: 190 }}
         options={[{ value: 'upcoming', label: 'Просрочено и 14 дней' }, { value: 'history', label: 'Все процедуры' }]}
         onChange={value => { setShowHistory(value === 'history'); setPage(1) }} />}
       {canManage && <Button type="primary" onClick={() => setEditor('new')}>Добавить процедуру</Button>}
@@ -104,7 +113,7 @@ function LegacyVetJournal({ horseId, scope = 'horse' }: { horseId?: string; scop
         {canManage && event.status !== 'completed' && <Button size="small" onClick={() => setEditor(event)}>Отметить выполнение</Button>}
       </div></List.Item>} />
     </StableListState>
-    {editor && <VetEntry horseId={horseId} event={editor === 'new' ? undefined : editor} onClose={() => setEditor(undefined)}
+    {editor && <VetEntry variant="drawer" horseId={horseId} event={editor === 'new' ? undefined : editor} onClose={() => setEditor(undefined)}
       onSaved={() => { setEditor(undefined); query.refresh() }} />}
   </section>
 }

@@ -33,7 +33,7 @@ import { CreateLessonDto } from './dto/create-lesson.dto';
 import { ListLessonsQueryDto } from './dto/list-lessons-query.dto';
 import { LessonHistoryQueryDto } from './dto/lesson-history-query.dto';
 import { setRefineTotalHeaders } from '../common/refine';
-import { RescheduleLessonDto, UpdateLessonStatusDto } from './dto/update-lesson.dto';
+import { RescheduleLessonDto, UpdateLessonStatusDto, UnlinkLessonMembershipDto } from './dto/update-lesson.dto';
 import type { LessonDetails } from './lessons.service';
 import { LessonsService } from './lessons.service';
 
@@ -127,6 +127,13 @@ export class LessonsController {
   @Roles(Role.ADMIN, Role.MANAGER)
   payWithMembership(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: PayWithMembershipDto, @CurrentUser() actor: AuthUser) {
     return this.lessonsService.payWithMembership(id, dto.membershipId, actor);
+  }
+
+  @Post(':id/bookings/:bookingId/unlink-membership')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  unlinkMembership(@Param('id', new ParseUUIDPipe()) id: string, @Param('bookingId', new ParseUUIDPipe()) bookingId: string,
+    @Body() dto: UnlinkLessonMembershipDto, @CurrentUser() actor: AuthUser) {
+    return this.lessonsService.unlinkMembership(id, bookingId, dto.reason, actor);
   }
 
   @Patch(':id/reschedule')

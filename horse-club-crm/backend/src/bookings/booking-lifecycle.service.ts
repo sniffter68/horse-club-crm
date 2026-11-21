@@ -1,11 +1,12 @@
 import { canUseMembership, membershipAccessWhere } from '../memberships/membership-access';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type BookingStatus, type Membership, type MembershipType } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../prisma/prisma.service';
 import { isSerializationFailure } from '../common/serialization-failure';
 import { BookingValidationError } from './booking-validation.error';
 import type { CancelBookingDto } from './dto/cancel-booking.dto';
+import { randomUUID } from 'node:crypto';
 
 export const cancellationStatus = (start: Date, now: Date): BookingStatus =>
   +start - +now >= 12 * 60 * 60 * 1000 ? 'cancelled_client' : 'penalty_cancellation';
@@ -34,6 +35,28 @@ export class BookingLifecycleService {
           const same = action === 'complete' ? initial.status === 'completed' : action === 'no-show' ? initial.status === 'no_show'
             : cancellation?.cancelledBy === 'club' ? initial.status === 'cancelled_club' : ['cancelled_client', 'penalty_cancellation'].includes(initial.status);
           if (same) return initial;
+          if (action === 'cancel' && cancellation?.cancelledBy === 'club' && initial.membershipId
+            && ['completed', 'no_show'].includes(initial.status)) {
+            if (!actorId) throw new ForbiddenException('Для возврата требуется пользователь');
+            const membership = await this.lockMembership(tx, initial.membershipId);
+            if (!membership) throw new BookingValidationError('MEMBERSHIP_INVALID', 'Абонемент не найден');
+            await tx.$queryRaw`SELECT "id" FROM "Booking" WHERE "id"=${id}::uuid FOR UPDATE`;
+            const charge = await tx.ledgerTransaction.findFirst({ where: { bookingId: id, membershipId: membership.id,
+              sourceMembershipOpId: null, transactionType: { in: ['usage', 'penalty_cancellation'] } } });
+            if (!charge) throw new BookingValidationError('BOOKING_STATE_CONFLICT', 'Не найдено исходное списание для возврата');
+            const priorRefund = await tx.ledgerTransaction.findFirst({ where: { bookingId: id, membershipId: membership.id, transactionType: 'refund' } });
+            if (!priorRefund) {
+              await tx.membership.update({ where: { id: membership.id }, data: { remainingUnits: { increment: charge.amount.abs() },
+                ...(membership.status === 'exhausted' ? { status: membership.validTo < new Date() ? 'expired' : 'active' } : {}) } });
+              await tx.ledgerTransaction.create({ data: { clientId: initial.clientId, ownerClientId: membership.clientId,
+                membershipId: membership.id, bookingId: id, transactionType: 'refund', amount: charge.amount.abs(), description: cancellation.reason } });
+            }
+            await tx.$queryRaw`SELECT reverse_booking_revenue(${id}::uuid)::text`;
+            await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'BOOKING_MEMBERSHIP_REFUNDED', actorId, actorName: actorId,
+              details: { bookingId: id, membershipId: membership.id, reason: cancellation.reason } } });
+            return tx.booking.update({ where: { id }, data: { status: 'cancelled_club', cancellationReason: cancellation.reason,
+              attended: false, attendanceStatus: 'PENDING', financialActorId: actorId } });
+          }
           if (initial.status !== 'scheduled') throw new BookingValidationError('BOOKING_STATE_CONFLICT', 'Исход тренировки уже зафиксирован. Обновите расписание');
           const [{ now: lookupTime }] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
           let membership: Membership | null = null;

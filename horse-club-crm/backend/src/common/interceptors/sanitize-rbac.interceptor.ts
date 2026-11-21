@@ -30,7 +30,7 @@ export class SanitizeRbacInterceptor implements NestInterceptor {
       if (!visible('VETERINARY')) hidden.push('healthLogs', 'vetEvents', 'vetRecords', 'healthStatus', 'quarantineUntil', 'lastShoeingAt', 'lastVaccinationAt', 'lastDewormingAt', 'lastVetCheckAt', 'lastDentistAt');
       if (!visible('STABLES')) hidden.push('boardingContracts', 'currentBoardingContract', 'stall');
       if (!visible('SCHEDULE')) hidden.push('bookings', 'lessons');
-      if (!visible('CASHBOX')) hidden.push('payments', 'operations', 'recognizedRevenue', 'revenueRecognitions', 'pricePerLesson', 'totalPrice');
+      if (!visible('CASHBOX')) hidden.push('payments', 'operations', 'transactions', 'recognizedRevenue', 'revenueRecognitions', 'pricePerLesson', 'totalPrice');
       if (!visible('STAFF_PAYROLL') || (user.role !== Role.ADMIN && user.role !== Role.MANAGER)) hidden.push('baseRate', 'commissionPercent', 'shiftRate', 'lessonRate', 'groupLessonRate', 'lessonPercentage');
       return this.interceptLegacy(context, next).pipe(map(value => this.sanitize(value, hidden)));
     }));
@@ -47,7 +47,7 @@ export class SanitizeRbacInterceptor implements NestInterceptor {
     }
     const fields = [...new Set(['medicalNotes', 'preferences', 'birthDate', 'email', 'phone', 'vkUserId', 'vkId', 'vkScreenName',
       'baseRate', 'price', 'monthlyRate', 'payments', 'membership', 'memberships', 'recognizedRevenue', 'revenueRecognitions', 'pricePerLesson', 'totalPrice',
-      'membershipId', 'operations', 'passwordHash', ...(extraFields ?? [])])];
+      'membershipId', 'operations', 'transactions', 'passwordHash', ...(extraFields ?? [])])];
     if (!this.access) return next.handle().pipe(map((value: unknown) => this.sanitize(value, fields)));
     return from(this.access.permissions(request.user.role)).pipe(switchMap(permissions => {
       let hidden = fields;
@@ -65,7 +65,7 @@ export class SanitizeRbacInterceptor implements NestInterceptor {
       .filter(([key]) => !fields.includes(key))
       .map(([key, item]) => [key, this.sanitize(item, fields)]));
     // Preserve collection shape for existing read-only screens without exposing records.
-    for (const key of ['payments', 'memberships', 'operations', 'healthLogs', 'vetEvents', 'vetRecords', 'boardingContracts', 'bookings', 'lessons']) {
+    for (const key of ['payments', 'memberships', 'operations', 'transactions', 'healthLogs', 'vetEvents', 'vetRecords', 'boardingContracts', 'bookings', 'lessons']) {
       if (fields.includes(key) && Array.isArray((value as JsonObject)[key])) result[key] = [];
     }
     if (fields.includes('currentBoardingContract') && 'currentBoardingContract' in value) result.currentBoardingContract = null;

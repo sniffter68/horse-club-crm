@@ -17,7 +17,8 @@
     "test:staff:postgres": "npm run build && node test/run-staff-postgres.cjs",
     "test:reset:postgres": "npm run build && node test/run-operational-reset-postgres.cjs",
     "test:expenses:postgres": "npm run build && node test/run-expenses-postgres.cjs",
-    "test:stalls:postgres": "npm run build && node test/run-stall-postgres.cjs"
+    "test:stalls:postgres": "npm run build && node test/run-stall-postgres.cjs",
+    "test:operations:postgres": "npm run build && node test/run-operations-postgres.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

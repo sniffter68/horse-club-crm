@@ -188,7 +188,7 @@ export class MembershipLedgerService {
 
     const membership = await tx.membership.findUnique({
       where: { id: membershipId },
-      select: { id: true, clientId: true, remainedLessons: true, validUntil: true, type: true, status: true, deletedAt: true },
+      select: { id: true, clientId: true, remainedLessons: true, validFrom: true, validUntil: true, type: true, status: true, deletedAt: true },
     });
     if (!membership) {
       throw new NotFoundException('Абонемент не найден');
@@ -219,6 +219,9 @@ export class MembershipLedgerService {
     if (membership.validUntil < now) {
       throw new ConflictException('Срок действия абонемента истёк');
     }
+    if (membership.validFrom > now) {
+      throw new ConflictException('Срок действия абонемента ещё не начался');
+    }
 
     // Условный UPDATE дублирует проверки непосредственно в write-запросе.
     // Это дополнительная защита от кода, который изменяет баланс вне сервиса.
@@ -228,6 +231,7 @@ export class MembershipLedgerService {
         deletedAt: null,
         remainedLessons: { gt: 0 },
         validUntil: { gte: now },
+        validFrom: { lte: now },
       },
       data: { remainedLessons: { decrement: 1 } },
     });

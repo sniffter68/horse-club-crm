@@ -195,6 +195,10 @@ async function setupSale(page: Page) {
     return route.fulfill({ status: 201, json: { id: 'membership', ...payload, cashboxPosted: !state.disabled } })
   })
   await page.route('**/api/payments/shifts/current', route => route.fulfill({ json: null }))
+  await page.route('**/api/finance/journal?*', route => route.fulfill({ json: { data: state.receipts.map(receipt => ({
+    ...receipt, kind: 'INCOME', at: receipt.paidAt, clientName: 'Анна Орлова', cashier: 'qa@example.com',
+    description: 'Выездка',
+  })), total: state.receipts.length } }))
   await page.route('**/api/finance/summary?*', route => {
     const cash = state.receipts.filter(row => row.method === 'CASH').reduce((sum, row) => sum + Number(row.amount), 0)
     const card = state.receipts.filter(row => row.method === 'CARD').reduce((sum, row) => sum + Number(row.amount), 0)

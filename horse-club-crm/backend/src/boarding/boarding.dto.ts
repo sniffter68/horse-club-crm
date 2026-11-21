@@ -3,7 +3,7 @@ import { IsEnum, IsISO8601, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, 
 import { VetEventStatus, VetEventType } from '@prisma/client';
 
 export class BoardingQueryDto {
-  @IsOptional() @IsUUID() horseId?: string;
+  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID() horseId?: string;
   @IsOptional() @IsISO8601() from?: string;
   @IsOptional() @IsISO8601() to?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) offset = 0;
@@ -19,6 +19,7 @@ export class CreateBoardingLogDto {
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
 }
 export class VetQueryDto extends BoardingQueryDto {
+  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsEnum(VetEventStatus) status?: VetEventStatus;
   @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsEnum(VetEventType) type?: VetEventType;
 }
 export class CreateVetEventDto {
@@ -28,7 +29,7 @@ export class CreateVetEventDto {
   @IsOptional() @IsISO8601() nextDueDate?: string;
   @IsOptional() @IsString() @MaxLength(200) performedBy?: string;
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
-  @IsOptional() @IsEnum(VetEventStatus) status: VetEventStatus = 'scheduled';
+  @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsEnum(VetEventStatus) status: VetEventStatus = 'scheduled';
 }
 export class CompleteVetEventDto {
   @IsOptional() @IsISO8601() nextDueDate?: string;
