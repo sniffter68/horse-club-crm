@@ -39,6 +39,17 @@ async function openHorseCard(page: import('@playwright/test').Page) {
   await expect(page.getByRole('dialog', { name: 'Карточка лошади' }).getByRole('heading', { name: 'Основная информация', exact: true })).toBeVisible()
 }
 
+test('horse card keeps boarding and modern veterinary tabs without duplicate health log', async ({ page }) => {
+  await page.goto('/horses')
+  await openHorseCard(page)
+  const card = page.getByRole('dialog', { name: 'Карточка лошади' })
+  await card.getByRole('tab', { name: 'Постой и расходы', exact: true }).click()
+  await expect(card.getByRole('heading', { name: 'Журнал здоровья', exact: true })).toHaveCount(0)
+  await card.getByRole('tab', { name: 'Здоровье и ковка', exact: true }).click()
+  await expect(card.getByRole('tab', { name: 'Ветзаписи и паспорт', exact: true })).toBeVisible()
+  await expect(card.getByRole('tab', { name: 'Календарь назначений', exact: true })).toBeVisible()
+})
+
 async function openHorseProcedure(page: import('@playwright/test').Page) {
   await page.goto('/horses')
   await openHorseCard(page)

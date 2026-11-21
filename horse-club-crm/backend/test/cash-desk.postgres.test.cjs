@@ -37,6 +37,19 @@ test('PostgreSQL cash desk atomicity, concurrency, shifts and aggregation', { sk
       assert.equal(summary.totalCash.toString(), '1200.1'); assert.equal(summary.totalCard.toString(), '800.2');
       assert.equal(summary.totalRevenue.toString(), '2000.3'); assert.equal(summary.operationsCount, 2); assert.equal(summary.operations.length, 1);
     });
+    await t.test('service date separates a future booking from receipts collected today', async () => {
+      const query = { from: '2089-12-31T21:00:00Z', to: '2090-01-01T21:00:00Z', cashierId: ids.user, page: 1, pageSize: 1 };
+      const service = await desk.summary(query);
+      assert.equal(service.totalCash.toString(), '1200.1');
+      assert.equal(service.operationsCount, 1);
+      assert.equal(service.operations[0].bookingId, ids.booking);
+      const payment = await desk.summary({ ...query, dateBasis: 'payment' });
+      assert.equal(payment.totalRevenue.toString(), '0');
+      assert.equal(payment.operationsCount, 0);
+      const today = { ...query, from: '2020-01-01T00:00:00Z', to: '2080-01-01T00:00:00Z' };
+      assert.equal((await desk.summary({ ...today, dateBasis: 'payment' })).totalCash.toString(), '1200.1');
+      assert.equal((await desk.summary(today)).totalCash.toString(), '0');
+    });
     await t.test('failed ledger insert rolls back receipt and deposit increment', async () => {
       const before = (await p.membership.findUnique({ where: { id: ids.membership } })).remainingUnits.toString();
       const requestId = randomUUID();

@@ -15,6 +15,7 @@ export class CashDeskPaymentDto {
   @IsOptional() @IsString() @MaxLength(500) notes?: string;
 }
 export class CashSummaryQueryDto {
+  @Transform(({ value }: { value: unknown }) => value === '' ? undefined : value) @IsOptional() @IsIn(['service', 'payment']) dateBasis?: 'service' | 'payment' = 'service';
   @IsDateString() from!: string;
   @IsDateString() to!: string;
   @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID() cashierId?: string;

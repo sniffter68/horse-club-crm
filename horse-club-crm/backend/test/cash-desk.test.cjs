@@ -113,18 +113,22 @@ test('ledger failure rejects entire transactional operation', async () => {
   await assert.rejects(() => fixture({ failLedger: true }).service.pay(dto, 'u1'), /ledger failed/);
 });
 test('summary applies paid/date/cashier filters and paginates operations without limiting totals', async () => {
-  let groupArgs, listArgs;
+  const statements = [];
   const service = new CashDeskService({ $transaction: async (fn, options) => {
     assert.equal(options.isolationLevel, 'RepeatableRead');
-    return fn({ payment: {
-      groupBy: async args => { groupArgs = args; return [{ method: 'CASH', _sum: { amount: new Prisma.Decimal(2500) }, _count: { _all: 25 } }]; },
-      findMany: async args => { listArgs = args; return []; },
+    return fn({ $queryRaw: async statement => {
+      statements.push(statement);
+      return statement.sql.includes('GROUP BY method') ? [{ method: 'CASH', amount: new Prisma.Decimal(2500), count: 25 }] : [];
     } });
   } });
   const result = await service.summary({ from: '2026-10-08T21:00:00Z', to: '2026-10-09T21:00:00Z', cashierId: 'u1', page: 2, pageSize: 20 });
   assert.equal(result.operationsCount, 25); assert.equal(result.totalCash.toString(), '2500');
-  assert.equal(groupArgs.where.status, 'PAID'); assert.equal(groupArgs.where.cashierId, 'u1');
-  assert.equal(listArgs.skip, 20); assert.equal(listArgs.take, 20); assert.deepEqual(groupArgs.where, listArgs.where);
+  for (const statement of statements) {
+    assert.match(statement.sql, /p.status = 'PAID' AND p\."archivedAt" IS NULL/);
+    assert.ok(statement.values.includes('u1'));
+  }
+  assert.match(statements[1].sql, /ORDER BY at DESC, id DESC LIMIT \? OFFSET \?/);
+  assert.deepEqual(statements[1].values.slice(-2), [20, 20]);
   await assert.rejects(() => service.summary({ from: '2026-10-10', to: '2026-10-09' }), e => e.status === 400);
 });
 test('cash receipts cannot be edited or removed through legacy CRUD', async () => {

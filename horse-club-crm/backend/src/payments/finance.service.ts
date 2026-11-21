@@ -11,6 +11,7 @@ import { rethrowFinancialPeriod } from './financial-period-error';
 import { cashShiftAt } from './cash-shift-boundary';
 import { aggregatePaymentMethods } from './cash-desk.math';
 import { cashboxBalances } from './cashbox-balances';
+import { paymentTurnover } from './payment-turnover';
 
 // Date-only values are Moscow business days; timestamps must carry an explicit offset.
 export function financeDate(value: string, endOfDay = false): Date {
@@ -114,24 +115,16 @@ export class FinanceService {
   }
   summary(query: CashSummaryQueryDto) {
     const { gte, lt } = this.range(query.from, query.to);
-    const paymentWhere = (start?: Date): Prisma.PaymentWhereInput => ({ archivedAt: null, status: 'PAID',
-      OR: [{ paidAt: { gte: start, lt } }, { paidAt: null, createdAt: { gte: start, lt } }],
-      ...(query.cashierId ? { cashierId: query.cashierId } : {}), ...(query.shiftId ? { shiftId: query.shiftId } : {}),
-    });
     const expenseWhere = (start?: Date): Prisma.ExpenseWhereInput => ({ archivedAt: null, cancelledAt: null, date: { gte: start, lt },
       ...(query.cashierId ? { createdById: query.cashierId } : {}), ...(query.shiftId ? { shiftId: query.shiftId } : {}),
     });
     return this.prisma.$transaction(async tx => {
-      const incomeGroups = await tx.payment.groupBy({ by: ['method'], where: paymentWhere(gte), _sum: { amount: true }, _count: { _all: true } });
+      const { operations, ...income } = await paymentTurnover(tx, query, { gte, lt });
       const expenseGroups = await tx.expense.groupBy({ by: ['paymentMethod'], where: expenseWhere(gte), _sum: { amount: true } });
       const asOf = new Date();
       const balance = await currentCashBalance(tx, asOf);
       const cashboxes = await cashboxBalances(tx, asOf);
-      const income = aggregatePaymentMethods(incomeGroups), expenses = expenseTotals(expenseGroups);
-      const operations = await tx.payment.findMany({ where: paymentWhere(gte), include: {
-        client: { select: { id: true, name: true, firstName: true, lastName: true, phone: true } }, cashier: { select: { id: true, email: true } }, service: true,
-        booking: { include: { lesson: { include: { service: true } } } }, membership: { include: { pricingPlan: true } },
-      }, orderBy: [{ paidAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.pageSize, take: query.pageSize });
+      const expenses = expenseTotals(expenseGroups);
       return { ...income, totalExpensesCash: expenses.cash, totalExpensesCard: expenses.card, totalExpenses: expenses.total,
         netCash: income.totalCash.minus(expenses.cash), netCard: income.totalCard.minus(expenses.card), netTotal: income.totalRevenue.minus(expenses.total),
         ...balance, cashboxes,

@@ -126,6 +126,41 @@ test('cash audit overview capture', async ({ page }) => {
   await page.screenshot({ path: '../docs/reports/cash-audit-after.png', fullPage: true, animations: 'disabled' })
 })
 
+for (const width of [1440, 390]) test(`turnover date basis changes receipts and preserves balances at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 })
+  await setup(page)
+  const queries: URL[] = []
+  let fail = false
+  await page.route('**/api/finance/summary?*', route => {
+    const url = new URL(route.request().url()); queries.push(url)
+    if (fail) return route.fulfill({ status: 500, json: { message: 'Ошибка сводки' } })
+    const cash = url.searchParams.get('dateBasis') === 'payment' ? '1200' : '0'
+    return route.fulfill({ json: { balanceCash: '5000', balanceCard: '2000', balanceTotal: '7000', totalCash: cash, totalCard: '0', totalRevenue: cash, totalExpenses: '0', operationsCount: 0, operations: [] } })
+  })
+  await page.goto('/cash-desk')
+  const current = page.locator('section[aria-labelledby="cash-current-title"]')
+  const turnover = page.locator('section[aria-labelledby="cash-turnover-title"]')
+  await expect.poll(() => queries.at(-1)?.searchParams.get('dateBasis')).toBe('service')
+  await expect(turnover.getByTestId('cash-metric-card').first()).toContainText('0,00')
+  const before = await current.innerText()
+  await page.getByText('По дате оплаты', { exact: true }).click()
+  await expect.poll(() => queries.at(-1)?.searchParams.get('dateBasis')).toBe('payment')
+  await expect(turnover.getByTestId('cash-metric-card').first()).toContainText(/1\s200,00/)
+  await expect(current).toHaveText(before, { useInnerText: true })
+  await page.reload()
+  await expect(page.getByRole('radio', { name: 'По дате оплаты', exact: true })).toBeChecked()
+  fail = true
+  await page.getByRole('radio', { name: 'По дате услуги', exact: true }).focus()
+  await page.getByRole('radio', { name: 'По дате услуги', exact: true }).press('Space')
+  await expect(page.getByText('Не удалось загрузить кассу', { exact: true })).toBeVisible()
+  fail = false
+  await page.getByRole('button', { name: 'Повторить', exact: true }).click()
+  await expect(turnover.getByTestId('cash-metric-card').first()).toContainText('0,00')
+  await expect(current).toHaveText(before, { useInnerText: true })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await turnover.screenshot({ path: `../docs/reports/date-basis-${width}.png`, animations: 'disabled' })
+})
+
 async function setup(page: Page, role = 'ADMIN') {
   await page.clock.setFixedTime(new Date('2026-10-09T09:00:00Z'))
   await page.addInitScript(role => {

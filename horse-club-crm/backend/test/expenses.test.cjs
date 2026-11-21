@@ -73,8 +73,13 @@ test('summary subtracts CASH/CARD expenses exactly and keeps cumulative balance 
   const queries = [];
   const service = new FinanceService({ $transaction: async (work, options) => {
     assert.equal(options.isolationLevel, 'RepeatableRead');
-    return work({ $queryRaw: async () => [], cashAuditLog: { create: async () => ({}) },
-      payment: { groupBy: async args => { queries.push(args); return args.where.OR[0].paidAt.gte ? [group('CASH', '5000.10'), group('CARD_TERMINAL', '3000.20'), group('SBP', '100')] : [group('CASH', '10000.10'), group('CARD', '5000.20')]; }, findMany: async args => { assert.equal(args.skip, 20); assert.equal(args.take, 20); return []; } },
+    return work({ $queryRaw: async statement => {
+      if (!statement.sql) return [];
+      if (statement.sql.includes('GROUP BY method')) return [['CASH', '5000.10'], ['CARD_TERMINAL', '3000.20'], ['SBP', '100']].map(([method, amount]) => ({ method, amount: new Prisma.Decimal(amount), count: 1 }));
+      if (statement.sql.includes('ORDER BY at')) assert.deepEqual(statement.values.slice(-2), [20, 20]);
+      return [];
+    }, cashAuditLog: { create: async () => ({}) },
+      payment: { groupBy: async args => { queries.push(args); return [group('CASH', '10000.10'), group('CARD', '5000.20')]; } },
       expense: { groupBy: async args => { queries.push(args); assert.equal(args.where.cancelledAt, null); return args.where.date.gte ? [expenseGroup('CASH', '1500'), expenseGroup('CARD', '200.10')] : [expenseGroup('CASH', '2500'), expenseGroup('CARD', '400.10')]; } },
     });
   } });
@@ -83,7 +88,7 @@ test('summary subtracts CASH/CARD expenses exactly and keeps cumulative balance 
   assert.equal(result.netCash.toString(), '3500.1'); assert.equal(result.netCard.toString(), '2900.1');
   assert.equal(result.balanceCash.toString(), '7500.1'); assert.equal(result.balanceCard.toString(), '4600.1');
   assert.equal(result.balanceTotal.toString(), '12100.2');
-  assert.equal(queries[2].where.OR[0].paidAt.gte, undefined);
+  assert.equal(queries.find(args => args.by[0] === 'method').where.OR[0].paidAt.gte, undefined);
   await assert.rejects(async () => service.summary({ from: '2026-10-19', to: '2026-10-18' }), e => e.status === 400);
 });
 test('create attaches authenticated author, shift and amount in serializable transaction; retry returns same expense', async () => {

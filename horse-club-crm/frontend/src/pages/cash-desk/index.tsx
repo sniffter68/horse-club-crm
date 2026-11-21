@@ -30,6 +30,7 @@ function CashDeskBook() {
   const [expenseOpen, setExpenseOpen] = useState(false)
   const [params, setParams] = useSearchParams()
   const period = params.get('period') || 'today'
+  const dateBasis = params.get('dateBasis') === 'payment' ? 'payment' : 'service'
   const from = params.get('from') || '', to = params.get('to') || ''
   const [summary, setSummary] = useState<CashSummary>()
   const [shift, setShift] = useState<CashShift | null>(null)
@@ -57,7 +58,7 @@ function CashDeskBook() {
         setShift(active)
         const noPeriod = (period === 'shift' && !active) || (period === 'custom' && (!from || !to))
         const range = periodRange(period, from, to)
-        const { data } = await httpClient.get<CashSummary>(`${API_URL}/finance/summary`, { params: { ...range, ...(period === 'shift' && active ? { from: active.openedAt, shiftId: active.id } : {}), page: 1, pageSize: 1 }, signal: controller.signal })
+        const { data } = await httpClient.get<CashSummary>(`${API_URL}/finance/summary`, { params: { ...range, dateBasis, ...(period === 'shift' && active ? { from: active.openedAt, shiftId: active.id } : {}), page: 1, pageSize: 1 }, signal: controller.signal })
         if (!controller.signal.aborted) {
           setSummary(noPeriod ? { ...data, totalCash: '0', totalCard: '0', totalRevenue: '0', totalUnspecified: '0',
             totalExpenses: '0', totalExpensesCash: '0', totalExpensesCard: '0', netTotal: '0', operationsCount: 0, operations: [] } : data)
@@ -68,7 +69,7 @@ function CashDeskBook() {
     return () => controller.abort()
   // URL primitives own loading and filter state.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, from, to, refresh])
+  }, [period, from, to, dateBasis, refresh])
   const openShift = async ({ startingCash }: { startingCash: number }) => {
     if (shiftBusy) return
     setShiftBusy(true); setShiftError(undefined)
@@ -104,6 +105,7 @@ function CashDeskBook() {
     </section>
     <section className="cash-summary-section gap-6" aria-labelledby="cash-turnover-title">
       <Typography.Title level={3} id="cash-turnover-title">Обороты за выбранный период</Typography.Title>
+      <Segmented size="small" aria-label="Дата учёта поступлений" value={dateBasis} onChange={value => changeParams({ dateBasis: value, page: '1' })} options={[{ value: 'service', label: 'По дате услуги' }, { value: 'payment', label: 'По дате оплаты' }]} />
     <Space className="cash-desk-filters" wrap><Segmented value={period} onChange={value => changeParams({ period: String(value), page: '1' })} options={[{ value: 'today', label: 'Сегодня' }, { value: 'shift', label: 'Текущая смена' }, { value: 'yesterday', label: 'Вчера' }, { value: 'week', label: 'Текущая неделя' }, { value: 'month', label: 'Текущий месяц' }, { value: 'custom', label: 'Выбрать даты' }]} />
       {period === 'custom' && <DatePicker.RangePicker locale={ruDatePicker} aria-label="Период кассовой книги" format="DD.MM.YYYY" value={from && to ? [dayjs(from), dayjs(to)] : null} onChange={values => changeParams({ from: values?.[0]?.format('YYYY-MM-DD') || '', to: values?.[1]?.format('YYYY-MM-DD') || '', page: '1' })} />}
     </Space>

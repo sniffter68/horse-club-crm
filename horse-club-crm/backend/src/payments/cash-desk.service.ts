@@ -4,7 +4,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { isSerializationFailure } from '../common/serialization-failure';
 import { CashDeskPaymentDto, CashSummaryQueryDto, OpenCashShiftDto } from './dto/cash-desk.dto';
-import { aggregatePaymentMethods, calculateCashChange } from './cash-desk.math';
+import { calculateCashChange } from './cash-desk.math';
+import { paymentTurnover } from './payment-turnover';
 import { defaultModuleAccess } from '../settings/module-access.service';
 import { money, paymentStatus } from '../lessons/lesson-finance';
 import { rethrowFinancialPeriod } from './financial-period-error';
@@ -149,14 +150,8 @@ export class CashDeskService {
   async summary(query: CashSummaryQueryDto) {
     const from = new Date(query.from), to = new Date(query.to);
     if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || from >= to) throw new BadRequestException('Укажите корректный период: начало раньше конца');
-    const where: Prisma.PaymentWhereInput = {
-      archivedAt: null, status: 'PAID', OR: [{ paidAt: { gte: from, lt: to } }, { paidAt: null, createdAt: { gte: from, lt: to } }],
-      ...(query.cashierId ? { cashierId: query.cashierId } : {}), ...(query.shiftId ? { shiftId: query.shiftId } : {}),
-    };
     return this.prisma.$transaction(async tx => {
-      const groups = await tx.payment.groupBy({ by: ['method'], where, _sum: { amount: true }, _count: { _all: true } });
-      const operations = await tx.payment.findMany({ where, include, orderBy: [{ paidAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.pageSize, take: query.pageSize });
-      return { ...aggregatePaymentMethods(groups), operations, page: query.page, pageSize: query.pageSize };
+      return { ...await paymentTurnover(tx, query, { gte: from, lt: to }), page: query.page, pageSize: query.pageSize };
     }, { isolationLevel: 'RepeatableRead' });
   }
 

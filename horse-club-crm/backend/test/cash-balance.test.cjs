@@ -50,6 +50,7 @@ test('dashboard and cash desk share current club balances regardless of period, 
   for (const query of [
     { from: '2020-01-01', to: '2020-01-01' },
     { from: '2021-01-01', to: '2021-02-01', shiftId: 'shift', cashierId: 'cashier' },
+    { from: '2021-01-01', to: '2021-02-01', dateBasis: 'payment' },
   ]) {
     const result = await finance.summary({ ...query, page: 1, pageSize: 20 });
     assert.equal(result.balanceCash.toFixed(2), summary.cash);
@@ -59,7 +60,7 @@ test('dashboard and cash desk share current club balances regardless of period, 
     assert.equal(result.operationsCount, 0);
   }
   const currentFilters = queries.filter(([model, where]) => model === 'payment' && !where.OR[0].paidAt.gte);
-  assert.equal(currentFilters.length, 4);
+  assert.equal(currentFilters.length, 5);
   assert.equal(currentFilters[0][1].OR[0].paidAt.lt, now);
   for (const [, where] of currentFilters.slice(1)) assert.ok(where.OR[0].paidAt.lt >= now);
 });

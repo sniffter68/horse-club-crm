@@ -28,7 +28,7 @@ function fixture(failAudit = false) {
       updateMany: async ({ where, data }) => { const rows = state[key].filter(row => matches(row, where)); rows.forEach(row => Object.assign(row, data)); return { count: rows.length }; },
       findUnique: async ({ where }) => { const row = state[key].find(row => matches(row, where)); return row ? { ...row, amount: new Prisma.Decimal(row.amount) } : null; },
       findFirst: async ({ where }) => state[key].find(row => matches(row, where)),
-      findMany: async ({ where }) => state[key].filter(row => matches(row, where)),
+      findMany: async ({ where }) => state[key].filter(row => where.id?.in ? where.id.in.includes(row.id) : matches(row, where)),
       create: async ({ data }) => { const row = { id: randomUUID(), archivedAt: null, cancelledAt: null, ...data }; state[key].push(row); return row; },
       aggregate: async ({ where }) => ({ _sum: { amount: state[key].filter(row => matches(row, where)).reduce((sum, row) => sum.plus(row.amount), new Prisma.Decimal(0)) } }),
       groupBy: async ({ by, where }) => {
@@ -43,7 +43,13 @@ function fixture(failAudit = false) {
     };
   }
   tx.$executeRaw = async () => 0;
-  tx.$queryRaw = async () => [];
+  tx.$queryRaw = async statement => {
+    if (!statement.sql) return [];
+    if (statement.sql.includes('GROUP BY method')) return (await tx.payment.groupBy({ by: ['method'], where: { archivedAt: null, status: 'PAID' } }))
+      .map(row => ({ method: row.method, amount: row._sum.amount, count: row._count._all }));
+    if (statement.sql.includes('ORDER BY at')) return state.payments.filter(row => !row.archivedAt && row.status === 'PAID').map(row => ({ id: row.id }));
+    return [];
+  };
   tx.user = { findUniqueOrThrow: async () => ({ ...user, staffProfile: { fullName: 'Владелец клуба' } }) };
   tx.cashAuditLog = {
     findUnique: async ({ where }) => state.audits.find(row => row.requestId === where.requestId),

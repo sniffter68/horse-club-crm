@@ -9,7 +9,7 @@ import { TableCellText } from '../../components/ConfigurableTable'
 import { money } from '../catalogs/format'
 import { CatalogList } from '../catalogs/shared'
 import type { Horse, HorseDetails } from '../catalogs/types'
-import { dateOnly, dateTime, personName } from '../cards/format'
+import { dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
 import { QuickBoardingActions } from '../boarding-contracts/quick'
 import { HorseFeeding } from './feeding'
@@ -21,8 +21,6 @@ import { horseStatuses } from '../stable/types'
 import { HorseIssues } from '../schedule/HorseIssues'
 import { useRoleAccess } from '../../access'
 import { sexes } from '../stalls/mapTypes'
-
-const healthLabels = { VACCINATION: 'Вакцинация', FARRIER: 'Коваль', DEWORMING: 'Дегельминтизация', INSPECTION: 'Осмотр' }
 
 export function HorseList() {
   const { canManage } = useCatalogPermissions()
@@ -79,12 +77,6 @@ export function HorseList() {
           ...(canManage && permissions.boardingAccess ? [{ key: 'boarding', label: 'Постой и расходы', children: <HorseBoardingExpenses horseId={horse.id} privateBoarding={Boolean(horse.currentBoardingContract?.client)} /> }] : []),
           ...(permissions.healthRead ? [{ key: 'vet', label: 'Здоровье и ковка', children: <VetJournal key={horse.id} horseId={horse.id} /> }] : []),
         ]} />
-        {permissions.healthRead && <section><Typography.Title level={5}>Журнал здоровья</Typography.Title>
-          {horse.healthLogs.length ? <List dataSource={horse.healthLogs} renderItem={log => <List.Item>
-            <Space wrap><Tag>{healthLabels[log.type]}</Tag><span>{dateOnly(log.occurredAt)}</span>
-              {log.nextDueAt && <span>Следующее: {dateOnly(log.nextDueAt)}</span>}<span>{log.notes || ''}</span></Space>
-          </List.Item>} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Записей нет" />}
-        </section>}
         <ProfileSection title="Предстоящие занятия и расписание">
           <HorseIssues key={horse.id} horseId={horse.id} />
         </ProfileSection>
