@@ -14,8 +14,8 @@ export const fullAccess: RolePermissions = { lessonCreateOwn: true, lessonCreate
 const noAccess: RolePermissions = { lessonCreateOwn: false, lessonCreateAny: false, horseReplaceOwn: false, horseReplaceAny: false, healthRead: false, healthWrite: false, financeRead: false, boardingAccess: false }
 export function mayReplaceHorse(role: Role | undefined, snapshot: AccessSnapshot | undefined, trainerId: string | undefined) {
   if (role === 'ADMIN' || role === 'MANAGER') return true
-  return role === 'TRAINER' && snapshot?.role === role && snapshot.permissions.horseReplaceOwn && Boolean(trainerId)
-    && trainerId === (snapshot.trainerId ?? snapshot.userId)
+  return role === 'TRAINER' && snapshot?.role === role && (snapshot.permissions.horseReplaceAny
+    || snapshot.permissions.horseReplaceOwn && Boolean(trainerId) && trainerId === (snapshot.trainerId ?? snapshot.userId))
 }
 export function useRoleAccess() {
   const modules = useModules()

@@ -7,9 +7,18 @@ it('allows only the assigned trainer and fails closed until server identity arri
   expect(mayReplaceHorse('TRAINER', undefined, 't1')).toBeFalsy()
   expect(mayReplaceHorse('TRAINER', trainer, undefined)).toBe(false)
 })
-it('revocation and even a forged any-lesson flag cannot bypass ownership', () => {
-  expect(mayReplaceHorse('TRAINER', { ...trainer, permissions: { ...fullAccess, horseReplaceOwn: false } }, 't1')).toBe(false)
-  expect(mayReplaceHorse('TRAINER', { ...trainer, permissions: fullAccess }, 't2')).toBe(false)
+it('revoking both permissions blocks own and colleague lessons', () => {
+  const revoked = { ...trainer, permissions: { ...trainer.permissions, horseReplaceOwn: false } }
+  expect(mayReplaceHorse('TRAINER', revoked, 't1')).toBe(false)
+  expect(mayReplaceHorse('TRAINER', revoked, 't2')).toBe(false)
+})
+it('the server all-lesson permission allows colleague lessons independently of ownership', () => {
+  const granted = { ...trainer, permissions: { ...fullAccess, horseReplaceOwn: false } }
+  expect(mayReplaceHorse('TRAINER', granted, 't1')).toBe(true)
+  expect(mayReplaceHorse('TRAINER', granted, 't2')).toBe(true)
+  expect(mayReplaceHorse('TRAINER', granted, undefined)).toBe(true)
+  expect(mayReplaceHorse('STABLE_WORKER', granted, 't2')).toBe(false)
+  expect(mayReplaceHorse('TRAINER', { ...granted, role: 'ADMIN' }, 't2')).toBe(false)
 })
 it('administrator and manager retain all-lesson replacement', () => {
   expect(mayReplaceHorse('ADMIN', undefined, 't2')).toBe(true)

@@ -16,7 +16,7 @@ const admin = { ...trainer, role: 'ADMIN' };
 const manager = { ...trainer, role: 'MANAGER' };
 const forbidden = error => error.getStatus() === 403 && error.message === 'Вы можете заменять лошадей только в своих занятиях';
 
-function fixture({ group = false, assigned = ids.own, ownAllowed = true, binding = ids.own, failAudit = false } = {}) {
+function fixture({ group = false, assigned = ids.own, ownAllowed = true, anyAllowed = false, binding = ids.own, failAudit = false } = {}) {
   const state = { booking: { id: ids.booking, horseId: ids.old, trainerId: group ? ids.other : assigned, clientId: 'client', status: 'scheduled', arenaId: null,
     startTime: new Date('2030-10-15T10:00Z'), endTime: new Date('2030-10-15T11:00Z'),
     lesson: group ? { id: 'lesson', trainerId: assigned, status: 'SCHEDULED', startTime: new Date('2030-10-15T10:00Z'), endTime: new Date('2030-10-15T11:00Z'), bookings: [{ id: ids.booking, horseId: ids.old, clientId: 'client' }] } : null }, history: [] };
@@ -25,7 +25,7 @@ function fixture({ group = false, assigned = ids.own, ownAllowed = true, binding
     const tx = {
       booking: { findUnique: async () => draft.booking, update: async ({ data }) => Object.assign(draft.booking, data) },
       bookingHorseChange: { create: async ({ data }) => { if (failAudit) throw new Error('audit unavailable'); draft.history.push(data); return data; }, findMany: async () => draft.history },
-      roleAccess: { findUnique: async () => ({ ...defaultRolePermissions('TRAINER'), horseReplaceOwn: ownAllowed }) },
+      roleAccess: { findUnique: async () => ({ ...defaultRolePermissions('TRAINER'), horseReplaceOwn: ownAllowed, horseReplaceAny: anyAllowed }) },
       user: { findUnique: async () => ({ trainerId: binding }) }, horse: { findMany: async () => [{ id: ids.horse }] },
     };
     const result = await work(tx); Object.assign(state, draft); return result;
@@ -46,6 +46,14 @@ for (const group of [false, true]) {
     await assert.rejects(f.service.availableHorses(ids.booking, trainer), forbidden);
     await assert.rejects(f.service.horseHistory(ids.booking, trainer), forbidden);
     assert.equal(f.state.booking.horseId, ids.old); assert.deepEqual(f.state.history, []);
+  });
+  test(`TRAINER with all-lesson access replaces a colleague's horse and records actual actor, group=${group}`, async () => {
+    const f = fixture({ group, assigned: ids.other, anyAllowed: true, ownAllowed: false });
+    await f.service.availableHorses(ids.booking, trainer);
+    await f.service.replaceHorse(ids.booking, ids.horse, ' colleague replacement ', trainer);
+    assert.equal(f.state.booking.horseId, ids.horse);
+    assert.deepEqual(await f.service.horseHistory(ids.booking, trainer), [{ bookingId: ids.booking, actorUserId: trainer.id,
+      oldHorseId: ids.old, newHorseId: ids.horse, reason: 'colleague replacement' }]);
   });
 }
 for (const actor of [admin, manager]) test(`${actor.role} replaces a horse in any lesson`, async () => {
@@ -71,9 +79,16 @@ test('audit failure rolls back the horse change', async () => {
   await assert.rejects(f.service.replaceHorse(ids.booking, ids.horse, undefined, admin), /audit unavailable/);
   assert.equal(f.state.booking.horseId, ids.old); assert.deepEqual(f.state.history, []);
 });
-test('role configuration cannot grant TRAINER all-lesson access or editing without reading', async () => {
+test('role configuration normalizes all-lesson access and still rejects editing without reading', async () => {
   const access = new RoleAccessService({ roleAccess: { upsert: async args => args.create } });
-  await assert.rejects(access.update('TRAINER', { ...defaultRolePermissions('TRAINER'), horseReplaceAny: true }), e => e.getStatus() === 400);
+  const saved = await access.update('TRAINER', { ...defaultRolePermissions('TRAINER'), horseReplaceOwn: false, horseReplaceAny: true });
+  assert.equal(saved.horseReplaceAny, true);
+  assert.equal(saved.horseReplaceOwn, true);
+  const reader = new RoleAccessService({ roleAccess: { findUnique: async () => ({ ...saved, horseReplaceOwn: false }) } });
+  assert.equal((await reader.permissions('TRAINER')).horseReplaceOwn, true);
+  assert.equal((await reader.permissions('TRAINER')).horseReplaceAny, true);
+  const defaults = new RoleAccessService({ roleAccess: { findUnique: async () => null } });
+  assert.equal((await defaults.permissions('TRAINER')).horseReplaceAny, false);
   await assert.rejects(access.update('TRAINER', { ...defaultRolePermissions('TRAINER'), healthRead: false, healthWrite: true }), e => e.getStatus() === 400);
   await assert.rejects(access.update('ADMIN', defaultRolePermissions('ADMIN')), e => e.getStatus() === 400);
   assert.equal((await access.update('TRAINER', { ...defaultRolePermissions('TRAINER'), horseReplaceOwn: false })).horseReplaceOwn, false);
@@ -150,7 +165,11 @@ test('HTTP role settings enforce health, boarding and report permissions without
     assert.equal((await request(report)).status, 200);
     assert.equal((await fetch(`${base}/vet/events`, { method: 'POST', headers: { 'x-test-session': 'trainer', 'content-type': 'application/json' }, body: JSON.stringify({ horseId: ids.horse, type: 'shoeing', eventDate: '2030-10-15T10:00:00Z' }) })).status, 201);
     assert.equal((await fetch(`${base}/payments/cash-desk`, { method: 'POST', headers: { 'x-test-session': 'trainer', 'content-type': 'application/json' }, body: '{}' })).status, 403);
-    assert.equal((await update({ horseReplaceAny: true })).status, 400);
+    const replacement = await update({ horseReplaceAny: true, horseReplaceOwn: false });
+    assert.equal(replacement.status, 200);
+    assert.deepEqual(await replacement.json(), { ...defaultRolePermissions('TRAINER'), horseReplaceAny: true, horseReplaceOwn: true });
+    const snapshot = await request('/settings/access/me');
+    assert.equal((await snapshot.json()).permissions.horseReplaceAny, true);
   } finally { await app.close(); }
 });
 
@@ -167,8 +186,8 @@ test('trainer response sanitization hides forbidden nested health/boarding recor
   assert.deepEqual(result.operations, [{ amount: 50 }]); assert.equal(result.phone, undefined);
 });
 
-test('HTTP RBAC: own trainer succeeds, colleague is 403, administrator/manager succeed and impersonation is rejected', async () => {
-  const f = fixture();
+for (const anyAllowed of [false, true]) test(`HTTP RBAC respects all-lesson permission=${anyAllowed} and rejects impersonation`, async () => {
+  const f = fixture({ anyAllowed });
   const actors = { own: trainer, colleague: { ...trainer, id: ids.other }, admin, manager };
   // Test-only session adapter. Production uses the JWT strategy's database identity.
   const module = await Test.createTestingModule({ controllers: [BookingsController], providers: [RolesGuard,
@@ -191,13 +210,14 @@ test('HTTP RBAC: own trainer succeeds, colleague is 403, administrator/manager s
   const base = await app.getUrl();
   const change = (session, body = { horseId: ids.horse }) => fetch(`${base}/bookings/${ids.booking}/horse`, { method: 'PATCH', headers: { 'content-type': 'application/json', 'x-test-session': session }, body: JSON.stringify(body) });
   try {
-    const denied = await change('colleague'); assert.equal(denied.status, 403);
-    assert.equal((await denied.json()).message, 'Вы можете заменять лошадей только в своих занятиях');
+    const colleague = await change('colleague'); assert.equal(colleague.status, anyAllowed ? 200 : 403);
+    if (!anyAllowed) assert.equal((await colleague.json()).message, 'Вы можете заменять лошадей только в своих занятиях');
+    else assert.equal(f.state.history[0].actorUserId, ids.other);
     assert.equal((await change('own')).status, 200);
     assert.equal((await change('admin')).status, 200);
     assert.equal((await change('manager')).status, 200);
     assert.equal((await change('colleague', { horseId: ids.horse, actorUserId: ids.user, trainerId: ids.own })).status, 400);
-    assert.equal(f.state.history.length, 3);
-    assert.equal((await fetch(`${base}/bookings/${ids.booking}/available-horses`, { headers: { 'x-test-session': 'colleague' } })).status, 403);
+    assert.equal(f.state.history.length, anyAllowed ? 4 : 3);
+    assert.equal((await fetch(`${base}/bookings/${ids.booking}/available-horses`, { headers: { 'x-test-session': 'colleague' } })).status, anyAllowed ? 200 : 403);
   } finally { await app.close(); }
 });

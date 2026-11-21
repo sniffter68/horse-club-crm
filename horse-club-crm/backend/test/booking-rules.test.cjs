@@ -259,6 +259,35 @@ test('horse replacement rejects unavailable horse and unknown rider weight witho
   }
 });
 
+test('all-lesson TRAINER replacement retains real resource and health validation in colleague lessons', async () => {
+  const startTime = new Date('2030-10-09T10:00Z'), endTime = new Date('2030-10-09T10:30Z');
+  const reservation = { horseId: 'horse', trainerId: 'another', arenaId: 'another', clientId: 'another', startTime, endTime };
+  const cases = [
+    [{}, null],
+    [{ bookings: [reservation] }, 'HORSE_BUSY'],
+    [{ horse: { maxDailyWorkloadMinutes: 20 } }, 'HORSE_OVERLOADED'],
+    [{ horse: { healthStatus: 'TREATMENT' } }, 'health'],
+    [{ horse: { healthStatus: 'QUARANTINE' } }, 'health'],
+  ];
+  for (const [config, code] of cases) {
+    const f = fixture({ ...config, client: { weightKg: 75 } });
+    const history = [], writes = [];
+    f.tx.user = { findUnique: async () => ({ trainerId: 'colleague' }) };
+    f.tx.roleAccess = { findUnique: async () => ({ horseReplaceAny: true, horseReplaceOwn: true }) };
+    f.tx.booking.findUnique = async () => ({ id: 'b', lesson: null, status: 'scheduled', clientId: 'client', horseId: 'old', trainerId: 'trainer', arenaId: 'arena', startTime, endTime });
+    f.tx.booking.update = async ({ data }) => { writes.push(data); return data; };
+    f.tx.bookingHorseChange.create = async ({ data }) => { history.push(data); return data; };
+    const service = new BookingsService({ $transaction: async work => work(f.tx) }, rules);
+    const replacement = () => service.replaceHorse('b', 'horse', undefined, { id: 'trainer-account', role: 'TRAINER', trainerId: 'colleague' });
+    if (code) {
+      await assert.rejects(replacement(), code === 'health' ? e => e.getStatus() === 400 : failure(code));
+      assert.deepEqual(writes, []); assert.deepEqual(history, []);
+    } else {
+      await replacement(); assert.equal(writes.length, 1); assert.equal(history[0].actorUserId, 'trainer-account');
+    }
+  }
+});
+
 test('legacy replacement excludes its lesson and validates the changed participant without duplicate horse assignments', async () => {
   let input, data;
   const lesson = { id: 'l', status: 'SCHEDULED', trainerId: 'trainer', arenaId: 'arena', startTime: new Date('2030-10-09T10:00Z'), endTime: new Date('2030-10-09T10:30Z'),

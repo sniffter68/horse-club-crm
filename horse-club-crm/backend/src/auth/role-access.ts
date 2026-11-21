@@ -15,6 +15,6 @@ export const defaultRolePermissions = (role: Role): RolePermissions => ({
 export function assertHorseReplacement(user: AuthUser, trainerId: string, permissions: RolePermissions) {
   if (!user) throw new ForbiddenException('Недостаточно прав для замены лошади');
   if (user.role === 'ADMIN' || user.role === 'MANAGER') return;
-  if (user.role === 'TRAINER' && permissions.horseReplaceOwn && (user.trainerId ?? user.id) === trainerId) return;
+  if (user.role === 'TRAINER' && (permissions.horseReplaceAny || permissions.horseReplaceOwn && (user.trainerId ?? user.id) === trainerId)) return;
   throw new ForbiddenException('Вы можете заменять лошадей только в своих занятиях');
 }

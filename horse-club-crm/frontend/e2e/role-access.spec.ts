@@ -48,7 +48,8 @@ for (const role of ['TRAINER', 'ADMIN', 'MANAGER']) test(`${role} lesson actions
   if (role === 'TRAINER') {
     await expect(page).toHaveURL(/\/trainer$/)
     await expect(page.locator('.board-lesson-own').getByRole('button', { name: 'Проведено', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Сменить лошадь', exact: true })).toHaveCount(0)
+    await expect(page.locator('.board-lesson-own').getByRole('button', { name: 'Сменить лошадь', exact: true })).toBeVisible()
+    await expect(page.getByRole('article', { name: '13:00 Ольга' }).getByRole('button', { name: 'Сменить лошадь', exact: true })).toHaveCount(0)
     expect(saved).toBe(false)
     return
   }
@@ -78,6 +79,30 @@ test('trainer has no replacement action in a colleague lesson and a rejected req
   expect(response).toMatchObject({ status: 403, data: { message: 'Вы можете заменять лошадей только в своих занятиях' } })
 })
 
+test('all-lesson TRAINER replaces a colleague horse and can retry a conflict', async ({ page }) => {
+  await setup(page, 'TRAINER', { ...permissions, horseReplaceAny: true })
+  let attempts = 0
+  await page.route(`**/api/bookings/${bookings[1].id}/horse`, route => {
+    expect(route.request().postDataJSON()).toEqual({ horseId: replacement.id })
+    attempts++
+    return attempts === 1 ? route.fulfill({ status: 409, json: { message: 'Лошадь занята' } })
+      : route.fulfill({ json: { ...bookings[1], horseId: replacement.id } })
+  })
+  await page.goto('/schedule')
+  const card = page.getByRole('article', { name: '13:00 Ольга' })
+  await card.getByRole('button', { name: 'Сменить лошадь', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Сменить лошадь' })
+  const select = dialog.getByRole('combobox', { name: 'Новая лошадь' })
+  await expect(select).toBeEnabled()
+  await select.focus(); await select.press('ArrowDown'); await select.press('Enter')
+  await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toContainText('Лошадь занята')
+  await expect(dialog).toContainText('Буран')
+  await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(attempts).toBe(2)
+})
+
 test('revoked own-lesson permission hides replacement even in the trainer lesson', async ({ page }) => {
   await setup(page, 'TRAINER', { ...permissions, horseReplaceOwn: false })
   await page.goto('/schedule')
@@ -102,7 +127,7 @@ async function setupRoles(page: Page) {
   await page.route('**/api/settings/role-access', route => route.fulfill({ json: [{ role: 'ADMIN', ...adminPermissions }, { role: 'TRAINER', ...trainerPolicy }] }))
   await page.route('**/api/settings/role-access/TRAINER', route => {
     trainerPolicy = route.request().postDataJSON()
-    expect(trainerPolicy.horseReplaceAny).toBe(false)
+    if (trainerPolicy.horseReplaceAny) expect(trainerPolicy.horseReplaceOwn).toBe(true)
     expect(Object.keys(trainerPolicy)).toHaveLength(8)
     return route.fulfill({ json: { role: 'TRAINER', ...trainerPolicy } })
   })
@@ -115,7 +140,19 @@ for (const width of [1280, 375]) test(`administrator configures persistent role 
   const policy = await setupRoles(page)
   const ownSwitch = page.getByRole('switch', { name: 'Тренер: Замена лошади в своих занятиях' })
   await expect(ownSwitch).toBeChecked()
-  await expect(page.getByRole('switch', { name: 'Тренер: Замена лошади в любых занятиях' })).toBeDisabled()
+  const anySwitch = page.getByRole('switch', { name: 'Тренер: Замена лошади в любых занятиях' })
+  await expect(anySwitch).toBeEnabled()
+  await ownSwitch.click()
+  await anySwitch.focus(); await anySwitch.press('Space')
+  await expect(ownSwitch).toBeChecked()
+  await page.getByRole('button', { name: 'Сохранить права', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Сохранить права', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(anySwitch).toBeEnabled()
+  expect(policy().horseReplaceAny).toBe(true)
+  await page.reload(); await page.getByRole('tab', { name: 'Роли и доступ' }).click()
+  await expect(anySwitch).toBeChecked()
+  await expect(ownSwitch).toBeChecked()
   const createOwn = page.getByRole('switch', { name: 'Тренер: Создание записей в своё расписание' })
   const createAny = page.getByRole('switch', { name: 'Тренер: Создание записей для любого тренера' })
   await expect(createAny).toBeEnabled()
@@ -124,6 +161,7 @@ for (const width of [1280, 375]) test(`administrator configures persistent role 
   await createAny.click()
   await expect(createOwn).toBeChecked()
   await ownSwitch.click()
+  await expect(anySwitch).not.toBeChecked()
   await page.getByRole('button', { name: 'Сохранить права', exact: true }).click()
   const confirm = page.getByRole('dialog')
   await expect(confirm).toContainText('все учётные записи тренеров')

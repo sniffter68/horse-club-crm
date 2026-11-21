@@ -4,6 +4,7 @@ import { SearchSelect } from '../../components/SearchSelect'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import type { Horse } from '../catalogs/types'
 import { useRoleAccess } from '../../access'
+import { isUuid } from '../../uuid'
 
 
 export function ReplaceHorseAction({ bookingId, trainerId, disabled, report, onSaved, onBusyChange }: {
@@ -23,7 +24,7 @@ export function ReplaceHorseAction({ bookingId, trainerId, disabled, report, onS
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string>()
   useEffect(() => {
-    if (!open) return
+    if (!open || !isUuid(bookingId)) return
     const controller = new AbortController()
     void httpClient.get<Horse[]>(`${API_URL}/bookings/${bookingId}/available-horses`, { signal: controller.signal })
       .then(response => { if (!controller.signal.aborted) setOptions(response.data) })
@@ -43,6 +44,10 @@ export function ReplaceHorseAction({ bookingId, trainerId, disabled, report, onS
   }
   async function save(values: { horseId: string; reason?: string }) {
     if (lock.current) return
+    if (!isUuid(bookingId) || !isUuid(values.horseId)) {
+      setError('Выберите корректную запись и лошадь')
+      return
+    }
     lock.current = true; setBusy(true); onBusyChange(true); setError(undefined)
     try {
       await httpClient.patch(`${API_URL}/bookings/${bookingId}/horse`, values)
@@ -53,7 +58,7 @@ export function ReplaceHorseAction({ bookingId, trainerId, disabled, report, onS
       if (failure.statusCode === 401) report(cause)
     } finally { lock.current = false; setBusy(false); onBusyChange(false) }
   }
-  if (!canReplaceHorse(trainerId)) return null
+  if (!isUuid(bookingId) || !canReplaceHorse(trainerId)) return null
   return <>
     <Button disabled={disabled || busy} onClick={() => { form.resetFields(); setError(undefined); setOptions([]); reload(); setOpen(true) }}>Сменить лошадь</Button>
     <Modal title="Сменить лошадь" open={open} footer={null} keyboard={!busy} maskClosable={!busy} closable={!busy} onCancel={close}>

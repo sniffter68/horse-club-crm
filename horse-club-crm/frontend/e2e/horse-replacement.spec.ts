@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures'
 
-const horse = { id: 'h1', name: 'Валдай', status: 'sick', isUnavailable: true, maxRiderWeight: 85, maxDailyMinutes: 120, minRestMinutes: 45 }
-const free = { ...horse, id: 'h2', name: 'Буран', status: 'active', isUnavailable: false }
+const horse = { id: '00000000-0000-4000-8000-000000000101', name: 'Валдай', status: 'sick', isUnavailable: true, maxRiderWeight: 85, maxDailyMinutes: 120, minRestMinutes: 45 }
+const free = { ...horse, id: '00000000-0000-4000-8000-000000000102', name: 'Буран', status: 'active', isUnavailable: false }
 const client = { id: 'c1', name: 'Анна Орлова', firstName: 'Анна', weightKg: 70 }
 const startTime = '2026-10-16T07:00:00Z', endTime = '2026-10-16T08:00:00Z'
-const issue = { id: 'b1', horseId: horse.id, horseName: horse.name, client, startTime, endTime }
+const issue = { id: '00000000-0000-4000-8000-000000000103', horseId: horse.id, horseName: horse.name, client, startTime, endTime }
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-15T06:00:00Z'))
   await page.addInitScript(() => { localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.role', 'ADMIN'); localStorage.setItem('horsecrm.email', 'qa@example.com') })
@@ -15,15 +15,15 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/horses/workload?*', route => route.fulfill({ json: [] }))
   await page.route('**/api/bookings/availability?*', route => route.fulfill({ json: { horseWorkloads: [], arenaOccupancy: [] } }))
   await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [issue], headers: { 'x-total-count': '1' } }))
-  await page.route('**/api/bookings/b1/available-horses', route => route.fulfill({ json: [free] }))
+  await page.route('**/api/bookings/00000000-0000-4000-8000-000000000103/available-horses', route => route.fulfill({ json: [free] }))
 })
 for (const width of [1280, 375]) test(`repairs a future problem from the banner with keyboard selection at ${width}px`, async ({ page }, testInfo) => {
   await page.setViewportSize({ width, height: 900 })
   let saved = false
   await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: saved ? [] : [issue], headers: { 'x-total-count': saved ? '0' : '1' } }))
-  await page.route('**/api/bookings/b1/horse', route => {
-    expect(route.request().postDataJSON()).toEqual({ horseId: 'h2' }); saved = true
-    return route.fulfill({ json: { id: 'b1', horseId: 'h2' } })
+  await page.route('**/api/bookings/00000000-0000-4000-8000-000000000103/horse', route => {
+    expect(route.request().postDataJSON()).toEqual({ horseId: '00000000-0000-4000-8000-000000000102' }); saved = true
+    return route.fulfill({ json: { id: '00000000-0000-4000-8000-000000000103', horseId: '00000000-0000-4000-8000-000000000102' } })
   })
   await page.goto('/schedule')
   await expect(page.getByText('Требуют замены лошади: 1')).toBeVisible()
@@ -42,7 +42,7 @@ for (const width of [1280, 375]) test(`repairs a future problem from the banner 
   expect(saved).toBe(true)
 })
 test('preserves the selected horse and reason after a concurrent conflict', async ({ page }) => {
-  await page.route('**/api/bookings/b1/horse', route => route.fulfill({ status: 409, json: { code: 'HORSE_REST_VIOLATION', message: 'Лошади нужен отдых' } }))
+  await page.route('**/api/bookings/00000000-0000-4000-8000-000000000103/horse', route => route.fulfill({ status: 409, json: { code: 'HORSE_REST_VIOLATION', message: 'Лошади нужен отдых' } }))
   await page.goto('/schedule'); await page.getByRole('button', { name: 'Сменить лошадь', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Сменить лошадь' })
   const select = dialog.getByRole('combobox', { name: 'Новая лошадь' })
@@ -55,7 +55,7 @@ test('preserves the selected horse and reason after a concurrent conflict', asyn
 })
 test('availability failure offers retry and empty availability blocks saving', async ({ page }) => {
   let failed = true
-  await page.route('**/api/bookings/b1/available-horses', route => route.fulfill(failed ? { status: 503, json: { message: 'Повторите загрузку' } } : { json: [] }))
+  await page.route('**/api/bookings/00000000-0000-4000-8000-000000000103/available-horses', route => route.fulfill(failed ? { status: 503, json: { message: 'Повторите загрузку' } } : { json: [] }))
   await page.goto('/schedule'); await page.getByRole('button', { name: 'Сменить лошадь', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Сменить лошадь' })
   await expect(dialog.getByRole('alert')).toBeVisible()
@@ -70,8 +70,8 @@ test('availability failure offers retry and empty availability blocks saving', a
 
 test('horse card previews future lessons before changing status and offers quick replacement afterward', async ({ page }) => {
   let statusSaved = false
-  const details = { ...free, id: 'h1', name: 'Валдай', healthLogs: [], boardingContracts: [], bookings: [] }
-  await page.route('**/api/horses/h1', async route => {
+  const details = { ...free, id: '00000000-0000-4000-8000-000000000101', name: 'Валдай', healthLogs: [], boardingContracts: [], bookings: [] }
+  await page.route('**/api/horses/00000000-0000-4000-8000-000000000101', async route => {
     if (route.request().method() === 'PATCH') { expect(route.request().postDataJSON()).toEqual({ status: 'sick' }); statusSaved = true }
     return route.fulfill({ json: { ...details, status: statusSaved ? 'sick' : 'active', isUnavailable: statusSaved } })
   })
@@ -98,9 +98,9 @@ test('horse card previews future lessons before changing status and offers quick
 
 test('legacy lesson participant can replace a horse beside its unavailable badge', async ({ page }) => {
   const trainer = { id: 't1', name: 'Мария' }, service = { id: 's1', title: 'Выездка' }
-  await page.route('**/api/lessons?*', route => route.fulfill({ json: [{ id: 'l1', startTime, endTime, trainer, service, status: 'SCHEDULED', arena: null, bookings: [{ id: 'b1', client, horse, membership: null }] }] }))
-  await page.route('**/api/horses/workload?*', route => route.fulfill({ json: [{ horseId: 'h1', horseName: 'Валдай', currentWorkloadMinutes: 60, maxDailyWorkloadMinutes: 120, status: 'UNAVAILABLE' }] }))
-  await page.route('**/api/bookings/b1/horse', route => route.fulfill({ json: { id: 'b1', horseId: 'h2' } }))
+  await page.route('**/api/lessons?*', route => route.fulfill({ json: [{ id: 'l1', startTime, endTime, trainer, service, status: 'SCHEDULED', arena: null, bookings: [{ id: '00000000-0000-4000-8000-000000000103', client, horse, membership: null }] }] }))
+  await page.route('**/api/horses/workload?*', route => route.fulfill({ json: [{ horseId: '00000000-0000-4000-8000-000000000101', horseName: 'Валдай', currentWorkloadMinutes: 60, maxDailyWorkloadMinutes: 120, status: 'UNAVAILABLE' }] }))
+  await page.route('**/api/bookings/00000000-0000-4000-8000-000000000103/horse', route => route.fulfill({ json: { id: '00000000-0000-4000-8000-000000000103', horseId: '00000000-0000-4000-8000-000000000102' } }))
   await page.goto('/schedule'); await page.locator('.fc-event').first().click()
   const card = page.getByRole('dialog', { name: 'Карточка занятия' })
   await expect(card.getByText(/Недоступна/)).toBeVisible()

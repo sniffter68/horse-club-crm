@@ -1,6 +1,7 @@
 import { LessonDrawer } from '../schedule/LessonDrawer'
+import { ReplaceHorseAction } from '../schedule/ReplaceHorseAction'
 import { useRoleAccess } from '../../access'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLogout } from '@refinedev/core'
 import { Alert, App, Button, DatePicker, Empty, Input, Segmented, Spin, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
@@ -27,6 +28,7 @@ function LessonCard({ lesson, canWrite, onSaved, tmaToken }: { lesson: BoardLess
   const [error, setError] = useState<string>()
   const lock = useRef(false)
   const { message } = App.useApp()
+  const report = useCallback((cause: unknown) => setError(toHttpError(cause).message), [])
   const mark = async (status: 'COMPLETED' | 'NO_SHOW') => {
     if (lock.current || !isUuid(lesson.id)) return
     lock.current = true; setBusy(true); setError(undefined)
@@ -50,6 +52,9 @@ function LessonCard({ lesson, canWrite, onSaved, tmaToken }: { lesson: BoardLess
       <div className="board-actions"><Button icon={<ClubIcon name="check" />} type="primary" disabled={busy} onClick={() => void mark('COMPLETED')}>Проведено</Button><Button disabled={busy} onClick={() => void mark('NO_SHOW')}>Неявка</Button></div>
     </>}
     {lesson.isOwn && lesson.status !== 'SCHEDULED' && lesson.trainerNote && <p>{lesson.trainerNote}</p>}
+    {!tmaToken && canWrite && lesson.status === 'SCHEDULED' && new Date(lesson.startTime) > new Date() && lesson.bookings.map(row =>
+      <ReplaceHorseAction key={row.id} bookingId={row.id} trainerId={lesson.trainerId} disabled={busy}
+        report={report} onSaved={onSaved} onBusyChange={setBusy} />)}
     {error && <Alert type="error" showIcon message={error} />}
   </article>
 }
