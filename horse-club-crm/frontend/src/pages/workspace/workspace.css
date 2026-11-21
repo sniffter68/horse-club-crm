@@ -29,13 +29,14 @@
 .board-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .board-actions button, .trainer-workspace-header button { min-height: 44px; }
 .board-continuation { display: block; font-size: 12px; padding: 6px 0; color: var(--crm-ink); }
+.admin-workspace.gap-6 { display: flex; flex-direction: column; gap: 1.5rem; }
+.admin-workspace > .workspace-toolbar { margin-bottom: 0; }
 .admin-workspace-columns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 24px; align-items: stretch; }
 .admin-workspace-columns-single { grid-template-columns: minmax(0, 1fr); }
 .workspace-main-card { min-width: 0; height: 100%; display: flex; flex-direction: column; }
 .workspace-main-card > .ant-card-body { flex: 1; }
 .workspace-finance-card > .ant-card-body { display: flex; flex-direction: column; }
 .workspace-finance-card .workspace-finance { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
-.workspace-actions-card { margin-top: 24px; }
 .workspace-actions-card > .ant-card-body { padding: 0; }
 .workspace-actions-card .tabular-nums, .workspace-actions-preview { font-variant-numeric: tabular-nums; }
 .workspace-actions-heading { margin: 0; font: inherit; }
@@ -48,7 +49,7 @@
 .workspace-actions-preview { display: block; margin-top: 4px; color: var(--crm-saddle); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-actions-indicator { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; }
 .workspace-actions-list { max-height: 20rem; overflow-y: auto; padding: 0 24px; border-top: 1px solid var(--crm-border); overflow-wrap: anywhere; scrollbar-gutter: stable; }
-.workspace-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 16px; margin: 24px 0; }
+.workspace-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 16px; }
 .workspace-kpi-link { display: flex; min-width: 0; border-radius: 24px; }
 .workspace-kpi-link > .ant-card { width: 100%; height: 100%; transition: border-color var(--crm-motion-press) ease; }
 .workspace-kpi-link:hover > .ant-card { border-color: var(--crm-saddle); }

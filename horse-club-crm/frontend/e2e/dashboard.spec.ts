@@ -613,6 +613,22 @@ for (const width of [1440, 1024, 390]) test(`dashboard shift journal toggles ind
   await expect(toggle).toContainText('20')
   await expect(toggle).toContainText('Администратор 19')
   await expect(list).toBeHidden()
+  const expectSectionGaps = async () => {
+    const sections = page.locator('.admin-workspace > .shift-welcome, .admin-workspace > .workspace-kpis, .admin-workspace > .admin-workspace-columns, .admin-workspace > .workspace-actions-card, .admin-workspace > #pending-leads')
+    await expect(sections).toHaveCount(5)
+    await expect.poll(async () => sections.evaluateAll(nodes => {
+      const rects = nodes.map(node => node.getBoundingClientRect())
+      return rects.slice(1).map((rect, index) => rect.top - rects[index].bottom)
+    })).toEqual([24, 24, 24, 24])
+    const [topGap, bottomGap] = await sections.evaluateAll(nodes => {
+      const [, , columns, journal, leads] = nodes.map(node => node.getBoundingClientRect())
+      return [journal.top - columns.bottom, leads.top - journal.bottom]
+    })
+    expect(topGap).toBeGreaterThanOrEqual(16)
+    expect(bottomGap).toBeGreaterThanOrEqual(16)
+    expect(Math.abs(topGap - bottomGap)).toBeLessThanOrEqual(2)
+  }
+  await expectSectionGaps()
   const mainCards = page.locator('.admin-workspace-columns > .workspace-main-card')
   const initialRects = await mainCards.evaluateAll(cards => cards.map(card => {
     const { top, bottom } = card.getBoundingClientRect()
@@ -626,6 +642,7 @@ for (const width of [1440, 1024, 390]) test(`dashboard shift journal toggles ind
   await toggle.click()
   await expect(toggle).toHaveAttribute('aria-expanded', 'true')
   await expect(list).toBeVisible()
+  await expectSectionGaps()
   expect(await list.evaluate(node => node.clientHeight <= 320 && node.scrollHeight > node.clientHeight && getComputedStyle(node).overflowY === 'auto')).toBe(true)
   const mainBottom = await mainCards.evaluateAll(cards => Math.max(...cards.map(card => card.getBoundingClientRect().bottom + window.scrollY)))
   expect(await page.locator('.workspace-actions-card').evaluate(node => node.getBoundingClientRect().top + window.scrollY)).toBeGreaterThanOrEqual(mainBottom)

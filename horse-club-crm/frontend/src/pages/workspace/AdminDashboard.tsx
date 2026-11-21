@@ -40,7 +40,7 @@ export function AdminDashboardPage() {
   const finance = data.finance
   const latestAction = data.actions.reduce<AdminSummary['actions'][number] | undefined>((latest, row) => !latest || Date.parse(row.createdAt) > Date.parse(latest.createdAt) ? row : latest, undefined)
   const percent = finance && Number(finance.accrued) > 0 ? Math.min(100, Math.round(Number(finance.paid) / Number(finance.accrued) * 100)) : 0
-  return <section aria-label="Рабочее место администратора">
+  return <section className="admin-workspace gap-6" aria-label="Рабочее место администратора">
     <header className="workspace-toolbar shift-welcome"><EquestrianMotif /><div><Typography.Title level={2}>Хорошей смены!</Typography.Title><ShiftConditions /></div><Button onClick={refresh}>Обновить сводку</Button></header>
     <div className="workspace-kpis">{([
       ['Занятий сегодня', data.kpi.lessonsToday, '/schedule', 'Открыть расписание'],
@@ -83,7 +83,7 @@ export function AdminDashboardPage() {
         <List dataSource={data.actions} locale={{ emptyText: 'Действий пока нет' }} renderItem={row => <List.Item><div><strong>{actionNames[row.action] || row.action}</strong><div className="tabular-nums">{localTime(row.createdAt)} · {row.actorName}</div></div></List.Item>} />
       </div>
     </Card>
-    <div id="pending-leads"><PendingLeads leads={data.leadRequests} loading={loading} onProcessed={refresh} /></div>
+    <PendingLeads leads={data.leadRequests} loading={loading} onProcessed={refresh} />
     {booking && <QuickBookingModal onClose={() => setBooking(false)} onSaved={() => { setBooking(false); refresh() }} />}
   </section>
 }
