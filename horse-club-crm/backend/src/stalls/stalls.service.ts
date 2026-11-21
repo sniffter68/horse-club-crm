@@ -74,7 +74,7 @@ export class StallsService {
   }
 
   assignmentHorses() {
-    return this.prisma.horse.findMany({ select: { id: true, name: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] });
+    return this.prisma.horse.findMany({ where: { deletedAt: null }, select: { id: true, name: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] });
   }
 
   private validateTransfer(stalls: Array<{ id: string; type?: string; horseId: string | null; status: string; isUnavailable: boolean }>, dto: TransferStallDto) {
@@ -136,7 +136,7 @@ export class StallsService {
         if (stall.horseId) await tx.horse.update({ where: { id: stall.horseId }, data: { stallNumber: null } });
         return;
       }
-      if (!await tx.horse.findUnique({ where: { id: horseId } })) throw new NotFoundException('Лошадь не найдена');
+      if (!await tx.horse.findUnique({ where: { id: horseId, deletedAt: null } })) throw new NotFoundException('Лошадь не найдена');
       if (stall.isUnavailable || ['MAINTENANCE', 'QUARANTINE'].includes(stall.status))
         throw new ConflictException('Денник недоступен для заселения');
       if (stall.horseId && stall.horseId !== horseId) throw new ConflictException('Сначала освободите занятый денник');

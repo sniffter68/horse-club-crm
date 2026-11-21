@@ -77,6 +77,17 @@ test('trainer board has Moscow boundaries, all active trainers and no financial 
   assert.equal(detail.bookings[0].client.name, 'Анна'); assert.equal('balance' in detail.bookings[0].client, false); assert.equal('cost' in detail, false);
 });
 
+test('trainer board excludes archived horses from its resource list but retains lesson history', async () => {
+  const lesson = row();
+  lesson.bookings[0].horse.deletedAt = new Date();
+  const tx = { trainer: { findMany: async () => [{ id: actor.trainerId, name: 'Тренер' }] },
+    lesson: { findMany: async query => [project(lesson, query.select)] }, clubSchedule: { findUnique: async () => null } };
+  const service = new WorkspaceService({ $transaction: fn => fn(tx) }, {}, {});
+  const data = await service.trainerBoard(actor, '2026-11-17');
+  assert.deepEqual(data.horses, []);
+  assert.equal(data.lessons[0].bookings[0].horse.name, 'Валдай');
+});
+
 test('admin summary aggregates month, uses actual cashboxes and removes finances for hidden cashbox', async () => {
   const filters = [], lessonFilters = [];
   const prisma = { lesson: { findMany: async query => { lessonFilters.push(query.where); return [project(row(), query.select)]; } },

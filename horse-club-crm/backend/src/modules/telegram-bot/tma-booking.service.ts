@@ -107,7 +107,7 @@ export class TmaBookingService {
       && shift.startTime <= day.toFormat('HH:mm') && shift.endTime >= DateTime.fromJSDate(end, { zone: ZONE }).toFormat('HH:mm'))) {
       throw new ConflictException('Тренер не работает в это время');
     }
-    const horses = await tx.horse.findMany({ where: { status: 'active', healthStatus: 'HEALTHY',
+    const horses = await tx.horse.findMany({ where: { deletedAt: null, status: 'active', healthStatus: 'HEALTHY',
       isUnavailable: false, isPublic: true, ownerType: 'club' }, orderBy: [{ order: 'asc' }, { id: 'asc' }], take: 100 });
     for (const horse of horses) {
       try {

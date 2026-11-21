@@ -158,7 +158,7 @@ export class LessonsService {
     const schedule = await this.getClubSchedule(this.prisma);
     const { open, close } = this.getWorkDayBounds(this.parseCalendarDate(date), schedule);
     const [horses, lessons] = await this.prisma.$transaction([
-      this.prisma.horse.findMany({ select: { id: true, name: true, maxDailyMinutes: true, isUnavailable: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
+      this.prisma.horse.findMany({ where: { deletedAt: null }, select: { id: true, name: true, maxDailyMinutes: true, isUnavailable: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
       this.prisma.lesson.findMany({
         where: { status: { not: LessonStatus.CANCELLED }, startTime: { lt: close }, endTime: { gt: open },
           ...(excludeLessonId ? { id: { not: excludeLessonId } } : {}) },
@@ -821,7 +821,7 @@ export class LessonsService {
     const { open, close } = this.getWorkDayBounds(date, schedule);
     const horse = await client.horse.findUnique({
       where: { id: horseId },
-      select: { name: true, maxDailyMinutes: true, isUnavailable: true, healthStatus: true },
+      select: { name: true, deletedAt: true, maxDailyMinutes: true, isUnavailable: true, healthStatus: true },
     });
     if (!horse) {
       throw new NotFoundException('Лошадь не найдена');
@@ -844,7 +844,7 @@ export class LessonsService {
     }, 0);
 
     if (additionalMinutes > 0 && horse.healthStatus && horse.healthStatus !== 'HEALTHY') throw new BadRequestException(`Лошадь «${horse.name}» на лечении, карантине или выбыла: тренировка запрещена`);
-    if (additionalMinutes > 0 && horse.isUnavailable) throw new ConflictException(`Лошадь "${horse.name}" недоступна`);
+    if (additionalMinutes > 0 && (horse.deletedAt || horse.isUnavailable)) throw new ConflictException(`Лошадь "${horse.name}" недоступна`);
     if (additionalMinutes > 0 && usedMinutes + additionalMinutes > horse.maxDailyMinutes) {
       throw new ConflictException(
         `Превышен суточный лимит нагрузки лошади "${horse.name}": ` +

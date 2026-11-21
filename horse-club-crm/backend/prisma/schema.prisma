@@ -308,6 +308,8 @@ model Trainer {
 }
 
 model Horse {
+  deletedAt DateTime? @db.Timestamptz(6)
+  @@index([deletedAt])
   preferredByClients Client[] @relation("ClientPreferredHorse")
   coat String?
   healthStatus HorseHealthStatus @default(HEALTHY)

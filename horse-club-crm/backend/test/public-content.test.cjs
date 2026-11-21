@@ -24,7 +24,7 @@ test('public content is anonymous, filtered, ordered and restricted to presentat
   await app.init();
   try {
     const { body } = await request(app.getHttpServer()).get('/api/public/content').expect(200);
-    assert.deepEqual(calls.horse.where, { isPublic: true, status: 'active', isUnavailable: false });
+    assert.deepEqual(calls.horse.where, { deletedAt: null, isPublic: true, status: 'active', isUnavailable: false });
     assert.deepEqual(calls.trainer.where, { isPublic: true, isActive: true });
     assert.deepEqual(calls.service.where, { isPublic: true });
     for (const model of ['horse', 'trainer', 'service']) {

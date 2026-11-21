@@ -1,7 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Horse } from '@prisma/client';
-import type { RefineQueryDto } from '../common/dto/refine-query.dto';
+import type { HorsesQueryDto } from './dto/horses-query.dto';
 import { rethrowCatalogMutation } from '../common/prisma-errors';
 import { parseRefineQuery } from '../common/refine';
 import type { PaginatedResult } from '../common/refine';
@@ -55,7 +55,7 @@ export type HorseDetailsResponse = HorseDetails & { currentBoardingContract: Hor
 export class HorsesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(query: RefineQueryDto): Promise<PaginatedResult<Horse>> {
+  async findAll(query: HorsesQueryDto): Promise<PaginatedResult<Horse>> {
     const options = parseRefineQuery(
       query,
       ['id', 'name', 'maxDailyMinutes', 'minRestMinutes', 'breed', 'riderLevel', 'isUnavailable'],
@@ -72,6 +72,7 @@ export class HorsesService {
           ] } } },
         ] }
       : {};
+    if (query.includeArchived !== 'true') where.deletedAt = null;
     const orderBy = { [options.sort]: options.order } as Prisma.HorseOrderByWithRelationInput;
     const [total, data] = await this.prisma.$transaction([
       this.prisma.horse.count({ where }),
@@ -105,7 +106,7 @@ export class HorsesService {
 
   async update(id: string, dto: UpdateHorseDto): Promise<Horse> {
     try {
-      return await this.prisma.horse.update({ where: { id }, data: this.normalize(dto) });
+      return await this.prisma.horse.update({ where: { id, deletedAt: null }, data: this.normalize(dto) });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Лошадь');
     }
@@ -130,8 +131,35 @@ export class HorsesService {
 
   async remove(id: string): Promise<Horse> {
     try {
-      return await this.prisma.horse.delete({ where: { id } });
+      return await this.prisma.$transaction(async tx => {
+        // Share the row lock used by booking writers before checking reservations.
+        await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Horse" WHERE "id" = ${id}::uuid FOR UPDATE`);
+        const horse = await tx.horse.findUnique({ where: { id }, include: {
+          _count: { select: { bookings: true, boardingContracts: true, vetRecords: true,
+            vetEvents: true, healthLogs: true, dailyLogs: true } },
+        } });
+        if (!horse || horse.deletedAt !== null) throw new NotFoundException('Лошадь не найдена');
+        const now = new Date();
+        const scheduled = await tx.booking.findFirst({ where: { horseId: id, OR: [
+          { lessonId: null, status: 'scheduled', endTime: { gt: now } },
+          { status: { in: ['scheduled', 'completed', 'no_show'] }, lesson: { is: { deletedAt: null, status: 'SCHEDULED', endTime: { gt: now } } } },
+        ] }, select: { id: true } });
+        if (scheduled) throw new ConflictException('У лошади есть запланированные занятия. Сначала снимите её с расписания или замените лошадь.');
+        const boarding = await tx.boardingContract.findFirst({ where: { horseId: id, status: 'ACTIVE' }, select: { id: true } });
+        if (boarding) throw new ConflictException('У лошади есть активный договор постоя. Сначала завершите договор постоя.');
+        await tx.client.updateMany({ where: { preferredHorseId: id }, data: { preferredHorseId: null } });
+        // Occupancy CHECK requires releasing the horse and status together.
+        await tx.stall.updateMany({ where: { horseId: id, status: 'OCCUPIED' }, data: { horseId: null, status: 'AVAILABLE' } });
+        await tx.stall.updateMany({ where: { horseId: id }, data: { horseId: null } });
+        if (Object.values(horse._count).some(count => count > 0)) {
+          return tx.horse.update({ where: { id }, data: { deletedAt: now, isUnavailable: true, isPublic: false, stallNumber: null } });
+        }
+        return tx.horse.delete({ where: { id } });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error: unknown) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+        throw new ConflictException('Связи лошади изменились. Обновите карточку и повторите удаление.');
+      }
       return rethrowCatalogMutation(error, 'Лошадь');
     }
   }

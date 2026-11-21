@@ -148,7 +148,7 @@ export class DashboardService {
           orderBy: [{ endTime: 'asc' }, { id: 'asc' }],
         }) : Promise.resolve([]),
         canRead('SCHEDULE') && canRead('STABLES') ? this.prisma.horse.findMany({
-          where: { isUnavailable: false },
+          where: { deletedAt: null, isUnavailable: false },
           select: {
             id: true,
             name: true,

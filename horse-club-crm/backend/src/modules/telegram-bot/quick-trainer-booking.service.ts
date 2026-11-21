@@ -38,7 +38,7 @@ export class QuickTrainerBookingService {
     const [services, trainers, horses, arenas, schedule, lessons, bookings] = await Promise.all([
       this.prisma.service.findMany({ orderBy: [{ order: 'asc' }, { id: 'asc' }], select: { id: true, name: true, title: true, durationMinutes: true, allowMembership: true } }),
       this.prisma.trainer.findMany({ where: { isActive: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }], select: { id: true, name: true, fullName: true } }),
-      this.prisma.horse.findMany({ orderBy: [{ name: 'asc' }, { id: 'asc' }], select: { id: true, name: true, status: true, healthStatus: true, isUnavailable: true, maxDailyMinutes: true, maxDailyWorkloadMinutes: true } }),
+      this.prisma.horse.findMany({ where: { deletedAt: null }, orderBy: [{ name: 'asc' }, { id: 'asc' }], select: { id: true, name: true, status: true, healthStatus: true, isUnavailable: true, maxDailyMinutes: true, maxDailyWorkloadMinutes: true } }),
       this.prisma.arena.findMany({ where: { isActive: true, isUnavailable: false }, orderBy: { id: 'asc' }, select: { id: true, name: true } }),
       this.prisma.clubSchedule.findUnique({ where: { id: 1 } }),
       this.prisma.lesson.findMany({ where: { deletedAt: null, status: { not: 'CANCELLED' }, startTime: { lt: end }, endTime: { gt: start } },

@@ -54,7 +54,7 @@ export class BoardingContractsService {
     };
     return this.prisma.$transaction(async tx => {
       const [horses, stalls] = await Promise.all([
-        tx.horse.findMany({ where: { boardingContracts: { none: reserved } }, select: { id: true, name: true,
+        tx.horse.findMany({ where: { deletedAt: null, boardingContracts: { none: reserved } }, select: { id: true, name: true,
           boardingContracts: { select: { clientId: true }, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], take: 1 },
         }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
         tx.stall.findMany({ where: { type: { not: 'SERVICE' }, isUnavailable: false, contracts: { none: reserved } }, select: { id: true, name: true, number: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
@@ -197,7 +197,7 @@ export class BoardingContractsService {
     }
     const [client, horse, stall] = await Promise.all([
       data.clientId ? tx.client.findUnique({ where: { id: data.clientId }, select: { id: true } }) : Promise.resolve(null),
-      tx.horse.findUnique({ where: { id: data.horseId }, select: { id: true } }),
+      tx.horse.findUnique({ where: { id: data.horseId, deletedAt: null }, select: { id: true } }),
       data.stallId
         ? tx.stall.findUnique({ where: { id: data.stallId }, select: { id: true, type: true, isUnavailable: true } })
         : Promise.resolve(null),

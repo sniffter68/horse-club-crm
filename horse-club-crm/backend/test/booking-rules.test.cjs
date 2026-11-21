@@ -26,6 +26,12 @@ function fixture({ horse = {}, client = {}, arena = {}, trainer = {}, bookings =
 }
 const failure = code => error => error.getStatus() === 409 && error.getResponse().code === code;
 
+test('archived horse cannot be assigned by UUID even if its active flags are stale', async () => {
+  const f = fixture({ horse: { deletedAt: new Date(), isUnavailable: false, status: 'active' } });
+  await assert.rejects(rules.validate(f.tx, f.input), failure('RESOURCE_NOT_FOUND'));
+  assert.equal(f.writes.length, 0);
+});
+
 test('health restrictions return 400 for individual and group assignments, including expired quarantine dates', async () => {
   for (const healthStatus of ['QUARANTINE', 'TREATMENT', 'RETIRED']) {
     for (const group of [false, true]) {

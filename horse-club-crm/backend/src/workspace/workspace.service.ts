@@ -13,7 +13,7 @@ export const boardSelect = {
   trainer: { select: { id: true, name: true } },
   arena: { select: { id: true, name: true } },
   bookings: { select: { id: true, clientConfirmed: true,
-    client: { select: { id: true, name: true } }, horse: { select: { id: true, name: true } } } },
+    client: { select: { id: true, name: true } }, horse: { select: { id: true, name: true, deletedAt: true } } } },
 } satisfies Prisma.LessonSelect;
 
 @Injectable()
@@ -38,7 +38,7 @@ export class WorkspaceService {
         lessons: lessons.map(lesson => ({ ...lesson, isOwn: lesson.trainerId === actor.trainerId,
           trainerNote: lesson.trainerId === actor.trainerId ? lesson.trainerNote : null,
           bookings: lesson.bookings.map(booking => ({ ...booking, client: lesson.trainerId === actor.trainerId ? booking.client : null })) })),
-        horses: lessons.filter(lesson => lesson.status !== 'CANCELLED').flatMap(lesson => lesson.bookings.flatMap(booking => booking.horse ? [{
+        horses: lessons.filter(lesson => lesson.status !== 'CANCELLED').flatMap(lesson => lesson.bookings.flatMap(booking => booking.horse && !booking.horse.deletedAt ? [{
           ...booking.horse, lessonId: lesson.id, trainerId: lesson.trainerId, startTime: lesson.startTime, endTime: lesson.endTime,
         }] : [])),
       };

@@ -39,8 +39,9 @@ export const dataProvider = {
         params.set('cashboxType', filter.value)
         continue
       }
-      if (['clients', 'memberships'].includes(resource) && 'field' in filter
-        && ['includeArchived', 'archivedOnly'].includes(filter.field) && filter.operator === 'eq') {
+      if ('field' in filter && filter.operator === 'eq'
+        && ((['clients', 'memberships'].includes(resource) && ['includeArchived', 'archivedOnly'].includes(filter.field))
+          || (resource === 'horses' && filter.field === 'includeArchived'))) {
         if (filter.value == null || filter.value === '') continue
         if (!['true', 'false', true, false].includes(filter.value)) throw new Error('Недопустимый фильтр архива')
         params.set(filter.field, String(filter.value))

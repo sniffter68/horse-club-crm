@@ -78,7 +78,7 @@ export class BookingsService {
       const booking = await tx.booking.findUnique({ where: { id } });
       if (!booking) throw new NotFoundException('Бронирование не найдено');
       await this.replacementInput(tx, id, booking.horseId ?? '', actor);
-      const horses = await tx.horse.findMany({ where: { status: 'active', isUnavailable: false, id: { not: booking.horseId ?? undefined } }, orderBy: { name: 'asc' } });
+      const horses = await tx.horse.findMany({ where: { deletedAt: null, status: 'active', isUnavailable: false, id: { not: booking.horseId ?? undefined } }, orderBy: { name: 'asc' } });
       const available: typeof horses = [];
       // Check the record even when no active alternatives exist.
       for (const horse of horses) {
@@ -231,7 +231,7 @@ export class BookingsService {
     const dayStart = day.toJSDate(), dayEnd = day.plus({ days: 1 }).toJSDate();
     const windowStart = new Date(Math.min(+start, +dayStart)), windowEnd = new Date(Math.max(+end, +dayEnd));
     return this.prisma.$transaction(async tx => {
-      const horses = await tx.horse.findMany();
+      const horses = await tx.horse.findMany({ where: { deletedAt: null } });
       const arenas = await tx.arena.findMany();
       const direct = await tx.booking.findMany({ where: { lessonId: null, status: { in: ['scheduled', 'completed'] }, startTime: { lt: windowEnd }, endTime: { gt: windowStart },
         ...(query.excludeBookingId ? { id: { not: query.excludeBookingId } } : {}) } });

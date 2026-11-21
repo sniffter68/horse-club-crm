@@ -10,7 +10,7 @@ export class PublicService {
     const orderBy = [{ order: 'asc' as const }, { id: 'asc' as const }];
     const [horses, trainers, services] = await Promise.all([
       this.prisma.horse.findMany({
-        where: { isPublic: true, status: 'active', isUnavailable: false }, orderBy,
+        where: { deletedAt: null, isPublic: true, status: 'active', isUnavailable: false }, orderBy,
         select: { id: true, name: true, breed: true, riderLevel: true, role: true, description: true, imageUrl: true },
       }),
       this.prisma.trainer.findMany({

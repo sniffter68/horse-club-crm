@@ -44,7 +44,7 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
       return client;
     } },
     lesson: { findMany: async query => { scheduleQuery = query; return [lesson]; }, findUnique: async () => ({ ...lesson, trainerId: owner }) },
-    horse: { findMany: async query => { assert.deepEqual(query.where, { status: 'active', healthStatus: 'HEALTHY', isUnavailable: false }); return [{ id: horseId, name: 'Гром' }]; } } };
+    horse: { findMany: async query => { assert.deepEqual(query.where, { deletedAt: null, status: 'active', healthStatus: 'HEALTHY', isUnavailable: false }); return [{ id: horseId, name: 'Гром' }]; } } };
   const access = { forRole: async () => [{ module: 'SCHEDULE', isEnabled: enabled, accessLevel: level }] };
   const jwt = new JwtService({ secret, signOptions: { algorithm: 'HS256' } });
   const service = new TrainerTmaService(prisma, jwt, access,

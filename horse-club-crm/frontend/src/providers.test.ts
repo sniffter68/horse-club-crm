@@ -57,6 +57,16 @@ describe('Authentication', () => {
   })
 })
 describe('Data provider', () => {
+  it('sends and clears the horse archive filter', async () => {
+    for (const value of ['true', 'false', undefined]) {
+      httpClient.defaults.adapter = async config => {
+        expect(new URL(config.url ?? '', 'http://localhost').searchParams.get('includeArchived')).toBe(value ?? null)
+        return response(config, [])
+      }
+      await dataProvider.getList({ resource: 'horses', filters: [{ field: 'includeArchived', operator: 'eq', value }] })
+    }
+    await expect(dataProvider.getList({ resource: 'horses', filters: [{ field: 'includeArchived', operator: 'eq', value: 'yes' }] })).rejects.toThrow()
+  })
   it('serializes and clears archive filters while retaining the catalogue allowlist', async () => {
     httpClient.defaults.adapter = async config => {
       const params = new URL(config.url ?? '', 'http://localhost').searchParams

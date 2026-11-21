@@ -102,7 +102,7 @@ export class VetRecordService {
     // Latest record per horse/type/title supersedes that procedure's previous deadline.
     const [records, restrictedHorses] = await this.prisma.$transaction([
       this.prisma.vetRecord.findMany({ distinct: ['horseId', 'type', 'title'], orderBy: [{ performedAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }], include }),
-      this.prisma.horse.findMany({ where: { healthStatus: { in: ['TREATMENT', 'QUARANTINE', 'RETIRED'] } }, select: { id: true, name: true, healthStatus: true, quarantineUntil: true }, orderBy: { name: 'asc' } }),
+      this.prisma.horse.findMany({ where: { deletedAt: null, healthStatus: { in: ['TREATMENT', 'QUARANTINE', 'RETIRED'] } }, select: { id: true, name: true, healthStatus: true, quarantineUntil: true }, orderBy: { name: 'asc' } }),
     ]);
     const pending = records.filter(r => r.nextDueDate).sort((a, b) => +a.nextDueDate! - +b.nextDueDate!);
     const overdue = pending.filter(r => vetDueStatus(r.nextDueDate, now) === 'overdue');

@@ -145,7 +145,7 @@ export class TrainerTmaService {
   }
 
   horses() {
-    return this.prisma.horse.findMany({ where: { status: 'active', healthStatus: 'HEALTHY', isUnavailable: false },
+    return this.prisma.horse.findMany({ where: { deletedAt: null, status: 'active', healthStatus: 'HEALTHY', isUnavailable: false },
       orderBy: [{ name: 'asc' }, { id: 'asc' }], select: { id: true, name: true } });
   }
 }

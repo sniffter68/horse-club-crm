@@ -9,7 +9,7 @@ import type { Response } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { RefineQueryDto } from '../common/dto/refine-query.dto';
+import { HorsesQueryDto } from './dto/horses-query.dto';
 import { setRefineTotalHeaders } from '../common/refine';
 import { CreateHorseDto } from './dto/create-horse.dto';
 import { UpdateHorseDto } from './dto/update-horse.dto';
@@ -25,7 +25,7 @@ export class HorsesController {
 
   @Get()
   @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER, Role.STABLE_WORKER)
-  async findAll(@Query() query: RefineQueryDto, @Res({ passthrough: true }) res: Response): Promise<Horse[]> {
+  async findAll(@Query() query: HorsesQueryDto, @Res({ passthrough: true }) res: Response): Promise<Horse[]> {
     const { data, total } = await this.horsesService.findAll(query);
     setRefineTotalHeaders(res, total);
     return data;

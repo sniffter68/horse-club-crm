@@ -20,13 +20,14 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
   editAction?: (record: T) => ReactNode
 }) {
   const { canManage, role } = useCatalogPermissions(resource)
-  const { tableProps, searchFormProps, tableQuery, sorters, filters, currentPage, pageSize, setCurrentPage } = useTable<T, HttpError, { q?: string; clientType?: string; archive?: string }>({
+  const { tableProps, searchFormProps, tableQuery, sorters, filters, currentPage, pageSize, setCurrentPage } = useTable<T, HttpError, { q?: string; clientType?: string; archive?: string; includeArchived?: boolean }>({
     resource, pagination: { pageSize: 10 }, sorters: { mode: 'server' },
     queryOptions: { retry: (count, error) => (error.statusCode === 0 || error.statusCode >= 500) && count < 2 },
-    onSearch: ({ q, clientType, archive }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' },
+    onSearch: ({ q, clientType, archive, includeArchived }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' },
       ...(resource === 'clients' ? [{ field: 'clientType', operator: 'eq' as const, value: clientType || undefined },
         { field: 'includeArchived', operator: 'eq' as const, value: archive === 'all' ? 'true' : undefined },
-        { field: 'archivedOnly', operator: 'eq' as const, value: archive === 'archived' ? 'true' : undefined }] : [])],
+        { field: 'archivedOnly', operator: 'eq' as const, value: archive === 'archived' ? 'true' : undefined }] : []),
+      ...(resource === 'horses' ? [{ field: 'includeArchived', operator: 'eq' as const, value: includeArchived ? 'true' : undefined }] : [])],
   })
   const total = tableQuery.data?.total
   useEffect(() => {
@@ -41,11 +42,12 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
   const actions: TableColumnsType<T> = canManage ? [{
     key: 'actions', title: 'Действия', width: layout === 'clients' ? 220 : storageKey ? 180 : 250, fixed: layout === 'clients' || storageKey ? 'right' : undefined, align: 'left',
     render: (_: unknown, record: T) => <Space wrap>
-      {editAction ? editAction(record) : <EditButton resource={resource} recordItemId={record.id} size="small" aria-label="Редактировать">Редактировать</EditButton>}
+      {resource === 'horses' && record.deletedAt ? null : editAction ? editAction(record) : <EditButton resource={resource} recordItemId={record.id} size="small" aria-label="Редактировать">Редактировать</EditButton>}
       {extraActions?.(record)}
       {resource === 'boarding-contracts' && <ServiceCancellationAction resource="boarding-contracts" id={String(record.id)} label="Отменить постой" />}
-      {resource !== 'stalls' && resource !== 'boarding-contracts' && resource !== 'clients' && (resource !== 'horse-health-logs' || role !== 'TRAINER') && <DeleteButton resource={resource} recordItemId={record.id} size="small" aria-label="Удалить"
-        confirmTitle="Удалить запись?" confirmOkText="Удалить" confirmCancelText="Отмена">Удалить</DeleteButton>}
+      {!(resource === 'horses' && record.deletedAt) && resource !== 'stalls' && resource !== 'boarding-contracts' && resource !== 'clients' && (resource !== 'horse-health-logs' || role !== 'TRAINER') && <DeleteButton resource={resource} recordItemId={record.id} size="small" aria-label="Удалить"
+        successNotification={resource === 'horses' ? () => ({ type: 'success', message: 'Лошадь удалена из клуба', description: 'Если у лошади была история, она сохранена в архиве.' }) : undefined}
+        confirmTitle={resource === 'horses' ? 'Удалить лошадь из клуба? Если по лошади есть история занятий или постоя, она будет перенесена в архив с сохранением всех отчётов' : 'Удалить запись?'} confirmOkText="Удалить" confirmCancelText="Отмена">Удалить</DeleteButton>}
     </Space>,
   }] : []
   return <List title={title} canCreate={canManage} createButtonProps={{ children: 'Создать' }}>
@@ -60,6 +62,10 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
       {resource === 'clients' && <Form.Item name="archive" initialValue={filters.some(f => 'field' in f && f.field === 'archivedOnly' && f.value === 'true') ? 'archived' : filters.some(f => 'field' in f && f.field === 'includeArchived' && f.value === 'true') ? 'all' : 'active'}>
         <Select aria-label="Архив клиентов" style={{ width: 190 }} onChange={() => searchFormProps.form?.submit()}
           options={[{ value: 'all', label: 'Все' }, { value: 'active', label: 'Только активные' }, { value: 'archived', label: 'Архив' }]} />
+      </Form.Item>}
+      {resource === 'horses' && <Form.Item name="includeArchived" valuePropName="checked"
+        initialValue={filters.some(f => 'field' in f && f.field === 'includeArchived' && f.value === 'true')}>
+        <Checkbox onChange={() => searchFormProps.form?.submit()}>Показать архивных</Checkbox>
       </Form.Item>}
       <Button type="primary" htmlType="submit">Найти</Button>
     </Form>
