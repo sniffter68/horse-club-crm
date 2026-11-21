@@ -3,7 +3,8 @@ import { Keyboard } from 'vk-io';
 const button = (label: string, command: string) => Keyboard.textButton({ label, payload: { command } });
 export function mainMenu(trainer = false) {
   return Keyboard.keyboard(trainer ? [
-    [button('📋 Расписание на сегодня', 'today'), button('Расписание на завтра', 'tomorrow')],
+    [button('📅 Моё расписание', 'schedule:personal:today')],
+    [button('🗓 Общее расписание', 'schedule:club:today')],
     [button('Мои лошади в работе', 'horses'), button('👥 Мои всадники', 'riders')],
   ] : [
     [button('📅 Мои тренировки', 'bookings'), button('🎫 Мой абонемент', 'membership')],
@@ -21,6 +22,8 @@ export function welcomeMenu() {
 
 export function normalizeVkCommand(value: string): string {
   const command = value.trim().toLowerCase().replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, '');
+  if (['расписание', 'моё расписание', 'мое расписание'].includes(command)) return 'schedule:personal:today';
+  if (command === 'общее расписание') return 'schedule:club:today';
   if (['start', '/start', 'начать'].includes(command)) return 'начать';
   if (['membership', 'balance', 'мой абонемент', 'абонемент', 'мой баланс', 'баланс абонемента'].includes(command)) return 'membership';
   if (['мои тренировки', 'мои занятия'].includes(command)) return 'bookings';

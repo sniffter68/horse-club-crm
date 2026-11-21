@@ -45,7 +45,7 @@ test('main and guest reply keyboards provide role-specific commands', () => {
   assert.deepEqual(client.buttons.flat().map(button => button.action.label), ['📅 Мои тренировки', '🎫 Мой абонемент', 'Записаться онлайн', 'Баланс и касса', 'Позвать администратора']);
   assert.deepEqual(client.buttons.flat().map(button => JSON.parse(button.action.payload).command), ['bookings', 'membership', 'book', 'cash', 'help']);
   assert.deepEqual(keyboard(welcomeMenu()).buttons.flat().map(button => button.action.label), ['Записаться на тренировку', 'Наш прайс и услуги', 'Привязать профиль CRM', 'Позвать администратора', 'О клубе', 'Как доехать']);
-  assert.equal(keyboard(mainMenu(true)).buttons[0][0].action.label, '📋 Расписание на сегодня');
+  assert.equal(keyboard(mainMenu(true)).buttons[0][0].action.label, '📅 Моё расписание');
 });
 
 for (const text of ['ℹ️ О клубе', 'О клубе', '  КОНТАКТЫ  ']) test(`club card accepts ${text} for unlinked guests`, async () => {
@@ -73,7 +73,7 @@ test('club details and guide can be changed through environment without editing 
   await send('', { command: 'about' }); await send('', { command: 'guide' });
   assert.equal(sent[0].message, '🐴 Конный клуб «Другой клуб»\n📍 Адрес: Город, улица, дом\n⏰ Режим работы: вт–вс 10:00–20:00\n📞 Телефон / WhatsApp: +7 (999) 123-45-67\n🗺️ Карта: https://maps.example/club');
   assert.equal(sent[1].message, 'Новая памятка\nПриезжайте заранее');
-  assert.match(String(sent[0].keyboard), /Расписание на сегодня/);
+  assert.match(String(sent[0].keyboard), /Моё расписание/);
 });
 
 for (const text of ['💬 Связаться с администратором', 'Связаться с администратором', 'администратор', 'позвать администратора', 'помощь']) {

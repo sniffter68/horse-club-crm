@@ -9,7 +9,7 @@ import { TmaBookingService } from './tma-booking.service';
 import { AuthModule } from '../../auth/auth.module';
 import { TelegramLinkService } from './telegram-link.service';
 import { TelegramPersonalService } from './telegram-personal.service';
-import { TelegramScheduleService } from './telegram-schedule.service';
+import { BotScheduleModule } from '../../common/bot-schedule/bot-schedule.module';
 import { ClientTelegramLinkController, UserTelegramLinkController } from './telegram-link.controller';
 import { TelegramDeliveryModule } from './telegram-delivery';
 import { JwtModule } from '@nestjs/jwt';
@@ -19,11 +19,11 @@ import { TrainerTmaService } from './trainer-tma.service';
 import { WorkspaceModule } from '../../workspace/workspace.module';
 import { TrainerBoardTmaController, TrainerTmaAuthController, TrainerTmaController, TrainerTmaGuard } from './trainer-tma.controller';
 
-@Module({ imports: [WorkspaceModule, PrismaModule, BookingsModule, LessonsModule, AuthModule, TelegramDeliveryModule,
+@Module({ imports: [BotScheduleModule, WorkspaceModule, PrismaModule, BookingsModule, LessonsModule, AuthModule, TelegramDeliveryModule,
   JwtModule.registerAsync({ imports: [AuthConfigModule], inject: [AUTH_OPTIONS],
     useFactory: (options: AuthOptions) => ({ secret: options.secret, signOptions: { algorithm: 'HS256' as const } }) })],
   controllers: [TrainerBoardTmaController, TelegramBotController, ClientTelegramLinkController, UserTelegramLinkController, TrainerTmaAuthController, TrainerTmaController],
-  providers: [TelegramBotService, TelegramAuthGuard, TmaBookingService, TelegramLinkService, TelegramPersonalService, TelegramScheduleService, TrainerTmaService, TrainerTmaGuard] })
+  providers: [TelegramBotService, TelegramAuthGuard, TmaBookingService, TelegramLinkService, TelegramPersonalService, TrainerTmaService, TrainerTmaGuard] })
 export class TelegramBotModule implements OnModuleInit {
   private readonly logger = new Logger(TelegramBotModule.name);
 

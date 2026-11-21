@@ -1,3 +1,4 @@
+import { BotScheduleModule } from '../common/bot-schedule/bot-schedule.module';
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { VkBotController } from './vk-bot.controller';
@@ -14,5 +15,5 @@ import { VkSettingsController } from './vk-settings.controller';
 import { VkSettingsService } from './vk-settings.service';
 import { VkLinkController } from './vk-link.controller';
 import { VkBookingResponseService } from './vk-booking-response.service';
-@Module({ imports: [VkIdentityModule, PrismaModule, AuthModule, MembershipsModule, LeadsModule, VkDeliveryModule, VkRemindersModule], controllers: [VkBotController, VkIdentityController, VkSettingsController, VkLinkController], providers: [VkBotService, VkLinkService, VkSettingsService, VkBookingResponseService] })
+@Module({ imports: [BotScheduleModule, VkIdentityModule, PrismaModule, AuthModule, MembershipsModule, LeadsModule, VkDeliveryModule, VkRemindersModule], controllers: [VkBotController, VkIdentityController, VkSettingsController, VkLinkController], providers: [VkBotService, VkLinkService, VkSettingsService, VkBookingResponseService] })
 export class VkBotModule {}

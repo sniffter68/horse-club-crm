@@ -1,10 +1,10 @@
 import { HttpException, Injectable, Logger, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
 import { Bot, Context, HttpError, InlineKeyboard } from 'grammy';
 import AbortController from 'abort-controller';
-import { DateTime } from 'luxon';
+import { scheduleNavigation, type ScheduleMode } from '../../common/bot-schedule/trainer-schedule-bot.service';
 import { TelegramLinkService } from './telegram-link.service';
 import { TelegramPersonalService } from './telegram-personal.service';
-import { CLUB_TIMEZONE, TelegramScheduleService } from './telegram-schedule.service';
+import { TelegramScheduleService } from './telegram-schedule.service';
 
 @Injectable()
 export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
@@ -49,8 +49,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const role = await this.personal.identity(sender);
       const keyboard = new InlineKeyboard();
       if (role === 'client') return keyboard.webApp('Записаться на занятие', url.href).row().text('Мои записи', 'my_bookings').text('Мой абонемент', 'my_balance');
-      if (role === 'trainer' || role === 'admin') keyboard.webApp('Открыть расписание тренера', new URL('/tma', url).href).row()
-        .text('📅 Расписание на сегодня', 'club_schedule:today').row().text('🗓 Расписание на завтра', 'club_schedule:tomorrow').row();
+      if (role === 'trainer' || role === 'admin' || role === 'staff') keyboard.webApp('Открыть расписание тренера', new URL('/tma', url).href).row()
+        .text('📅 Моё расписание', 'schedule:personal:today').row().text('🗓 Общее расписание', 'schedule:club:today').row();
       keyboard.text('Расписание на день', 'day').row().text('Расписание на неделю', 'week');
       return keyboard;
     };
@@ -63,30 +63,29 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     bot.command('balance', async ctx => {
       await ctx.reply(await this.personal.balance(String(ctx.from!.id)), { parse_mode: 'HTML' });
     });
-    const showSchedule = async (ctx: Context, day: DateTime) => {
-      const user = await this.schedule.authorize(String(ctx.from!.id));
-      if (!day.isValid) {
-        await ctx.reply('Некорректная дата расписания');
-        return;
+    const showSchedule = async (ctx: Context, mode: ScheduleMode, date = 'today') => {
+      const { day, chunks } = await this.schedule.getSchedule('telegram', String(ctx.from!.id), mode, date);
+      const keyboard = new InlineKeyboard();
+      for (const row of scheduleNavigation(mode, day)) {
+        for (const button of row) keyboard.text(button.label, `schedule:${button.mode}:${button.date}`);
+        keyboard.row();
       }
-      const chunks = await this.schedule.getDaySchedule(day.toJSDate(), user.id);
-      const keyboard = new InlineKeyboard()
-        .text('⬅️ Вчера', `club_schedule:${day.minus({ days: 1 }).toISODate()}`)
-        .text('🔄 Обновить', `club_schedule:${day.toISODate()}`)
-        .text('Завтра ➡️', `club_schedule:${day.plus({ days: 1 }).toISODate()}`);
       for (const [index, chunk] of chunks.entries()) await ctx.reply(chunk, index === chunks.length - 1 ? { reply_markup: keyboard } : {});
     };
-    const clubDay = (tomorrow = false) => DateTime.now().setZone(CLUB_TIMEZONE).startOf('day').plus({ days: tomorrow ? 1 : 0 });
     bot.command('schedule', async ctx => {
-      await showSchedule(ctx, clubDay(ctx.match.trim().toLowerCase() === 'tomorrow'));
+      await showSchedule(ctx, 'personal', ctx.match.trim().toLowerCase() === 'tomorrow' ? 'tomorrow' : 'today');
     });
-    bot.hears(['📅 Расписание на сегодня', '🗓 Расписание на завтра'], async ctx => {
-      await showSchedule(ctx, clubDay(ctx.msg?.text === '🗓 Расписание на завтра'));
+    bot.hears(['📅 Моё расписание', '🗓 Общее расписание', '📅 Расписание на сегодня', '🗓 Расписание на завтра'], async ctx => {
+      await showSchedule(ctx, ctx.msg.text === '📅 Моё расписание' ? 'personal' : 'club', ctx.msg.text === '🗓 Расписание на завтра' ? 'tomorrow' : 'today');
     });
+    bot.callbackQuery(/^schedule:(personal|club):(today|tomorrow|\d{4}-\d{2}-\d{2})$/, async ctx => {
+      await ctx.answerCallbackQuery();
+      await showSchedule(ctx, ctx.match[1] === 'personal' ? 'personal' : 'club', ctx.match[2]);
+    });
+    // Keep buttons in messages sent by older versions working.
     bot.callbackQuery(/^club_schedule:(today|tomorrow|\d{4}-\d{2}-\d{2})$/, async ctx => {
       await ctx.answerCallbackQuery();
-      const value = ctx.match[1];
-      await showSchedule(ctx, value === 'today' || value === 'tomorrow' ? clubDay(value === 'tomorrow') : DateTime.fromISO(value, { zone: CLUB_TIMEZONE }));
+      await showSchedule(ctx, 'club', ctx.match[1]);
     });
     bot.on('message:text', async ctx => {
       const sender = String(ctx.from!.id);

@@ -1,5 +1,7 @@
+import { TrainerScheduleBotService, scheduleNavigation } from '../common/bot-schedule/trainer-schedule-bot.service';
+import { ModuleAccessService } from '../settings/module-access.service';
 import { VkIdentityService } from './vk-identity.service';
-import { BadRequestException, ForbiddenException, HttpException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import { DateTime } from 'luxon';
 import { Keyboard, VK, type KeyboardBuilder } from 'vk-io';
@@ -43,7 +45,8 @@ export class VkBotService {
   constructor(private readonly prisma: PrismaService, private readonly links: VkLinkService,
     private readonly ledger: MembershipLedgerService, private readonly leads: LeadsService,
     private readonly identity: VkIdentityService = new VkIdentityService(prisma),
-    private readonly bookingResponses: VkBookingResponseService = new VkBookingResponseService(prisma)) {
+    private readonly bookingResponses: VkBookingResponseService = new VkBookingResponseService(prisma),
+    @Optional() private readonly schedule: TrainerScheduleBotService = new TrainerScheduleBotService(prisma, new ModuleAccessService(prisma))) {
     const token = vkGroupToken();
     if (token) this.vk = new VK({ token, apiVersion: '5.199', apiTimeout: 5000, apiRetryLimit: 0 });
   }
@@ -182,11 +185,22 @@ export class VkBotService {
     const lead = /^заявка\s+([^;]{1,100});\s*(.+)$/i.exec(text.trim());
     // Only explicit commands reach the reply handlers, including their default menus.
     const isMenuCommand = /^(начать|\/start|старт|меню)$/i.test(text.trim());
+    const scheduleCommand = /^schedule:(personal|club):(today|tomorrow|\d{4}-\d{2}-\d{2})$/.exec(command);
     const knownCommand = ['начать', 'help', 'link', 'book', 'cash', 'about', 'directions', 'prices', 'guide',
       'первичная заявка', 'tomorrow', 'horses', 'today', 'riders', 'next-booking', 'membership', 'bookings'].includes(command);
-    if (!isMenuCommand && !knownCommand && !consent && !binding && !lead) return;
+    if (!isMenuCommand && !knownCommand && !scheduleCommand && !consent && !binding && !lead) return;
     if (command === 'help') { await this.requestAdministrator(peer, eventId); return; }
     try {
+      if (scheduleCommand) {
+        const mode = scheduleCommand[1] === 'personal' ? 'personal' : 'club';
+        const { day, chunks } = await this.schedule.getSchedule('vk', String(sender), mode, scheduleCommand[2]);
+        const keyboard = Keyboard.keyboard(scheduleNavigation(mode, day).map(row => row.map(button => Keyboard.textButton({
+          label: button.label, payload: { command: `schedule:${button.mode}:${button.date}` },
+        })))).inline();
+        for (const [index, chunk] of chunks.entries())
+          await this.send(peer, `${eventId}:schedule:${index}`, chunk, index === chunks.length - 1 ? keyboard : undefined);
+        return;
+      }
       // Shared with GET /vk/identify; embedded webhook avoids a loopback HTTP request.
       const identity = await this.identity.identify(String(sender));
       if (consent) {
