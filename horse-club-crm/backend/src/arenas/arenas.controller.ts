@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role, type Arena } from '@prisma/client';
@@ -13,7 +14,8 @@ import { UpdateArenaDto } from './dto/update-arena.dto';
 
 @ApiTags('Arenas')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
+@RequireModule('SCHEDULE')
 @Controller('arenas')
 export class ArenasController {
   constructor(private readonly service: ArenasService) {}

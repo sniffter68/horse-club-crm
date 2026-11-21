@@ -1,3 +1,6 @@
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthUser } from '../auth/auth.types';
+import { BookingMembershipsQueryDto } from './dto/booking-memberships-query.dto';
 import { ClientQueryDto } from './dto/client-query.dto';
 import { QuickCreateClientDto } from './dto/quick-create-client.dto';
 import {
@@ -44,6 +47,12 @@ export class ClientsController {
     return this.clientsService.findOne(id);
   }
 
+  @Get(':id/booking-memberships')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  bookingMemberships(@Param('id', new ParseUUIDPipe()) id: string, @Query() query: BookingMembershipsQueryDto) {
+    return this.clientsService.bookingMemberships(id, query);
+  }
+
   @Get(':id/membership-ledger')
   @Roles(Role.ADMIN, Role.MANAGER)
   async findLedger(@Param('id', new ParseUUIDPipe()) id: string, @Query() query: RefineQueryDto,
@@ -54,9 +63,10 @@ export class ClientsController {
   }
 
   @Post('quick')
-  @Roles(Role.ADMIN, Role.MANAGER)
-  quickCreate(@Body() dto: QuickCreateClientDto): Promise<Client> {
-    return this.clientsService.quickCreate(dto);
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  async quickCreate(@Body() dto: QuickCreateClientDto, @CurrentUser() actor: AuthUser) {
+    const client = await this.clientsService.quickCreate(dto);
+    return actor.role === Role.TRAINER ? { id: client.id, name: client.name, clientType: client.clientType, riderLevel: client.riderLevel } : client;
   }
 
   @Patch(':id/convert-to-regular')

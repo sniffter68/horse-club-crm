@@ -1,3 +1,4 @@
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import {
   Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query,
   Res, UseGuards, UseInterceptors,
@@ -19,7 +20,8 @@ import { ServicesService } from './services.service';
 
 @ApiTags('Services')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
+@RequireModule('SCHEDULE')
 @UseInterceptors(SanitizeRbacInterceptor)
 @SanitizeTrainerFields('price')
 @Controller('services')

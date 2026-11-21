@@ -1,3 +1,5 @@
+import { membershipAccessWhere } from '../memberships/membership-access';
+import type { BookingMembershipsQueryDto } from './dto/booking-memberships-query.dto';
 import { phoneSearchIds } from '../common/phone-search';
 import { VkIdentityService } from '../vk-bot/vk-identity.service';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
@@ -110,6 +112,21 @@ export type ClientLedgerOperation = Omit<LedgerRow, 'amount'> & { amount: number
 
 @Injectable()
 export class ClientsService {
+  async bookingMemberships(clientId: string, query: BookingMembershipsQueryDto) {
+    const from = new Date(query.from), to = new Date(query.to);
+    if (!Number.isFinite(+from) || !Number.isFinite(+to) || from >= to) throw new BadRequestException('Некорректный интервал занятия');
+    const service = await this.prisma.service.findUnique({ where: { id: query.serviceId }, select: { allowMembership: true, isPerPerson: true, name: true, title: true } });
+    if (!service) throw new NotFoundException('Услуга не найдена');
+    if (!service.allowMembership || service.isPerPerson || /экскурс|excursion/i.test(`${service.title} ${service.name}`)) return [];
+    return this.prisma.membership.findMany({
+      where: { AND: [membershipAccessWhere(clientId), { OR: [{ serviceId: query.serviceId }, { serviceId: null }] }],
+        client: { deletedAt: null }, deletedAt: null, status: 'active', type: 'fixed_lessons',
+        remainedLessons: { gt: 0 }, validFrom: { lte: from }, validUntil: { gte: to } },
+      select: { id: true, title: true },
+      orderBy: [{ validUntil: 'asc' }, { id: 'asc' }],
+    });
+  }
+
   constructor(private readonly prisma: PrismaService, private readonly identity: VkIdentityService = new VkIdentityService(prisma)) {}
 
   private ensureSpecialCategoryAllowed(medicalNotes: string | undefined): void {

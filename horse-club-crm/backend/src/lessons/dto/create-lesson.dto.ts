@@ -37,7 +37,9 @@ export class CreateLessonDto extends LessonPriceDto {
   @Min(0)
   pricePerPerson?: number;
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiPropertyOptional({ format: 'uuid', description: 'Для тренера определяется из текущего пользователя.' })
+  @Transform(({ value }) => value === '' ? undefined : value)
+  @IsOptional()
   @IsUUID()
   trainerId!: string;
 

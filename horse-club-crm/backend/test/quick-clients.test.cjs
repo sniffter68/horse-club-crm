@@ -24,7 +24,7 @@ test('quick clients HTTP: minimal guest, regular, validation, filtering and idem
     $transaction: async queries => Promise.all(queries),
   });
   const module = await Test.createTestingModule({ controllers: [ClientsController], providers: [{ provide: ClientsService, useValue: service }] })
-    .overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true }).overrideGuard(JwtAuthGuard).useValue({ canActivate: () => true })
+    .overrideGuard(require('../dist/auth/module-access.guard').ModuleAccessGuard).useValue({ canActivate: () => true }).overrideGuard(JwtAuthGuard).useValue({ canActivate: context => { context.switchToHttp().getRequest().user = { id, email: 'manager@test.local', role: 'MANAGER' }; return true; } })
     .overrideGuard(RolesGuard).useValue({ canActivate: () => true })
     .overrideInterceptor(SanitizeRbacInterceptor).useValue({ intercept: (_, next) => next.handle() }).compile();
   const app = module.createNestApplication();
@@ -56,7 +56,7 @@ test('quick clients HTTP: minimal guest, regular, validation, filtering and idem
     await api.patch(`/api/clients/${id}/convert-to-regular`).expect(200);
     assert.equal(rows[0].name, 'Анна Орлова');
     await api.patch('/api/clients/invalid/convert-to-regular').expect(400);
-    assert.deepEqual(Reflect.getMetadata('auth:roles', ClientsController.prototype.quickCreate), ['ADMIN', 'MANAGER']);
+    assert.deepEqual(Reflect.getMetadata('auth:roles', ClientsController.prototype.quickCreate), ['ADMIN', 'MANAGER', 'TRAINER']);
     assert.deepEqual(Reflect.getMetadata('auth:roles', ClientsController.prototype.convertToRegular), ['ADMIN', 'MANAGER']);
   } finally { await app.close(); }
 });

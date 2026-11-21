@@ -31,7 +31,7 @@ export interface ScheduleEntry {
   horses: { id: string; name: string; restMinutes: number }[];
   riders: string[]; participantsCount?: number; paymentSummary?: string; discipline: string; status: string; active: boolean; completed: boolean;
 }
-export const clientName = (client: Pick<Client, 'id' | 'firstName' | 'lastName' | 'name'>) => [client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || client.id
+export const clientName = (client: Pick<Client, 'id' | 'firstName' | 'lastName' | 'name'> | null) => client ? [client.firstName, client.lastName].filter(Boolean).join(' ') || client.name || client.id : 'Занято'
 export const bookingStatusLabels: Record<TriadStatus, string> = { scheduled: 'Запланировано', completed: 'Проведено', no_show: 'Неявка', cancelled_client: 'Отменено клиентом', cancelled_club: 'Отменено клубом', penalty_cancellation: 'Штрафная отмена' }
 export function entryStatusLabel(entry: ScheduleEntry): string {
   return bookingStatusLabels[entry.status.toLowerCase() as TriadStatus] ?? (entry.status === 'CANCELLED' ? 'Отменено' : entry.status)

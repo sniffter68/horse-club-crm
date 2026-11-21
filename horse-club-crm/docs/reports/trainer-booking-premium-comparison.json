@@ -1,0 +1,18 @@
+{
+  "baseline": {
+    "errors": 247,
+    "total": 247,
+    "unresolved": 0,
+    "violations": 247,
+    "warnings": 0
+  },
+  "current": {
+    "errors": 247,
+    "total": 247,
+    "unresolved": 0,
+    "violations": 247,
+    "warnings": 0
+  },
+  "newFindingKinds": [],
+  "note": "Static scanner treats Ant Design Form.Item and Select as native HTML tags; actual shared Form declares noValidate."
+}

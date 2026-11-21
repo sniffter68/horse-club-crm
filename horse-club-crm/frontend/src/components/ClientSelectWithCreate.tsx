@@ -5,6 +5,8 @@ import { Alert, Button, Select, Space, Tag, type SelectProps } from 'antd'
 import type { RefSelectProps } from 'antd/es/select'
 import { API_URL, httpClient, toHttpError } from '../httpClient'
 import { isUuid } from '../uuid'
+import { usePermissions } from '../modulePermissions'
+import { getIdentity } from '../authStorage'
 import { useCatalogPermissions } from '../pages/catalogs/permissions'
 import { QuickCreateClientModal, type CreatedClient } from '../pages/clients/QuickCreateClientModal'
 
@@ -13,9 +15,12 @@ type Props = Omit<SelectProps<string>, 'options' | 'onChange'> & {
   onChange?: (value: string | undefined) => void
   onCreated?: (client: CreatedClient) => void
   excludedIds?: string[]
+  bookingForTrainer?: boolean
 }
-export function ClientSelectWithCreate({ value, onChange, onCreated, excludedIds = [], disabled, ...props }: Props) {
+export function ClientSelectWithCreate({ value, onChange, onCreated, excludedIds = [], bookingForTrainer = false, disabled, ...props }: Props) {
   const { canManage } = useCatalogPermissions()
+  const modules = usePermissions()
+  const canQuickCreate = canManage || bookingForTrainer && getIdentity()?.role === 'TRAINER' && modules.canWrite('SCHEDULE')
   const invalidate = useInvalidate()
   const select = useRef<RefSelectProps>(null)
   const [rows, setRows] = useState<CreatedClient[]>([])
@@ -64,7 +69,7 @@ export function ClientSelectWithCreate({ value, onChange, onCreated, excludedIds
       notFoundContent={loading ? 'Загрузка…' : 'Клиенты не найдены'}
       popupRender={menu => <>{menu}{error && <Alert role="alert" type="error" message={error} action={<Button onClick={() => retry(n => n + 1)}>Повторить</Button>} />}
         {search && <Button type="link" onClick={() => { setSearch(''); select.current?.focus() }}>Очистить поиск</Button>}
-        {canManage && !disabled && <Space direction="vertical" style={{ padding: 8, width: '100%' }}>
+        {canQuickCreate && !disabled && <Space direction="vertical" style={{ padding: 8, width: '100%' }}>
           <Button block onClick={() => { setOpen(false); setCreating('REGULAR') }}>+ Постоянный клиент</Button>
           <Button block onClick={() => { setOpen(false); setCreating('ONE_TIME') }}>⚡ Разовый гость</Button>
         </Space>}

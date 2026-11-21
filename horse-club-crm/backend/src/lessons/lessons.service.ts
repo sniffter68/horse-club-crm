@@ -213,6 +213,15 @@ export class LessonsService {
   }
 
   async createLesson(dto: CreateLessonDto, transaction?: Prisma.TransactionClient, actor?: AuthUser): Promise<LessonDetails> {
+    if (actor?.role === 'TRAINER') {
+      if (!actor.trainerId) throw new ForbiddenException('Профиль пользователя не привязан к тренеру');
+      if (dto.trainerId && dto.trainerId !== actor.trainerId) throw new ForbiddenException('Тренер может создавать записи только в своё расписание');
+      if ([dto.cost, dto.pricePerPerson, dto.prepaymentAmount, dto.prepaymentMethod].some(value => value !== undefined)) {
+        throw new ForbiddenException('Тренер не может указывать финансовые параметры оплаты при записи');
+      }
+      dto = { ...dto, trainerId: actor.trainerId };
+    }
+    if (!dto.trainerId) throw new BadRequestException('Укажите тренера');
     if (dto.participants && (dto.clientId || dto.horseId || dto.membershipId)) {
       throw new BadRequestException('Передайте участников либо в participants, либо в устаревших полях clientId/horseId/membershipId');
     }
@@ -294,10 +303,11 @@ export class LessonsService {
         if (!participant.membershipId) continue;
         if (!service.allowMembership) throw new BadRequestException('Услуга не допускает оплату абонементом');
         const membership = await tx.membership.findUnique({ where: { id: participant.membershipId },
-          select: { id: true, clientId: true, remainedLessons: true, validFrom: true, validUntil: true, deletedAt: true, status: true } });
+          select: { id: true, clientId: true, remainedLessons: true, validFrom: true, validUntil: true, deletedAt: true, status: true, serviceId: true, type: true } });
         if (!membership || !await canUseMembership(tx, membership, participant.clientId)) {
           throw new BadRequestException('Абонемент не принадлежит участнику');
         }
+        if (membership.serviceId && membership.serviceId !== dto.serviceId || membership.type && membership.type !== 'fixed_lessons') throw new BadRequestException('Абонемент не подходит для выбранной услуги');
         if (membership.deletedAt || membership.status !== 'active' || membership.remainedLessons <= 0 || membership.validFrom > start || membership.validUntil < end) {
           throw new BadRequestException('Абонемент недоступен на время занятия');
         }
@@ -371,7 +381,7 @@ export class LessonsService {
       });
       await this.recordPrepayment(tx, created, clientIds[0], prepayment, dto.prepaymentMethod, actor);
       await this.notifyLesson(tx, created, 'created', 'Запись на тренировку подтверждена');
-      if (actor) await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'LESSON_CREATED', actorId: actor.id, actorName: actor.email, details: { lessonId: created.id } } });
+      if (actor) await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: actor.role === 'TRAINER' ? 'LESSON_CREATED_BY_TRAINER' : 'LESSON_CREATED', actorId: actor.id, actorName: actor.email, details: { lessonId: created.id, trainerId: created.trainerId } } });
       return created;
     };
     return transaction ? create(transaction) : this.runSerializable(create);
