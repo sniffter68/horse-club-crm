@@ -1,5 +1,6 @@
 import { ProfileHeader, ProfileSection, ProfileFields } from '../cards/ProfileDetails'
 import { Link } from 'react-router-dom'
+import { isUuid } from '../../uuid'
 import { useState } from 'react'
 import { HorseForm } from './form'
 import { CatalogEditAction } from '../catalogs/EditDrawer'
@@ -50,7 +51,9 @@ export function HorseList() {
           { label: 'Масть', value: horse.coat || 'Не указана' },
           { label: 'Год рождения', value: horse.birthYear || 'Не указан' },
           { label: 'Тип принадлежности', value: horse.ownerType === 'private' ? 'Частная' : 'Клубная' },
-          { label: 'Владелец', value: horse.owner ? personName(horse.owner) : horse.ownerType === 'private' ? 'Не указан' : 'Клуб' },
+          { label: 'Владелец', value: horse.ownerType === 'club' ? 'Клуб' : horse.owner
+            ? isUuid(horse.owner.id) ? <Link to={`/clients?clientId=${horse.owner.id}`}>{personName(horse.owner)}</Link> : personName(horse.owner)
+            : 'Не указан' },
           { label: 'Текущий денник и корпус', value: permissions.boardingAccess && horse.stall
             ? <Link to={`/stable?stallId=${horse.stall.id}`}>{horse.stall.building?.name || 'Корпус не указан'} · Денник {horse.stall.number || horse.stall.name}</Link>
             : 'Не назначен' },

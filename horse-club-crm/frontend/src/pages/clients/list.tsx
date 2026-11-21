@@ -7,6 +7,7 @@ import { ArchiveAction } from './ArchiveAction'
 import { ClientForm } from './form'
 import { CatalogEditAction } from '../catalogs/EditDrawer'
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ClientColumnSettings } from './columnSettings'
 import { useClientColumns } from './useClientColumns'
 import type { TableColumnsType } from 'antd'
@@ -87,7 +88,17 @@ export function ClientList() {
   const [now] = useState(() => Date.now())
   const { canManage } = useCatalogPermissions()
   const [ledgerClient, setLedgerClient] = useState<Client>()
-  const [selectedClientId, setSelectedClientId] = useState<string>()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const clientId = searchParams.get('clientId')
+  const selectedClientId = clientId && isUuid(clientId) ? clientId : undefined
+  function setSelectedClientId(id?: string) {
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous)
+      if (id && isUuid(id)) next.set('clientId', id)
+      else next.delete('clientId')
+      return next
+    })
+  }
   const { result: client, query } = useOne<ClientDetails, HttpError>({
     resource: 'clients',
     id: selectedClientId,

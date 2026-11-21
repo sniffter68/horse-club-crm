@@ -60,6 +60,50 @@ test('client card preserves completed subscriptions and their chronological audi
   await page.screenshot({ path: '../docs/reports/operations-client-card.png', fullPage: true, animations: 'disabled' })
 })
 
+test('horse owner link opens the matching client card', async ({ page }) => {
+  await page.goto('/horses')
+  await page.getByRole('button', { name: horse.name, exact: true }).first().click()
+  const horseCard = page.getByRole('dialog', { name: 'Карточка лошади' })
+  const ownerLink = horseCard.getByRole('link', { name: client.name, exact: true })
+  await expect(ownerLink).toHaveAttribute('href', `/clients?clientId=${clientId}`)
+  const response = page.waitForResponse(r => new URL(r.url()).pathname === `/api/clients/${clientId}`)
+  await ownerLink.click()
+  await response
+  await expect(page).toHaveURL(url => url.pathname === '/clients' && url.searchParams.get('clientId') === clientId)
+  const clientCard = page.getByRole('dialog', { name: 'Карточка клиента', exact: true })
+  await expect(clientCard.getByRole('heading', { name: client.name, exact: true })).toBeVisible()
+  await page.reload()
+  await expect(clientCard.getByRole('heading', { name: client.name, exact: true })).toBeVisible()
+  await clientCard.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(clientCard).toBeHidden()
+  await expect(page).not.toHaveURL(/clientId=/)
+})
+
+for (const scenario of [
+  { ownerType: 'club', owner: client, expected: 'Клуб' },
+  { ownerType: 'private', owner: null, expected: 'Не указан' },
+  { ownerType: 'private', owner: { ...client, id: 'invalid-id' }, expected: client.name },
+]) test(`horse owner has no link: ${scenario.ownerType}, ${scenario.expected}`, async ({ page }) => {
+  await page.route(`**/api/horses/${horseId}`, route => route.fulfill({ json: { ...horse, ...scenario } }))
+  await page.goto('/horses')
+  await page.getByRole('button', { name: horse.name, exact: true }).first().click()
+  const ownerField = page.getByRole('dialog', { name: 'Карточка лошади' })
+    .locator('.profile-fields__item').filter({ has: page.locator('dt', { hasText: /^Владелец$/ }) })
+  await expect(ownerField.locator('dd')).toHaveText(scenario.expected)
+  await expect(ownerField.getByRole('link')).toHaveCount(0)
+})
+
+test('invalid client deep link does not request a client card', async ({ page }) => {
+  const requests: string[] = []
+  page.on('request', request => {
+    if (new URL(request.url()).pathname.startsWith('/api/clients/')) requests.push(request.url())
+  })
+  await page.goto('/clients?clientId=invalid-id')
+  await expect(page.getByRole('button', { name: client.name, exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Карточка клиента', exact: true })).toHaveCount(0)
+  expect(requests).toEqual([])
+})
+
 test('horse card exposes owner, actual placement and veterinary journal', async ({ page }) => {
   await page.route('**/api/vet/events?*', route => {
     const status = new URL(route.request().url()).searchParams.get('status') || 'overdue'
