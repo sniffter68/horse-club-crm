@@ -44,7 +44,7 @@ function fixture({ debit = true, group = false, legacy = false } = {}) {
       findFirst: async ({ where }) => linked && (where.id === clientId || where.OR?.some(x => x.telegramUserId === '123')) ? { id: clientId, name: 'Анна Всадник' } : null },
     clubModuleSettings: { findUnique: async () => null },
     membership: { findUnique: async () => ({ id, clientId }), update: async () => { balance++; },
-      findFirst: async ({ where }) => { assert.ok(where.OR.some(x => x.clientId === clientId)); return { id, title: 'Абонемент 8', totalLessons: 8, remainedLessons: balance, status: 'active', validUntil: new Date(Date.now() + 864000000), pricingPlan: { name: 'Тариф 8', lessonsCount: 8 } }; } },
+      findFirst: async ({ where }) => { assert.ok(where.OR.some(x => x.clientId === clientId)); return { id, title: 'Абонемент 8', totalLessons: 8, remainedLessons: balance, status: 'active', validUntil: new Date(Date.now() + 864000000), pricingPlan: { name: 'Тариф 8', totalLessons: 8 } }; } },
     booking: { findFirst: async ({ where }) => { assert.equal(where.clientId, clientId); return where.OR.some(x => x.id === id || x.lessonId === other) ? row : null; },
       findMany: async ({ where }) => { assert.equal(where.clientId, clientId); return [row]; },
       update: async ({ data }) => { row = { ...row, ...data }; return row; },

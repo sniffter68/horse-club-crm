@@ -6,7 +6,7 @@ const { TelegramPersonalService } = require('../dist/modules/telegram-bot/telegr
 const { TmaBookingService } = require('../dist/modules/telegram-bot/tma-booking.service');
 const now = new Date('2026-11-09T12:00:00Z');
 const row = { id: 'package', title: 'Манеж <8> & тренер', totalLessons: 8, remainedLessons: 5,
-  validUntil: new Date('2026-12-09T21:30:00Z'), status: 'active', serviceTitle: 'Занятия', pricingPlan: { name: 'План', lessonsCount: 8 } };
+  validUntil: new Date('2026-12-09T21:30:00Z'), status: 'active', serviceTitle: 'Занятия', pricingPlan: { name: 'План', totalLessons: 10 } };
 
 test('membership lookup restricts owner/family, active dates, lesson units and balance; selects latest expiry deterministically', async () => {
   const membership = await activeTelegramMembership({ membership: { findFirst: async args => {
@@ -15,7 +15,8 @@ test('membership lookup restricts owner/family, active dates, lesson units and b
       OR: [{ clientId: 'signed-client' }, { members: { some: { clientId: 'signed-client' } } }] });
     assert.deepEqual(args.orderBy, [{ validUntil: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }]);
     assert.equal(args.select.remainedLessons, true);
-    assert.equal(args.select.pricingPlan.select.lessonsCount, true);
+    assert.equal(args.select.totalLessons, true);
+    assert.deepEqual(args.select.pricingPlan, { select: { name: true, totalLessons: true } });
     return row;
   } } }, 'signed-client', now);
   assert.deepEqual(membership, { id: row.id, title: row.title, totalLessons: 8, remainingLessons: 5,
@@ -23,10 +24,23 @@ test('membership lookup restricts owner/family, active dates, lesson units and b
     validUntil: row.validUntil.toISOString(), isExpiringSoon: false });
 });
 
-test('missing pricing plan falls back to remaining lessons and a generic plan name', async () => {
+test('missing pricing plan preserves membership total and uses a generic plan name', async () => {
   const result = await activeTelegramMembership({ membership: { findFirst: async () => ({ ...row, pricingPlan: null }) } }, 'client', now);
-  assert.equal(result.totalLessons, row.remainedLessons);
+  assert.equal(result.totalLessons, row.totalLessons);
   assert.equal(result.planName, 'Абонемент');
+});
+
+test('lesson total falls back from membership to pricing plan to remaining lessons, preserving zero', async () => {
+  for (const [fields, expected] of [
+    [{ totalLessons: 0 }, 0],
+    [{ totalLessons: null }, 10],
+    [{ totalLessons: undefined }, 10],
+    [{ totalLessons: null, pricingPlan: { name: 'План', totalLessons: 0 } }, 0],
+    [{ totalLessons: null, pricingPlan: null }, row.remainedLessons],
+  ]) {
+    const result = await activeTelegramMembership({ membership: { findFirst: async () => ({ ...row, ...fields }) } }, 'client', now);
+    assert.equal(result.totalLessons, expected);
+  }
 });
 
 test('expiry warning includes exactly three days or one lesson and excludes values above both boundaries', async () => {

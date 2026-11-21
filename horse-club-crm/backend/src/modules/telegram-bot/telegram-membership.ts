@@ -13,11 +13,11 @@ export async function activeTelegramMembership(prisma: Pick<PrismaService, 'memb
     },
     orderBy: [{ validUntil: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
     select: { id: true, title: true, serviceTitle: true, totalLessons: true, remainedLessons: true,
-      validUntil: true, status: true, pricingPlan: { select: { name: true, lessonsCount: true } } },
+      validUntil: true, status: true, pricingPlan: { select: { name: true, totalLessons: true } } },
   });
   return row ? {
     id: row.id, title: row.title || row.serviceTitle || row.pricingPlan?.name || 'Абонемент',
-    totalLessons: row.pricingPlan?.lessonsCount ?? row.remainedLessons,
+    totalLessons: row.totalLessons ?? row.pricingPlan?.totalLessons ?? row.remainedLessons,
     remainedLessons: row.remainedLessons, remainingLessons: row.remainedLessons,
     status: row.status, planName: row.pricingPlan?.name ?? 'Абонемент',
     validUntil: row.validUntil.toISOString(),
