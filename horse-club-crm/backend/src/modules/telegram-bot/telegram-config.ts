@@ -5,7 +5,12 @@ import type { PrismaService } from '../../prisma/prisma.service';
 
 /** Same encrypted envelope as VK settings, with a separate encryption key domain. */
 export async function resolveTelegramBotToken(prisma?: PrismaService): Promise<string | undefined> {
-  const row = await prisma?.telegramIntegrationSettings?.findUnique({ where: { id: 1 } });
+  let row: { encryptedConfig: string } | null | undefined;
+  try {
+    row = await prisma?.telegramIntegrationSettings?.findUnique({ where: { id: 1 } });
+  } catch {
+    return process.env.TELEGRAM_BOT_TOKEN?.trim() || undefined;
+  }
   if (row) {
     try {
       const secret = process.env.JWT_SECRET;
