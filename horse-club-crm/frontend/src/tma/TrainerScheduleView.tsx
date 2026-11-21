@@ -19,13 +19,17 @@ type DayResult = { lessons: TrainerLesson[]; error?: string }
 export function TrainerScheduleView() {
   const { state, dark, retry, expire } = useTelegramWebApp()
   const [board, setBoard] = useState(false)
+  const [date, setDate] = useState(tmaDay)
   return <ConfigProvider locale={ruRU} theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm,
     token: { colorPrimary: window.Telegram?.WebApp?.themeParams.button_color ?? '#724C39', borderRadius: 12, controlHeight: 44 } }}>
     <App><main className="trainer-tma">
-      {state.kind === 'ready' && state.session.role !== 'ADMIN' && <Button onClick={() => setBoard(value => !value)}>{board ? 'Моё расписание' : 'Общая шахматка'}</Button>}
+      {state.kind === 'ready' && state.session.role === 'TRAINER' && <nav className="trainer-view-switch" aria-label="Режим расписания">
+        <Button aria-pressed={!board} type={!board ? 'primary' : 'default'} onClick={() => setBoard(false)}>Моё расписание</Button>
+        <Button aria-pressed={board} type={board ? 'primary' : 'default'} onClick={() => setBoard(true)}>Общее расписание</Button>
+      </nav>}
       {state.kind === 'ready' ? state.session.role === 'ADMIN'
         ? <AdminTmaView session={state.session} onExpired={expire} />
-        : board ? <TrainerBoardView canWrite={state.session.accessLevel === 'FULL'} tmaToken={state.session.access_token} onExit={() => setBoard(false)} /> : <TrainerSchedule session={state.session} onExpired={expire} /> : <section className="trainer-gate">
+        : board ? <><header className="trainer-header"><h1>{state.session.trainer.name}</h1></header><TrainerBoardView date={date} onDateChange={setDate} canWrite={state.session.accessLevel === 'FULL'} tmaToken={state.session.access_token} onExit={() => setBoard(false)} /></> : <TrainerSchedule date={date} onDateChange={setDate} session={state.session} onExpired={expire} /> : <section className="trainer-gate">
         <img src="/horse-crm.svg" alt="КСК «СЛКС»" width={64} height={64} />
         <p className="trainer-eyebrow">HORSE CLUB · КСК «СЛКС»</p>
         <h1>Кабинет клуба</h1>
@@ -42,19 +46,19 @@ export function TrainerScheduleView() {
 }
 
 export function AdminTmaView({ session, onExpired }: { session: TrainerSession; onExpired: () => void }) {
-  const [view, setView] = useState<'admin' | 'trainer'>(() => /^\/tma\/trainer\/?$/.test(window.location.pathname) && session.trainer.trainerId ? 'trainer' : 'admin')
+  const [view, setView] = useState<'admin' | 'trainer'>('admin')
+  const [date, setDate] = useState(tmaDay)
   return <>
-    {session.trainer.trainerId && <nav className="trainer-heading-row" aria-label="Режим кабинета">
-      <Button type={view === 'admin' ? 'primary' : 'default'} aria-pressed={view === 'admin'} onClick={() => setView('admin')}>Вид администратора</Button>
-      <Button type={view === 'trainer' ? 'primary' : 'default'} aria-pressed={view === 'trainer'} onClick={() => setView('trainer')}>Вид тренера</Button>
+    {session.trainer.trainerId && <nav className="trainer-view-switch" aria-label="Режим расписания">
+      <Button type={view === 'trainer' ? 'primary' : 'default'} aria-pressed={view === 'trainer'} onClick={() => setView('trainer')}>Моё расписание</Button>
+      <Button type={view === 'admin' ? 'primary' : 'default'} aria-pressed={view === 'admin'} onClick={() => setView('admin')}>Общее расписание</Button>
     </nav>}
-    <TrainerSchedule key={view} session={session} onExpired={onExpired} all={view === 'admin'} />
+    <TrainerSchedule date={date} onDateChange={setDate} session={session} onExpired={onExpired} all={view === 'admin'} />
   </>
 }
 
-function TrainerSchedule({ session, onExpired, all = false }: { session: TrainerSession; onExpired: () => void; all?: boolean }) {
+function TrainerSchedule({ session, onExpired, all = false, date, onDateChange: setDate }: { session: TrainerSession; onExpired: () => void; all?: boolean; date: string; onDateChange: (date: string) => void }) {
   const { message } = App.useApp()
-  const [date, setDate] = useState(tmaDay)
   const [weekData, setWeekData] = useState<{ key: string; days: Record<string, DayResult> }>({ key: '', days: {} })
   const [revision, setRevision] = useState(0)
   const [sheet, setSheet] = useState<Sheet>(null)
@@ -72,7 +76,7 @@ function TrainerSchedule({ session, onExpired, all = false }: { session: Trainer
   const [horseRetry, setHorseRetry] = useState(0)
   const weekStart = tmaWeek(date)[0].toISODate()!
   const full = session.accessLevel === 'FULL'
-  const requestKey = `${weekStart}:${revision}`
+  const requestKey = `${all}:${weekStart}:${revision}`
   const days = weekData.key === requestKey ? weekData.days : {}
   useEffect(() => {
     const controller = new AbortController()

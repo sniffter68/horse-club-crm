@@ -15,8 +15,8 @@ async function telegram(page: Page) {
       themeParams: { bg_color: '#f7f4f0', secondary_bg_color: '#ffffff', text_color: '#3a2f2b', button_color: '#724c39' },
       ready: () => document.documentElement.setAttribute('data-tg-ready', 'true'),
       expand: () => document.documentElement.setAttribute('data-tg-expanded', 'true'),
-      onEvent: (_event, callback) => window.addEventListener('trainer-theme', callback),
-      offEvent: (_event, callback) => window.removeEventListener('trainer-theme', callback),
+      onEvent: (event, callback) => window.addEventListener(event, callback),
+      offEvent: (event, callback) => window.removeEventListener(event, callback),
     }
     window.Telegram = { WebApp: app }
     // An unrelated CRM session must neither be used nor overwritten.
@@ -24,7 +24,7 @@ async function telegram(page: Page) {
   })
 }
 
-async function mock(page: Page, options: { admin?: boolean; noTrainer?: boolean; readOnly?: boolean; unlinked?: boolean; authFailure?: boolean; scheduleFailure?: boolean; empty?: boolean } = {}) {
+async function mock(page: Page, options: { admin?: boolean; noTrainer?: boolean; readOnly?: boolean; unlinked?: boolean; authFailure?: boolean; scheduleFailure?: boolean; empty?: boolean; name?: string } = {}) {
   let status: TrainerLesson['status'] = 'SCHEDULED', horse = 'Гром', failMutation = false, mutations = 0, expire = false
   const bodies: unknown[] = []
   const lesson = (): TrainerLesson => ({ id: lessonId, startTime: `${today}T07:00:00Z`, endTime: `${today}T07:45:00Z`,
@@ -36,12 +36,13 @@ async function mock(page: Page, options: { admin?: boolean; noTrainer?: boolean;
       expect(route.request().postDataJSON()).toEqual({ initData: 'signed-test-init-data' })
       if (options.authFailure) return route.fulfill({ status: 401, json: { message: 'Подпись недействительна' } })
       return route.fulfill({ json: options.unlinked ? { role: 'CLIENT', token: null, user: { telegramId: '123', firstName: 'Анна' } } : {
-        role: options.admin ? 'ADMIN' : 'TRAINER', token: 'trainer-memory-session', trainerId: options.noTrainer ? null : bookingId, user: { id: lessonId, name: 'Мария Тренер' }, accessLevel: options.readOnly ? 'READ_ONLY' : 'FULL',
+        role: options.admin ? 'ADMIN' : 'TRAINER', token: 'trainer-memory-session', trainerId: options.noTrainer ? null : bookingId, user: { id: lessonId, name: options.name ?? 'Мария Тренер' }, accessLevel: options.readOnly ? 'READ_ONLY' : 'FULL',
         trainer: { trainerId: bookingId, name: 'Мария Тренер' },
       } })
     }
     expect(route.request().headers().authorization).toBe('Bearer trainer-memory-session')
     if (expire) return route.fulfill({ status: 401, json: { message: 'Сессия истекла' } })
+    if (path.endsWith('/trainer-board')) return route.fulfill({ json: { date: new URL(route.request().url()).searchParams.get('date'), trainerId: bookingId, trainers: [], lessons: [], openTime: '08:00', closeTime: '22:00' } })
     if (path.endsWith('/schedule')) {
       if (options.scheduleFailure) return route.fulfill({ status: 503, json: { message: 'Нет соединения с сервером' } })
       return route.fulfill({ json: !options.empty && new URL(route.request().url()).searchParams.get('date') === today ? [lesson()] : [] })
@@ -139,7 +140,7 @@ test('READ_ONLY, dark theme and 320px layout', async ({ page }) => {
     const app = window.Telegram!.WebApp!
     app.colorScheme = 'dark'
     app.themeParams = { bg_color: '#181311', text_color: '#faf7f2', secondary_bg_color: '#241e1c' }
-    window.dispatchEvent(new Event('trainer-theme'))
+    window.dispatchEvent(new Event('themeChanged'))
   })
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   expect(await page.locator('main').evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(24, 19, 17)')
@@ -182,12 +183,12 @@ for (const noTrainer of [false, true]) test(`root gateway opens admin schedule; 
   expect(paths).toContain('/api/tma/admin/schedule')
   await page.screenshot({ path: `../test-results/gateway-admin-${noTrainer ? 'standalone' : 'trainer'}.png`, fullPage: true })
   await expect(page.locator('.ant-layout-sider')).toHaveCount(0)
-  if (noTrainer) await expect(page.getByRole('button', { name: 'Вид тренера', exact: true })).toHaveCount(0)
+  if (noTrainer) await expect(page.getByRole('navigation', { name: 'Режим расписания' })).toHaveCount(0)
   else {
-    await page.getByRole('button', { name: 'Вид тренера', exact: true }).click()
+    await page.getByRole('button', { name: 'Моё расписание', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Моё расписание' })).toBeVisible()
     expect(paths).toContain('/api/tma/schedule')
-    await page.getByRole('button', { name: 'Вид администратора', exact: true }).click()
+    await page.getByRole('button', { name: 'Общее расписание', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Расписание клуба' })).toBeVisible()
   }
 })
@@ -224,4 +225,58 @@ test('root gateway sends clients to the isolated client entry preserving Telegra
   await expect(page).toHaveURL(/\/tma\/client\?tgWebAppVersion=8.0#tgWebAppData=signed-launch$/)
   await expect(page.getByRole('heading', { name: 'Запись в клуб' })).toBeVisible()
   expect(await page.evaluate(() => localStorage.getItem('horsecrm.access_token'))).toBe('crm-untouched')
+})
+
+for (const insets of [false, true]) test(`header clears Telegram chrome and mobile layout fits; SDK insets=${insets}`, async ({ page }) => {
+  await telegram(page)
+  await page.addInitScript(useInsets => {
+    if (!useInsets) return
+    window.Telegram!.WebApp!.safeAreaInset = { top: 44, bottom: 0, left: 0, right: 0 }
+    window.Telegram!.WebApp!.contentSafeAreaInset = { top: 48, bottom: 0, left: 0, right: 0 }
+  }, insets)
+  await mock(page, { admin: true, noTrainer: true, empty: true, name: 'Валерий Константинович' })
+  await page.goto('/tma')
+  const heading = page.getByRole('heading', { name: 'Валерий Константинович', exact: true })
+  await expect(heading).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Режим расписания' })).toHaveCount(0)
+  const checkLayout = async (minimum: number) => {
+    const rect = await heading.boundingBox()
+    expect(rect!.y).toBeGreaterThanOrEqual(minimum)
+    expect(rect!.y + rect!.height).toBeLessThan(844)
+    expect(await heading.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    // Empty schedule fits the viewport without padding-induced vertical scrolling.
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true)
+  }
+  for (const width of [390, 360, 430]) {
+    await page.setViewportSize({ width, height: 844 })
+    await checkLayout(insets ? 44 + 48 + 20 : 20)
+  }
+  await page.evaluate(() => {
+    window.Telegram!.WebApp!.safeAreaInset = { top: 24, bottom: 0, left: 0, right: 0 }
+    window.dispatchEvent(new Event('safeAreaChanged'))
+    window.Telegram!.WebApp!.contentSafeAreaInset = { top: 64, bottom: 0, left: 0, right: 0 }
+    window.dispatchEvent(new Event('contentSafeAreaChanged'))
+  })
+  await expect(page.locator('.trainer-tma')).toHaveCSS('padding-top', '108px')
+  await checkLayout(108)
+  await page.screenshot({ path: `../test-results/tma-safe-area-${insets}.png`, fullPage: true })
+})
+
+for (const admin of [false, true]) test(`trainer schedule modes preserve selected day; admin=${admin}`, async ({ page }) => {
+  await telegram(page)
+  await mock(page, { admin })
+  await page.goto('/tma')
+  await expect(page.getByRole('heading', { name: 'Мария Тренер' })).toBeVisible()
+  const modes = page.getByRole('navigation', { name: 'Режим расписания' })
+  await modes.getByRole('button', { name: 'Моё расписание', exact: true }).click()
+  const day = page.getByRole('button', { name: /четверг, 12 ноября/ })
+  await day.click()
+  const request = page.waitForRequest(request => request.url().includes(admin ? '/admin/schedule?date=2026-11-12' : '/trainer-board?date=2026-11-12'))
+  await modes.getByRole('button', { name: 'Общее расписание', exact: true }).click()
+  await request
+  if (!admin) await expect(page.locator('#trainer-board-date')).toHaveValue('2026-11-12')
+  await modes.getByRole('button', { name: 'Моё расписание', exact: true }).click()
+  await expect(day).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('heading', { name: '12 ноября, четверг', exact: true })).toBeVisible()
 })

@@ -3,10 +3,17 @@
   --tma-text: var(--trainer-text, var(--crm-ink));
   --tma-surface: var(--trainer-surface, var(--crm-paper));
   min-height: 100dvh;
+  box-sizing: border-box;
+  width: 100%;
+  overflow-x: hidden;
   background: var(--tma-bg);
   color: var(--tma-text);
-  padding: max(20px, var(--tg-content-safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  /* System inset and Telegram chrome are separate; env and SDK describe the same system area. */
+  padding: calc(20px + max(env(safe-area-inset-top, 0px), var(--trainer-safe-area-inset-top, var(--tg-safe-area-inset-top, 0px))) + var(--trainer-content-safe-area-inset-top, var(--tg-content-safe-area-inset-top, 0px))) max(16px, env(safe-area-inset-right, 0px)) max(32px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
 }
+.trainer-view-switch { max-width: 600px; margin: 0 auto 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.trainer-view-switch .ant-btn { padding-inline: 6px; font-size: 13px; }
+.trainer-tma .trainer-workspace { min-height: 0; padding: 0; }
 .trainer-header, .trainer-day, .trainer-gate { max-width: 600px; margin: 0 auto; }
 .trainer-gate { padding-top: 15vh; display: grid; gap: 24px; }
 .trainer-tma h1 { margin: 8px 0 24px; font-size: clamp(26px, 6vw, 34px); line-height: 1.2; overflow-wrap: anywhere; }

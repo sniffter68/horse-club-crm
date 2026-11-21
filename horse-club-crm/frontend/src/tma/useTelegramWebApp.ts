@@ -2,13 +2,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { tmaRequest, type TmaBootstrapResponse, type TrainerSession } from './api'
 
 export interface TelegramWebApp {
+  safeAreaInset?: { top: number; bottom: number; left: number; right: number }
+  contentSafeAreaInset?: { top: number; bottom: number; left: number; right: number }
   initData: string
   colorScheme: 'light' | 'dark'
   themeParams: { bg_color?: string; text_color?: string; secondary_bg_color?: string; hint_color?: string; button_color?: string; button_text_color?: string }
   ready(): void
   expand(): void
-  onEvent(event: 'themeChanged', callback: () => void): void
-  offEvent(event: 'themeChanged', callback: () => void): void
+  onEvent(event: 'themeChanged' | 'safeAreaChanged' | 'contentSafeAreaChanged', callback: () => void): void
+  offEvent(event: 'themeChanged' | 'safeAreaChanged' | 'contentSafeAreaChanged', callback: () => void): void
 }
 declare global { interface Window { Telegram?: { WebApp?: TelegramWebApp } } }
 
@@ -48,6 +50,16 @@ export function useTelegramWebApp() {
         app.expand()
         const root = document.documentElement
         const previousTheme = root.dataset.theme
+        const syncSafeArea = () => {
+          for (const [name, inset] of [['safe', app.safeAreaInset], ['content-safe', app.contentSafeAreaInset]] as const) {
+            for (const edge of ['top', 'bottom', 'left', 'right'] as const) {
+              const value = inset?.[edge]
+              const property = `--trainer-${name}-area-inset-${edge}`
+              if (typeof value === 'number' && Number.isFinite(value) && value >= 0) root.style.setProperty(property, `${value}px`)
+              else root.style.removeProperty(property)
+            }
+          }
+        }
         const syncTheme = () => {
           setDark(app.colorScheme === 'dark')
           root.dataset.theme = app.colorScheme
@@ -60,9 +72,15 @@ export function useTelegramWebApp() {
           }
         }
         syncTheme()
+        syncSafeArea()
         app.onEvent('themeChanged', syncTheme)
+        app.onEvent('safeAreaChanged', syncSafeArea)
+        app.onEvent('contentSafeAreaChanged', syncSafeArea)
         disposeTheme = () => {
           app.offEvent('themeChanged', syncTheme)
+          app.offEvent('safeAreaChanged', syncSafeArea)
+          app.offEvent('contentSafeAreaChanged', syncSafeArea)
+          for (const name of ['safe', 'content-safe']) for (const edge of ['top', 'bottom', 'left', 'right']) root.style.removeProperty(`--trainer-${name}-area-inset-${edge}`)
           if (previousTheme) root.dataset.theme = previousTheme
           else delete root.dataset.theme
           for (const key of ['bg', 'text', 'surface', 'hint', 'button', 'button-text']) root.style.removeProperty(`--trainer-${key}`)

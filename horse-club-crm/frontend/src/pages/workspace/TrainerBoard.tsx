@@ -58,8 +58,10 @@ export function TrainerBoardPage() {
   return <TrainerBoardView canWrite={permissions.canWrite('SCHEDULE')} onExit={() => logout()} />
 }
 
-export function TrainerBoardView({ canWrite, onExit, tmaToken }: { canWrite: boolean; onExit: () => void; tmaToken?: string }) {
-  const [date, setDate] = useState(() => DateTime.now().setZone(zone).toISODate()!)
+export function TrainerBoardView({ canWrite, onExit, tmaToken, date: selectedDate, onDateChange }: { canWrite: boolean; onExit: () => void; tmaToken?: string; date?: string; onDateChange?: (date: string) => void }) {
+  const [localDate, setLocalDate] = useState(() => DateTime.now().setZone(zone).toISODate()!)
+  const date = selectedDate ?? localDate
+  const setDate = onDateChange ?? setLocalDate
   const [mine, setMine] = useState(false)
   const [now, setNow] = useState(() => DateTime.now().setZone(zone))
   useEffect(() => {
