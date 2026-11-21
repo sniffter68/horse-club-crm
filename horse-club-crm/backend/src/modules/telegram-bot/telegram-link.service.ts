@@ -48,7 +48,7 @@ export class TelegramLinkService {
       const owner = entityType === 'client' ? await tx.client.findFirst({ where }) : await tx.user.findFirst({ where });
       if (owner) throw new ConflictException('Telegram уже привязан к другому профилю');
       const select = { telegramUserId: true, telegramUsername: true };
-      const result = entityType === 'client' ? await tx.client.update({ where: { id }, data, select }) : await tx.user.update({ where: { id }, data, select });
+      const result = entityType === 'client' ? await tx.client.update({ where: { id }, data: { ...data, telegramChatId: null }, select }) : await tx.user.update({ where: { id }, data, select });
       await tx.telegramLinkToken.deleteMany({ where: { entityType, entityId: id } });
       return result;
     });
@@ -98,7 +98,7 @@ export class TelegramLinkService {
     return this.transaction(async tx => {
       await this.target(tx, entityType, id, actor);
       const data = { telegramUserId: null, telegramUsername: null };
-      if (entityType === 'client') await tx.client.update({ where: { id }, data });
+      if (entityType === 'client') await tx.client.update({ where: { id }, data: { ...data, telegramChatId: null } });
       else await tx.user.update({ where: { id }, data });
       await tx.telegramLinkToken.deleteMany({ where: { entityType, entityId: id } });
       return { success: true };

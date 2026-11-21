@@ -15,7 +15,7 @@ let sessionToken: string | null = null;
 export function setClientSession(token: string | null): void { sessionToken = token; }
 export interface ClientDashboard { client?: ClientOverview['client']; bookings?: Booking[]; isEstablished: boolean; membership: Membership | null; nextBooking: Booking | null }
 export type BootstrapResponse = { role: 'CLIENT'; token: string | null; clientId: string | null; clientName: string | null;
-  activeMembership: Membership | null; nextLesson: Booking | null } | { role: 'ADMIN' | 'TRAINER' | 'STAFF' };
+  activeMembership: Membership | null; nextLesson: Booking | null } | { role: 'UNLINKED_CLIENT'; needsPhoneLink: true } | { role: 'ADMIN' | 'TRAINER' | 'STAFF' };
 export interface Booking {
   id: string; canCancel?: boolean; canConfirm?: boolean; horse?: { name: string } | null; startTime: string; endTime: string; status: string; clientConfirmed: boolean;
   clientCancellationRequested: boolean; costAmount: string; trainer?: { name?: string } | null;
@@ -27,15 +27,31 @@ export function requireUuid(value: string): string {
   return value;
 }
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return request<T>(path, options, true);
+}
+let renewal: Promise<BootstrapResponse> | undefined;
+async function request<T>(path: string, options: RequestInit, retry: boolean): Promise<T> {
   const initData = telegram()?.initData;
   if (!initData && !sessionToken) throw new Error('Откройте запись через Telegram-бота');
-  const response = await fetch(`/api/tma/${path}`, { ...options, credentials: 'omit',
-    headers: { 'Content-Type': 'application/json', Authorization: sessionToken ? `Bearer ${sessionToken}` : `tma ${initData}`, ...(initData ? { 'X-Telegram-Init-Data': initData } : {}), ...options.headers } });
+  const response = await fetch(`/api/tma/${path}`, { ...options, credentials: 'omit', cache: 'no-store',
+    signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
+    headers: { 'Content-Type': 'application/json', ...options.headers, Authorization: sessionToken && path !== 'bootstrap' ? `Bearer ${sessionToken}` : `tma ${initData}`, ...(initData ? { 'X-Telegram-Init-Data': initData } : {}) } });
+  if (response.status === 401 && initData && path !== 'bootstrap' && retry) {
+    renewal ??= request<BootstrapResponse>('bootstrap', { method: 'POST', body: JSON.stringify({ initData }) }, false)
+      .finally(() => { renewal = undefined; });
+    const result = await renewal;
+    setClientSession(result.role === 'CLIENT' ? result.token : null);
+    if (result.role === 'UNLINKED_CLIENT') {
+      window.dispatchEvent(new Event('tma:phone-link-required'));
+      throw new Error('Подтвердите телефон для привязки кабинета');
+    }
+    if (result.role !== 'CLIENT') throw new Error('Откройте кабинет персонала: /tma/trainer');
+    return request<T>(path, options, false);
+  }
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
     const message = body && typeof body === 'object' && 'message' in body ? body.message : undefined;
-    throw new Error(response.status === 401 ? 'Сессия истекла. Откройте запись заново через бота'
-      : typeof message === 'string' ? message : 'Проверьте соединение и повторите запрос');
+    throw new Error(`${typeof message === 'string' ? message : 'Проверьте соединение и повторите запрос'} (HTTP ${response.status})`);
   }
   return response.json() as Promise<T>;
 }

@@ -3,6 +3,7 @@ import { Api } from 'grammy';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { resolveTelegramBotToken } from './telegram-config';
 
 export async function queueTelegram(tx: Prisma.TransactionClient, key: string, peerId: string, message: string) {
   await tx.telegramNotification.upsert({ where: { key: `${key}:${peerId}` }, update: {}, create: { key: `${key}:${peerId}`, peerId, message } });
@@ -20,8 +21,8 @@ export class TelegramDelivery implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramDelivery.name);
   private api?: Api;
   constructor(private readonly prisma: PrismaService) {}
-  onModuleInit() {
-    const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  async onModuleInit() {
+    const token = await resolveTelegramBotToken(this.prisma);
     if (!token) return;
     const apiRoot = process.env.TELEGRAM_API_ROOT?.trim();
     this.api = new Api(token, { ...(apiRoot ? { apiRoot } : {}), timeoutSeconds: 10 });

@@ -54,7 +54,7 @@ export function applyTheme(): void {
 }
 
 export async function waitForTelegram(signal: AbortSignal): Promise<TelegramWebApp | undefined> {
-  const deadline = Date.now() + 2000;
+  const deadline = Date.now() + 1000;
   while (!signal.aborted && Date.now() < deadline) {
     if (telegram()?.initData) return telegram();
     await new Promise<void>(resolve => window.setTimeout(resolve, 50));

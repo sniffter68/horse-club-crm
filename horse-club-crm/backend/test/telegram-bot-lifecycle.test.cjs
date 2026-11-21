@@ -57,9 +57,9 @@ test('startup clears webhook before init/start, logs success and awaits stop', a
     calls.push('stop');
     releaseStop = () => { running = false; resolve(); };
   }));
-  assert.equal(service.onModuleInit(), undefined);
+  await service.onModuleInit();
   await flush();
-  service.onModuleInit();
+  await service.onModuleInit();
   assert.deepEqual(calls, ['deleteWebhook', 'init', 'start']);
   assert.ok(messages.some(([, message]) => message === 'Telegram bot polling started successfully'));
   let destroyed = false;
@@ -80,7 +80,7 @@ test('webhook timeout aborts request, warns and proceeds to polling without bloc
   }));
   t.mock.method(Bot.prototype, 'init', async () => {});
   t.mock.method(Bot.prototype, 'start', async () => { started = true; });
-  assert.equal(service.onModuleInit(), undefined);
+  await service.onModuleInit();
   assert.equal(started, false);
   t.mock.timers.tick(10_000);
   await flush();
@@ -99,7 +99,7 @@ for (const stage of ['webhook', 'getMe']) {
     t.mock.method(Api.prototype, 'deleteWebhook', stage === 'webhook' ? pending : async () => true);
     t.mock.method(Bot.prototype, 'init', stage === 'getMe' ? pending : async () => {});
     t.mock.method(Bot.prototype, 'start', async () => { started = true; });
-    service.onModuleInit();
+    await service.onModuleInit();
     await flush();
     assert.equal(signal.aborted, false);
     await service.onModuleDestroy();
@@ -117,7 +117,7 @@ test('polling errors retain API code, stack and nested network cause while redac
   const error = new GrammyError('Conflict', { ok: false, error_code: 409, description: 'Conflict: another polling instance' }, 'getUpdates', {});
   error.cause = new HttpError('network failed', network);
   t.mock.method(Bot.prototype, 'start', async () => { throw error; });
-  service.onModuleInit();
+  await service.onModuleInit();
   await flush();
   const errors = messages.filter(([level]) => level === 'error').map(([, message]) => message).join('\n');
   assert.match(errors, /409/);
@@ -135,7 +135,7 @@ test('getMe timeout is cancellable and reported without starting polling', async
     signal.addEventListener('abort', () => reject(new Error('getMe timeout')), { once: true });
   }));
   t.mock.method(Bot.prototype, 'start', async () => { started = true; });
-  service.onModuleInit();
+  await service.onModuleInit();
   await flush();
   t.mock.timers.tick(30_000);
   await flush();
@@ -152,7 +152,7 @@ test('global catch logs update identity and cause without dumping the private up
     const ctx = new Context({ update_id: 42, message: { message_id: 1, text: 'private message content' } }, this.api, {});
     await this.errorHandler(new BotError(new Error(`handler failed ${token}`), ctx));
   });
-  service.onModuleInit();
+  await service.onModuleInit();
   await flush();
   const errors = messages.filter(([level]) => level === 'error').map(([, message]) => message).join('\n');
   assert.match(errors, /update_id=42, type=message/);

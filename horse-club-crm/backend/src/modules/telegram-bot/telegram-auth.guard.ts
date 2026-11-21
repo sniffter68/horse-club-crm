@@ -5,6 +5,7 @@ import type { Request } from 'express';
 import { TelegramLinkService } from './telegram-link.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { validateTelegramInitData, type TelegramIdentity } from './telegram-init-data';
+import { resolveTelegramBotToken, telegramInitData, telegramClientWhere } from './telegram-config';
 
 export interface TelegramRequest extends Request {
   telegram: TelegramIdentity & { clientId: string };
@@ -16,12 +17,9 @@ export class TelegramAuthGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService, private readonly links: TelegramLinkService, private readonly jwt: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
-    if (!token) throw new ServiceUnavailableException('Онлайн-запись через Telegram пока недоступна');
     const request = context.switchToHttp().getRequest<TelegramRequest>();
     const authorization = request.get('Authorization');
-    const initData = authorization !== undefined ? /^tma (.+)$/i.exec(authorization)?.[1] ?? ''
-      : request.get('X-Telegram-Init-Data') ?? '';
+    const initData = telegramInitData(request);
     const bearer = /^Bearer (\S+)$/i.exec(authorization ?? '')?.[1];
     let identity: TelegramIdentity;
     let sessionClientId: string | undefined;
@@ -32,7 +30,11 @@ export class TelegramAuthGuard implements CanActivate {
       if (payload.tokenType !== 'client-tma' || typeof payload.sub !== 'string' || !payload.sub || typeof payload.telegramUserId !== 'string' || !payload.telegramUserId) throw new UnauthorizedException('Недействительная сессия');
       sessionClientId = payload.sub;
       identity = { telegramUserId: payload.telegramUserId, firstName: '', lastName: '' };
-    } else identity = validateTelegramInitData(initData, token);
+    } else {
+      const token = await resolveTelegramBotToken(this.prisma);
+      if (!token) throw new ServiceUnavailableException('Онлайн-запись через Telegram пока недоступна');
+      identity = validateTelegramInitData(initData, token);
+    }
     const now = Date.now();
     for (const [key, bucket] of this.buckets) if (bucket.until <= now) this.buckets.delete(key);
     const slots = request.path?.endsWith('/slots');
@@ -45,13 +47,19 @@ export class TelegramAuthGuard implements CanActivate {
     const settings = await this.prisma.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
     if (settings && !settings.isEnabled) throw new ForbiddenException('Онлайн-запись временно отключена');
     if (sessionClientId) {
-      const linked = await this.prisma.client.findUnique({ where: { telegramUserId: identity.telegramUserId }, select: { id: true, deletedAt: true } });
+      const linked = await this.prisma.client.findFirst({ where: { id: sessionClientId, ...telegramClientWhere(identity.telegramUserId) }, select: { id: true, deletedAt: true } });
       if (!linked || linked.deletedAt || linked.id !== sessionClientId) throw new UnauthorizedException('Привязка Telegram изменилась');
       request.telegram = { ...identity, clientId: linked.id };
       return true;
     }
     await this.links.bindUsername(identity.telegramUserId, identity.username);
-    const client = await this.prisma.client.upsert({
+    const existing = await this.prisma.client.findFirst({ where: telegramClientWhere(identity.telegramUserId), select: { id: true, deletedAt: true } });
+    // Contact requests must not create a card that bootstrap mistakes for a link.
+    if (request.method === 'POST' && request.path?.endsWith('/client/request-contact')) {
+      request.telegram = { ...identity, clientId: existing?.id ?? '' };
+      return true;
+    }
+    const client = existing ?? await this.prisma.client.upsert({
       where: { telegramUserId: identity.telegramUserId },
       create: { telegramUserId: identity.telegramUserId, telegramUsername: identity.username?.toLowerCase(),
         firstName: identity.firstName, lastName: identity.lastName,

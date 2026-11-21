@@ -5,6 +5,8 @@ import { scheduleNavigation, type ScheduleMode } from '../../common/bot-schedule
 import { TelegramLinkService } from './telegram-link.service';
 import { TelegramPersonalService } from './telegram-personal.service';
 import { TelegramScheduleService } from './telegram-schedule.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { resolveTelegramBotToken } from './telegram-config';
 
 @Injectable()
 export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
@@ -13,10 +15,10 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   private startupAbort?: AbortController;
   private stopping = false;
   constructor(private readonly links: TelegramLinkService, private readonly personal: TelegramPersonalService,
-    private readonly schedule: TelegramScheduleService) {}
+    private readonly schedule: TelegramScheduleService, private readonly prisma: PrismaService) {}
 
-  onModuleInit(): void {
-    const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  async onModuleInit(): Promise<void> {
+    const token = await resolveTelegramBotToken(this.prisma);
     this.logger.log(`Telegram bot configuration: token present=${Boolean(token)}, token length=${token?.length ?? 0}, mode=polling`);
     if (!token) {
       this.logger.warn('Telegram bot disabled: TELEGRAM_BOT_TOKEN is empty');

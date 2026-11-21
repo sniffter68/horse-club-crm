@@ -2,8 +2,8 @@ import { Transform } from 'class-transformer';
 import { IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
 
 export class TrainerTmaAuthDto {
-  @IsString() @MinLength(1) @MaxLength(16384)
-  initData!: string;
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(16384)
+  initData?: string;
 }
 
 export class TrainerTmaScheduleQuery {

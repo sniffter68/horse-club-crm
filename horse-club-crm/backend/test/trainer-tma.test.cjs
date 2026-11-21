@@ -38,9 +38,9 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
   let client = null;
   const membership = { id, title: 'Абонемент', remainingLessons: 5, totalLessons: 8, validUntil: '2026-12-31T00:00:00Z' };
   const prisma = { clubModuleSettings: { findUnique: async () => null }, user: { findUnique: async () => linked ? user : null, findFirst: async () => null },
-    client: { findUnique: async query => {
-      assert.deepEqual(query.where, { telegramUserId: '12345' });
-      assert.deepEqual(query.select, { id: true, name: true, deletedAt: true });
+    client: { findFirst: async query => {
+      assert.deepEqual(query.where, { OR: [{ telegramUserId: '12345' }, { telegramChatId: '12345' }], deletedAt: null });
+      assert.equal(query.select.phone, true);
       return client;
     } },
     lesson: { findMany: async query => { scheduleQuery = query; return [lesson]; }, findUnique: async () => ({ ...lesson, trainerId: owner }) },
@@ -70,26 +70,21 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
     await api.post('/api/tma/bootstrap').send({ initData: 42 }).expect(400);
     await api.post('/api/tma/bootstrap').send({ initData: signed(), role: 'ADMIN' }).expect(400);
     linked = false;
-    let result = await bootstrap().expect(201);
-    assert.equal(result.body.role, 'CLIENT'); assert.equal(result.body.token, null);
-    assert.equal(result.body.user.telegramId, '12345');
-    assert.equal(result.body.clientId, null);
-    assert.equal(result.body.activeMembership, null);
-    assert.equal(result.body.nextLesson, null);
+    let result = await bootstrap().expect(200);
+    assert.deepEqual(result.body, { role: 'UNLINKED_CLIENT', needsPhoneLink: true });
     client = { id, name: 'Постоянный клиент', deletedAt: null };
-    result = await bootstrap().expect(201);
+    result = await bootstrap().expect(200);
     assert.equal(result.body.role, 'CLIENT');
     assert.equal(result.body.clientId, id);
     assert.equal(result.body.clientName, client.name);
     assert.deepEqual(result.body.activeMembership, membership);
     assert.deepEqual(result.body.nextLesson, { id: bookingId });
     client.deletedAt = new Date();
-    result = await bootstrap().expect(201);
-    assert.equal(result.body.clientId, null);
-    assert.equal(result.body.activeMembership, null);
+    result = await bootstrap().expect(200);
+    assert.deepEqual(result.body, { role: 'UNLINKED_CLIENT', needsPhoneLink: true });
     client = null;
     linked = true;
-    result = await bootstrap().expect(201);
+    result = await bootstrap().expect(200);
     assert.equal(result.body.role, 'TRAINER'); assert.equal(result.body.trainerId, trainerId);
     assert.equal(result.headers['cache-control'], 'no-store');
     await api.get('/api/tma/admin/schedule?date=2026-11-11').auth(result.body.token, { type: 'bearer' }).expect(403);
@@ -97,7 +92,7 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
     user.crmAccess = false; await bootstrap().expect(403); user.crmAccess = true;
     const trainer = user.trainer;
     user.role = 'ADMIN'; user.trainer = null; user.trainerId = null;
-    result = await bootstrap().expect(201);
+    result = await bootstrap().expect(200);
     assert.equal(result.body.role, 'ADMIN'); assert.equal(result.body.trainerId, null);
     await api.get('/api/tma/admin/schedule?date=2026-11-11').auth(result.body.token, { type: 'bearer' }).expect(200);
     assert.equal(scheduleQuery.where.trainerId, undefined);
@@ -106,7 +101,7 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
     await assert.rejects(JwtStrategy.prototype.validate.call({ prisma }, payload), error => error.getStatus() === 401);
     user.role = 'TRAINER'; user.trainer = trainer; user.trainerId = trainerId;
     linked = false; prisma.user.findFirst = async () => user;
-    result = await bootstrap().expect(201); assert.equal(result.body.role, 'TRAINER');
+    result = await bootstrap().expect(200); assert.equal(result.body.role, 'TRAINER');
     await api.get('/api/tma/schedule?date=2026-11-11').auth(result.body.token, { type: 'bearer' }).expect(200);
     prisma.user.findFirst = async () => null;
     await api.get('/api/tma/schedule?date=2026-11-11').auth(result.body.token, { type: 'bearer' }).expect(401);

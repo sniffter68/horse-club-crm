@@ -92,7 +92,7 @@ export function useTelegramWebApp() {
         const result = await tmaRequest<TmaBootstrapResponse>('bootstrap', null, { method: 'POST',
           body: JSON.stringify({ initData: app.initData }), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]) })
         if (controller.signal.aborted) return
-        if (result.role === 'CLIENT') {
+        if (result.role === 'CLIENT' || result.role === 'UNLINKED_CLIENT') {
           if (/^\/tma\/trainer\/?$/.test(window.location.pathname)) { setState({ kind: 'not-linked' }); return }
           // Preserve Telegram's signed launch parameters across the separate client bundle.
           window.location.replace(`/tma/client${window.location.search}${window.location.hash}`)

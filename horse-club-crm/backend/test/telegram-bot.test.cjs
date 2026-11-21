@@ -41,7 +41,7 @@ test('guard derives signed identity and lets archived profiles access only the b
     const bindings = [];
     const guard = new TelegramAuthGuard({
       clubModuleSettings: { findUnique: async () => ({ isEnabled: !disabled }) },
-      client: { upsert: async input => { upserts++; assert.equal(input.where.telegramUserId, '123456789012'); return { id: clientId, deletedAt: archived ? new Date() : null }; } },
+      client: { findFirst: async () => null, upsert: async input => { upserts++; assert.equal(input.where.telegramUserId, '123456789012'); return { id: clientId, deletedAt: archived ? new Date() : null }; } },
     }, { bindUsername: async (...args) => bindings.push(args) });
     const request = { get: name => name === 'X-Telegram-Init-Data' ? sign() : undefined };
     const context = { switchToHttp: () => ({ getRequest: () => request }) };
@@ -66,6 +66,7 @@ test('signed TMA binds the pending CRM profile before upsert and rejects forged 
   const prisma = {
     clubModuleSettings: { findUnique: async () => null },
     client: {
+      findFirst: async () => client.telegramUserId ? client : null,
       findUnique: async ({ where }) => client.telegramUserId === where.telegramUserId ? client : null,
       findMany: async ({ where }) => client.telegramUsername === where.telegramUsername && client.telegramUserId === null ? [client] : [],
       updateMany: async ({ where, data }) => { assert.equal(where.id, clientId); bindings++; Object.assign(client, data); return { count: 1 }; },
@@ -85,7 +86,7 @@ test('signed TMA binds the pending CRM profile before upsert and rejects forged 
     await guard.canActivate(context);
     assert.equal(bindings, 1); assert.equal(request.telegram.clientId, clientId);
     await guard.canActivate(context);
-    assert.equal(bindings, 1); assert.equal(upserts, 2);
+    assert.equal(bindings, 1); assert.equal(upserts, 0);
   } finally { if (previous === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = previous; }
 });
 
@@ -169,12 +170,12 @@ test('cancellation checks owner and effective lesson state, leaves finances and 
   f.saved.lesson = { startTime: f.start.toJSDate(), status: 'CANCELLED' };
   await assert.rejects(f.service.cancelRequest(clientId, f.saved.id), status(409));
 });
-test('bot is disabled without a token and rejects non-HTTPS WebApp URLs before polling', () => {
+test('bot is disabled without a token and rejects non-HTTPS WebApp URLs before polling', async () => {
   const previous = { token: process.env.TELEGRAM_BOT_TOKEN, url: process.env.TELEGRAM_WEBAPP_URL };
   try {
-    delete process.env.TELEGRAM_BOT_TOKEN; assert.doesNotThrow(() => new TelegramBotService().onModuleInit());
+    delete process.env.TELEGRAM_BOT_TOKEN; await new TelegramBotService().onModuleInit();
     process.env.TELEGRAM_BOT_TOKEN = token; process.env.TELEGRAM_WEBAPP_URL = 'http://example.test/tma';
-    assert.throws(() => new TelegramBotService().onModuleInit(), /HTTPS/);
+    await assert.rejects(new TelegramBotService().onModuleInit(), /HTTPS/);
   } finally {
     for (const [name, value] of [['TELEGRAM_BOT_TOKEN', previous.token], ['TELEGRAM_WEBAPP_URL', previous.url]]) {
       if (value === undefined) delete process.env[name]; else process.env[name] = value;
@@ -215,7 +216,7 @@ test('bot routes getMe through TELEGRAM_API_ROOT without waiting for the network
     process.env.TELEGRAM_API_ROOT = ` http://127.0.0.1:${server.address().port}/telegram `;
     process.env.TELEGRAM_WEBAPP_URL = 'https://example.test/tma';
     const service = new TelegramBotService();
-    assert.equal(service.onModuleInit(), undefined);
+    await service.onModuleInit();
     await received;
     // The proxy is still holding getMe open while Nest initialization has returned.
     finishResponse();
@@ -249,7 +250,7 @@ test('empty API root keeps the Telegram default and polling failure is handled w
     process.env.TELEGRAM_API_ROOT = '   ';
     process.env.TELEGRAM_WEBAPP_URL = 'https://example.test/tma';
     const service = new TelegramBotService();
-    assert.equal(service.onModuleInit(), undefined);
+    await service.onModuleInit();
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(messages.length, 1);
     assert.match(messages[0], /network/);
@@ -278,7 +279,7 @@ test('HTTP routes require signed Telegram auth, reject invalid UUIDs, staff fiel
     { provide: require('../dist/modules/telegram-bot/telegram-bot.service').TelegramBotService, useValue: {} },
     { provide: TelegramLinkService, useValue: { bindUsername: async () => {} } },
     { provide: TmaBookingService, useValue: service }, { provide: PrismaService, useValue: {
-      clubModuleSettings: { findUnique: async () => null }, client: { upsert: async () => ({ id: clientId }) },
+      clubModuleSettings: { findUnique: async () => null }, client: { findFirst: async () => null, upsert: async () => ({ id: clientId }) },
     } }] }).compile();
   const app = module.createNestApplication(); app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true } }));

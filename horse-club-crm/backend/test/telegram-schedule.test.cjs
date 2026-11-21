@@ -170,7 +170,7 @@ test('real bot dispatch covers schedule commands, menus, refresh, relative navig
   const callback = (sender, data) => bot.handleUpdate({ update_id: updateId++, callback_query: { id: 'callback', from: from(sender), chat_instance: 'private', data,
     message: { message_id: 1, date: 0, chat: { id: sender, type: 'private' }, text: 'Menu' } } });
   try {
-    process.env.TELEGRAM_BOT_TOKEN = '123:test'; service.onModuleInit();
+    process.env.TELEGRAM_BOT_TOKEN = '123:test'; await service.onModuleInit();
     await new Promise(resolve => setImmediate(resolve));
     for (const sender of [2, 3, 4]) {
       await message(sender, '/start');

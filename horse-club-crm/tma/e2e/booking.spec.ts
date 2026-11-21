@@ -111,7 +111,7 @@ test('dashboard failure retries without classifying the client as new', async ({
   await expect(page.getByRole('alert')).toContainText('Нет соединения');
   await expect(page.getByRole('region', { name: 'Каталог услуг' })).toHaveCount(0);
   fail = false;
-  await page.getByRole('button', { name: 'Повторить загрузку' }).click();
+  await page.getByRole('button', { name: 'Повторить', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Кабинет всадника' })).toBeVisible();
   await expect(page.getByText('Предстоящих тренировок пока нет.', { exact: false })).toBeVisible();
 });

@@ -46,13 +46,13 @@
 
 {$CRM_SITE} {
 	import common
-	@trainerTma path /tma /tma/ /tma/trainer /tma/trainer/
+	@trainerTma path /tma/trainer /tma/trainer/
 	handle @trainerTma {
 		header -X-Frame-Options
 		header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors https://web.telegram.org https://*.telegram.org; form-action 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'"
 		root * /var/www/crm-dist
 		rewrite * /index.html
-		header Cache-Control "no-store"
+		header Cache-Control "no-cache, no-store, must-revalidate"
 		file_server
 	}
 	@tma path /tma /tma/*
@@ -61,8 +61,9 @@
 		header -X-Frame-Options
 		header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors https://web.telegram.org https://*.telegram.org; form-action 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'"
 		root * /var/www/crm-dist
+		rewrite /tma /tma/index.html
 		try_files {path} /tma/index.html
-		header Cache-Control "no-cache"
+		header Cache-Control "no-cache, no-store, must-revalidate"
 		file_server
 	}
 	handle {

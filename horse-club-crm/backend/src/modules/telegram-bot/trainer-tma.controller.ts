@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Header, Injectable, Param, ParseUUIDPipe, Patch, Post, Query, Req, UnauthorizedException, UseGuards, type CanActivate, type ExecutionContext } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, Injectable, Param, ParseUUIDPipe, Patch, Post, Query, Req, UnauthorizedException, UseGuards, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
+import { telegramInitData } from './telegram-config';
 import { WorkspaceService } from '../../workspace/workspace.service';
 import { LessonsService } from '../../lessons/lessons.service';
 import { TrainerBoardQuery, TrainerStatusDto } from '../../workspace/workspace.dto';
@@ -24,10 +25,12 @@ export class TrainerTmaGuard implements CanActivate {
 @Controller('tma')
 export class TrainerTmaAuthController {
   constructor(private readonly service: TrainerTmaService) {}
-  @Post(['bootstrap', 'auth/telegram']) @Header('Cache-Control', 'no-store')
-  bootstrap(@Body() dto: TrainerTmaAuthDto) { return this.service.bootstrap(dto.initData); }
+  @Post('bootstrap') @HttpCode(200) @Header('Cache-Control', 'no-store')
+  bootstrap(@Body() dto: TrainerTmaAuthDto, @Req() req: Request) { return this.service.bootstrap(telegramInitData(req, dto.initData)); }
+  @Post('auth/telegram') @Header('Cache-Control', 'no-store')
+  telegramAuth(@Body() dto: TrainerTmaAuthDto, @Req() req: Request) { return this.service.bootstrap(telegramInitData(req, dto.initData)); }
   @Post('auth') @Header('Cache-Control', 'no-store')
-  auth(@Body() dto: TrainerTmaAuthDto) { return this.service.authenticate(dto.initData); }
+  auth(@Body() dto: TrainerTmaAuthDto, @Req() req: Request) { return this.service.authenticate(telegramInitData(req, dto.initData)); }
 }
 
 @Controller('tma')

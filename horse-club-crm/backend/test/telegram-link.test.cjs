@@ -45,6 +45,7 @@ test('direct save normalizes usernames, links numeric IDs and clears both fields
     assert.equal(row.telegramUsername, null); assert.equal(row.telegramUserId, '123456789012');
     await f.service.unlink(kind, id, actor);
     assert.equal(row.telegramUsername, null); assert.equal(row.telegramUserId, null);
+    if (kind === 'client') assert.equal(row.telegramChatId, null);
     for (const invalid of ['', ' ', '@bad/name', 'https://evil.test/name', '-42', '0', '123456789012345678901'])
       await assert.rejects(f.service.save(kind, id, actor, invalid), status(400));
     assert.ok(f.options.every(row => row.isolationLevel === 'Serializable'));
@@ -197,7 +198,7 @@ test('real bot dispatch handles username binding, role menus, personal queries a
   const callback = (sender, data) => bot.handleUpdate({ update_id: updateId++, callback_query: { id: 'callback', from: { id: Number(sender), is_bot: false, first_name: 'Test' },
     chat_instance: 'private', data, message: { message_id: 1, date: 0, chat: { id: Number(sender), type: 'private' }, text: 'Menu' } } });
   try {
-    process.env.TELEGRAM_BOT_TOKEN = '123:test'; service.onModuleInit();
+    process.env.TELEGRAM_BOT_TOKEN = '123:test'; await service.onModuleInit();
     await new Promise(resolve => setImmediate(resolve));
     await message('1', '/start link_client_test');
     assert.deepEqual(consumed[0], ['1', 'test_user']);

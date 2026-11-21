@@ -9,7 +9,8 @@ import { useTelegramNavigation } from './useTelegramNavigation';
 const _h = React.createElement;
 
 const ADDRESS = 'Тамбов, ул. Бастионная, 22АС2';
-type Screen = 'loading' | 'dashboard' | 'catalog' | 'slots' | 'checkout' | 'success' | 'my-bookings';
+type Screen = 'loading' | 'link' | 'dashboard' | 'catalog' | 'slots' | 'checkout' | 'success' | 'my-bookings';
+const titles: Record<Screen, string> = { loading: 'Кабинет клуба', link: 'Привязка кабинета', dashboard: 'Кабинет всадника', catalog: 'Время для лошадей', slots: 'Когда приедете?', checkout: 'Всё готово к записи', success: 'Ждём вас в клубе', 'my-bookings': 'Мои записи' };
 const errorText = (error: unknown): string => error instanceof Error ? error.message : 'Не удалось загрузить. Повторите попытку';
 const serviceTitle = (service: Service): string => service.title || service.name;
 const bookingTitle = (booking: Booking): string => booking.lesson?.service?.title || booking.lesson?.service?.name || 'Занятие в клубе';
@@ -18,7 +19,6 @@ export function App() {
   const [screen, setScreen] = useState<Screen>('loading');
   const [dashboard, setDashboard] = useState<ClientDashboard>();
   const [linked, setLinked] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
   const [home, setHome] = useState<'catalog' | 'dashboard'>('catalog');
   const [services, setServices] = useState<Service[]>([]);
   const [consentVersion, setConsentVersion] = useState('');
@@ -50,6 +50,12 @@ export function App() {
 
 
   useEffect(() => {
+    const requireLink = () => { setLinked(false); setScreen('link'); };
+    window.addEventListener('tma:phone-link-required', requireLink);
+    return () => window.removeEventListener('tma:phone-link-required', requireLink);
+  }, []);
+
+  useEffect(() => {
     applyTheme();
     withTelegram(app => app.ready());
     withTelegram(app => app.expand());
@@ -63,7 +69,7 @@ export function App() {
     withTelegram(app => {
       if (screen === 'checkout') app.enableClosingConfirmation(); else app.disableClosingConfirmation();
     });
-    document.title = `${({ loading: 'Кабинет клуба', dashboard: 'Кабинет всадника', catalog: 'Выбор занятия', slots: 'Дата и время', checkout: 'Оформление записи', success: 'Запись создана', 'my-bookings': 'Мои записи' })[screen]} · КСК «СЛКС»`;
+    document.title = titles[screen];
     heading.current?.focus();
   }, [screen, tg]);
 
@@ -74,16 +80,16 @@ export function App() {
     if (screen === 'loading' || screen === 'dashboard') {
       const loadDashboard = async () => {
         const app = await waitForTelegram(controller.signal);
-        if (controller.signal.aborted) throw new Error('Загрузка отменена');
-        setAuthChecked(true);
+        controller.signal.throwIfAborted();
         if (!app?.initData) throw new Error('Откройте запись через Telegram-бота');
         const bootstrap = screen === 'loading' ? await api<BootstrapResponse>('bootstrap', {
           method: 'POST', body: JSON.stringify({ initData: app.initData }), signal: controller.signal,
         }) : undefined;
-        if (bootstrap && bootstrap.role !== 'CLIENT') {
-          window.location.replace(`/tma${window.location.search}${window.location.hash}`);
-          throw new Error('Открываем расписание…');
+        if (bootstrap?.role === 'UNLINKED_CLIENT') {
+          setClientSession(null); setLinked(false); setScreen('link');
+          return undefined;
         }
+        if (bootstrap && bootstrap.role !== 'CLIENT') throw new Error('Кабинет персонала: /tma/trainer');
         if (bootstrap?.role === 'CLIENT') { setClientSession(bootstrap.token ?? null); setLinked(Boolean(bootstrap.clientId)); }
         const isLinked = bootstrap?.role === 'CLIENT' ? Boolean(bootstrap.clientId) : linked;
         let result: ClientDashboard;
@@ -94,8 +100,9 @@ export function App() {
         return { result, linked: bootstrap?.role === 'CLIENT' && Boolean(bootstrap.clientId) };
       };
       loadDashboard()
-        .then(({ result, linked }) => {
-          if (controller.signal.aborted) return;
+        .then(data => {
+          if (controller.signal.aborted || !data) return;
+          const { result, linked } = data;
           setDashboard(result);
           if (result.client?.phone) setPhone(result.client.phone);
           const target = linked || result.isEstablished || screen === 'dashboard' ? 'dashboard' : 'catalog';
@@ -124,7 +131,7 @@ export function App() {
     setBooking(undefined); setService(undefined); setSlot(undefined); setTrainerId(''); setConsent(false);
     requestId.current = ''; navigate('catalog');
   };
-  const back = screen === 'loading' || screen === home ? undefined : () => navigate(screen === 'checkout' ? 'slots' : screen === 'slots' ? 'catalog' : home);
+  const back = screen === 'loading' || screen === 'link' || screen === home ? undefined : () => navigate(screen === 'checkout' ? 'slots' : screen === 'slots' ? 'catalog' : home);
   const next = () => {
     if (screen === 'catalog' && service) navigate('slots');
     else if (screen === 'slots' && slot) { requestId.current = crypto.randomUUID(); navigate('checkout'); }
@@ -171,18 +178,32 @@ export function App() {
     finally { submitting.current = false; setBusy(false); }
   }
 
-  const titles: Record<Screen, string> = { loading: 'Кабинет клуба', dashboard: 'Кабинет всадника', catalog: 'Время для лошадей', slots: 'Когда приедете?', checkout: 'Всё готово к записи', success: 'Ждём вас в клубе', 'my-bookings': 'Мои записи' };
+  if (screen === 'loading') return <main className="mx-auto max-w-xl px-5" aria-busy={!error}>
+    {error ? <div role="alert"><h1>Не удалось открыть кабинет</h1><p>{error}</p><button className="primary mt-4" onClick={() => setRetry(value => value + 1)}>Повторить</button></div>
+      : <p role="status">Загружаем личный кабинет…</p>}
+  </main>;
+  if (screen === 'link') return <main className="mx-auto max-w-xl px-5">
+    <h1>{titles.link}</h1><p>Поделитесь телефоном +7… в чате бота.</p>
+    <button className="primary mt-4" disabled={busy} onClick={async () => {
+      if (submitting.current) return;
+      submitting.current = true; setBusy(true); setError('');
+      try { await api('client/request-contact', { method: 'POST' }); setContactNotice('Отправьте свой контакт в чат бота.'); }
+      catch (failure: unknown) { setError(errorText(failure)); }
+      finally { submitting.current = false; setBusy(false); }
+    }}>Привязать по телефону</button>
+    <p role="status">{contactNotice}</p>{error && <p role="alert">{error}</p>}
+    <button className="quiet mt-4" disabled={busy} onClick={() => { setClientSession(null); setScreen('loading'); }}>Проверить привязку</button>
+  </main>;
+
   return <main className="mx-auto max-w-xl px-5">
     <header className="mb-6 flex items-center justify-between gap-3">
       <span className="club-mark" aria-label="КСК СЛКС">СЛКС<span>КОННЫЙ КЛУБ · ТАМБОВ</span></span>
       <button className="quiet" disabled={busy || screen === 'my-bookings'} onClick={() => navigate('my-bookings')}>Мои записи</button>
     </header>
-    {authChecked && !native && <p className="notice">Откройте запись через Telegram-бота клуба.</p>}
     {back && !native && <button className="quiet mb-4" disabled={busy} onClick={back}>← Назад</button>}
     <p className="eyebrow">{screen === 'catalog' ? 'В седле — ближе к природе' : screen === 'slots' ? 'Шаг 2 из 3' : screen === 'checkout' ? 'Шаг 3 из 3' : 'КСК «СЛКС»'}</p>
     <h1 ref={heading} tabIndex={-1}>{titles[screen]}</h1>
     {screen === 'dashboard' && dashboard && <ClientDashboardView data={dashboard} onBook={newBooking} onRefresh={() => setRetry(value => value + 1)} />}
-    {screen === 'catalog' && !linked && <section className="summary stack" aria-label="Загрузка отменена"><h2>Уже занимаетесь в клубе?</h2><p>Подтвердите свой телефон в чате бота, чтобы открыть абонемент и записи.</p><button className="quiet" disabled={busy} onClick={async () => { if (submitting.current) return; submitting.current = true; setBusy(true); try { await api('client/request-contact', { method: 'POST' }); setContactNotice('Перейдите в чат бота и поделитесь собственным контактом.'); } catch (failure: unknown) { setError(errorText(failure)); } finally { submitting.current = false; setBusy(false); } }}>Привязать по телефону</button>{contactNotice && <p role="status">{contactNotice}</p>}<button className="quiet" onClick={() => { setClientSession(null); setScreen('loading'); }}>Проверить привязку</button></section>}
     {screen === 'catalog' && <ClientBookingCatalog services={services} serviceId={service?.id} format={format}
       loading={loading} error={error} onFormat={value => { setFormat(value); setService(undefined); }} onSelect={setService} />}
     {screen === 'slots' && <>
@@ -225,7 +246,7 @@ export function App() {
       </div>
     </section>}
     {screen === 'my-bookings' && <MyBookings onBook={newBooking} />}
-    <div className="feedback" aria-live="polite">{loading && <p role="status">{screen === 'loading' || screen === 'dashboard' ? 'Загружаем личный кабинет…' : 'Проверяем свободные места…'}</p>}
+    <div className="feedback" aria-live="polite">{loading && <p role="status">{screen === 'dashboard' ? 'Загружаем личный кабинет…' : 'Проверяем свободные места…'}</p>}
       {error && <div role="alert"><p>{error}</p>{screen !== 'checkout' && <button className="quiet mt-2" onClick={() => setRetry(value => value + 1)}>Повторить загрузку</button>}</div>}
     </div>
     {text && !native && <button className="primary w-full" disabled={!enabled} onClick={next}>{busy ? 'Сохраняем запись…' : text}</button>}

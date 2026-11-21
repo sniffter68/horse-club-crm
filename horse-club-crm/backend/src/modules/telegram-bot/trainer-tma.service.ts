@@ -10,10 +10,13 @@ import { ModuleAccessService } from '../../settings/module-access.service';
 import { validateTelegramInitData } from './telegram-init-data';
 import type { TrainerTmaHorseDto, TrainerTmaStatusDto } from './trainer-tma.dto';
 import { TmaBookingService } from './tma-booking.service';
+import { resolveTelegramBotToken, telegramClientWhere } from './telegram-config';
 
-export enum TmaRole { ADMIN = 'ADMIN', TRAINER = 'TRAINER', CLIENT = 'CLIENT', STAFF = 'STAFF' }
+export enum TmaRole { ADMIN = 'ADMIN', TRAINER = 'TRAINER', CLIENT = 'CLIENT', STAFF = 'STAFF', UNLINKED_CLIENT = 'UNLINKED_CLIENT' }
 export type TmaBootstrapResponse =
+  | { role: TmaRole.UNLINKED_CLIENT; needsPhoneLink: true }
   | { role: TmaRole.CLIENT; token: string | null; user: { telegramId: string; firstName: string };
+      client: { id: string; name: string; firstName: string; lastName: string; phone: string | null };
       clientId: string | null; clientName: string | null;
       activeMembership: Awaited<ReturnType<TmaBookingService['dashboard']>>['membership'];
       nextLesson: Awaited<ReturnType<TmaBookingService['dashboard']>>['nextBooking'] }
@@ -39,7 +42,7 @@ export class TrainerTmaService {
   }
 
   async bootstrap(initData: string): Promise<TmaBootstrapResponse> {
-    const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+    const botToken = await resolveTelegramBotToken(this.prisma);
     if (!botToken) throw new ServiceUnavailableException('Telegram Mini App временно недоступен');
     const identity = validateTelegramInitData(initData, botToken);
     // A directly linked User takes precedence over the legacy Trainer binding.
@@ -49,12 +52,13 @@ export class TrainerTmaService {
       const settings = await this.prisma.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
       if (settings?.isEnabled === false) throw new ForbiddenException('Онлайн-запись временно отключена');
       // Client/User IDs are String in Prisma; Trainer retains the legacy telegramId field.
-      const client = await this.prisma.client.findUnique({ where: { telegramUserId: identity.telegramUserId },
-        select: { id: true, name: true, deletedAt: true } });
+      const client = await this.prisma.client.findFirst({ where: { ...telegramClientWhere(identity.telegramUserId), deletedAt: null },
+        select: { id: true, name: true, firstName: true, lastName: true, phone: true, deletedAt: true } });
       const linked = client && !client.deletedAt ? client : null;
+      if (!linked) return { role: TmaRole.UNLINKED_CLIENT, needsPhoneLink: true };
       const dashboard = linked ? await this.clientBookings.dashboard(linked.id) : null;
       const clientToken = linked ? await this.jwt.signAsync({ sub: linked.id, telegramUserId: identity.telegramUserId, tokenType: 'client-tma' }, { audience: 'client-tma', expiresIn: '1h' }) : null;
-      return { role: TmaRole.CLIENT, token: clientToken, user: { telegramId: identity.telegramUserId, firstName: identity.firstName },
+      return { role: TmaRole.CLIENT, token: clientToken, client: { id: linked.id, name: linked.name, firstName: linked.firstName, lastName: linked.lastName, phone: linked.phone }, user: { telegramId: identity.telegramUserId, firstName: identity.firstName },
         clientId: linked?.id ?? null, clientName: linked?.name ?? null,
         activeMembership: dashboard?.membership ?? null, nextLesson: dashboard?.nextBooking ?? null };
     }
@@ -75,7 +79,7 @@ export class TrainerTmaService {
 
   async authenticate(initData: string) {
     const result = await this.bootstrap(initData);
-    if (result.role === TmaRole.CLIENT) return { authenticated: false as const, reason: 'NOT_LINKED' as const };
+    if (result.role === TmaRole.CLIENT || result.role === TmaRole.UNLINKED_CLIENT) return { authenticated: false as const, reason: 'NOT_LINKED' as const };
     if (!result.trainerId) throw new ForbiddenException('Карточка тренера не привязана');
     return { authenticated: true as const, access_token: result.token,
       trainer: { trainerId: result.trainerId, name: result.user.name }, accessLevel: result.accessLevel };

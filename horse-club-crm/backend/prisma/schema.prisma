@@ -20,6 +20,13 @@ model VkIntegrationSettings {
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 }
 
+model TelegramIntegrationSettings {
+  id Int @id @default(1)
+  encryptedConfig String
+  updatedById String @db.Uuid
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+}
+
 enum Role {
   ADMIN
   MANAGER
@@ -355,6 +362,7 @@ enum ClientType {
 
 model Client {
   telegramUserId String? @unique
+  telegramChatId String? @unique
   telegramUsername String?
   preferredTrainerId String? @db.Uuid
   preferredHorseId String? @db.Uuid

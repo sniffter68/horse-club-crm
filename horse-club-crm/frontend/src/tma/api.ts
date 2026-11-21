@@ -41,5 +41,6 @@ export async function tmaRequest<T>(path: string, token: string | null, options:
 }
 
 export type TmaBootstrapResponse =
+  | { role: 'UNLINKED_CLIENT'; needsPhoneLink: true }
   | { role: 'CLIENT'; token: string | null; user: { telegramId: string; firstName: string }; clientId: string | null; clientName: string | null }
   | { role: 'TRAINER' | 'ADMIN' | 'STAFF'; token: string; trainerId: string | null; user: { id: string; name: string }; accessLevel: 'FULL' | 'READ_ONLY' }

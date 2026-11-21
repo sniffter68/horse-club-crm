@@ -41,7 +41,7 @@ function fixture({ debit = true, group = false, legacy = false } = {}) {
     $queryRaw: async () => [],
     user: { findUnique: async () => null, findFirst: async () => null, findMany: async () => [{ telegramUserId: '789' }] },
     client: { findUnique: async () => linked ? { id: clientId, name: 'Анна Всадник', telegramUserId: '123', deletedAt: null } : null,
-      findFirst: async ({ where }) => where.id === clientId ? { id: clientId, name: 'Анна Всадник' } : null },
+      findFirst: async ({ where }) => linked && (where.id === clientId || where.OR?.some(x => x.telegramUserId === '123')) ? { id: clientId, name: 'Анна Всадник' } : null },
     clubModuleSettings: { findUnique: async () => null },
     membership: { findUnique: async () => ({ id, clientId }), update: async () => { balance++; },
       findFirst: async ({ where }) => { assert.ok(where.OR.some(x => x.clientId === clientId)); return { id, title: 'Абонемент 8', totalLessons: 8, remainedLessons: balance, status: 'active', validUntil: new Date(Date.now() + 864000000), pricingPlan: { name: 'Тариф 8', lessonsCount: 8 } }; } },

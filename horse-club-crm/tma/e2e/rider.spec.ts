@@ -1,16 +1,20 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { TelegramWebApp } from '../src/telegram';
 
-declare global { interface Window { __riderNext(): void; __riderReady(): boolean } }
+declare global { interface Window { __riderNext(): void; __riderReady(): boolean; __loginSeen: boolean } }
 const id = '11111111-1111-4111-8111-111111111111';
 const trainerId = '22222222-2222-4222-8222-222222222222';
 const start = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10) + 'T12:00:00+03:00';
 async function setup(page: Page, delayed = false) {
   await page.route('https://telegram.org/js/telegram-web-app.js', route => route.fulfill({ body: '' }));
   await page.addInitScript(({ delayed }) => {
+    window.__loginSeen = false;
+    new MutationObserver(() => {
+      if (document.body?.textContent?.includes('Выполните вход')) window.__loginSeen = true;
+    }).observe(document, { childList: true, subtree: true, characterData: true });
     let next = () => {}, enabled = false;
     const app: TelegramWebApp = {
-      initData: delayed ? '' : 'signed-rider', initDataUnsafe: { user: { id: 123, first_name: 'Анна' } },
+      initData: delayed ? '' : 'signed-rider', initDataUnsafe: { user: { id: 1808998846, first_name: 'Инна', last_name: 'Ярцева' } },
       safeAreaInset: { top: 36, bottom: 20, left: 0, right: 0 }, themeParams: {},
       ready() {}, expand() {}, enableClosingConfirmation() {}, disableClosingConfirmation() {}, onEvent() {}, offEvent() {},
       MainButton: { show() {}, hide() {}, showProgress() {}, hideProgress() {}, setParams(p) { enabled = p.is_active; },
@@ -64,7 +68,7 @@ test('linked rider waits for SDK, sees profile, confirms, cancels and books a sl
   await page.addInitScript(() => {
     new MutationObserver(() => { if (document.body?.textContent?.includes('Выполните вход')) void (window as unknown as { recordGate(text: string): Promise<void> }).recordGate('login'); }).observe(document, { childList: true, subtree: true });
   });
-  await page.goto('client');
+  await page.goto('/tma/');
   await expect(page.getByRole('heading', { name: 'Кабинет всадника' })).toBeVisible();
   await expect(page.getByText('Анна Всадник', { exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Мой абонемент' })).toContainText('5 шт.');
@@ -101,7 +105,7 @@ test('linked rider waits for SDK, sees profile, confirms, cancels and books a sl
 
 test('failed cancellation retains confirmation and retries; dark theme and long content fit 360–430 px', async ({ page }) => {
   const mock = await setup(page); mock.fail(true);
-  await page.goto('client');
+  await page.goto('/tma/');
   await page.getByRole('button', { name: 'Отменить', exact: true }).click();
   await page.getByRole('button', { name: 'Подтвердить отмену' }).click();
   await expect(page.getByRole('alert')).toContainText('Занятие изменилось');
@@ -111,4 +115,66 @@ test('failed cancellation retains confirmation and retries; dark theme and long 
   await expect(page.getByText('Отменена', { exact: true })).toBeVisible();
   for (const width of [360, 390, 430]) { await page.setViewportSize({ width, height: 844 }); await noOverflow(page); }
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe('dark');
+});
+
+test('unlinked Telegram client sees phone linking and rechecks after sharing contact', async ({ page }) => {
+  await setup(page, true);
+  let linked = false;
+  await page.route('**/api/tma/bootstrap', route => route.fulfill({ json: linked
+    ? { role: 'CLIENT', clientId: id, token: 'client-only-session' }
+    : { role: 'UNLINKED_CLIENT', needsPhoneLink: true } }));
+  await page.route('**/api/tma/client/request-contact', route => route.fulfill({ json: { sent: true } }));
+  await page.goto('/tma/');
+  await expect(page.getByRole('heading', { name: 'Привязка кабинета' })).toBeVisible();
+  await page.getByRole('button', { name: 'Привязать по телефону' }).click();
+  await expect(page.getByRole('status')).toContainText('Отправьте свой контакт');
+  linked = true;
+  await page.getByRole('button', { name: 'Проверить привязку' }).click();
+  await expect(page.getByRole('heading', { name: 'Кабинет всадника' })).toBeVisible();
+  expect(await page.evaluate(() => window.__loginSeen)).toBe(false);
+});
+
+test('bootstrap loading and server failure never show CRM login; keyboard retry opens cabinet', async ({ page }) => {
+  await setup(page);
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  let fail = true;
+  await page.route('**/api/tma/bootstrap', async route => {
+    await pending;
+    await route.fulfill(fail ? { status: 503, json: { message: 'Сервис временно недоступен' } }
+      : { json: { role: 'CLIENT', clientId: id, token: 'client-only-session' } });
+  });
+  await page.goto('/tma/');
+  await expect(page.getByRole('status')).toHaveText('Загружаем личный кабинет…');
+  await expect(page.getByRole('button')).toHaveCount(0);
+  release();
+  await expect(page.getByRole('alert')).toContainText('HTTP 503');
+  fail = false;
+  await page.getByRole('button', { name: 'Повторить', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Кабинет всадника' })).toBeVisible();
+  expect(await page.evaluate(() => window.__loginSeen)).toBe(false);
+});
+
+test('expired client session bootstraps once again using initData and retries overview', async ({ page }) => {
+  await setup(page);
+  let bootstraps = 0, expired = false;
+  await page.route('**/api/tma/bootstrap', route => {
+    bootstraps++;
+    expect(route.request().postDataJSON()).toEqual({ initData: 'signed-rider' });
+    return route.fulfill({ json: { role: 'CLIENT', clientId: id, token: bootstraps === 1 ? 'expired' : 'renewed' } });
+  });
+  await page.route('**/api/tma/client/overview', route => {
+    if (route.request().headers().authorization === 'Bearer expired') {
+      expired = true;
+      return route.fulfill({ status: 401, json: { message: 'Сессия истекла' } });
+    }
+    expect(route.request().headers().authorization).toBe('Bearer renewed');
+    return route.fulfill({ json: { client: { id, name: 'Инна Ярцева', phone: '+79991234567' }, membership: null, bookings: [] } });
+  });
+  await page.goto('/tma/');
+  await expect(page.getByRole('heading', { name: 'Кабинет всадника' })).toBeVisible();
+  await expect(page.getByText('Инна Ярцева')).toBeVisible();
+  expect(expired).toBe(true); expect(bootstraps).toBe(2);
+  expect(await page.evaluate(() => window.__loginSeen)).toBe(false);
 });
