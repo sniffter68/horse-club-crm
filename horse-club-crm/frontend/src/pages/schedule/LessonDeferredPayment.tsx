@@ -16,6 +16,7 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
   const [choosing, setChoosing] = useState(false)
   const [memberships, setMemberships] = useState<MembershipSummary[]>([])
   const [selected, setSelected] = useState<string>()
+  const [selectionTime, setSelectionTime] = useState(() => Date.now())
   const [busy, setBusy] = useState(false)
   const pending = useRef(false)
   const [error, setError] = useState<string>()
@@ -26,6 +27,9 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
   const canRevisePrice = lesson.bookings.length === 1 && !booking?.membership && lesson.paymentStatus === 'UNPAID' && Number(lesson.prepaymentAmount ?? 0) === 0 && Number(lesson.finalPaymentAmount ?? 0) === 0 && !booking?.payments?.some(payment => payment.status === 'PAID')
   const oneOffPrice = canRevisePrice ? Number(lesson.cost) > 0 ? Number(lesson.cost) : Number(lesson.service.price ?? 0) : undefined
   const canSell = !access.isEnabled('CASHBOX') || access.canWrite('CASHBOX')
+  const selectedMembership = memberships.find(membership => membership.id === selected)
+  const lateMembership = +new Date(lesson.startTime) <= selectionTime && selectedMembership?.validFrom
+    && +new Date(selectedMembership.validFrom) > +new Date(lesson.startTime)
   if (!access.canWrite('SCHEDULE') || lesson.status === 'CANCELLED' || !booking || (lessonBalance(lesson).remaining <= 0 && lesson.paymentStatus !== 'UNPAID') || lesson.paymentStatus === 'PAID_BY_MEMBERSHIP') return null
 
   async function refresh() {
@@ -41,7 +45,13 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
     try {
       if (!isUuid(booking.client.id)) throw new Error('Некорректный идентификатор клиента')
       const { data } = await httpClient.get<ClientWithMemberships>(`${API_URL}/clients/${booking.client.id}`)
-      const rows = data.memberships.filter(m => m.isActive && m.type !== 'deposit' && m.type !== 'boarding' && m.remainedLessons > 0)
+      const now = Date.now()
+      setSelectionTime(now)
+      const start = +new Date(lesson.startTime)
+      const rows = data.memberships.filter(m => m.isActive && (!m.status || m.status === 'active')
+        && m.type === 'fixed_lessons' && m.remainedLessons > 0 && (!m.serviceId || m.serviceId === lesson.service.id)
+        && (!m.validFrom || +new Date(m.validFrom) <= now) && +new Date(m.validUntil) >= now
+        && (start <= now || ((!m.validFrom || +new Date(m.validFrom) <= start) && +new Date(m.validUntil) >= +new Date(lesson.endTime))))
       setMemberships(rows)
       setSelected(rows.length === 1 ? rows[0].id : undefined)
     } catch (cause) { setError(toHttpError(cause).message) }
@@ -80,7 +90,8 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
     {choosing && <Space direction="vertical" style={{ width: '100%' }}>
       {!busy && !memberships.length && !error && <Typography.Text type="secondary">У клиента нет активных абонементов с доступными занятиями.</Typography.Text>}
       <Select aria-label="Абонемент для оплаты" style={{ width: '100%' }} loading={busy} disabled={busy} value={selected} placeholder="Выберите абонемент"
-        options={memberships.map(m => ({ value: m.id, label: `${m.title || m.pricingPlan?.name || 'Абонемент'} · Осталось: ${m.remainedLessons}` }))} onChange={setSelected} />
+        options={memberships.map(m => ({ value: m.id, label: `${m.title || m.pricingPlan?.name || 'Абонемент'}${m.isShared ? ` · Семейный: ${m.ownerName || 'Общий доступ'}` : ''} · Осталось: ${m.remainedLessons}` }))} onChange={setSelected} />
+      {lateMembership && <Alert type="info" showIcon message="Отложенная оплата: абонемент оформлен после даты занятия" />}
       <Button type="primary" loading={busy} disabled={!selected} onClick={() => { if (selected) void attach(selected) }}>Списать занятие</Button>
     </Space>}
     {cashOpen && <CashDeskPaymentModal oneOffPrice={oneOffPrice} initialClientId={booking.client.id} initialBookingId={booking.id} onClose={() => setCashOpen(false)} onPaid={() => void refresh()} />}

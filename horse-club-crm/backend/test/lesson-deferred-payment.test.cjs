@@ -14,14 +14,15 @@ const { BookingRulesService } = require('../dist/bookings/booking-rules.service'
 const id = n => `${String(n).padStart(8, '0')}-1111-4111-8111-111111111111`;
 const actor = { id: id(1), role: 'ADMIN', email: 'qa@test.local' };
 
-function harness({ status = 'SCHEDULED', membership = {}, lesson = {}, failRevenue = false } = {}) {
+function harness({ status = 'SCHEDULED', membership = {}, lesson = {}, failRevenue = false, shared = false, additionalMemberships = [] } = {}) {
   let state = {
     lesson: { id: id(2), trainerId: id(5), serviceId: id(6), startTime: new Date('2026-11-02T09:00:00Z'), endTime: new Date('2026-11-02T10:00:00Z'),
       status, paymentStatus: 'UNPAID', cost: '1500', prepaymentAmount: '0', finalPaymentAmount: '0', service: { allowMembership: true }, trainer: {},
       bookings: [{ id: id(3), clientId: id(4), client: { id: id(4), name: 'Client' }, membershipId: null, membership: null,
         horseId: null, horse: null, isPaid: false, costAmount: '1500', prepaymentAmount: '0', finalPaymentAmount: '0', payments: [] }], ...lesson },
-    membership: { id: id(7), clientId: id(4), type: 'fixed_lessons', status: 'active', remainedLessons: 4, validUntil: new Date('2099-01-01'), ...membership },
-    operations: [], revenueCalls: 0, pendingCancelled: false,
+    membership: { id: id(7), clientId: id(4), type: 'fixed_lessons', status: 'active', deletedAt: null, remainedLessons: 4, validFrom: new Date('2020-01-01'), validUntil: new Date('2099-01-01'), ...membership },
+    additionalMemberships, operations: [], revenueCalls: 0, pendingCancelled: false, audit: [],
+    payments: [{ bookingId: id(3), status: 'PENDING' }, { bookingId: id(3), status: 'PENDING' }, { bookingId: id(99), status: 'PENDING' }],
   };
   let serial = Promise.resolve();
   const prisma = { $transaction: (work, options) => {
@@ -29,21 +30,34 @@ function harness({ status = 'SCHEDULED', membership = {}, lesson = {}, failReven
     const result = serial.then(async () => {
       const draft = structuredClone(state);
       const details = () => ({ ...draft.lesson, operations: draft.operations, bookings: draft.lesson.bookings.map(b => ({ ...b, membership: b.membershipId ? draft.membership : null })) });
-      const tx = { cashAuditLog: { create: async ({ data }) => data },
-        $queryRaw: async sql => {
+      const tx = { cashAuditLog: { create: async ({ data }) => { draft.audit.push(data); return data; } },
+        membershipMember: { findUnique: async () => shared ? { client: { deletedAt: null } } : null },
+        $queryRaw: async (sql, ...values) => {
           const query = sql.join('');
           if (query.includes('CURRENT_TIMESTAMP')) return [{ now: new Date() }];
           if (query.includes('post_late_membership_revenue')) {
             if (failRevenue) throw new Error('recognition failed');
+            assert.deepEqual(values, [draft.lesson.bookings[0].id, draft.lesson.startTime, draft.lesson.bookings[0].membershipId, actor.id]);
             draft.revenueCalls++;
           }
           return [];
         },
         lesson: { findUnique: async () => details(), findUniqueOrThrow: async () => details(), update: async ({ data }) => { Object.assign(draft.lesson, data); return details(); } },
         booking: { update: async ({ data }) => Object.assign(draft.lesson.bookings[0], data) },
-        membership: { findUnique: async () => draft.membership, updateMany: async () => { draft.membership.remainedLessons--; return { count: 1 }; } },
+        membership: { findUnique: async ({ where }) => [draft.membership, ...draft.additionalMemberships].find(row => row.id === where.id),
+          updateMany: async ({ where }) => {
+            const row = [draft.membership, ...draft.additionalMemberships].find(row => row.id === where.id);
+            assert.ok(row.validFrom <= where.validFrom.lte && row.validUntil >= where.validUntil.gte);
+            row.remainedLessons--; return { count: 1 };
+          } },
         membershipOp: { findFirst: async () => draft.operations.find(o => o.type === 'DEBIT'), create: async ({ data }) => { draft.operations.push(data); return data; } },
-        payment: { updateMany: async () => { draft.pendingCancelled = true; return { count: 1 }; } },
+        payment: { updateMany: async ({ where, data }) => {
+          assert.deepEqual(where, { bookingId: id(3), status: 'PENDING' });
+          assert.deepEqual(data, { status: 'CANCELLED' });
+          const rows = draft.payments.filter(row => row.bookingId === where.bookingId && row.status === where.status);
+          rows.forEach(row => Object.assign(row, data));
+          draft.pendingCancelled = true; return { count: rows.length };
+        } },
       };
       const output = await work(tx); state = draft; return output;
     });
@@ -51,6 +65,49 @@ function harness({ status = 'SCHEDULED', membership = {}, lesson = {}, failReven
   } };
   return { service: new LessonsService(prisma, new MembershipLedgerService(prisma)), state: () => state };
 }
+
+for (const shared of [false, true]) test(`yesterday's completed debt accepts today's ${shared ? 'family' : 'owned'} membership`, async () => {
+  const now = Date.now();
+  const h = harness({ status: 'COMPLETED', shared,
+    lesson: { startTime: new Date(now - 86400000), endTime: new Date(now - 82800000) },
+    membership: { validFrom: new Date(now - 60000), clientId: shared ? id(99) : id(4), serviceId: id(6) } });
+  const result = await h.service.payWithMembership(id(2), id(7), actor);
+  assert.equal(result.paymentStatus, 'PAID_BY_MEMBERSHIP');
+  assert.equal(result.bookings[0].isPaid, true);
+  assert.equal(h.state().membership.remainedLessons, 3);
+  assert.equal(h.state().operations.length, 1);
+  assert.equal(h.state().pendingCancelled, true);
+  assert.deepEqual(h.state().payments.map(row => row.status), ['CANCELLED', 'CANCELLED', 'PENDING']);
+  assert.equal(h.state().revenueCalls, 1);
+  assert.equal(h.state().audit[0].actorId, actor.id);
+  assert.equal(h.state().audit[0].details.deferredPayment, true);
+  assert.match(h.state().audit[0].details.reason, /Отложенная оплата/);
+});
+
+test('manual selection debits the requested membership when several are available', async () => {
+  const h = harness({ status: 'COMPLETED', additionalMemberships: [{ id: id(8), clientId: id(4), type: 'fixed_lessons', status: 'active',
+    deletedAt: null, remainedLessons: 8, validFrom: new Date(Date.now() - 60000), validUntil: new Date('2099-01-01') }] });
+  const result = await h.service.payWithMembership(id(2), id(8), actor);
+  assert.equal(result.bookings[0].membershipId, id(8));
+  assert.equal(h.state().membership.remainedLessons, 4);
+  assert.equal(h.state().additionalMemberships[0].remainedLessons, 7);
+  assert.equal(h.state().operations[0].membershipId, id(8));
+});
+
+test('future lesson still requires membership coverage through its end', async () => {
+  const now = Date.now();
+  const h = harness({ lesson: { startTime: new Date(now + 86400000), endTime: new Date(now + 90000000) },
+    membership: { validUntil: new Date(now + 3600000) } });
+  await assert.rejects(h.service.payWithMembership(id(2), id(7), actor), /Абонемент недоступен/);
+  assert.equal(h.state().operations.length, 0);
+});
+
+test('past no-show debt accepts a later membership without completed-lesson revenue', async () => {
+  const h = harness({ status: 'NO_SHOW', membership: { validFrom: new Date(Date.now() - 60000) } });
+  await h.service.payWithMembership(id(2), id(7), actor);
+  assert.equal(h.state().membership.remainedLessons, 3);
+  assert.equal(h.state().revenueCalls, 0);
+});
 
 for (const status of ['SCHEDULED', 'COMPLETED']) test(`membership settles ${status} lesson atomically and consumes exactly one visit`, async () => {
   const h = harness({ status });
@@ -78,7 +135,7 @@ test('concurrent membership payment consumes one visit; repeat is rejected', asy
   assert.equal(h.state().membership.remainedLessons, 3);
 });
 
-for (const membership of [{ clientId: id(99) }, { status: 'frozen' }, { remainedLessons: 0 }, { type: 'deposit' }, { deletedAt: new Date() }, { validUntil: new Date('2020-01-01') }, { serviceId: id(99) }]) {
+for (const membership of [{ clientId: id(99) }, { status: 'frozen' }, { remainedLessons: 0 }, { type: 'deposit' }, { deletedAt: new Date() }, { validFrom: new Date('2099-01-01') }, { validUntil: new Date('2020-01-01') }, { serviceId: id(99) }]) {
   test(`unavailable membership ${JSON.stringify(membership)} leaves lesson and balance intact`, async () => {
     const h = harness({ membership });
     await assert.rejects(h.service.payWithMembership(id(2), id(7), actor));

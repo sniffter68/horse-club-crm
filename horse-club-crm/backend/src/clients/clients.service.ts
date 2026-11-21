@@ -38,6 +38,7 @@ const clientMembershipSelect = {
   members: { include: { client: { select: { id: true, name: true, firstName: true, lastName: true } } } },
   deletedAt: true, _count: { select: { bookings: true, operations: true, transactions: true, payments: true } }, totalPrice: true, type: true, title: true, initialUnits: true, remainingUnits: true, validFrom: true, validTo: true, status: true,
   id: true,
+  serviceId: true,
   totalLessons: true,
   remainedLessons: true,
   validUntil: true,

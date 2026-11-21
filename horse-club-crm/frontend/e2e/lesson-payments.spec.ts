@@ -85,9 +85,10 @@ for (const width of [1440, 390]) test(`completed zero-cost debt converts to one-
 for (const sell of [false, true]) test(`completed unpaid lesson uses ${sell ? 'newly sold' : 'existing'} membership with retry`, async ({ page }) => {
   await page.setViewportSize({ width: sell ? 390 : 1440, height: 1000 })
   const state = await setup(page, 0)
+  await page.clock.setFixedTime(new Date('2026-10-21T08:00:00Z'))
   state.lesson!.status = 'COMPLETED'
   state.lesson!.service = { ...service, allowMembership: true }
-  const membership = { id: id(40), title: '4 тренировки', type: 'fixed_lessons', isActive: true, totalLessons: 4, remainedLessons: 4, validUntil: '2099-01-01' }
+  const membership = { id: id(40), title: '4 тренировки', type: 'fixed_lessons', isActive: true, serviceId: service.id, totalLessons: 4, remainedLessons: 4, validFrom: '2026-10-21T07:00:00Z', validUntil: '2099-01-01' }
   await page.route(`**/api/clients/${id(1)}`, route => route.fulfill({ json: { ...client, memberships: sell ? [] : [membership] } }))
   await page.route('**/api/services?*', route => route.fulfill({ json: [{ ...service, allowMembership: true }], headers: { 'x-total-count': '1' } }))
   await page.route('**/api/pricing-plans?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
@@ -104,7 +105,9 @@ for (const sell of [false, true]) test(`completed unpaid lesson uses ${sell ? 'n
     state.lesson = { ...state.lesson!, cost: 0, paymentStatus: 'PAID_BY_MEMBERSHIP', bookings: [{ ...state.lesson!.bookings[0], membership: { ...membership, type: 'fixed_lessons', remainedLessons: 3 } }] }
     await route.fulfill({ json: state.lesson })
   })
-  await page.goto('/schedule'); await page.locator('.fc-event').first().click()
+  await page.goto('/schedule')
+  await page.getByRole('textbox', { name: 'Дата нагрузки' }).fill('2026-10-20')
+  await page.locator('.fc-event').first().click()
   const detail = page.getByRole('dialog', { name: 'Карточка занятия', exact: true })
   if (sell) {
     await detail.getByRole('button', { name: 'Продать абонемент и привязать' }).click()
@@ -114,6 +117,7 @@ for (const sell of [false, true]) test(`completed unpaid lesson uses ${sell ? 'n
     await expect(sale).not.toBeVisible()
   } else {
     await detail.getByRole('button', { name: 'Списать с абонемента' }).click()
+    await expect(detail).toContainText('Отложенная оплата: абонемент оформлен после даты занятия')
     await detail.getByRole('button', { name: 'Списать занятие', exact: true }).click()
   }
   await expect(detail.getByRole('alert').filter({ hasText: 'Повторите привязку' })).toBeVisible()
@@ -122,6 +126,45 @@ for (const sell of [false, true]) test(`completed unpaid lesson uses ${sell ? 'n
   await expect(detail.getByRole('button', { name: 'Продать абонемент и привязать' })).toHaveCount(0)
   expect(sold).toBe(sell ? 1 : 0)
   expect(attempts).toBe(2)
+})
+
+for (const status of ['COMPLETED', 'NO_SHOW'] as const) test(`past ${status} debt allows manual family membership selection and filters service`, async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 1000 })
+  const state = await setup(page, 0)
+  await page.clock.setFixedTime(new Date('2026-10-21T08:00:00Z'))
+  state.lesson!.status = status
+  state.lesson!.service = { ...service, allowMembership: true }
+  const membership = { id: id(40), title: 'Личный', type: 'fixed_lessons' as const, status: 'active' as const, isActive: true,
+    serviceId: service.id, totalLessons: 4, remainedLessons: 4, validFrom: '2026-10-21T07:00:00Z', validUntil: '2099-01-01' }
+  const family = { ...membership, id: id(41), title: 'Семейный', isShared: true, ownerName: 'Ирина' }
+  await page.route(`**/api/clients/${client.id}`, route => route.fulfill({ json: { ...client, memberships: [membership, family,
+    { ...membership, id: id(42), title: 'Другая услуга', serviceId: id(99) },
+    { ...membership, id: id(43), title: 'Будущий', validFrom: '2026-10-22T07:00:00Z' }] } }))
+  let selected: string | undefined
+  await page.route(`**/api/lessons/${id(4)}/pay-with-membership`, async route => {
+    selected = (route.request().postDataJSON() as { membershipId: string }).membershipId
+    state.lesson = { ...state.lesson!, cost: 0, paymentStatus: 'PAID_BY_MEMBERSHIP',
+      bookings: [{ ...state.lesson!.bookings[0], membership: { ...family, remainedLessons: 3 } }] }
+    await route.fulfill({ json: state.lesson })
+  })
+  await page.goto('/schedule')
+  await page.locator('input[aria-label="Дата нагрузки"]').fill('2026-10-20')
+  await page.locator('.fc-event').first().click()
+  const detail = page.getByRole('dialog', { name: 'Карточка занятия', exact: true })
+  await detail.getByRole('button', { name: 'Списать с абонемента' }).click()
+  await expect(detail.getByRole('button', { name: 'Списать занятие', exact: true })).toBeDisabled()
+  const select = detail.getByRole('combobox', { name: 'Абонемент для оплаты', exact: true })
+  await select.focus(); await select.press('ArrowDown')
+  const popup = page.locator('.ant-select-dropdown:visible')
+  await expect(popup).toContainText('Личный')
+  await expect(popup).toContainText('Семейный: Ирина')
+  await expect(popup).not.toContainText('Другая услуга')
+  await expect(popup).not.toContainText('Будущий')
+  await select.press('ArrowDown'); await select.press('Enter')
+  await expect(detail).toContainText('Отложенная оплата: абонемент оформлен после даты занятия')
+  await detail.getByRole('button', { name: 'Списать занятие', exact: true }).click()
+  await expect(detail).toContainText('Абонемент: 3 / 4')
+  expect(selected).toBe(family.id)
 })
 
 const id = (n: number) => `${String(n).padStart(8, '0')}-1111-4111-8111-111111111111`
@@ -232,6 +275,11 @@ async function setup(page: Page, prepaid?: number, group = false) {
     return route.fulfill({ json: lesson })
   })
   await page.route('**/api/payments/shifts/current', route => route.fulfill({ json: null }))
+  await page.route('**/api/finance/journal?*', route => route.fulfill({ json: {
+    total: state.receipts.length,
+    data: state.receipts.map(receipt => ({ ...receipt, amount: String(receipt.amount), kind: 'INCOME',
+      at: '2026-10-20T08:00:00Z', clientName: client.name, cashier: 'qa@example.com' })),
+  } }))
   await page.route('**/api/finance/expenses?*', route => route.fulfill({ json: { data: [], total: 0 } }))
   await page.route('**/api/finance/summary?*', route => {
     const cash = state.receipts.filter(r => r.method === 'CASH').reduce((sum, r) => sum + r.amount, 0)

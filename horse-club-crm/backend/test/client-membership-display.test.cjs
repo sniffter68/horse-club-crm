@@ -5,6 +5,22 @@ require('reflect-metadata');
 const { ClientsService } = require('../dist/clients/clients.service');
 const { ClientsController } = require('../dist/clients/clients.controller');
 
+test('client payment selector receives every currently active owned and shared membership, including later purchases', async () => {
+  const now = Date.now();
+  const membership = { id: 'owned', clientId: 'client', type: 'fixed_lessons', status: 'active', deletedAt: null,
+    remainedLessons: 4, validFrom: new Date(now - 60000), validUntil: new Date(now + 86400000), serviceId: 'service' };
+  const service = new ClientsService({ client: { findUnique: async ({ include }) => {
+    assert.equal(include.memberships.select.serviceId, true);
+    assert.equal(include.sharedMemberships.include.membership.select.serviceId, true);
+    return { id: 'client', memberships: [membership, { ...membership, id: 'second' }],
+      sharedMemberships: [{ membership: { ...membership, id: 'family', clientId: 'owner', client: { name: 'Owner' } } }] };
+  } } });
+  const result = await service.findOne('client');
+  assert.deepEqual(result.memberships.map(row => row.id), ['owned', 'second', 'family']);
+  assert.ok(result.memberships.every(row => row.isActive && row.serviceId === 'service'));
+  assert.equal(result.memberships[2].isShared, true);
+});
+
 test('client list includes nearest active membership and returns an explicit empty balance', async () => {
   const validUntil = new Date(Date.now() + 3 * 86400000);
   const service = new ClientsService({

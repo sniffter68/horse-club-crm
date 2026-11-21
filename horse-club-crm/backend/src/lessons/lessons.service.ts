@@ -472,19 +472,24 @@ export class LessonsService {
       if (booking.membershipId || booking.isPaid || money(booking.prepaymentAmount).gt(0) || money(booking.finalPaymentAmount).gt(0)
         || booking.payments.some(p => p.status === 'PAID')) throw new ConflictException('У занятия уже есть оплата');
       const membership = await tx.membership.findUnique({ where: { id: membershipId } });
-      if (!membership || membership.clientId !== booking.clientId) throw new BadRequestException('Абонемент не принадлежит клиенту занятия');
+      if (!membership || !await canUseMembership(tx, membership, booking.clientId)) throw new BadRequestException('Абонемент не принадлежит клиенту занятия');
+      const now = new Date();
+      const deferredPayment = lesson.startTime <= now;
       if (membership.deletedAt || membership.status !== 'active' || membership.type !== 'fixed_lessons' || membership.remainedLessons <= 0
-        || membership.validFrom > new Date() || membership.validFrom > lesson.startTime
-        || membership.validUntil < new Date() || membership.validUntil < lesson.endTime) throw new BadRequestException('Абонемент недоступен для занятия');
+        || membership.validFrom > now || membership.validUntil < now
+        || (!deferredPayment && (membership.validFrom > lesson.startTime || membership.validUntil < lesson.endTime))) throw new BadRequestException('Абонемент недоступен для занятия');
       if (membership.serviceId && membership.serviceId !== lesson.serviceId) throw new BadRequestException('Абонемент предназначен для другой услуги');
       // The ledger owns the atomic decrement and audited DEBIT. Completion and
       // cancellation reuse that operation, so neither can consume a second visit.
-      await this.membershipLedgerService.debitLesson(membershipId, lessonId, 'Оплата занятия абонементом', tx, booking.clientId);
+      const reason = deferredPayment ? 'Отложенная оплата занятия абонементом' : 'Оплата занятия абонементом';
+      await this.membershipLedgerService.debitLesson(membershipId, lessonId, reason, tx, booking.clientId);
       await tx.booking.update({ where: { id: booking.id }, data: { membershipId, isPaid: true, financialActorId: actor.id } });
       await tx.payment.updateMany({ where: { bookingId: booking.id, status: 'PENDING' }, data: { status: 'CANCELLED' } });
       if (lesson.status === 'COMPLETED') {
         await tx.$queryRaw`SELECT post_late_membership_revenue(${booking.id}::uuid, ${lesson.startTime}::timestamptz, ${membershipId}::uuid, ${actor.id}::uuid)::text`;
       }
+      await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'LESSON_PAID_BY_MEMBERSHIP', actorId: actor.id,
+        actorName: actor.email, details: { lessonId, bookingId: booking.id, membershipId, deferredPayment, reason } } });
       return tx.lesson.update({ where: { id: lessonId }, data: { cost: 0, paymentStatus: 'PAID_BY_MEMBERSHIP', financialActorId: actor.id }, ...lessonDetails });
     });
   }
