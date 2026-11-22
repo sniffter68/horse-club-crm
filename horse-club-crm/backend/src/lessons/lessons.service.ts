@@ -1,4 +1,6 @@
 import { telegramCancellation } from '../modules/telegram-bot/telegram-cancellation';
+import { DateTime } from 'luxon';
+import type { TrainerTmaRescheduleDto, TrainerTmaRescheduleQuery } from '../modules/telegram-bot/trainer-tma.dto';
 import type { TrainerStatusDto } from '../workspace/workspace.dto';
 import { refundService, serviceRefundQuote } from '../payments/service-refund';
 import type { CancelServiceDto } from '../payments/dto/cancel-service.dto';
@@ -14,6 +16,7 @@ import { queueTrainingConfirmation } from '../vk-bot/vk-training-notifications';
 import { queueTelegram, queueTelegramAdmins } from '../modules/telegram-bot/telegram-delivery';
 import { defaultModuleAccess } from '../settings/module-access.service';
 import { RoleAccessService } from '../auth/role-access.service';
+import { assertHorseReplacement } from '../auth/role-access';
 import {
   BadRequestException,
   ConflictException,
@@ -180,37 +183,154 @@ export class LessonsService {
     });
   }
 
-  async rescheduleLesson(lessonId: string, startTime: string, durationMinutes: number, trainerId?: string, arenaId?: string, actor?: AuthUser): Promise<LessonDetails> {
+  async assertLessonManagement(actor: AuthUser, trainerId: string, tx: TransactionClient = this.prisma) {
+    if ('telegramUserId' in actor && typeof actor.telegramUserId === 'string') {
+      const user = await tx.user.findUnique({ where: { telegramUserId: actor.telegramUserId }, include: { trainer: true, staffProfile: true } })
+        ?? await tx.user.findFirst({ where: { telegramUserId: null, trainer: { telegramId: actor.telegramUserId } }, include: { trainer: true, staffProfile: true } });
+      if (!user || user.id !== actor.id || user.role !== actor.role || !user.crmAccess || user.staffProfile?.isActive === false
+        || user.role === 'TRAINER' && (!user.trainer?.isActive || user.trainerId !== actor.trainerId))
+        throw new ForbiddenException('Доступ изменён. Откройте приложение заново');
+    }
+    if (actor.role === 'ADMIN') return;
+    const module = await tx.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
+    const permission = await tx.roleModulePermission.findUnique({ where: { role_module: { role: actor.role, module: 'SCHEDULE' } } });
+    if (module?.isEnabled === false || (permission?.accessLevel ?? defaultModuleAccess(actor.role, 'SCHEDULE')) !== 'FULL')
+      throw new ForbiddenException('Недостаточно прав для изменения расписания');
+    if (actor.role === 'TRAINER') {
+      const policy = await new RoleAccessService(this.prisma).permissions(actor.role, tx);
+      if (!policy.lessonCreateAny && !(policy.lessonCreateOwn && actor.trainerId === trainerId))
+        throw new ForbiddenException('Можно менять только свои занятия согласно настройкам роли');
+    }
+  }
+
+  async moveScheduledLesson(id: string, dto: TrainerTmaRescheduleDto, actor: AuthUser) {
+    return this.runSerializable(async tx => {
+      const lesson = await tx.lesson.findUnique({ where: { id }, ...lessonDetails });
+      if (!lesson) throw new NotFoundException('Занятие не найдено');
+      if (lesson.deletedAt || lesson.status !== 'SCHEDULED') throw new ConflictException('Переносить можно только запланированные занятия');
+      await this.assertLessonManagement(actor, lesson.trainerId, tx);
+      if (dto.trainerId) await this.assertLessonManagement(actor, dto.trainerId, tx);
+      return this.rescheduleLesson(id, this.moveStart(dto).toISO()!, (+lesson.endTime - +lesson.startTime) / 60000,
+        dto.trainerId, undefined, actor, { horseId: dto.horseId, reason: dto.reason, tx });
+    });
+  }
+
+  async lessonManagementDetails(id: string, actor: AuthUser) {
+    const lesson = await this.findOne(id);
+    await this.assertLessonManagement(actor, lesson.trainerId);
+    const [horses, trainers] = await Promise.all([
+      this.prisma.horse.findMany({ where: { deletedAt: null, status: 'active', healthStatus: 'HEALTHY', isUnavailable: false }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+      this.prisma.trainer.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    ]);
+    const policy = await new RoleAccessService(this.prisma).permissions(actor.role);
+    const canReplaceHorse = actor.role === 'ADMIN' || actor.role === 'MANAGER' || policy.horseReplaceAny || policy.horseReplaceOwn && actor.trainerId === lesson.trainerId;
+    return { id, startTime: lesson.startTime, endTime: lesson.endTime, trainerId: lesson.trainerId, status: lesson.status,
+      serviceName: lesson.service.title || lesson.service.name, horses: canReplaceHorse ? horses : [], canReplaceHorse, trainers: policy.lessonCreateAny ? trainers : trainers.filter(t => t.id === actor.trainerId),
+      bookings: lesson.bookings.map(b => ({ id: b.id, clientName: b.client.name, phone: b.client.phone, horseId: b.horseId, horseName: b.horse?.name,
+        payment: b.membershipId ? 'Абонемент' : b.isPaid ? 'Оплачено' : 'Не оплачено' })) };
+  }
+
+  private moveStart(dto: { date: string; startTime: string }) {
+    const start = DateTime.fromISO(`${dto.date}T${dto.startTime}`, { zone: 'Europe/Moscow' });
+    if (!start.isValid || start.toISODate() !== dto.date || start.toFormat('HH:mm') !== dto.startTime)
+      throw new BadRequestException('Укажите существующую дату и время');
+    if (start.toMillis() <= Date.now()) throw new ConflictException('Выберите время в будущем');
+    return start;
+  }
+
+  async rescheduleSlots(id: string, query: TrainerTmaRescheduleQuery, actor: AuthUser) {
+    return this.prisma.$transaction(async tx => {
+      const lesson = await tx.lesson.findUnique({ where: { id }, ...lessonDetails });
+      if (!lesson) throw new NotFoundException('Занятие не найдено');
+      if (lesson.deletedAt || lesson.status !== 'SCHEDULED') throw new ConflictException('Переносить можно только запланированные занятия');
+      await this.assertLessonManagement(actor, lesson.trainerId, tx);
+      if (query.trainerId) await this.assertLessonManagement(actor, query.trainerId, tx);
+      if (query.horseId) assertHorseReplacement(actor, lesson.trainerId, await new RoleAccessService(this.prisma).permissions(actor.role, tx));
+      return this.lessonMoveSlots(tx, lesson, query);
+    }, { isolationLevel: 'RepeatableRead', timeout: 30000 });
+  }
+
+  readMoveLesson(tx: TransactionClient, id: string) { return tx.lesson.findUniqueOrThrow({ where: { id }, ...lessonDetails }); }
+
+  async lessonMoveSlots(tx: TransactionClient, lesson: LessonDetails, query: TrainerTmaRescheduleQuery) {
+    const day = DateTime.fromISO(query.date, { zone: 'Europe/Moscow' });
+    if (!day.isValid || day.toISODate() !== query.date) throw new BadRequestException('Некорректная дата');
+    const schedule = await this.getClubSchedule(tx);
+    const slots: { startTime: string; available: boolean; reason?: string }[] = [];
+    const duration = (+lesson.endTime - +lesson.startTime) / 60000;
+    const { open, close } = this.getWorkDayBounds(this.parseCalendarDate(query.date), schedule);
+    for (let time = +open; time + duration * 60000 <= +close; time += 30 * 60000) {
+      if (time <= Date.now()) continue;
+      const start = new Date(time), end = new Date(time + duration * 60000);
+      try {
+        await this.validateLessonMove(tx, lesson, start, end, query.trainerId, undefined, query.horseId, false);
+        slots.push({ startTime: DateTime.fromJSDate(start, { zone: 'Europe/Moscow' }).toFormat('HH:mm'), available: true });
+      } catch (error: unknown) {
+        if (!(error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException)) throw error;
+        slots.push({ startTime: DateTime.fromJSDate(start, { zone: 'Europe/Moscow' }).toFormat('HH:mm'), available: false, reason: error.message });
+      }
+    }
+    return { slots };
+  }
+
+  private async validateLessonMove(tx: TransactionClient, lesson: LessonDetails, start: Date, end: Date,
+    trainerId?: string, arenaId?: string, horseId?: string, lockResources = true) {
+    if (lesson.status !== 'SCHEDULED' || lesson.deletedAt) throw new ConflictException('Переносить можно только запланированные занятия');
+    if (horseId && lesson.bookings.length !== 1) throw new BadRequestException('В группе заменяйте лошадь отдельно для каждого участника');
+    this.assertClubWorkingHours(start, end, await this.getClubSchedule(tx));
+    for (const booking of lesson.bookings.filter(row => row.status === 'scheduled')) {
+      if (booking.membership && (booking.membership.deletedAt || booking.membership.cancelledAt || !booking.isPaid && booking.membership.remainedLessons <= 0 || booking.membership.validFrom > start || booking.membership.validUntil < end))
+        throw new ConflictException('Абонемент участника недоступен на новое время занятия');
+    }
+    const participants = lesson.bookings.filter(b => b.status === 'scheduled').map(b => ({ clientId: b.clientId, horseId: horseId ?? b.horseId }));
+    await this.bookingRules.validate(tx, { trainerId: trainerId ?? lesson.trainerId, arenaId: arenaId ?? lesson.arenaId,
+      participants, start, end, excludeLessonId: lesson.id, lockResources }).catch((error: unknown) => {
+        if (error instanceof BadRequestException) throw new ConflictException(error.message);
+        throw error;
+      });
+    await this.validateNoConflictsWithClient(tx, trainerId ?? lesson.trainerId, participants.flatMap(b => b.horseId ? [b.horseId] : []), start, end, lesson.id, arenaId ?? lesson.arenaId ?? undefined);
+    for (const horse of new Set(participants.flatMap(b => b.horseId ? [b.horseId] : [])))
+      await this.getHorseWorkloadWithClient(tx, horse, this.getLocalDateParts(start), (+end - +start) / 60000, lesson.id);
+  }
+
+  async rescheduleLesson(lessonId: string, startTime: string, durationMinutes: number, trainerId?: string, arenaId?: string, actor?: AuthUser,
+    options?: { horseId?: string; reason?: string; tx?: TransactionClient }): Promise<LessonDetails> {
     const eventId = randomUUID();
     if (!Number.isSafeInteger(durationMinutes) || durationMinutes <= 0) throw new BadRequestException('Укажите положительную длительность занятия');
     const start = this.parseDate(startTime, 'Некорректное время начала занятия');
     const end = new Date(start.getTime() + durationMinutes * MILLISECONDS_PER_MINUTE);
     this.assertValidInterval(start, end);
-    return this.runSerializable(async tx => {
+    const move = async (tx: TransactionClient) => {
       const lesson = await tx.lesson.findUnique({ where: { id: lessonId }, ...lessonDetails });
       if (!lesson) throw new NotFoundException('Занятие не найдено');
+      if (actor) {
+        await this.assertLessonManagement(actor, lesson.trainerId, tx);
+        if (trainerId) await this.assertLessonManagement(actor, trainerId, tx);
+      }
       if (lesson.status !== LessonStatus.SCHEDULED) throw new ConflictException('Переносить можно только запланированные занятия');
       if (!arenaId && lesson.arena?.isUnavailable) throw new ConflictException('Манеж недоступен на новое время занятия');
-      const schedule = await this.getClubSchedule(tx);
-      this.assertClubWorkingHours(start, end, schedule);
-      for (const booking of lesson.bookings) {
-        if (booking.membership && ((!booking.isPaid && booking.membership.remainedLessons <= 0) || booking.membership.validUntil < end)) {
-          throw new ConflictException('Абонемент участника недоступен на новое время занятия');
-        }
+      await this.validateLessonMove(tx, lesson, start, end, trainerId, arenaId, options?.horseId);
+      if (options?.horseId && options.horseId !== lesson.bookings[0]?.horseId && actor) {
+        const policy = await new RoleAccessService(this.prisma).permissions(actor.role, tx);
+        assertHorseReplacement(actor, lesson.trainerId, policy);
+        await tx.bookingHorseChange.create({ data: { bookingId: lesson.bookings[0].id, actorUserId: actor.id,
+          oldHorseId: lesson.bookings[0].horseId, newHorseId: options.horseId, reason: options.reason || 'Замена при переносе занятия' } });
       }
-      const horseIds = [...new Set(lesson.bookings.map(booking => booking.horseId).filter((id): id is string => Boolean(id)))];
-      await this.bookingRules.validate(tx, { trainerId: trainerId ?? lesson.trainerId, arenaId: arenaId ?? lesson.arenaId, participants: lesson.bookings, start, end, excludeLessonId: lessonId });
-      await this.validateNoConflictsWithClient(tx, trainerId ?? lesson.trainerId, horseIds, start, end, lessonId, arenaId ?? lesson.arenaId ?? undefined);
-      for (const horseId of horseIds) {
-        await this.getHorseWorkloadWithClient(tx, horseId, this.getLocalDateParts(start), durationMinutes, lessonId);
-      }
+      await tx.booking.updateMany({ where: { lessonId }, data: { startTime: start, endTime: end,
+        trainerId: trainerId ?? lesson.trainerId, arenaId: arenaId ?? lesson.arenaId,
+        ...(options?.horseId ? { horseId: options.horseId } : {}),
+        ...(+lesson.startTime !== +start ? { clientConfirmed: false, clientCancellationRequested: false } : {}) } });
       const updated = await tx.lesson.update({ where: { id: lessonId }, data: { startTime: start, endTime: end, ...(trainerId ? { trainerId } : {}), ...(arenaId ? { arenaId } : {}) }, ...lessonDetails });
       if (trainerId && trainerId !== lesson.trainerId || arenaId && arenaId !== lesson.arenaId || lesson.startTime.getTime() !== start.getTime() || lesson.endTime.getTime() !== end.getTime()) {
         await this.notifyLesson(tx, updated, `rescheduled:${eventId}`, 'Тренировка перенесена', undefined, lesson.startTime);
-        if (actor) await tx.cashAuditLog.create({ data: { requestId: eventId, action: 'LESSON_RESCHEDULED', actorId: actor.id, actorName: actor.email, details: { lessonId, startTime } } });
+        const format = (date: Date) => DateTime.fromJSDate(date, { zone: 'Europe/Moscow' }).toFormat('dd.MM.yyyy HH:mm');
+        await queueTelegramAdmins(tx, `admin:reschedule:${eventId}`, `Тренировка перенесена: ${format(lesson.startTime)} → ${format(start)} (Москва)\n${options?.reason ?? ''}`);
+        if (actor) await tx.cashAuditLog.create({ data: { requestId: eventId, action: 'LESSON_RESCHEDULED', actorId: actor.id, actorName: actor.email,
+          details: { lessonId, startTime, previousStart: lesson.startTime.toISOString(), horseId: options?.horseId ?? null, reason: options?.reason ?? null } } });
       }
       return updated;
-    });
+    };
+    return options?.tx ? move(options.tx) : this.runSerializable(move);
   }
 
   async createLesson(dto: CreateLessonDto, transaction?: Prisma.TransactionClient, actor?: AuthUser): Promise<LessonDetails> {
@@ -557,6 +677,7 @@ export class LessonsService {
     cancellation?: Partial<CancelServiceDto>,
     telegramSender?: string,
     trainerUpdate?: TrainerStatusDto,
+    scheduledCancellation = false,
   ): Promise<LessonDetails> {
     if (trainerUpdate && (trainerUpdate.status !== newStatus || !['COMPLETED', 'NO_SHOW'].includes(newStatus))) {
       throw new BadRequestException('Тренеру доступны только отметки проведения и неявки');
@@ -583,6 +704,14 @@ export class LessonsService {
       if (!lesson) {
         throw new NotFoundException('Занятие не найдено');
       }
+      if (scheduledCancellation) {
+        if (!actor) throw new ForbiddenException('Требуется пользователь');
+        await this.assertLessonManagement(actor, lesson.trainerId, tx);
+        if (lesson.status !== 'SCHEDULED') throw new ConflictException('Отменять можно только запланированные занятия');
+        if (!cancellation?.reason?.trim()) throw new BadRequestException('Укажите причину отмены');
+        const quote = await serviceRefundQuote(tx, 'lessons', lessonId);
+        if (quote.paid.gt(0)) throw new ConflictException('Для возврата оплаты откройте полную CRM');
+      }
       if (trainerUpdate) {
         const user = actor && await tx.user.findUnique({ where: { id: actor.id }, include: { trainer: true } });
         if (!user || user.role !== 'TRAINER' || !user.crmAccess || !user.trainer?.isActive || user.trainerId !== lesson.trainerId)
@@ -593,8 +722,9 @@ export class LessonsService {
       if (telegramSender) {
         const user = await tx.user.findUnique({ where: { telegramUserId: telegramSender }, include: { trainer: true, staffProfile: true } })
           ?? await tx.user.findFirst({ where: { telegramUserId: null, trainer: { telegramId: telegramSender } }, include: { trainer: true, staffProfile: true } });
-        if (!user || !user.crmAccess || user.id !== actor?.id || user.role !== actor.role || (user.role !== 'ADMIN' && user.trainerId !== lesson.trainerId) || (user.role !== 'ADMIN' && user.trainer?.isActive === false) || user.staffProfile?.isActive === false)
+        if (!user || !user.crmAccess || user.id !== actor?.id || user.role !== actor.role || (user.role !== 'ADMIN' && user.trainer?.isActive === false) || user.staffProfile?.isActive === false)
           throw new ForbiddenException('Можно менять только свои занятия');
+        await this.assertLessonManagement(actor, lesson.trainerId, tx);
         const module = await tx.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
         const permission = await tx.roleModulePermission.findUnique({ where: { role_module: { role: user.role, module: 'SCHEDULE' } } });
         if (module?.isEnabled === false || user.role !== 'ADMIN' && (permission?.accessLevel ?? defaultModuleAccess(user.role, 'SCHEDULE')) !== 'FULL')
@@ -745,7 +875,7 @@ export class LessonsService {
 
   private async notifyLesson(tx: TransactionClient, lesson: LessonDetails, event: string, title: string,
     clientIds?: string[], previousStart?: Date): Promise<void> {
-    await this.notifyTelegramLesson(tx, lesson, event, title, clientIds);
+    await this.notifyTelegramLesson(tx, lesson, event, title, clientIds, previousStart);
     const participants = (lesson.bookings ?? []).filter(row => !clientIds || clientIds.includes(row.clientId));
     if (!lesson.trainer?.vkId && !participants.some(row => row.client?.vkUserId)) return;
     if (event === 'created' || event.startsWith('booking:')) {
@@ -764,15 +894,17 @@ export class LessonsService {
     if (!recipients.size) return;
     const format = (date: Date) => new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short', timeZone: CLUB_TIME_ZONE }).format(date);
     const message = `${title}: ${lesson.service.title || lesson.service.name}\n${format(lesson.startTime)} — ${format(lesson.endTime)} (${CLUB_TIME_ZONE})`
-      + (previousStart ? `\nРанее: ${format(previousStart)}` : '') + `\nТренер: ${lesson.trainer.name}`;
+      + (previousStart ? `\nРанее: ${format(previousStart)}` : '') + `\nТренер: ${lesson.trainer.name}`
+      + (event === 'cancelled' ? `\nПричина: ${lesson.bookings.map(b => b.cancellationReason).filter(Boolean).join('; ')}` : '');
     for (const peer of recipients) await queueVkNotification(tx, `lesson:${lesson.id}:${event}:${peer}`, peer, message);
   }
 
-  private async notifyTelegramLesson(tx: TransactionClient, lesson: LessonDetails, event: string, title: string, clientIds?: string[]) {
+  private async notifyTelegramLesson(tx: TransactionClient, lesson: LessonDetails, event: string, title: string, clientIds?: string[], previousStart?: Date) {
     if (event === 'cancelled') await queueTelegramAdmins(tx, `admin:cancel:${lesson.id}`, telegramCancellation(lesson.startTime, lesson.endTime, lesson.bookings ?? []));
     if (!(lesson.bookings ?? []).some(row => row.client?.telegramUserId && (!clientIds || clientIds.includes(row.clientId)))) return;
     const when = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Moscow' }).format(lesson.startTime);
-    const message = `${title}: ${lesson.service.title || lesson.service.name}\n${when} (Москва)`;
+    const message = `${title}: ${lesson.service.title || lesson.service.name}\n${when} (Москва)`
+      + (previousStart ? `\nРанее: ${new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Moscow' }).format(previousStart)} (Москва)` : '');
     for (const row of lesson.bookings ?? []) if ((!clientIds || clientIds.includes(row.clientId)) && row.client?.telegramUserId)
       await queueTelegram(tx, `client:${row.clientId}:lesson:${lesson.id}:${event}`, row.client.telegramUserId, event === 'cancelled' ? telegramCancellation(lesson.startTime, lesson.endTime, [row]) : message);
   }

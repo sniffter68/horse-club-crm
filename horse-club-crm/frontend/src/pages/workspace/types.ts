@@ -2,7 +2,7 @@ export interface Person { id: string; name: string }
 export interface BoardLesson {
   id: string; trainerId: string; startTime: string; endTime: string
   status: 'SCHEDULED' | 'COMPLETED' | 'NO_SHOW' | 'CANCELLED'
-  trainer: Person; arena: Person | null; trainerNote: string | null; isOwn?: boolean
+  trainer: Person; arena: Person | null; trainerNote: string | null; isOwn?: boolean; canManage?: boolean
   bookings: { id: string; clientConfirmed: boolean; client: Person | null; horse: Person | null }[]
 }
 export interface TrainerBoard {

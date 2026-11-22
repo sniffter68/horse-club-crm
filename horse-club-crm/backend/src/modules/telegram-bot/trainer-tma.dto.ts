@@ -11,6 +11,29 @@ export class TrainerTmaScheduleQuery {
   date!: string;
 }
 
+export class TrainerTmaRescheduleQuery extends TrainerTmaScheduleQuery {
+  @Transform(({ value }: { value: unknown }) => value === '' ? undefined : value)
+  @IsOptional() @IsUUID()
+  horseId?: string;
+
+  @Transform(({ value }: { value: unknown }) => value === '' ? undefined : value)
+  @IsOptional() @IsUUID()
+  trainerId?: string;
+}
+
+export class ClientRescheduleDto extends TrainerTmaScheduleQuery {
+  @IsString() @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  startTime!: string;
+}
+
+export class TrainerTmaRescheduleDto extends TrainerTmaRescheduleQuery {
+  @IsString() @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  startTime!: string;
+
+  @IsOptional() @IsString() @MaxLength(300)
+  reason?: string;
+}
+
 export class TrainerTmaStatusDto {
   @IsIn(['COMPLETED', 'CANCELLED', 'NO_SHOW'])
   status!: 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';

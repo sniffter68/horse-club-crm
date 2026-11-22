@@ -64,7 +64,7 @@ test('issue access to a linked disabled account in place, preserving user and tr
 
 test('same names never confer ownership; active club columns include trainers without logins', async () => {
   const own = { id, name: 'Same Name' }, other = { id: 'other-trainer', name: 'Same Name' };
-  const tx = { trainer: { findMany: async ({ where }) => { assert.deepEqual(where, { isActive: true }); return [own, other]; } },
+  const tx = { roleAccess: { findUnique: async () => null }, trainer: { findMany: async ({ where }) => { assert.deepEqual(where, { isActive: true }); return [own, other]; } },
     clubSchedule: { findUnique: async () => null },
     lesson: { findMany: async () => [own, other].map((trainer, index) => ({ id: `lesson-${index}`, trainerId: trainer.id, trainerNote: 'private', bookings: [], status: 'COMPLETED' })) },
   };

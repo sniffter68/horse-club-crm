@@ -1,4 +1,5 @@
 import { QuickTrainerBookingAction } from '../pages/workspace/QuickTrainerBookingDrawer'
+import { LessonActionsDrawer } from '../pages/workspace/LessonActionsDrawer'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, ConfigProvider, Drawer, Input, Select as AntSelect, Spin, Tag, theme } from 'antd'
 import ruRU from 'antd/locale/ru_RU'
@@ -63,6 +64,7 @@ function TrainerSchedule({ session, onExpired, all = false, date, onDateChange: 
   const [weekData, setWeekData] = useState<{ key: string; days: Record<string, DayResult> }>({ key: '', days: {} })
   const [revision, setRevision] = useState(0)
   const [sheet, setSheet] = useState<Sheet>(null)
+  const [actionsId, setActionsId] = useState<string>()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const saving = useRef(false)
@@ -168,10 +170,12 @@ function TrainerSchedule({ session, onExpired, all = false, date, onDateChange: 
           action={<Button onClick={() => setRevision(value => value + 1)}>Повторить</Button>} />
         : selected.lessons.length === 0 ? <div className="trainer-empty"><h3>На этот день занятий нет</h3><p>Выберите другой день или обновите расписание.</p></div>
         : <div className="trainer-lessons">{selected.lessons.map(lesson => <article key={lesson.id} className="trainer-lesson">
+          <button type="button" className="board-lesson-details" disabled={!full} aria-label={`Занятие ${tmaTime(lesson.startTime)} · ${lesson.clientName}`} onClick={() => setActionsId(lesson.id)}>
           <div className="trainer-heading-row"><strong className="trainer-time">{tmaTime(lesson.startTime)} – {tmaTime(lesson.endTime)}</strong>
             <Tag color={statuses[lesson.status].color}>{statuses[lesson.status].label}</Tag></div>
           <h3>{lesson.clientName || 'Участники не назначены'}</h3><p>{lesson.serviceName}</p>
           {all && lesson.trainerName && <p>Тренер: {lesson.trainerName}</p>}
+          </button>
           <div className="trainer-horse"><span><span aria-hidden="true">♞ </span>{lesson.horseName || 'Лошадь не назначена'}</span>
             {full && lesson.status === 'SCHEDULED' && <Button disabled={busy} onClick={event => openSheet('horse', lesson, event.currentTarget)}>Сменить лошадь</Button>}</div>
           {lesson.notes && <p className="trainer-muted">{lesson.notes}</p>}
@@ -181,6 +185,7 @@ function TrainerSchedule({ session, onExpired, all = false, date, onDateChange: 
           </div>}
         </article>)}</div>}
     </section>
+    {actionsId && <LessonActionsDrawer lessonId={actionsId} tmaToken={session.access_token} onClose={() => setActionsId(undefined)} onSaved={() => setRevision(value => value + 1)} />}
     <Drawer placement="bottom" height="auto" rootClassName="trainer-sheet" title={sheet?.kind === 'horse' ? 'Сменить лошадь' : 'Статус занятия'}
       open={sheetOpen} onClose={() => { if (!saving.current) closeSheet() }} maskClosable={!busy} keyboard={!busy} closable={busy ? false : { 'aria-label': 'Закрыть' }}
       afterOpenChange={visible => { if (!visible && !sheetOpen) {

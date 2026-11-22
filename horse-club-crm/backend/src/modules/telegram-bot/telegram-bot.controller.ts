@@ -4,9 +4,10 @@ import { RequireModule } from '../../auth/module-access.guard';
 import { TelegramAuthGuard, type TelegramRequest } from './telegram-auth.guard';
 import { TmaBookingsQuery, TmaCreateBookingDto, TmaSlotsQuery } from './telegram-bot.dto';
 import { ClientMiniappService } from './client-miniapp.service';
+import { ClientRescheduleDto, TrainerTmaScheduleQuery } from './trainer-tma.dto';
 import { TmaBookingService } from './tma-booking.service';
 
-@Controller('tma')
+@Controller(['tma', 'telegram-bot'])
 @RequireModule('SCHEDULE')
 @UseGuards(TelegramAuthGuard)
 export class TelegramBotController {
@@ -15,6 +16,10 @@ export class TelegramBotController {
   requestContact(@Req() req: TelegramRequest) { return this.bot.requestOwnContact(req.telegram.telegramUserId); }
   @Get('client/overview') @Header('Cache-Control', 'no-store')
   overview(@Req() req: TelegramRequest) { return this.clients.overview(req.telegram.clientId); }
+  @Get('client/lessons/:id/reschedule-slots') @Header('Cache-Control', 'no-store')
+  rescheduleSlots(@Req() req: TelegramRequest, @Param('id', new ParseUUIDPipe()) id: string, @Query() query: TrainerTmaScheduleQuery) { return this.clients.rescheduleSlots(req.telegram.clientId, id, query); }
+  @Post('client/lessons/:id/reschedule')
+  reschedule(@Req() req: TelegramRequest, @Param('id', new ParseUUIDPipe()) id: string, @Body() dto: ClientRescheduleDto) { return this.clients.reschedule(req.telegram.clientId, id, dto); }
   @Post('client/lessons/:id/confirm')
   confirm(@Req() req: TelegramRequest, @Param('id', new ParseUUIDPipe()) id: string) { return this.clients.action(req.telegram.clientId, id, 'confirm'); }
   @Post('client/lessons/:id/cancel')

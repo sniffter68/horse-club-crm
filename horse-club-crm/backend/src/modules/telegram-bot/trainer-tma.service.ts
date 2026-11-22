@@ -124,14 +124,14 @@ export class TrainerTmaService {
   private async ownLesson(actor: TrainerTmaActor, id: string) {
     const lesson = await this.prisma.lesson.findUnique({ where: { id }, include: { bookings: { select: { id: true } } } });
     if (!lesson || (lesson.deletedAt && lesson.status !== 'CANCELLED')) throw new NotFoundException('Занятие не найдено');
-    if (actor.role !== 'ADMIN' && lesson.trainerId !== actor.trainerId) throw new ForbiddenException('Можно менять только свои занятия');
+    if (actor.role !== 'ADMIN' && lesson.trainerId !== actor.trainerId) await this.lessons.assertLessonManagement(actor, lesson.trainerId);
     return lesson;
   }
 
   async status(actor: TrainerTmaActor, id: string, dto: TrainerTmaStatusDto) {
     await this.ownLesson(actor, id);
     // No cash decisions in TMA: paid cancellations require the existing CRM refund flow.
-    await this.lessons.updateLessonStatus(id, dto.status, {}, actor, { reason: dto.reason }, actor.telegramUserId);
+    await this.lessons.updateLessonStatus(id, dto.status, {}, actor, { reason: dto.reason }, actor.telegramUserId, undefined, dto.status === 'CANCELLED');
     return { updated: true };
   }
 
@@ -146,5 +146,15 @@ export class TrainerTmaService {
   horses() {
     return this.prisma.horse.findMany({ where: { deletedAt: null, status: 'active', healthStatus: 'HEALTHY', isUnavailable: false },
       orderBy: [{ name: 'asc' }, { id: 'asc' }], select: { id: true, name: true } });
+  }
+
+  reschedule(actor: TrainerTmaActor, id: string, dto: import('./trainer-tma.dto').TrainerTmaRescheduleDto) {
+    return this.lessons.moveScheduledLesson(id, dto, actor).then(row => ({ id: row.id, startTime: row.startTime }));
+  }
+
+  managementDetails(actor: TrainerTmaActor, id: string) { return this.lessons.lessonManagementDetails(id, actor); }
+
+  rescheduleSlots(actor: TrainerTmaActor, id: string, query: import('./trainer-tma.dto').TrainerTmaRescheduleQuery) {
+    return this.lessons.rescheduleSlots(id, query, actor);
   }
 }

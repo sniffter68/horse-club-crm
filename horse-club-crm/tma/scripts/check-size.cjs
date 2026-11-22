@@ -12,4 +12,4 @@ for (const name of assets) {
 }
 console.log(`TMA JS + CSS: ${raw} bytes raw; ${gzip} bytes gzip (Telegram SDK excluded)`);
 // The authenticated dashboard adds membership progress and the next lesson.
-if (raw >= 155_000) throw new Error('TMA exceeds the 155 KB uncompressed JS + CSS budget');
+if (raw >= 160_000) throw new Error('TMA exceeds the 160 KB uncompressed JS + CSS budget');

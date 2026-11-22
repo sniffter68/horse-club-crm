@@ -10,6 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { normalizePhone } from '../../vk-bot/vk-link.service';
 import { queueTelegramAdmins } from './telegram-delivery';
 import { activeTelegramMembership } from './telegram-membership';
+import { clientCanReschedule } from './client-lesson-policy';
 import type { TmaBookingsQuery, TmaCreateBookingDto, TmaSlotsQuery } from './telegram-bot.dto';
 
 const ZONE = 'Europe/Moscow';
@@ -18,7 +19,8 @@ const bookingView = {
   clientCancellationRequested: true, costAmount: true,
   trainer: { select: { name: true } },
   lesson: { select: { status: true, deletedAt: true, startTime: true, endTime: true,
-    service: { select: { title: true, name: true } } } },
+    _count: { select: { bookings: { where: { status: 'scheduled' } } } },
+    service: { select: { title: true, name: true, cancellationWindowHours: true } } } },
 } satisfies Prisma.BookingSelect;
 
 @Injectable()
@@ -192,14 +194,15 @@ export class TmaBookingService {
     ]);
     const hasProfile = Boolean(client.phone || client.email || client.birthDate || client.riderLevel || client.preferences
       || client.preferredTrainerId || client.preferredHorseId);
-    return { isEstablished: hasProfile || Object.values(client._count).some(count => count > 0) || Boolean(membership), membership, nextBooking };
+    return { isEstablished: hasProfile || Object.values(client._count).some(count => count > 0) || Boolean(membership), membership,
+      nextBooking: nextBooking ? { ...nextBooking, canReschedule: clientCanReschedule(nextBooking) } : null };
   }
 
   async myBookings(clientId: string, query: TmaBookingsQuery) {
     const rows = await this.prisma.booking.findMany({ where: { clientId, OR: [{ lesson: null }, { lesson: { deletedAt: null } }] }, select: bookingView,
       orderBy: [{ startTime: 'desc' }, { id: 'desc' }], skip: query.offset, take: query.limit + 1 });
     const membership = await activeTelegramMembership(this.prisma, clientId);
-    return { bookings: rows.slice(0, query.limit), hasMore: rows.length > query.limit, membership };
+    return { bookings: rows.slice(0, query.limit).map(row => ({ ...row, canReschedule: clientCanReschedule(row) })), hasMore: rows.length > query.limit, membership };
   }
 
   async cancelRequest(clientId: string, id: string) {

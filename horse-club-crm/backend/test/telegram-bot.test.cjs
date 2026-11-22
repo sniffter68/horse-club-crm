@@ -347,7 +347,7 @@ test('my bookings are scoped to the signed client, exclude archived lessons and 
   let captured;
   const rows = [{ id: 'latest' }, { id: 'older' }, { id: 'next-page' }];
   const service = new TmaBookingService({ membership: { findFirst: async () => null }, booking: { findMany: async input => { captured = input; return rows; } } }, {}, {});
-  assert.deepEqual(await service.myBookings(clientId, { offset: 0, limit: 2 }), { bookings: rows.slice(0, 2), hasMore: true, membership: null });
+  assert.deepEqual(await service.myBookings(clientId, { offset: 0, limit: 2 }), { bookings: rows.slice(0, 2).map(row => ({ ...row, canReschedule: false })), hasMore: true, membership: null });
   assert.deepEqual(captured.where, { clientId, OR: [{ lesson: null }, { lesson: { deletedAt: null } }] });
   assert.deepEqual(captured.orderBy, [{ startTime: 'desc' }, { id: 'desc' }]);
   assert.equal(captured.take, 3);

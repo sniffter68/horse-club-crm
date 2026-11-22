@@ -1,4 +1,5 @@
 import { QuickTrainerBookingDrawer } from './QuickTrainerBookingDrawer'
+import { LessonActionsDrawer } from './LessonActionsDrawer'
 import { useQuickBookingPermissions } from './useQuickBookingPermissions'
 import { ReplaceHorseAction } from '../schedule/ReplaceHorseAction'
 import { useRoleAccess } from '../../access'
@@ -24,6 +25,7 @@ const clock = (value: string) => DateTime.fromISO(value, { zone }).toFormat('HH:
 const statusLabels = { SCHEDULED: 'Запланировано', COMPLETED: 'Проведено', NO_SHOW: 'Неявка', CANCELLED: 'Отменено' }
 
 function LessonCard({ lesson, canWrite, onSaved, tmaToken }: { lesson: BoardLesson; canWrite: boolean; onSaved: () => void; tmaToken?: string }) {
+  const [actionsOpen, setActionsOpen] = useState(false)
   const [note, setNote] = useState(lesson.trainerNote ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -41,12 +43,15 @@ function LessonCard({ lesson, canWrite, onSaved, tmaToken }: { lesson: BoardLess
     finally { lock.current = false; setBusy(false) }
   }
   return <article className={`board-lesson ${lesson.isOwn ? 'board-lesson-own' : ''}`} style={lessonAccent(lesson.trainerId)} aria-label={`${clock(lesson.startTime)} ${lesson.trainer.name}`}>
+    <button type="button" className="board-lesson-details" disabled={!canWrite || !(lesson.canManage ?? lesson.isOwn)} onClick={() => setActionsOpen(true)} aria-label={`Занятие ${clock(lesson.startTime)} · ${lesson.trainer.name}`}>
     <strong className="club-icon-label"><ClubIcon name="clock" />{clock(lesson.startTime)}–{clock(lesson.endTime)}</strong>
     {lesson.isOwn ? <><b>{lesson.bookings.map(row => row.client?.name).filter(Boolean).join(', ') || 'Всадник не назначен'}</b>
       <Tag color={lesson.bookings.length && lesson.bookings.every(row => row.clientConfirmed) ? 'success' : 'warning'}>{lesson.bookings.length && lesson.bookings.every(row => row.clientConfirmed) ? 'Подтверждено' : 'Ждём подтверждения'}</Tag></> : <b>{lesson.trainer.name}</b>}
     <span>{lesson.bookings.map(row => row.horse?.name).filter(Boolean).join(', ') || 'Лошадь не назначена'}</span>
     <span>{lesson.arena?.name || 'Площадка не назначена'}</span>
     <Tag color={lesson.status === 'COMPLETED' ? 'success' : 'default'}>{statusLabels[lesson.status]}</Tag>
+    </button>
+    {actionsOpen && <LessonActionsDrawer lessonId={lesson.id} tmaToken={tmaToken} onClose={() => setActionsOpen(false)} onSaved={onSaved} />}
     {lesson.isOwn && lesson.status === 'SCHEDULED' && canWrite && <>
       <label htmlFor={`note-${lesson.id}`}>Заметка по тренировке / лошади</label>
       <Input id={`note-${lesson.id}`} value={note} maxLength={1000} disabled={busy} onChange={event => setNote(event.target.value)} />

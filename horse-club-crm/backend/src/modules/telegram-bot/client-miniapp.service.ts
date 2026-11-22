@@ -6,13 +6,22 @@ import { MembershipLedgerService } from '../../memberships/membership-ledger.ser
 import { isSerializationFailure } from '../../common/serialization-failure';
 import { activeTelegramMembership } from './telegram-membership';
 import { queueTelegramAdmins } from './telegram-delivery';
+import { DateTime } from 'luxon';
+import { LessonsService } from '../../lessons/lessons.service';
+import { BookingRulesService } from '../../bookings/booking-rules.service';
+import type { ClientRescheduleDto, TrainerTmaScheduleQuery } from './trainer-tma.dto';
+import { BadRequestException } from '@nestjs/common';
+import { queueTelegram } from './telegram-delivery';
+import { queueVkNotification } from '../../vk-bot/vk-delivery.module';
+import { clientCanReschedule, clientChangeWindowHours } from './client-lesson-policy';
 
 const view = {
   id: true, lessonId: true, startTime: true, endTime: true, status: true,
   clientConfirmed: true, clientCancellationRequested: true,
   trainer: { select: { name: true } }, horse: { select: { name: true } },
   lesson: { select: { startTime: true, endTime: true, status: true, deletedAt: true,
-    service: { select: { name: true, title: true } } } },
+    _count: { select: { bookings: { where: { status: 'scheduled' } } } },
+    service: { select: { name: true, title: true, cancellationWindowHours: true } } } },
 } satisfies Prisma.BookingSelect;
 type Row = Prisma.BookingGetPayload<{ select: typeof view }>;
 const future = (row: Row) => row.status === 'scheduled' && (!row.lesson ||
@@ -24,11 +33,98 @@ const present = (row: Row) => ({
   trainer: row.trainer, horse: row.horse, lesson: row.lesson,
   clientStatus: row.status === 'scheduled' ? row.clientConfirmed ? 'CONFIRMED' : 'SCHEDULED' : row.status.toUpperCase(),
   canCancel: future(row), canConfirm: future(row) && !row.clientConfirmed,
+  canReschedule: clientCanReschedule(row),
 });
 
 @Injectable()
 export class ClientMiniappService {
-  constructor(private readonly prisma: PrismaService, private readonly ledger: MembershipLedgerService) {}
+  constructor(private readonly prisma: PrismaService, private readonly ledger: MembershipLedgerService,
+    private readonly lessons: LessonsService, private readonly rules: BookingRulesService) {}
+
+  private async movable(tx: Prisma.TransactionClient, clientId: string, id: string) {
+    const row = await tx.booking.findFirst({ where: { clientId, OR: [{ id }, { lessonId: id }] },
+      include: { client: true, membership: true, lesson: { include: { service: true, bookings: true } } } });
+    if (!row) throw new NotFoundException('Запись не найдена');
+    const start = row.lesson?.startTime ?? row.startTime;
+    const hours = clientChangeWindowHours(row);
+    if (row.status !== 'scheduled' || row.lesson && (row.lesson.status !== 'SCHEDULED' || row.lesson.deletedAt)
+      || +start - Date.now() <= hours * 3600000) throw new ConflictException(`Перенос доступен не позднее чем за ${hours} ч. до занятия`);
+    if (row.lesson && row.lesson.bookings.filter(b => b.status === 'scheduled').length !== 1)
+      throw new ConflictException('Для переноса участия в групповом занятии обратитесь к администратору');
+    return row;
+  }
+
+  private async validateMove(tx: Prisma.TransactionClient, row: Awaited<ReturnType<ClientMiniappService['movable']>>, dto: ClientRescheduleDto, preview = false) {
+    const start = DateTime.fromISO(`${dto.date}T${dto.startTime}`, { zone: 'Europe/Moscow' });
+    if (!start.isValid || start.toISODate() !== dto.date || start.toFormat('HH:mm') !== dto.startTime
+      || start.toMillis() <= Date.now() || start > DateTime.now().setZone('Europe/Moscow').plus({ days: 30 }).endOf('day'))
+      throw new BadRequestException('Выберите время в ближайшие 30 дней');
+    const duration = +(row.lesson?.endTime ?? row.endTime) - +(row.lesson?.startTime ?? row.startTime);
+    const end = start.plus({ milliseconds: duration });
+    const schedule = await tx.clubSchedule.findUnique({ where: { id: 1 } });
+    if (!schedule || schedule.daysOfWeekOff.includes(start.weekday % 7) || start.toISODate() !== end.toISODate()
+      || start.toFormat('HH:mm') < schedule.openTime || end.toFormat('HH:mm') > schedule.closeTime)
+      throw new ConflictException('Клуб закрыт в выбранное время');
+    if (row.membership && (row.membership.deletedAt || row.membership.cancelledAt || row.membership.validFrom > start.toJSDate() || row.membership.validUntil < end.toJSDate()))
+      throw new ConflictException('Абонемент недоступен на выбранную дату');
+    await this.rules.validate(tx, { trainerId: row.lesson?.trainerId ?? row.trainerId, arenaId: row.lesson?.arenaId ?? row.arenaId,
+      participants: [{ clientId: row.clientId, horseId: row.horseId }], start: start.toJSDate(), end: end.toJSDate(),
+      excludeLessonId: row.lessonId ?? undefined, excludeBookingId: row.id, lockResources: !preview });
+    return { start: start.toJSDate(), end: end.toJSDate() };
+  }
+
+  async rescheduleSlots(clientId: string, id: string, query: TrainerTmaScheduleQuery) {
+    return this.prisma.$transaction(async tx => {
+      const row = await this.movable(tx, clientId, id);
+      const day = DateTime.fromISO(query.date, { zone: 'Europe/Moscow' });
+      if (!day.isValid || day.toISODate() !== query.date || day.startOf('day') < DateTime.now().setZone('Europe/Moscow').startOf('day')
+        || day > DateTime.now().setZone('Europe/Moscow').plus({ days: 30 }).endOf('day'))
+        throw new BadRequestException('Выберите дату в ближайшие 30 дней');
+      if (row.lessonId) {
+        const lesson = await this.lessons.readMoveLesson(tx, row.lessonId);
+        const result = await this.lessons.lessonMoveSlots(tx, lesson, query);
+        return { slots: result.slots.filter(slot => slot.available) };
+      }
+      const slots: { startTime: string; available: boolean; reason?: string }[] = [];
+      for (let minute = 0; minute < 1440; minute += 30) {
+        const startTime = `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+        try { await this.validateMove(tx, row, { date: query.date, startTime }, true); slots.push({ startTime, available: true }); }
+        catch (error: unknown) {
+          if (!(error instanceof BadRequestException || error instanceof ConflictException)) throw error;
+        }
+      }
+      return { slots };
+    }, { isolationLevel: 'RepeatableRead', timeout: 30000 });
+  }
+
+  async reschedule(clientId: string, id: string, dto: ClientRescheduleDto) {
+    for (let attempt = 0; ; attempt++) {
+      try { return await this.prisma.$transaction(async tx => {
+        const row = await this.movable(tx, clientId, id);
+        const { start, end } = await this.validateMove(tx, row, dto);
+        const oldStart = row.lesson?.startTime ?? row.startTime;
+        if (+oldStart === +start) return { updated: true };
+        if (row.lessonId) await this.lessons.rescheduleLesson(row.lessonId, start.toISOString(), (+end - +start) / 60000, undefined, undefined, undefined, { tx });
+        else {
+          await tx.booking.update({ where: { id: row.id }, data: { startTime: start, endTime: end, clientConfirmed: false, clientCancellationRequested: false } });
+          const event = randomUUID();
+          const format = (date: Date) => DateTime.fromJSDate(date, { zone: 'Europe/Moscow' }).toFormat('dd.MM.yyyy HH:mm');
+          const message = `Тренировка перенесена: ${format(oldStart)} → ${format(start)} (Москва)`;
+          await queueTelegramAdmins(tx, `admin:client:reschedule:${event}`, message);
+          if (row.client.telegramUserId) await queueTelegram(tx, `client:${row.clientId}:reschedule:${event}`, row.client.telegramUserId, message);
+          if (row.client.vkUserId) await queueVkNotification(tx, `client:${row.clientId}:reschedule:${event}`, row.client.vkUserId, message);
+        }
+        await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'CLIENT_LESSON_RESCHEDULED', actorId: clientId,
+          actorName: 'Клиент Telegram', details: { bookingId: row.id, previousStart: oldStart.toISOString(), startTime: start.toISOString() } } });
+        return { updated: true };
+      }, { isolationLevel: 'Serializable', timeout: 30000 }); }
+      catch (error: unknown) {
+        if (isSerializationFailure(error) && attempt < 2) continue;
+        if (isSerializationFailure(error)) throw new ConflictException('Запись изменилась. Обновите кабинет');
+        throw error;
+      }
+    }
+  }
 
   async overview(clientId: string) {
     const now = new Date();

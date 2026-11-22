@@ -26,6 +26,11 @@ function fixture({ horse = {}, client = {}, arena = {}, trainer = {}, bookings =
 }
 const failure = code => error => error.getStatus() === 409 && error.getResponse().code === code;
 
+test('shared availability enforces the lower legacy minute limit for standalone reservations too', async () => {
+  const f = fixture({ horse: { maxDailyMinutes: 20, maxDailyWorkloadMinutes: 120 } });
+  await assert.rejects(rules.validate(f.tx, f.input), error => failure('HORSE_OVERLOADED')(error) && error.getResponse().details.limitMinutes === 20);
+});
+
 test('archived horse cannot be assigned by UUID even if its active flags are stale', async () => {
   const f = fixture({ horse: { deletedAt: new Date(), isUnavailable: false, status: 'active' } });
   await assert.rejects(rules.validate(f.tx, f.input), failure('RESOURCE_NOT_FOUND'));

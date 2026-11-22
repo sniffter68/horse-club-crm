@@ -61,7 +61,7 @@ for (const status of ['COMPLETED', 'NO_SHOW']) test(`trainer ${status} is idempo
 
 test('trainer board has Moscow boundaries, all active trainers and no financial projection', async () => {
   let where;
-  const tx = { trainer: { findMany: async () => [{ id: 'trainer-1', name: 'Мария' }, { id: 'trainer-2', name: 'Иван' }] },
+  const tx = { roleAccess: { findUnique: async () => null }, trainer: { findMany: async () => [{ id: 'trainer-1', name: 'Мария' }, { id: 'trainer-2', name: 'Иван' }] },
     clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00' }) },
     lesson: { findMany: async query => { where = query.where; return [row(), { ...row(), id: 'foreign', trainerId: 'trainer-2' }].map(value => project(value, query.select)); } } };
   const service = new WorkspaceService({ $transaction: fn => fn(tx) }, {}, {});
@@ -80,7 +80,7 @@ test('trainer board has Moscow boundaries, all active trainers and no financial 
 test('trainer board excludes archived horses from its resource list but retains lesson history', async () => {
   const lesson = row();
   lesson.bookings[0].horse.deletedAt = new Date();
-  const tx = { trainer: { findMany: async () => [{ id: actor.trainerId, name: 'Тренер' }] },
+  const tx = { roleAccess: { findUnique: async () => null }, trainer: { findMany: async () => [{ id: actor.trainerId, name: 'Тренер' }] },
     lesson: { findMany: async query => [project(lesson, query.select)] }, clubSchedule: { findUnique: async () => null } };
   const service = new WorkspaceService({ $transaction: fn => fn(tx) }, {}, {});
   const data = await service.trainerBoard(actor, '2026-11-17');

@@ -5,6 +5,7 @@ import type { AuthUser } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { CashboxService } from '../cashbox/cashbox.service';
 import { ModuleAccessService } from '../settings/module-access.service';
+import { RoleAccessService } from '../auth/role-access.service';
 
 const zone = 'Europe/Moscow';
 // Explicit projection: never return full client, service, trainer or payment records.
@@ -26,6 +27,7 @@ export class WorkspaceService {
     if (!day.isValid || day.toISODate() !== date) throw new BadRequestException('Укажите существующую дату YYYY-MM-DD');
     if (actor.role === 'TRAINER' && !actor.trainerId) throw new ForbiddenException('Карточка тренера не привязана');
     return this.prisma.$transaction(async tx => {
+      const policy = await new RoleAccessService(this.prisma).permissions(actor.role, tx);
       const [trainers, lessons, schedule] = await Promise.all([
         tx.trainer.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
         tx.lesson.findMany({ where: { deletedAt: null, startTime: { lt: day.plus({ days: 1 }).toJSDate() }, endTime: { gt: day.startOf('day').toJSDate() } },
@@ -36,6 +38,7 @@ export class WorkspaceService {
       return { date, timeZone: zone, trainerId: actor.trainerId ?? null, trainers,
         openTime: schedule?.openTime ?? '08:00', closeTime: schedule?.closeTime ?? '22:00',
         lessons: lessons.map(lesson => ({ ...lesson, isOwn: lesson.trainerId === actor.trainerId,
+          canManage: actor.role !== 'TRAINER' || policy.lessonCreateAny || policy.lessonCreateOwn && lesson.trainerId === actor.trainerId,
           trainerNote: lesson.trainerId === actor.trainerId ? lesson.trainerNote : null,
           bookings: lesson.bookings.map(booking => ({ ...booking, client: lesson.trainerId === actor.trainerId ? booking.client : null })) })),
         horses: lessons.filter(lesson => lesson.status !== 'CANCELLED').flatMap(lesson => lesson.bookings.flatMap(booking => booking.horse && !booking.horse.deletedAt ? [{

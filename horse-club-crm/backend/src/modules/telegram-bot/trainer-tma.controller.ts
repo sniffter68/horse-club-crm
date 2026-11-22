@@ -9,7 +9,7 @@ import { WorkspaceService } from '../../workspace/workspace.service';
 import { LessonsService } from '../../lessons/lessons.service';
 import { TrainerBoardQuery, TrainerStatusDto } from '../../workspace/workspace.dto';
 import { ModuleAccessGuard, RequireModule } from '../../auth/module-access.guard';
-import { TrainerTmaAuthDto, TrainerTmaHorseDto, TrainerTmaScheduleQuery, TrainerTmaStatusDto } from './trainer-tma.dto';
+import { TrainerTmaAuthDto, TrainerTmaHorseDto, TrainerTmaScheduleQuery, TrainerTmaStatusDto, TrainerTmaRescheduleDto, TrainerTmaRescheduleQuery } from './trainer-tma.dto';
 import { TrainerTmaService, type TrainerTmaActor } from './trainer-tma.service';
 
 interface TrainerTmaRequest extends Request { user: TrainerTmaActor }
@@ -56,6 +56,12 @@ export class TrainerBoardTmaController {
 @UseGuards(TrainerTmaGuard, ModuleAccessGuard)
 export class TrainerTmaController {
   constructor(private readonly service: TrainerTmaService) {}
+  @Get('lessons/:id/management-details') @Header('Cache-Control', 'no-store')
+  details(@Req() req: TrainerTmaRequest, @Param('id', new ParseUUIDPipe()) id: string) { return this.service.managementDetails(req.user, id); }
+  @Patch('lessons/:id/reschedule')
+  reschedule(@Req() req: TrainerTmaRequest, @Param('id', new ParseUUIDPipe()) id: string, @Body() dto: TrainerTmaRescheduleDto) { return this.service.reschedule(req.user, id, dto); }
+  @Get('lessons/:id/reschedule-slots') @Header('Cache-Control', 'no-store')
+  rescheduleSlots(@Req() req: TrainerTmaRequest, @Param('id', new ParseUUIDPipe()) id: string, @Query() query: TrainerTmaRescheduleQuery) { return this.service.rescheduleSlots(req.user, id, query); }
   @Get('schedule') @Header('Cache-Control', 'no-store')
   schedule(@Req() req: TrainerTmaRequest, @Query() query: TrainerTmaScheduleQuery) { return this.service.schedule(req.user, query.date); }
   @Get('admin/schedule') @Header('Cache-Control', 'no-store')

@@ -48,8 +48,10 @@ function rescheduleHarness(options = {}) {
   const updates = [];
   const reads = [];
   const lesson = { id: 'lesson-a', trainerId: 'trainer-a', arenaId: null, status: options.status || 'SCHEDULED',
-    ...interval, bookings: [{ horseId: 'h1', membership: options.membership || null }], arena: null };
+    ...interval, bookings: [{ status: 'scheduled', clientId: 'client', horseId: 'h1', membership: options.membership || null }], arena: null };
   const tx = {
+    booking: { updateMany: async () => ({ count: 1 }) },
+    user: { findMany: async () => [] },
     clubSchedule: { findUnique: async () => schedule },
     horse: { findUnique: async () => ({ name: 'Валдай', maxDailyMinutes: 120, isUnavailable: options.unavailable || false }) },
     lesson: {
@@ -67,7 +69,7 @@ function rescheduleHarness(options = {}) {
   } }, {}) };
 }
 
-test('reschedule excludes itself from conflicts and workload and accepts exact daily limit without modifying bookings or ledger', async () => {
+test('reschedule excludes itself from conflicts and workload and accepts exact daily limit while synchronizing booking times without charging the ledger', async () => {
   const harness = rescheduleHarness();
   const result = await harness.service.rescheduleLesson('lesson-a', '2026-10-08T09:00:00Z', 60);
   assert.equal(result.endTime.toISOString(), '2026-10-08T10:00:00.000Z');

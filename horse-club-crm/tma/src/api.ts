@@ -17,7 +17,7 @@ export interface ClientDashboard { client?: ClientOverview['client']; bookings?:
 export type BootstrapResponse = { role: 'CLIENT'; token: string | null; clientId: string | null; clientName: string | null;
   activeMembership: Membership | null; nextLesson: Booking | null } | { role: 'UNLINKED_CLIENT'; needsPhoneLink: true } | { role: 'ADMIN' | 'TRAINER' | 'STAFF' };
 export interface Booking {
-  id: string; canCancel?: boolean; canConfirm?: boolean; horse?: { name: string } | null; startTime: string; endTime: string; status: string; clientConfirmed: boolean;
+  id: string; canCancel?: boolean; canConfirm?: boolean; canReschedule?: boolean; horse?: { name: string } | null; startTime: string; endTime: string; status: string; clientConfirmed: boolean;
   clientCancellationRequested: boolean; costAmount: string; trainer?: { name?: string } | null;
   lesson?: { status: string; deletedAt: string | null; startTime: string; endTime: string; service?: { title?: string; name?: string } | null } | null;
 }

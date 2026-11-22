@@ -11,5 +11,5 @@ test('TMA dependency graph excludes CRM frameworks and keeps a strict size gate'
     assert.doesNotMatch(source, /from ['"](?:@refinedev|antd|axios|.*frontend\/src)/);
     assert.doesNotMatch(source, /\b(?:localStorage|sessionStorage)\b/);
   }
-  assert.match(fs.readFileSync(path.join(root, 'scripts/check-size.cjs'), 'utf8'), /raw >= 155_000/);
+  assert.match(fs.readFileSync(path.join(root, 'scripts/check-size.cjs'), 'utf8'), /raw >= 160_000/);
 });

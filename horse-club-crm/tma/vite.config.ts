@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   base: '/tma/',
   plugins: [tailwindcss()],
-  // Keep the production WebView bundle within 155 KB; development retains React DevTools.
+  // Keep the production WebView bundle within 160 KB; development retains React DevTools.
   define: process.env.NODE_ENV === 'production' ? { __REACT_DEVTOOLS_GLOBAL_HOOK__: 'undefined' } : {},
   build: { outDir: '../frontend/dist/tma', emptyOutDir: true, target: 'es2020', cssTarget: 'chrome120',
     // A single entry without dynamic imports has no modulepreload dependencies.

@@ -1,4 +1,5 @@
 import { CancelServiceDto } from '../payments/dto/cancel-service.dto';
+import { TrainerTmaRescheduleDto, TrainerTmaRescheduleQuery, TrainerTmaStatusDto } from '../modules/telegram-bot/trainer-tma.dto';
 import { TrainerStatusDto } from '../workspace/workspace.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
@@ -7,6 +8,7 @@ import { PayWithMembershipDto } from './dto/pay-with-membership.dto';
 import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import {
   Body,
+  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -57,6 +59,31 @@ export function trainerLessonView(lesson: LessonDetails, actor: AuthUser) {
 @Controller('lessons')
 export class LessonsController {
   constructor(private readonly lessonsService: LessonsService) {}
+
+  @Get(':id/management-details')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  managementDetails(@Param('id', new ParseUUIDPipe()) id: string, @CurrentUser() actor: AuthUser) { return this.lessonsService.lessonManagementDetails(id, actor); }
+
+  @Patch(':id/scheduled-reschedule')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  async moveScheduled(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: TrainerTmaRescheduleDto, @CurrentUser() actor: AuthUser) {
+    const row = await this.lessonsService.moveScheduledLesson(id, dto, actor);
+    return { id: row.id, startTime: row.startTime };
+  }
+
+  @Get(':id/reschedule-slots')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  slots(@Param('id', new ParseUUIDPipe()) id: string, @Query() query: TrainerTmaRescheduleQuery, @CurrentUser() actor: AuthUser) {
+    return this.lessonsService.rescheduleSlots(id, query, actor);
+  }
+
+  @Patch(':id/scheduled-cancel')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.TRAINER)
+  async cancelScheduled(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: TrainerTmaStatusDto, @CurrentUser() actor: AuthUser) {
+    if (dto.status !== 'CANCELLED') throw new BadRequestException('Выберите отмену занятия');
+    const row = await this.lessonsService.updateLessonStatus(id, 'CANCELLED', {}, actor, { reason: dto.reason }, undefined, undefined, true);
+    return { id: row.id, status: row.status };
+  }
 
   @Patch(':id/trainer-status')
   @Roles(Role.TRAINER)

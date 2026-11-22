@@ -16,7 +16,7 @@
 .trainer-tma .trainer-workspace { min-height: 0; padding: 0; }
 .trainer-header, .trainer-day, .trainer-gate { max-width: 600px; margin: 0 auto; }
 .trainer-gate { padding-top: 15vh; display: grid; gap: 24px; }
-.trainer-tma h1 { margin: 8px 0 24px; font-size: clamp(26px, 6vw, 34px); line-height: 1.2; overflow-wrap: anywhere; }
+.trainer-tma h1 { margin: 8px 0 24px; font-size: clamp(26px, 6vw, 34px); line-height: 1.4; overflow-wrap: anywhere; }
 .trainer-tma h2 { font-size: 17px; margin: 0; line-height: 1.4; }
 .trainer-tma h3 { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
 .trainer-tma p { margin: 8px 0; overflow-wrap: anywhere; }

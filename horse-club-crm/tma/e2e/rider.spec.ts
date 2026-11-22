@@ -28,7 +28,7 @@ async function setup(page: Page, delayed = false) {
   }, { delayed });
   let confirmed = false, cancelled = false, fail = false, creates = 0, confirms = 0, cancels = 0;
   const row = () => ({ id, startTime: start, endTime: start, status: cancelled ? 'cancelled_client' : 'scheduled', clientConfirmed: confirmed,
-    canCancel: !cancelled, canConfirm: !confirmed && !cancelled, trainer: { name: 'Мария Тренер' }, horse: { name: 'Гром' },
+    canCancel: !cancelled, canReschedule: !cancelled, canConfirm: !confirmed && !cancelled, trainer: { name: 'Мария Тренер' }, horse: { name: 'Гром' },
     lesson: { status: cancelled ? 'CANCELLED' : 'SCHEDULED', deletedAt: null, startTime: start, endTime: start, service: { title: 'Индивидуальная тренировка' } } });
   await page.route('**/api/tma/**', async route => {
     const path = new URL(route.request().url()).pathname;
@@ -60,6 +60,35 @@ async function advance(page: Page) {
 async function noOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 }
+
+test('client reschedules with native date/time controls, preserves selection after conflict and recovers from empty slots', async ({ page }) => {
+  await setup(page);
+  let empty = true, conflict = true, moves = 0;
+  await page.route('**/api/tma/client/lessons/*/reschedule-slots?*', route => route.fulfill({ json: { slots: empty ? [] : [{ startTime: '12:30', available: true }] } }));
+  await page.route('**/api/tma/client/lessons/*/reschedule', route => {
+    moves++;
+    expect(route.request().postDataJSON()).toMatchObject({ startTime: '12:30' });
+    expect(route.request().headers().authorization).toBe('Bearer client-only-session');
+    return route.fulfill(conflict ? { status: 409, json: { message: 'Тренер занят. Выберите другое время' } } : { json: { updated: true } });
+  });
+  await page.goto('/tma/');
+  const trigger = page.getByRole('button', { name: 'Перенести', exact: true });
+  await trigger.click();
+  await expect(page.getByText('Свободного времени нет. Выберите другой день.')).toBeVisible();
+  empty = false;
+  await page.getByRole('button', { name: 'Завтра', exact: true }).click();
+  await page.getByLabel('Время по Москве').selectOption('12:30');
+  await page.getByRole('button', { name: 'Подтвердить перенос' }).click();
+  await expect(page.getByRole('alert')).toContainText('Тренер занят');
+  await expect(page.getByLabel('Время по Москве')).toHaveValue('12:30');
+  conflict = false;
+  await noOverflow(page);
+  await page.screenshot({ path: 'test-results/rider-reschedule.png', fullPage: true });
+  await page.getByRole('button', { name: 'Подтвердить перенос' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Занятие перенесено' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Перенос занятия' })).toHaveCount(0);
+  expect(moves).toBe(2);
+});
 
 test('linked rider waits for SDK, sees profile, confirms, cancels and books a slot at 390×844', async ({ page }) => {
   const mock = await setup(page, true);

@@ -48,7 +48,10 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
   const access = { forRole: async () => [{ module: 'SCHEDULE', isEnabled: enabled, accessLevel: level }] };
   const jwt = new JwtService({ secret, signOptions: { algorithm: 'HS256' } });
   const service = new TrainerTmaService(prisma, jwt, access,
-    { updateLessonStatus: async (...args) => mutations.push(['status', ...args]) },
+    { assertLessonManagement: async () => { throw new (require('@nestjs/common').ForbiddenException)('Можно менять только свои занятия'); },
+      moveScheduledLesson: async (lessonId, dto, actor) => { mutations.push(['reschedule', lessonId, dto, actor]); return { id: lessonId, startTime: dto.startTime }; },
+      rescheduleSlots: async () => ({ slots: [{ startTime: '12:00', available: true }] }),
+      updateLessonStatus: async (...args) => mutations.push(['status', ...args]) },
     { replaceHorse: async (...args) => mutations.push(['horse', ...args]) },
     { dashboard: async clientId => {
       assert.equal(clientId, id);
@@ -200,6 +203,22 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
       await patch(`${id}/horse`, { horseId }).expect(403); assert.equal(mutations.length, writes);
       level = 'HIDDEN'; await get('schedule?date=2026-11-11').expect(403);
       level = 'FULL'; enabled = false; await get('horses').expect(403);
+    });
+    await t.test('reschedule HTTP validates date/time and optional UUIDs, strips empty IDs and enforces module permissions', async () => {
+      enabled = true; level = 'FULL';
+      await patch(`${id}/reschedule`, { date: '2026-11-11', startTime: '24:00' }).expect(400);
+      await patch(`${id}/reschedule`, { date: 'bad', startTime: '12:00' }).expect(400);
+      await patch(`${id}/reschedule`, { date: '2026-11-11', startTime: '12:00', horseId: 'bad' }).expect(400);
+      await patch(`bad/reschedule`, { date: '2026-11-11', startTime: '12:00' }).expect(400);
+      await patch(`${id}/reschedule`, { date: '2026-11-11', startTime: '12:00', horseId: '', trainerId: '' }).expect(200);
+      assert.equal(mutations.at(-1)[0], 'reschedule');
+      assert.equal(mutations.at(-1)[2].horseId, undefined);
+      await get(`lessons/${id}/reschedule-slots?date=2026-11-11`).expect(200);
+      const count = mutations.length;
+      level = 'READ_ONLY';
+      await patch(`${id}/reschedule`, { date: '2026-11-11', startTime: '12:00' }).expect(403);
+      assert.equal(mutations.length, count);
+      level = 'HIDDEN'; await get(`lessons/${id}/reschedule-slots?date=2026-11-11`).expect(403);
     });
   } finally { await app.close(); if (previous === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = previous; }
 });

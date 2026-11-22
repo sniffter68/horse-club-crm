@@ -105,7 +105,8 @@ export class BookingRulesService {
       for (let day = firstDay; day <= lastDay; day = day.plus({ days: 1 })) {
         const dayStart = day.toJSDate(), dayEnd = day.plus({ days: 1 }).toJSDate();
         const minutes = (work.reduce((sum, r) => sum + intersection(r.start, r.end, dayStart, dayEnd), 0) + intersection(start, end, dayStart, dayEnd)) / MINUTE;
-        if (minutes > horse.maxDailyWorkloadMinutes) throw new BookingValidationError('HORSE_OVERLOADED', 'Превышен суточный лимит нагрузки лошади', { horseId: horse.id, date: day.toISODate(), workloadMinutes: minutes, limitMinutes: horse.maxDailyWorkloadMinutes });
+        const limitMinutes = Math.min(horse.maxDailyMinutes ?? horse.maxDailyWorkloadMinutes, horse.maxDailyWorkloadMinutes);
+        if (minutes > limitMinutes) throw new BookingValidationError('HORSE_OVERLOADED', 'Превышен суточный лимит нагрузки лошади', { horseId: horse.id, date: day.toISODate(), workloadMinutes: minutes, limitMinutes });
       }
       const rest = horse.requiredRestMinutes * MINUTE;
       if (work.some(r => overlaps(r.start, r.end, new Date(+start - rest), new Date(+end + rest)))) {
