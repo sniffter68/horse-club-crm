@@ -263,6 +263,50 @@ test('empty API root keeps the Telegram default and polling failure is handled w
   }
 });
 
+test('bot start, help and text menus route staff and clients to their respective Mini Apps', async t => {
+  const { Api, Bot } = require('grammy');
+  const names = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_WEBAPP_URL'];
+  const previous = names.map(name => [name, process.env[name]]);
+  process.env.TELEGRAM_BOT_TOKEN = token;
+  let bot, role = 'client';
+  const replies = [];
+  t.mock.method(Api.prototype, 'deleteWebhook', async () => true);
+  t.mock.method(Api.prototype, 'setChatMenuButton', async () => true);
+  t.mock.method(Bot.prototype, 'init', async function () {
+    this.botInfo = { id: 1, is_bot: true, first_name: 'Club', username: 'club_bot' };
+  });
+  t.mock.method(Bot.prototype, 'start', async function () { bot = this; });
+  let service;
+  try {
+    for (const base of ['https://example.test', 'https://example.test/tma', 'https://example.test/tma/trainer?old=1#old']) {
+      process.env.TELEGRAM_WEBAPP_URL = base;
+      service = new TelegramBotService({ bindUsername: async () => {} }, { identity: async () => role });
+      await service.onModuleInit();
+      await new Promise(resolve => setImmediate(resolve));
+      bot.api.config.use(async (_previous, method, payload) => {
+        assert.equal(method, 'sendMessage'); replies.push(payload);
+        return { ok: true, result: { message_id: 1 } };
+      });
+      for (role of ['admin', 'trainer', 'staff', 'client']) {
+        for (const text of ['/start', '/help', 'menu']) {
+          await bot.handleUpdate({ update_id: 1, message: { message_id: 1, date: 1,
+            chat: { id: 123, type: 'private' }, from: { id: 123, is_bot: false, first_name: 'Test' }, text,
+            ...(text.startsWith('/') ? { entities: [{ type: 'bot_command', offset: 0, length: text.length }] } : {}) } });
+          const markup = replies.at(-1).reply_markup;
+          const keyboard = typeof markup === 'string' ? JSON.parse(markup) : markup;
+          assert.equal(keyboard.inline_keyboard[0][0].web_app.url, `https://example.test${role === 'client' ? '/tma' : '/tma/trainer'}`);
+        }
+      }
+      await service.onModuleDestroy();
+    }
+  } finally {
+    await service?.onModuleDestroy();
+    for (const [name, value] of previous) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+  }
+});
+
 test('HTTP routes require signed Telegram auth, reject invalid UUIDs, staff fields and consent coercion', async () => {
   const { Test } = require('@nestjs/testing');
   const { ValidationPipe } = require('@nestjs/common');

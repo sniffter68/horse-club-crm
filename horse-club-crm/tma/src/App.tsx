@@ -3,7 +3,7 @@ import { api, setClientSession, dateTime, money, moscowDate, requireUuid, time, 
 import { ClientDashboardView } from './ClientDashboardView';
 import { ClientBookingCatalog } from './ClientBookingCatalog';
 import type { BootstrapResponse, ClientDashboard, ClientOverview } from './api';
-import { applyTheme, waitForTelegram, canRequestContact, haptic, telegram, withTelegram } from './telegram';
+import { applyTheme, waitForTelegram, canRequestContact, haptic, telegram, telegramRequiredError, withTelegram } from './telegram';
 import { useTelegramNavigation } from './useTelegramNavigation';
 
 const _h = React.createElement;
@@ -37,6 +37,7 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [staffUrl, setStaffUrl] = useState('');
   const [retry, setRetry] = useState(0);
   const submitting = useRef(false);
   const requestId = useRef('');
@@ -47,6 +48,8 @@ export function App() {
   const native = Boolean(tg?.initData);
   const validPhone = /^\+7\d{10}$/.test(phone.replace(/[\s()-]/g, ''));
   const slotServiceId = screen === 'slots' ? service?.id : undefined;
+  const refresh = () => setRetry(value => value + 1);
+  const reportError = (failure: unknown) => setError(errorText(failure));
 
 
   useEffect(() => {
@@ -75,13 +78,14 @@ export function App() {
 
   useEffect(() => {
     const controller = new AbortController();
+    const reportFailure = (failure: unknown) => { if (!controller.signal.aborted) reportError(failure); };
     if (!['loading', 'dashboard', 'catalog', 'slots'].includes(screen)) return;
     setLoading(true); setError('');
     if (screen === 'loading' || screen === 'dashboard') {
       const loadDashboard = async () => {
         const app = await waitForTelegram(controller.signal);
         controller.signal.throwIfAborted();
-        if (!app?.initData) throw new Error('Откройте запись через Telegram-бота');
+        if (!app?.initData) throw telegramRequiredError();
         const bootstrap = screen === 'loading' ? await api<BootstrapResponse>('bootstrap', {
           method: 'POST', body: JSON.stringify({ initData: app.initData }), signal: controller.signal,
         }) : undefined;
@@ -89,15 +93,21 @@ export function App() {
           setClientSession(null); setLinked(false); setScreen('link');
           return undefined;
         }
-        if (bootstrap && bootstrap.role !== 'CLIENT') throw new Error('Кабинет персонала: /tma/trainer');
-        if (bootstrap?.role === 'CLIENT') { setClientSession(bootstrap.token ?? null); setLinked(Boolean(bootstrap.clientId)); }
-        const isLinked = bootstrap?.role === 'CLIENT' ? Boolean(bootstrap.clientId) : linked;
+        if (bootstrap && bootstrap.role !== 'CLIENT') {
+          // Telegram's SDK reads the signed launch parameters again in the separate staff bundle.
+          const target = `/tma/trainer${window.location.search}${window.location.hash}`;
+          setStaffUrl(target);
+          window.location.replace(target);
+          return undefined;
+        }
+        if (bootstrap) { setClientSession(bootstrap.token); setLinked(Boolean(bootstrap.clientId)); }
+        const isLinked = bootstrap ? Boolean(bootstrap.clientId) : linked;
         let result: ClientDashboard;
         if (isLinked) {
           const overview = await api<ClientOverview>('client/overview', { signal: controller.signal });
           result = { ...overview, isEstablished: true, nextBooking: overview.bookings.find(item => upcoming(item)) ?? null };
         } else result = await api<ClientDashboard>('dashboard', { signal: controller.signal });
-        return { result, linked: bootstrap?.role === 'CLIENT' && Boolean(bootstrap.clientId) };
+        return { result, linked: isLinked };
       };
       loadDashboard()
         .then(data => {
@@ -109,18 +119,18 @@ export function App() {
           setHome(target);
           if (screen === 'loading') setScreen(target);
         })
-        .catch((failure: unknown) => { if (!controller.signal.aborted) setError(errorText(failure)); })
+        .catch(reportFailure)
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     } else if (screen === 'catalog') {
       api<{ services: Service[]; consentVersion: string }>('services', { signal: controller.signal })
         .then(result => { setServices(result.services); setConsentVersion(result.consentVersion); })
-        .catch((failure: unknown) => { if (!controller.signal.aborted) setError(errorText(failure)); })
+        .catch(reportFailure)
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     } else if (slotServiceId) {
       setSlots([]); setSlot(undefined); setTrainerId('');
       api<{ slots: Slot[] }>(`slots?date=${day}&serviceId=${requireUuid(slotServiceId)}`, { signal: controller.signal })
         .then(result => { if (!controller.signal.aborted) setSlots(result.slots); })
-        .catch((failure: unknown) => { if (!controller.signal.aborted) setError(errorText(failure)); })
+        .catch(reportFailure)
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     }
     return () => controller.abort();
@@ -174,12 +184,14 @@ export function App() {
         lesson: result?.lesson ? { ...result.lesson, service: result.lesson.service ?? service } : {
           status: 'SCHEDULED', deletedAt: null, startTime: slot.startTime, endTime: slot.endTime, service,
         } }); setScreen('success');
-    } catch (failure: unknown) { setError(errorText(failure)); }
+    } catch (failure: unknown) { reportError(failure); }
     finally { submitting.current = false; setBusy(false); }
   }
 
   if (screen === 'loading') return <main className="mx-auto max-w-xl px-5" aria-busy={!error}>
-    {error ? <div role="alert"><h1>Не удалось открыть кабинет</h1><p>{error}</p><button className="primary mt-4" onClick={() => setRetry(value => value + 1)}>Повторить</button></div>
+    {error ? <div role="alert"><h1>Не удалось открыть кабинет</h1><p>{error}</p>
+      {staffUrl ? <a className="primary mt-4" href={staffUrl}>Открыть кабинет персонала</a>
+        : <button className="primary mt-4" onClick={refresh}>Повторить</button>}</div>
       : <p role="status">Загружаем личный кабинет…</p>}
   </main>;
   if (screen === 'link') return <main className="mx-auto max-w-xl px-5">
@@ -188,7 +200,7 @@ export function App() {
       if (submitting.current) return;
       submitting.current = true; setBusy(true); setError('');
       try { await api('client/request-contact', { method: 'POST' }); setContactNotice('Отправьте свой контакт в чат бота.'); }
-      catch (failure: unknown) { setError(errorText(failure)); }
+      catch (failure: unknown) { reportError(failure); }
       finally { submitting.current = false; setBusy(false); }
     }}>Привязать по телефону</button>
     <p role="status">{contactNotice}</p>{error && <p role="alert">{error}</p>}
@@ -203,7 +215,7 @@ export function App() {
     {back && !native && <button className="quiet mb-4" disabled={busy} onClick={back}>← Назад</button>}
     <p className="eyebrow">{screen === 'catalog' ? 'В седле — ближе к природе' : screen === 'slots' ? 'Шаг 2 из 3' : screen === 'checkout' ? 'Шаг 3 из 3' : 'КСК «СЛКС»'}</p>
     <h1 ref={heading} tabIndex={-1}>{titles[screen]}</h1>
-    {screen === 'dashboard' && dashboard && <ClientDashboardView data={dashboard} onBook={newBooking} onRefresh={() => setRetry(value => value + 1)} />}
+    {screen === 'dashboard' && dashboard && <ClientDashboardView data={dashboard} onBook={newBooking} onRefresh={refresh} />}
     {screen === 'catalog' && <ClientBookingCatalog services={services} serviceId={service?.id} format={format}
       loading={loading} error={error} onFormat={value => { setFormat(value); setService(undefined); }} onSelect={setService} />}
     {screen === 'slots' && <>
@@ -247,7 +259,7 @@ export function App() {
     </section>}
     {screen === 'my-bookings' && <MyBookings onBook={newBooking} />}
     <div className="feedback" aria-live="polite">{loading && <p role="status">{screen === 'dashboard' ? 'Загружаем личный кабинет…' : 'Проверяем свободные места…'}</p>}
-      {error && <div role="alert"><p>{error}</p>{screen !== 'checkout' && <button className="quiet mt-2" onClick={() => setRetry(value => value + 1)}>Повторить загрузку</button>}</div>}
+      {error && <div role="alert"><p>{error}</p>{screen !== 'checkout' && <button className="quiet mt-2" onClick={refresh}>Повторить загрузку</button>}</div>}
     </div>
     {text && !native && <button className="primary w-full" disabled={!enabled} onClick={next}>{busy ? 'Сохраняем запись…' : text}</button>}
     <footer className="hint mt-4"><p>{ADDRESS}</p><a href="tel:+79156720030">+7 (915) 672-00-30</a></footer>

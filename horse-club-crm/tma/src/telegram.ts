@@ -23,6 +23,7 @@ export interface TelegramWebApp {
 }
 declare global { interface Window { Telegram?: { WebApp: TelegramWebApp } } }
 export const telegram = (): TelegramWebApp | undefined => typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
+export const telegramRequiredError = (): Error => new Error('Откройте запись через Telegram-бота');
 
 // Native bridge methods may exist but throw on older Telegram clients.
 export function withTelegram(action: (app: TelegramWebApp) => void): void {

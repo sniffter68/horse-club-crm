@@ -80,7 +80,6 @@ export class TrainerTmaService {
   async authenticate(initData: string) {
     const result = await this.bootstrap(initData);
     if (result.role === TmaRole.CLIENT || result.role === TmaRole.UNLINKED_CLIENT) return { authenticated: false as const, reason: 'NOT_LINKED' as const };
-    if (!result.trainerId) throw new ForbiddenException('Карточка тренера не привязана');
     return { authenticated: true as const, access_token: result.token,
       trainer: { trainerId: result.trainerId, name: result.user.name }, accessLevel: result.accessLevel };
   }

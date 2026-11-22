@@ -108,6 +108,28 @@ test('trainer TMA HTTP: signed auth, scoped JWT, ownership, DTO, dates, RBAC and
     linked = true;
   });
   try {
+    await t.test('ADMIN and staff authenticate without a trainer card and retain role permissions', async () => {
+      const trainer = user.trainer;
+      user.trainer = null; user.trainerId = null;
+      try {
+        for (const [role, accessLevel, bootstrapRole] of [['ADMIN', 'FULL', 'ADMIN'], ['MANAGER', 'READ_ONLY', 'STAFF'], ['STABLE_WORKER', 'FULL', 'STAFF']]) {
+          user.role = role; level = accessLevel;
+          const bootstrap = await api.post('/api/tma/bootstrap').send({ initData: signed() }).expect(200);
+          assert.equal(bootstrap.body.role, bootstrapRole);
+          assert.equal(bootstrap.body.trainerId, null);
+          assert.equal(bootstrap.body.accessLevel, accessLevel);
+          const result = await api.post('/api/tma/auth').send({ initData: signed() }).expect(201);
+          assert.equal(result.body.authenticated, true);
+          assert.equal(result.body.trainer.trainerId, null);
+          assert.equal(result.body.accessLevel, accessLevel);
+          assert.equal((await service.session(result.body.access_token)).role, role);
+        }
+        user.role = 'MANAGER'; level = 'HIDDEN';
+        await api.post('/api/tma/auth').send({ initData: signed() }).expect(403);
+        user.role = 'TRAINER'; level = 'FULL';
+        await api.post('/api/tma/auth').send({ initData: signed() }).expect(403);
+      } finally { user.role = 'TRAINER'; user.trainer = trainer; user.trainerId = trainerId; level = 'FULL'; }
+    });
     await t.test('auth rejects forged, expired, duplicate and invalid payloads before lookup', async () => {
       for (const initData of ['bad', signed() + '&user=forged', signed({ auth_date: '1' }), signed({ auth_date: String(Math.floor(Date.now() / 1000) + 100) })])
         await api.post('/api/tma/auth').send({ initData }).expect(401);

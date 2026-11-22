@@ -1,4 +1,4 @@
-import { telegram } from './telegram';
+import { telegram, telegramRequiredError } from './telegram';
 
 const ZONE = 'Europe/Moscow';
 
@@ -32,7 +32,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
 let renewal: Promise<BootstrapResponse> | undefined;
 async function request<T>(path: string, options: RequestInit, retry: boolean): Promise<T> {
   const initData = telegram()?.initData;
-  if (!initData && !sessionToken) throw new Error('Откройте запись через Telegram-бота');
+  if (!initData && !sessionToken) throw telegramRequiredError();
   const response = await fetch(`/api/tma/${path}`, { ...options, credentials: 'omit', cache: 'no-store',
     signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
     headers: { 'Content-Type': 'application/json', ...options.headers, Authorization: sessionToken && path !== 'bootstrap' ? `Bearer ${sessionToken}` : `tma ${initData}`, ...(initData ? { 'X-Telegram-Init-Data': initData } : {}) } });

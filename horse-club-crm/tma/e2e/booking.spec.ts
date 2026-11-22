@@ -48,6 +48,23 @@ async function advance(page: Page) {
   await page.evaluate(() => window.__tmaTest.main());
 }
 
+for (const role of ['ADMIN', 'TRAINER', 'STAFF'] as const) {
+  test(`${role} redirects to staff Mini App with Telegram launch parameters`, async ({ page }) => {
+    await setup(page);
+    await page.route('**/api/tma/bootstrap', route => route.fulfill({ json: { role } }));
+    await page.route('**/tma/trainer?**', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: '<h1>Кабинет персонала</h1>' }));
+    const clientRequests: string[] = [];
+    page.on('request', request => {
+      if (/\/api\/tma\/(dashboard|client\/overview|services)$/.test(request.url())) clientRequests.push(request.url());
+    });
+    const launch = '?tgWebAppStartParam=schedule#tgWebAppData=signed-data-test&tgWebAppVersion=8.0';
+    await page.goto(`/tma/${launch}`);
+    await expect(page).toHaveURL(`http://127.0.0.1:5175/tma/trainer${launch}`);
+    await expect(page.getByRole('heading', { name: 'Кабинет персонала' })).toBeVisible();
+    expect(clientRequests).toEqual([]);
+  });
+}
+
 test('linked client opens dashboard despite empty profile classification and returns home after booking', async ({ page }) => {
   await setup(page);
   await page.route('**/api/tma/bootstrap', route => route.fulfill({ json: { role: 'CLIENT', clientId: serviceId } }));
