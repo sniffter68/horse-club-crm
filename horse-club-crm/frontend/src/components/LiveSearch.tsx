@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { AutoComplete, Button, Input, Typography, type InputRef } from 'antd'
+import { AutoComplete, Button, Input, Typography, type InputProps, type InputRef } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
 import { matchRange, type SearchSuggestion } from './searchText'
 
@@ -8,7 +8,7 @@ export function SearchHighlight({ text, query }: { text: string; query: string }
   return range ? <>{text.slice(0, range[0])}<mark>{text.slice(...range)}</mark>{text.slice(range[1])}</> : <>{text}</>
 }
 
-interface Props {
+interface Props extends Pick<InputProps, 'aria-invalid' | 'aria-describedby' | 'aria-labelledby' | 'onBlur'> {
   value?: string
   onChange?: (value: string) => void
   onSearch: (value: string) => void
@@ -21,7 +21,7 @@ interface Props {
   'aria-label'?: string
 }
 
-export function LiveSearch({ value = '', onChange, onSearch, suggestions = [], onSelectSuggestion, loading, placeholder = 'Поиск', style, id, 'aria-label': ariaLabel = 'Поиск' }: Props) {
+export function LiveSearch({ value = '', onChange, onSearch, suggestions = [], onSelectSuggestion, loading, placeholder = 'Поиск', style, id, 'aria-label': ariaLabel = 'Поиск', ...inputProps }: Props) {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const composing = useRef(false)
   const input = useRef<InputRef>(null)
@@ -53,7 +53,7 @@ export function LiveSearch({ value = '', onChange, onSearch, suggestions = [], o
     value: item.id,
     label: <div><SearchHighlight text={item.text} query={value} />{item.detail && <><br /><Typography.Text type="secondary"><SearchHighlight text={item.detail} query={value} /></Typography.Text></>}</div>,
   }))
-  return <AutoComplete style={{ width: '100%', ...style }} value={value} options={options} filterOption={false}
+  return <AutoComplete id={id} style={{ width: '100%', ...style }} value={value} options={options} filterOption={false}
     onInputKeyDown={event => {
       if (event.key === 'Tab' && !event.shiftKey && value) {
         event.preventDefault(); event.stopPropagation(); requestAnimationFrame(() => clearButton.current?.focus())
@@ -67,7 +67,7 @@ export function LiveSearch({ value = '', onChange, onSearch, suggestions = [], o
       if (!item) return
       cancel(); latestValue.current = item.text; onChange?.(item.text); commit(item.text); onSelectSuggestion?.(id)
     }} notFoundContent={pending || loading ? 'Поиск…' : 'Совпадений нет'}>
-    <Input ref={input} id={id} aria-label={ariaLabel} placeholder={placeholder} prefix={<SearchOutlined />}
+    <Input {...inputProps} ref={input} id={id} aria-label={ariaLabel} placeholder={placeholder} prefix={<SearchOutlined />}
       suffix={value ? <Button ref={clearButton} type="text" size="small" aria-label="Очистить поиск" onKeyDown={event => event.stopPropagation()} onClick={() => {
         composing.current = false; latestValue.current = ''; onChange?.(''); commit(''); input.current?.focus()
       }}>×</Button> : <span />}

@@ -1,0 +1,74 @@
+
+Running 2 tests using 1 worker
+
+(node:52004) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1/2] [mock] › frontend\e2e\live-search.spec.ts:4:36 › live clients search at 1280px
+  1) [mock] › frontend\e2e\live-search.spec.ts:4:36 › live clients search at 1280px ────────────────
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('dialog', { name: 'Карточка клиента' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByRole('dialog', { name: 'Карточка клиента' }) with timeout 5000ms
+      - waiting for getByRole('dialog', { name: 'Карточка клиента' })
+
+
+      80 |     } else await page.locator('.ant-select-item-option:visible').filter({ hasText: 'Анна' }).click()
+      81 |     const title = resource === 'clients' ? 'Карточка клиента' : resource === 'horses' ? 'Карточка лошади' : 'Карточка тренера'
+    > 82 |     await expect(page.getByRole('dialog', { name: title })).toBeVisible()
+         |                                                             ^
+      83 |     await expect(input).toHaveValue('Анна')
+      84 |   })
+      85 | }
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\live-search.spec.ts:82:61
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\ui-audit-baseline\live-search-live-clients-search-at-1280px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\ui-audit-baseline\live-search-live-clients-search-at-1280px-mock\error-context.md
+
+
+(node:41264) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[2/2] [mock] › frontend\e2e\live-search.spec.ts:4:36 › live clients search at 390px
+  2) [mock] › frontend\e2e\live-search.spec.ts:4:36 › live clients search at 390px ─────────────────
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('dialog', { name: 'Карточка клиента' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByRole('dialog', { name: 'Карточка клиента' }) with timeout 5000ms
+      - waiting for getByRole('dialog', { name: 'Карточка клиента' })
+
+
+      80 |     } else await page.locator('.ant-select-item-option:visible').filter({ hasText: 'Анна' }).click()
+      81 |     const title = resource === 'clients' ? 'Карточка клиента' : resource === 'horses' ? 'Карточка лошади' : 'Карточка тренера'
+    > 82 |     await expect(page.getByRole('dialog', { name: title })).toBeVisible()
+         |                                                             ^
+      83 |     await expect(input).toHaveValue('Анна')
+      84 |   })
+      85 | }
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\live-search.spec.ts:82:61
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\ui-audit-baseline\live-search-live-clients-search-at-390px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\ui-audit-baseline\live-search-live-clients-search-at-390px-mock\error-context.md
+
+
+  2 failed
+    [mock] › frontend\e2e\live-search.spec.ts:4:36 › live clients search at 1280px ─────────────────
+    [mock] › frontend\e2e\live-search.spec.ts:4:36 › live clients search at 390px ──────────────────

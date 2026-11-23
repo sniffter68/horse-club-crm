@@ -78,9 +78,9 @@ const clientName = (booking: DashboardAlertBooking): string =>
   booking.client.id
 
 function workloadColor(percent: number): string {
-  if (percent >= 100) return '#8C3838'
-  if (percent >= 75) return '#8C6527'
-  return '#3E5F48'
+  if (percent >= 100) return 'var(--crm-danger)'
+  if (percent >= 75) return 'var(--crm-warning)'
+  return 'var(--crm-success)'
 }
 
 export function DashboardPage() {

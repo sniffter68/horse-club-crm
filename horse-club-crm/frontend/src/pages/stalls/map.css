@@ -24,8 +24,8 @@
 .stall-tile-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .stall-tile--maintenance, .stall-tile--quarantine { border-style: dashed; }
 .stall-horse-name { font-family: Georgia, serif; font-size: 24px; }
-.stall-passage { display: grid; place-items: center; background: var(--crm-alabaster); border-inline: 1px dashed var(--crm-border); color: var(--crm-saddle); font-variant-numeric: tabular-nums; }
-.stall-warning { color: var(--crm-warning, #8c6527); }
+.stall-passage { display: grid; place-items: center; background: var(--crm-alabaster); border-inline: 1px dashed var(--crm-border); color: var(--crm-text-accent); font-variant-numeric: tabular-nums; }
+.stall-warning { color: var(--crm-warning); }
 html[data-theme='dark'] .stall-warning { color: var(--crm-beige); }
 .stall-assignment { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
 .stall-unplaced { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }

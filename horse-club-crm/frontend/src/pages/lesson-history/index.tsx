@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { List as RefineList } from '@refinedev/antd'
 import { Alert, Button, DatePicker, Descriptions, Form, List, Modal, Select, Space, Tag, Typography } from 'antd'
 import type { Dayjs } from 'dayjs'
+import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import type { Arena, Client, Horse, Service, Trainer } from '../catalogs/types'
@@ -153,7 +154,7 @@ export function LessonHistoryPage() {
       <Form<FilterValues> noValidate form={form} layout="vertical" onFinish={applyFilters}>
         <Space align="end" wrap size="middle">
           <Form.Item name="q" label="Поиск"><LiveSearch loading={loading} suggestions={[...catalogs.clients, ...catalogs.horses, ...catalogs.trainers, ...catalogs.services].flatMap(row => { const item = recordSuggestion(row); return item && (matchRange(item.text, searchQuery) || matchRange(item.detail ?? '', searchQuery)) ? [item] : [] })} placeholder="Клиент, телефон, услуга, тренер, лошадь" onSearch={() => form.submit()} style={{ width: 300 }} /></Form.Item>
-          <Form.Item name="period" label="Период"><DatePicker.RangePicker format="DD.MM.YYYY" /></Form.Item>
+          <Form.Item name="period" label="Период"><DatePicker.RangePicker aria-label="Период занятий" locale={ruDatePicker} format="DD.MM.YYYY" /></Form.Item>
           <Form.Item name="status" label="Статус"><Select allowClear placeholder="Все" style={{ width: 180 }} options={Object.entries(statuses).map(([value, item]) => ({ value, label: item.label }))} /></Form.Item>
           <Form.Item name="clientId" label="Клиент"><Select showSearch allowClear optionFilterProp="label" style={{ width: 220 }} options={catalogs.clients.map(row => option(row.id, personName(row)))} /></Form.Item>
           <Form.Item name="trainerId" label="Тренер"><Select showSearch allowClear optionFilterProp="label" style={{ width: 200 }} options={catalogs.trainers.map(row => option(row.id, row.name))} /></Form.Item>
@@ -173,7 +174,7 @@ export function LessonHistoryPage() {
           { key: 'clients', title: 'Клиенты', render: (_: unknown, row) => row.bookings.length ? <Space wrap>{row.bookings.map(booking => <Tag key={booking.id}>{personName(booking.client)}</Tag>)}</Space> : 'Без участников' },
           { key: 'trainer', title: 'Тренер', render: (_: unknown, row) => row.trainer.name },
           { key: 'horses', title: 'Лошади', render: (_: unknown, row) => [...new Set(row.bookings.map(booking => booking.horse?.name).filter(Boolean))].join(', ') || '—' },
-          { key: 'status', title: 'Статус', render: (_: unknown, row) => <Tag className="status-badge" bordered={false} style={{ background: statuses[row.status].background, color: statuses[row.status].text }}>{statuses[row.status].label}</Tag> },
+          { key: 'status', title: 'Статус', render: (_: unknown, row) => <Tag className={`crm-tag crm-tag--${statuses[row.status].badge}`} bordered={false}>{statuses[row.status].label}</Tag> },
           { key: 'actions', title: 'Действия', render: (_: unknown, row) => <Button onClick={() => setSelected(row)}>Открыть</Button> },
         ]} />
     </RefineList>
@@ -183,7 +184,7 @@ export function LessonHistoryPage() {
       {selected && <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Descriptions bordered size="small" column={2} items={[
           { key: 'time', label: 'Дата и время', children: <span className="data-mono">{dateTime(selected.startTime)} — {dateTime(selected.endTime)}</span> },
-          { key: 'status', label: 'Статус', children: <Tag className="status-badge" bordered={false} style={{ background: statuses[selected.status].background, color: statuses[selected.status].text }}>{statuses[selected.status].label}</Tag> },
+          { key: 'status', label: 'Статус', children: <Tag className={`crm-tag crm-tag--${statuses[selected.status].badge}`} bordered={false}>{statuses[selected.status].label}</Tag> },
           { key: 'service', label: 'Услуга', children: selected.service.title || selected.service.name },
           { key: 'trainer', label: 'Тренер', children: selected.trainer.name },
           { key: 'arena', label: 'Манеж', span: 2, children: selected.arena?.name || '—' },

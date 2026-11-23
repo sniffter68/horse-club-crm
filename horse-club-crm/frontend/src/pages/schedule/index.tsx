@@ -305,7 +305,7 @@ export function SchedulePage() {
       <Button onClick={() => { const next = DateTime.fromISO(workloadDate).plus({ days: 1 }).toISODate()!; setWorkloadDate(next); calendarRef.current?.getApi().gotoDate(next) }}>Следующий день</Button></Space>}
     {dayWorkloads.error && <Alert type="error" showIcon message="Не удалось загрузить нагрузку лошадей" description={dayWorkloads.error}
       action={<Button onClick={() => setWorkloadRevision(value => value + 1)}>Повторить</Button>} />}
-    <Space wrap>{Object.entries(statuses).map(([status, item]) => <Tag className="status-badge" bordered={false} key={status} style={{ background: item.background, color: item.text }}>{item.label}</Tag>)}</Space>
+    <Space wrap>{Object.entries(statuses).map(([status, item]) => <Tag className={`crm-tag crm-tag--${item.badge}`} bordered={false} key={status}>{item.label}</Tag>)}</Space>
     <Card className="schedule-calendar"><Spin spinning={loading || triadLoading || (!ready && !error)}>
       {grouping !== 'calendar' && schedule && <ResourceSchedule grouping={grouping} date={workloadDate} schedule={schedule} entries={entries}
         trainers={trainers.filter(t => !trainerId || t.id === trainerId)} horses={horses.filter(h => !horseId || h.id === horseId)} arenas={arenas.filter(a => !arenaId || a.id === arenaId)}
@@ -325,8 +325,8 @@ export function SchedulePage() {
         select={({ start, end, view }) => { openBooking({ startTime: toLocalInput(start) }, Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000))); view.calendar.unselect() }}
         events={entries.map(entry => ({ id: entry.source === 'booking' ? `triad:${entry.id}` : entry.id,
           title: eventSummary(entry), start: entry.startTime, end: entry.endTime,
-          backgroundColor: entry.source === 'lesson' ? statuses[entry.status as Status].event : entry.completed ? '#3E5F48' : entry.active ? '#724C39' : '#8C6527',
-          borderColor: trainers.find(trainer => trainer.id === entry.trainerId)?.scheduleColor || 'transparent', textColor: '#FFFFFF' }))}
+          backgroundColor: entry.source === 'lesson' ? statuses[entry.status as Status].event : entry.completed ? 'var(--crm-success)' : entry.active ? 'var(--crm-saddle)' : 'var(--crm-warning)',
+          borderColor: trainers.find(trainer => trainer.id === entry.trainerId)?.scheduleColor || 'transparent', textColor: 'var(--crm-on-solid)' }))}
         eventContent={({ event }) => {
           const entry = entries.find(item => (item.source === 'booking' ? `triad:${item.id}` : item.id) === event.id)
           return entry ? <ScheduleEventContent entry={entry} /> : null
@@ -373,7 +373,7 @@ export function SchedulePage() {
       {detail && <Space direction="vertical" style={{ width: '100%' }}>
         <LessonGroupBadge lesson={detail} /><LessonGroupSummary lesson={detail} /><LessonPaymentBadge lesson={detail} />
         <LessonDeferredPayment key={detail.id} lesson={detail} onBusyChange={setPaymentBusy} onSaved={updated => { setDetail(updated); setRevision(v => v + 1) }} />
-        <Tag className="status-badge" bordered={false} style={{ background: statuses[detail.status].background, color: statuses[detail.status].text }}>{statuses[detail.status].label}</Tag>
+        <Tag className={`crm-tag crm-tag--${statuses[detail.status].badge}`} bordered={false}>{statuses[detail.status].label}</Tag>
         <Descriptions column={1} items={[
           { key: 'service', label: 'Услуга', children: detail.service.title || detail.service.name },
           { key: 'start', label: 'Начало', children: formatTime(detail.startTime) },

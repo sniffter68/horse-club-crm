@@ -30,7 +30,7 @@ export function HorseWorkloadList({ rows, loading, error, onRefresh }: {
                 </Tag>
               </Space>
               <Progress percent={row.maxDailyWorkloadMinutes > 0 ? Math.min(100, Math.round(row.currentWorkloadMinutes / row.maxDailyWorkloadMinutes * 100)) : 100}
-                showInfo={false} strokeColor={row.status === 'OVERLOADED' ? '#8C3838' : '#724C39'} />
+                showInfo={false} strokeColor={row.status === 'OVERLOADED' ? 'var(--crm-danger)' : 'var(--crm-saddle)'} />
             </div>
           </List.Item>} />
       </Spin>}

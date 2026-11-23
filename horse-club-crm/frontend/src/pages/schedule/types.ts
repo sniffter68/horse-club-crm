@@ -37,9 +37,9 @@ export interface BookingValues {
   cost?: number; prepaymentAmount?: number; prepaymentMethod?: 'CASH' | 'CARD';
   participants: BookingParticipantValues[]; serviceId: string; trainerId: string; arenaId?: string; startTime: string; durationMinutes: number;
 }
-export const statuses: Record<Status, { background: string; text: string; event: string; label: string }> = {
-  SCHEDULED: { background: '#EFECE8', text: '#3A2F2B', event: '#724C39', label: 'Запланировано' },
-  COMPLETED: { background: '#EDF4EF', text: '#3E5F48', event: '#3E5F48', label: 'Проведено' },
-  NO_SHOW: { background: '#FBF4E8', text: '#8C6527', event: '#8C6527', label: 'Неявка' },
-  CANCELLED: { background: '#FBEFEF', text: '#8C3838', event: '#8C3838', label: 'Отменено' },
+export const statuses: Record<Status, { badge: string; event: string; label: string }> = {
+  SCHEDULED: { badge: 'accent', event: 'var(--crm-saddle)', label: 'Запланировано' },
+  COMPLETED: { badge: 'success', event: 'var(--crm-success)', label: 'Проведено' },
+  NO_SHOW: { badge: 'warning', event: 'var(--crm-warning)', label: 'Неявка' },
+  CANCELLED: { badge: 'danger', event: 'var(--crm-danger)', label: 'Отменено' },
 }
