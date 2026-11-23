@@ -8,7 +8,7 @@ import { defaultModuleAccess } from '../settings/module-access.service';
 import { isSerializationFailure } from '../common/serialization-failure';
 import { BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { ArchiveQueryDto } from '../common/dto/archive-query.dto';
+import type { MembershipQueryDto } from './dto/membership-query.dto';
 import { archiveTransaction } from '../common/archive-transaction';
 import { parseRefineQuery, type PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
@@ -52,17 +52,33 @@ export class MembershipsService {
 
   refundQuote(id: string) { return this.prisma.$transaction(tx => serviceRefundQuote(tx, 'memberships', id)).then(({ amount, refundMethod, cancelled }) => ({ amount, refundMethod, cancelled })); }
 
-  async findAll(query: ArchiveQueryDto): Promise<PaginatedResult<MembershipResponse>> {
+  async findAll(query: MembershipQueryDto): Promise<PaginatedResult<MembershipResponse>> {
     const options = parseRefineQuery(query, ['id', 'totalLessons', 'remainedLessons', 'validUntil', 'createdAt', 'updatedAt'], 'createdAt');
     const where: Prisma.MembershipWhereInput = options.search ? {
-      client: { is: { OR: [
+      OR: [{ client: { is: { OR: [
         { name: { contains: options.search, mode: 'insensitive' } },
         { firstName: { contains: options.search, mode: 'insensitive' } },
         { lastName: { contains: options.search, mode: 'insensitive' } },
-      ] } },
+        { phone: { contains: options.search } },
+      ] } } }, { serviceTitle: { contains: options.search, mode: 'insensitive' } },
+      { title: { contains: options.search, mode: 'insensitive' } },
+      { pricingPlan: { name: { contains: options.search, mode: 'insensitive' } } },
+      { service: { title: { contains: options.search, mode: 'insensitive' } } },
+      { service: { name: { contains: options.search, mode: 'insensitive' } } }],
     } : {};
     if (query.archivedOnly) where.deletedAt = { not: null };
     else if (!query.includeArchived) where.deletedAt = null;
+    const today = DateTime.now().setZone('Europe/Moscow').startOf('day').toJSDate();
+    if (query.state === 'archived') { delete where.deletedAt; where.AND = [{ OR: [{ deletedAt: { not: null } }, { cancelledAt: { not: null } }] }]; }
+    else if (query.state) {
+      where.cancelledAt = null;
+      if (query.state === 'active') Object.assign(where, { status: 'active', remainedLessons: { gt: 0 }, validUntil: { gte: today } });
+      if (query.state === 'exhausted') where.remainedLessons = 0;
+      if (query.state === 'expired') where.validUntil = { lt: today };
+    }
+    // Unpaid invoices remain authoritative for deferred sales; sold receipts have no pending invoice.
+    if (query.payment === 'debt') where.payments = { some: { status: 'PENDING', archivedAt: null } };
+    if (query.payment === 'paid') where.payments = { some: { status: 'PAID', archivedAt: null }, none: { status: 'PENDING', archivedAt: null } };
     const orderBy = { [options.sort]: options.order } as Prisma.MembershipOrderByWithRelationInput;
     const [total, data] = await this.prisma.$transaction([
       this.prisma.membership.count({ where }),
@@ -230,6 +246,6 @@ export class MembershipsService {
     return DateTime.now().setZone('Europe/Moscow').plus({ days }).toJSDate();
   }
   private withActive<T extends { remainedLessons: number; validUntil: Date; deletedAt: Date | null; status: string }>(membership: T): T & { isActive: boolean } {
-    return { ...membership, isActive: !membership.deletedAt && membership.status === 'active' && membership.remainedLessons > 0 && membership.validUntil >= new Date() };
+    return { ...membership, isActive: !membership.deletedAt && membership.status === 'active' && membership.remainedLessons > 0 && membership.validUntil >= DateTime.now().setZone('Europe/Moscow').startOf('day').toJSDate() };
   }
 }

@@ -5,6 +5,8 @@ import { CatalogList } from '../catalogs/shared'
 import { dateOnly, dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
 import type { BoardingContract, BoardingContractStatus } from './types'
+import { BoardingCash } from '../cash-desk/BoardingCash'
+import { usePermissions } from '../../modulePermissions'
 
 const statusLabels: Record<BoardingContractStatus, string> = {
   DRAFT: 'Черновик', ACTIVE: 'Активен', SUSPENDED: 'Приостановлен', TERMINATED: 'Завершён', EXPIRED: 'Истёк',
@@ -14,8 +16,10 @@ const statusColors: Record<BoardingContractStatus, string> = {
 }
 
 export function BoardingContractList() {
+  const { canRead } = usePermissions()
   const [selectedId, setSelectedId] = useState<string>()
   return <>
+    {canRead('CASHBOX') && <BoardingCash />}
     <CatalogList<BoardingContract> resource="boarding-contracts" storageKey="horse_crm_boarding_contracts_columns_v1" defaultHiddenColumns={['startsAt', 'endsAt', 'payments']} title="Договоры постоя" columns={[
       { key: 'client', fixed: 'left', width: 180, title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : 'Лошадь клуба'}</CardLink> },
       { key: 'horse', width: 125, dataIndex: ['horse', 'name'], title: 'Лошадь' },

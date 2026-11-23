@@ -9,7 +9,7 @@ import { ArchiveAction } from '../clients/ArchiveAction'
 import { useMemo, useState } from 'react'
 import { CreateButton, List as RefineList, useTable } from '@refinedev/antd'
 import type { HttpError } from '@refinedev/core'
-import { Descriptions, Empty, Form, List, Progress, Space, Tag, Typography } from 'antd'
+import { Button, Descriptions, Empty, Form, List, Progress, Select, Space, Tag, Typography } from 'antd'
 import { money } from '../catalogs/format'
 import type { RelationLesson, RelationPayment } from '../catalogs/types'
 import { dateOnly, dateTime, personName } from '../cards/format'
@@ -39,10 +39,11 @@ export function MembershipList() {
   const canSell = canManage && !access.loading && !access.error && (!access.isEnabled('CASHBOX') || access.canWrite('CASHBOX'))
   const [selectedId, setSelectedId] = useState<string>()
   const [sortConfig, setSortConfig] = useState<SortConfig>({ field: null, order: null })
-  const { tableProps, searchFormProps, tableQuery } = useTable<Membership, HttpError, { q?: string }>({
+  const { tableProps, searchFormProps, tableQuery } = useTable<Membership, HttpError, { q?: string; state?: string; payment?: string }>({
     resource: 'memberships', pagination: { pageSize: 10 },
     sorters: { mode: 'off' },
-    onSearch: ({ q }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' }],
+    onSearch: ({ q, state, payment }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' },
+      { field: 'state', operator: 'eq', value: state }, { field: 'payment', operator: 'eq', value: payment }],
   })
   const sortedMemberships = useMemo(() => sortMemberships(tableProps.dataSource ?? [], sortConfig), [tableProps.dataSource, sortConfig])
   function sortable(field: SortField, label: string): Pick<ConfigurableColumn<Membership>, 'title' | 'label' | 'onHeaderCell'> {
@@ -60,8 +61,17 @@ export function MembershipList() {
   return <>
     <RefineList title="Абонементы" headerButtons={<CreateButton disabled={!canSell}>Продать абонемент</CreateButton>}>
       <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q">
-        <LiveSearch loading={tableQuery.isFetching} suggestions={(tableProps.dataSource ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })} placeholder="Поиск клиента" onSearch={() => searchFormProps.form?.submit()} />
-      </Form.Item></Form>
+        <LiveSearch loading={tableQuery.isFetching} suggestions={(tableProps.dataSource ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })} placeholder="Клиент, телефон или услуга" onSearch={() => searchFormProps.form?.submit()} />
+      </Form.Item>
+        <Form.Item name="state"><Select aria-label="Статус абонемента" placeholder="Все статусы" allowClear style={{ minWidth: 180 }} onChange={() => searchFormProps.form?.submit()} options={[
+          { value: 'active', label: 'Активные' }, { value: 'exhausted', label: 'Закончились' }, { value: 'expired', label: 'Истёк срок' }, { value: 'archived', label: 'Отменённые / Архив' },
+        ]} /></Form.Item>
+        <Form.Item name="payment"><Select aria-label="Оплата абонемента" placeholder="Любая оплата" allowClear style={{ minWidth: 180 }} onChange={() => searchFormProps.form?.submit()} options={[
+          { value: 'paid', label: 'Оплачен' }, { value: 'debt', label: 'Не оплачен / Долг' },
+        ]} /></Form.Item>
+        <Button onClick={() => { searchFormProps.form?.setFieldsValue({ q: '', state: undefined, payment: undefined }); searchFormProps.form?.submit() }}>Сбросить фильтры</Button>
+      </Form>
+      <Typography.Paragraph role="status">Найдено: {tableProps.pagination && tableProps.pagination.total || 0}</Typography.Paragraph>
       <Typography.Paragraph type="secondary">Сортировка по заголовкам применяется к текущей странице.</Typography.Paragraph>
       <ConfigurableTable<Membership> storageKey="horse_crm_memberships_columns_v1" {...tableProps} dataSource={sortedMemberships} rowKey="id" columns={[
         { key: 'client', fixed: 'left', width: 180, ...sortable('client', 'Клиент'), render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : '—'}</CardLink> },

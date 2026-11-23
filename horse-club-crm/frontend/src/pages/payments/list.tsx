@@ -13,6 +13,9 @@ import { dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
 import type { Payment, PaymentStatus } from './types'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
+import { PaymentEditDrawer } from './PaymentEditDrawer'
+import { paymentMethods } from './methods'
+import { BoardingCash } from '../cash-desk/BoardingCash'
 
 const statuses: Record<PaymentStatus, string> = { PENDING: 'Не оплачено', PAID: 'Оплачено', REFUNDED: 'Возвращено', CANCELLED: 'Отменено' }
 const colors: Record<PaymentStatus, string> = { PENDING: 'gold', PAID: 'green', REFUNDED: 'blue', CANCELLED: 'default' }
@@ -32,6 +35,7 @@ export function PaymentList() {
   const [updatingId, setUpdatingId] = useState<string>()
   const [selectedId, setSelectedId] = useState<string>()
   const [collecting, setCollecting] = useState<Payment>()
+  const [editing, setEditing] = useState<Payment>()
   const { mutate: update } = useUpdate()
   const { tableProps, searchFormProps, tableQuery, setCurrentPage } = useTable<Payment, HttpError, { q?: string }>({
     resource: 'payments', pagination: { pageSize: 20 }, sorters: { initial: [{ field: 'createdAt', order: 'desc' }] },
@@ -55,6 +59,7 @@ export function PaymentList() {
       <PeriodClosingButton />
       <Tabs activeKey={cashboxType} onChange={value => setParams(previous => { const next = new URLSearchParams(previous); if (value) next.set('cashboxType', value); else next.delete('cashboxType'); return next })}
         items={[{ key: '', label: 'Все' }, { key: 'MAIN', label: 'Основная касса' }, { key: 'BOARDING', label: 'Касса постоя' }]} />
+      {cashboxType === 'BOARDING' && <BoardingCash />}
       <Alert type="info" showIcon message="Простой внутренний учёт"
         description="Начисления создаются автоматически. Нажмите «Оплачено», когда деньги получены. Кассовые чеки и бухгалтерия ведутся отдельно."
         style={{ marginBottom: 20 }} />
@@ -63,22 +68,24 @@ export function PaymentList() {
         <Button htmlType="submit">Найти</Button>
       </Form>
       {tableQuery.error && <Alert type="error" showIcon message="Не удалось загрузить оплаты" description={tableQuery.error.message} />}
-      <ResponsiveTable<Payment> {...tableProps} rowKey="id" scroll={{ x: 'max-content' }} pagination={{
+      <ResponsiveTable<Payment> {...tableProps} className="crm-entity-table" tableLayout="fixed" size="small" rowKey="id" pagination={{
         ...tableProps.pagination, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showTotal: total => `Всего: ${total}`,
       }} columns={[
         { key: 'client', title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{personName(record.client)}</CardLink> },
         { key: 'source', title: 'Основание', render: (_: unknown, record) => source(record) },
         { key: 'amount', dataIndex: 'amount', title: 'Сумма', sorter: true, render: money },
+        { key: 'method', title: 'Способ оплаты', render: (_: unknown, row) => <Tag color={row.method === 'CASH' ? 'green' : 'blue'}>{paymentMethods.find(item => item.value === row.method)?.label || 'Не указан'}</Tag> },
         { key: 'status', dataIndex: 'status', title: 'Оплата', sorter: true, render: (_: PaymentStatus, record) => <Space>
           <Tag color={colors[record.status]}>{statuses[record.status]}</Tag>
-          {record.cashierId || record.status === 'PAID' ? <Tag>Проведено в кассе</Tag>
-            : record.status === 'PENDING' && <Button disabled={!writable} type="primary" size="small" loading={updatingId === record.id} onClick={() => setPaid(record, true)}>Оплачено</Button>}
+          {record.status === 'PENDING' && <Button disabled={!writable} type="primary" size="small" loading={updatingId === record.id} onClick={() => setPaid(record, true)}>Оплачено</Button>}
         </Space> },
         { key: 'paidAt', dataIndex: 'paidAt', title: 'Дата оплаты', sorter: true, render: dateTime },
+        { key: 'edit', title: 'Действия', render: (_: unknown, row) => writable && row.status === 'PAID' && <Button size="small" onClick={() => setEditing(row)}>Изменить</Button> },
       ]} />
     </List>
     {collecting && <CashDeskPaymentModal variant="drawer" initialClientId={collecting.clientId} initialBookingId={collecting.bookingId || undefined} initialMembershipId={collecting.membershipId || undefined}
       onClose={() => setCollecting(undefined)} onPaid={() => { void tableQuery.refetch() }} />}
+    {editing && <PaymentEditDrawer payment={editing} onClose={() => setEditing(undefined)} onSaved={() => { setEditing(undefined); void tableQuery.refetch() }} />}
     <DetailsModal<Payment> resource="payments" id={selectedId} title="Карточка начисления" onClose={() => setSelectedId(undefined)}>
       {payment => <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} items={[
         { key: 'client', label: 'Клиент', children: personName(payment.client) },

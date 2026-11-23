@@ -38,6 +38,12 @@ export class PaymentsController {
     return data;
   }
 
+  @Get('boarding-cash')
+  boardingCash() { return this.service.boardingCash(); }
+
+  @Get('boarding-options')
+  boardingOptions() { return this.service.boardingOptions(); }
+
   @Post('cash-desk')
   pay(@Body() dto: CashDeskPaymentDto, @Req() req: { user: { id: string } }) { return this.cashDesk.pay(dto, req.user.id); }
 

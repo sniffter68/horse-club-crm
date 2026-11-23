@@ -102,6 +102,8 @@ export class BoardingContractsService {
           ],
         }
       : {};
+    // Rental availability never determines visibility in the boarding module.
+    where.horse = { is: { deletedAt: null } };
     const orderBy = { [options.sort]: options.order } as Prisma.BoardingContractOrderByWithRelationInput;
     const [total, data] = await this.prisma.$transaction([
       this.prisma.boardingContract.count({ where }),

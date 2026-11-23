@@ -771,6 +771,8 @@ enum ExpenseCategory {
 }
 
 model Expense {
+  cashboxType String @default("MAIN") @db.VarChar(16)
+  @@index([cashboxType, date])
   trainerPayout TrainerPayout?
   operationType CashOperationType @default(EXPENSE)
   refundPaymentId String? @unique @db.Uuid

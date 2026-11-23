@@ -57,6 +57,21 @@ describe('Authentication', () => {
   })
 })
 describe('Data provider', () => {
+  it('sends membership filters with server page offsets and clears them', async () => {
+    for (const state of ['active', 'exhausted', 'expired', 'archived', undefined]) {
+      httpClient.defaults.adapter = async config => {
+        const params = new URL(config.url ?? '', 'http://localhost').searchParams
+        expect(params.get('state')).toBe(state ?? null)
+        expect(params.get('payment')).toBe('debt')
+        expect(params.get('_start')).toBe('20')
+        return response(config, [])
+      }
+      await dataProvider.getList({ resource: 'memberships', pagination: { currentPage: 3, pageSize: 10 }, filters: [
+        { field: 'state', operator: 'eq', value: state }, { field: 'payment', operator: 'eq', value: 'debt' },
+      ] })
+    }
+    await expect(dataProvider.getList({ resource: 'memberships', filters: [{ field: 'state', operator: 'eq', value: 'invalid' }] })).rejects.toThrow()
+  })
   it('sends and clears the horse archive filter', async () => {
     for (const value of ['true', 'false', undefined]) {
       httpClient.defaults.adapter = async config => {

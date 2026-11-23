@@ -11,6 +11,7 @@ export async function cashJournal(tx: Prisma.TransactionClient, query: CashJourn
   const ledger = Prisma.sql`WITH movements AS (
     SELECT 'payment:' || p.id AS id, 'INCOME' AS kind, COALESCE(p."paidAt", p."createdAt") AS at,
       p.amount::text AS amount, p.method::text AS method, p."shiftId", p."cashierId" AS actor,
+      CASE WHEN p."boardingContractId" IS NULL THEN 'MAIN' ELSE 'BOARDING' END AS cashbox,
       COALESCE(NULLIF(c.name, ''), concat_ws(' ', c."lastName", c."firstName")) AS "clientName",
       COALESCE(p.notes, p.description, p."serviceType", s.title, 'Оплата услуги') AS description, u.email AS cashier
     FROM "Payment" p JOIN "Client" c ON c.id = p."clientId"
@@ -18,11 +19,13 @@ export async function cashJournal(tx: Prisma.TransactionClient, query: CashJourn
     WHERE p.status = 'PAID' AND p."archivedAt" IS NULL
     UNION ALL
     SELECT 'expense:' || e.id, 'EXPENSE', e.date, e.amount::text, e."paymentMethod"::text, e."shiftId", e."createdById",
+      CASE WHEN p."boardingContractId" IS NOT NULL THEN 'BOARDING' ELSE e."cashboxType" END,
       COALESCE(NULLIF(c.name, ''), concat_ws(' ', c."lastName", c."firstName")), e.description, u.email
     FROM "Expense" e JOIN "User" u ON u.id = e."createdById"
     LEFT JOIN "Payment" p ON p.id = e."refundPaymentId" LEFT JOIN "Client" c ON c.id = p."clientId"
     WHERE e."archivedAt" IS NULL AND e."cancelledAt" IS NULL
   ), filtered AS (SELECT * FROM movements WHERE at >= ${range.gte} AND at < ${range.lt}
+    ${query.cashboxType ? Prisma.sql`AND cashbox = ${query.cashboxType}` : Prisma.empty}
     ${query.shiftId ? Prisma.sql`AND "shiftId" = ${query.shiftId}::uuid` : Prisma.empty}
     ${query.cashierId ? Prisma.sql`AND actor = ${query.cashierId}::uuid` : Prisma.empty}
     ${query.operationType ? Prisma.sql`AND kind = ${query.operationType}` : Prisma.empty}

@@ -1,11 +1,12 @@
 import { Transform, Type } from 'class-transformer';
 import { ExpenseCategory, ExpensePaymentMethod } from '@prisma/client';
-import { IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUrl, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsDateString, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUrl, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 const empty = ({ value }: { value: unknown }) => typeof value === 'string' && !value.trim() ? undefined : value;
 const trimmed = ({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value;
 
 export class CreateExpenseDto {
+  @Transform(empty) @IsOptional() @IsIn(['MAIN', 'BOARDING']) cashboxType?: 'MAIN' | 'BOARDING';
   @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(9999999999.99) amount!: number;
   @IsEnum(ExpensePaymentMethod) paymentMethod!: ExpensePaymentMethod;
   @IsEnum(ExpenseCategory) category!: ExpenseCategory;

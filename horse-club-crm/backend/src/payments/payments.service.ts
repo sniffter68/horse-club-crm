@@ -10,6 +10,8 @@ import { parseRefineQuery, type PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreatePaymentDto } from './dto/create-payment.dto';
 import type { UpdatePaymentDto } from './dto/update-payment.dto';
+import { boardingCashBalances } from './boarding-cash-balances';
+import { correctPayment } from './payment-correction';
 
 const paymentInclude = Prisma.validator<Prisma.PaymentDefaultArgs>()({
   include: {
@@ -44,6 +46,12 @@ type PaymentData = {
 @Injectable()
 export class PaymentsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  boardingCash() { return this.prisma.$transaction(tx => boardingCashBalances(tx), { isolationLevel: 'RepeatableRead' }); }
+  boardingOptions() {
+    return this.prisma.boardingContract.findMany({ where: { status: 'ACTIVE', cancelledAt: null, clientId: { not: null }, horse: { deletedAt: null } },
+      select: { id: true, clientId: true, client: { select: { name: true, firstName: true, lastName: true } }, horse: { select: { name: true } } }, orderBy: [{ startsAt: 'desc' }, { id: 'asc' }] });
+  }
 
   async findAll(query: PaymentQueryDto): Promise<PaginatedResult<PaymentWithRelations>> {
     const options = parseRefineQuery(query, ['id', 'amount', 'method', 'status', 'paidAt', 'createdAt', 'updatedAt'], 'createdAt');
@@ -114,6 +122,7 @@ export class PaymentsService {
       return await archiveTransaction(this.prisma, async tx => {
         const current = await tx.payment.findUnique({ where: { id }, include: { refundExpense: { select: { id: true } } } });
         if (!current) throw new NotFoundException('Платёж не найден');
+        if (current.status === 'PAID' && !current.archivedAt && !current.refundExpense) return correctPayment(tx, current, dto, actor);
         if (current.archivedAt || current.cashierId || current.refundExpense || current.status === 'PAID' || current.status === 'REFUNDED' || current.status === 'CANCELLED') throw new ConflictException('Проведённый или отменённый платёж нельзя редактировать');
         const data = await this.resolveData({
           clientId: dto.clientId ?? current.clientId,
@@ -207,6 +216,7 @@ export class PaymentsService {
     const client = await tx.client.findUnique({ where: { id: clientId }, select: { id: true } });
     if (!client) throw new NotFoundException('Клиент не найден');
     const status = dto.status ?? PaymentStatus.PENDING;
+    if (status === PaymentStatus.PAID && dto.paidAt && this.date(dto.paidAt) > new Date()) throw new BadRequestException('Дата оплаты не может быть в будущем');
     if (status === PaymentStatus.REFUNDED) throw new BadRequestException('Возврат проводится через отмену услуги с записью расхода');
     return {
       clientId,

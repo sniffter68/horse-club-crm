@@ -33,6 +33,13 @@ export const dataProvider = {
     }
 
     for (const filter of filters ?? []) {
+      if (resource === 'memberships' && 'field' in filter && ['state', 'payment'].includes(filter.field) && filter.operator === 'eq') {
+        if (!filter.value) continue
+        const allowed = filter.field === 'state' ? ['active', 'exhausted', 'expired', 'archived'] : ['paid', 'debt']
+        if (!allowed.includes(filter.value)) throw new Error('Недопустимый фильтр абонементов')
+        params.set(filter.field, filter.value)
+        continue
+      }
       if (resource === 'payments' && 'field' in filter && filter.field === 'cashboxType' && filter.operator === 'eq') {
         if (!filter.value) continue
         if (!['MAIN', 'BOARDING'].includes(filter.value)) throw new Error('Недопустимый тип кассы')

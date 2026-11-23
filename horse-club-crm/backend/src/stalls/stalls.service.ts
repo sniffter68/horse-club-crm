@@ -68,9 +68,20 @@ export class StallsService {
   }
 
   async map() {
-    const stalls = await this.prisma.stall.findMany({ include: { horse: stallInclude.include.horse, contracts: { where: { status: { in: [BoardingContractStatus.ACTIVE, BoardingContractStatus.SUSPENDED] } }, select: { status: true } } },
+    const now = new Date();
+    const stalls = await this.prisma.stall.findMany({ include: { horse: stallInclude.include.horse, contracts: { where: {
+      status: { in: [BoardingContractStatus.ACTIVE, BoardingContractStatus.SUSPENDED] }, cancelledAt: null,
+      horse: { deletedAt: null }, startsAt: { lte: now }, OR: [{ endsAt: null }, { endsAt: { gt: now } }],
+    }, include: { horse: stallInclude.include.horse }, orderBy: [{ startsAt: 'desc' }, { id: 'asc' }], take: 1 } },
       orderBy: [{ zone: 'asc' }, { position: 'asc' }, { side: 'asc' }] });
-    return stalls.map(stall => ({ ...stall, rowPosition: stallRowPosition(stall, stalls), warnings: neighborhoodWarnings(stall, stalls) }));
+    // A valid placement is authoritative even when legacy horseId snapshots are missing.
+    // Rest/availability describes rental eligibility, never whether a stall is occupied.
+    const placed = stalls.map(stall => {
+      const horse = stall.contracts?.[0]?.horse ?? (stall.horse?.deletedAt ? null : stall.horse);
+      return { ...stall, horse, horseId: horse?.id ?? null,
+        status: horse && stall.status === 'AVAILABLE' ? 'OCCUPIED' as const : stall.status };
+    });
+    return placed.map(stall => ({ ...stall, rowPosition: stallRowPosition(stall, placed), warnings: neighborhoodWarnings(stall, placed) }));
   }
 
   assignmentHorses() {

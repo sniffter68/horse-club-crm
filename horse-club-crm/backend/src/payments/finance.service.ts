@@ -12,6 +12,7 @@ import { cashShiftAt } from './cash-shift-boundary';
 import { aggregatePaymentMethods } from './cash-desk.math';
 import { cashboxBalances } from './cashbox-balances';
 import { paymentTurnover } from './payment-turnover';
+import { boardingCashBalances } from './boarding-cash-balances';
 
 // Date-only values are Moscow business days; timestamps must carry an explicit offset.
 export function financeDate(value: string, endOfDay = false): Date {
@@ -64,7 +65,7 @@ export class FinanceService {
         const existing = await tx.expense.findUnique({ where: { requestId: dto.requestId }, include: author });
         if (existing) {
           if (existing.createdById !== createdById || !existing.amount.equals(dto.amount) || existing.paymentMethod !== dto.paymentMethod
-            || existing.category !== dto.category || existing.description !== dto.description.trim()
+            || (existing.cashboxType ?? 'MAIN') !== (dto.cashboxType ?? 'MAIN') || existing.category !== dto.category || existing.description !== dto.description.trim()
             || existing.receiptUrl !== (dto.receiptUrl ?? null) || (dto.date && existing.date.getTime() !== date.getTime())) {
             throw new ConflictException('Ключ операции уже использован для другого расхода');
           }
@@ -72,6 +73,13 @@ export class FinanceService {
         }
       }
       const shift = await cashShiftAt(tx, createdById, date);
+      if (dto.cashboxType === 'BOARDING') {
+        if (date > new Date()) throw new BadRequestException('Расход постоя не может быть в будущем');
+        if (dto.category === 'SALARY') throw new BadRequestException('Зарплата проводится через ведомость персонала');
+        const balances = await boardingCashBalances(tx);
+        const available = dto.paymentMethod === 'CASH' ? balances.cash : balances.bank;
+        if (available.lt(dto.amount)) throw new BadRequestException('Недостаточно средств на выбранном счёте постоя');
+      }
       const expense = await tx.expense.create({ data: { ...dto, date, description: dto.description.trim(), createdById, shiftId: shift?.id }, include: author });
       await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'EXPENSE_CREATED', actorId: createdById,
         actorName: expense.createdBy?.email ?? createdById, details: { expenseId: expense.id, amount: String(dto.amount), date: date.toISOString() } } });

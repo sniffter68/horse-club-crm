@@ -60,7 +60,8 @@ test('map exposes active boarding status even without an assigned horse', async 
   const { service, db } = fixture();
   db.stall.findMany = async ({ include }) => {
     assert.deepEqual(include.contracts.where.status.in, ['ACTIVE', 'SUSPENDED']);
-    assert.deepEqual(include.contracts.select, { status: true });
+    assert.ok(include.contracts.include.horse);
+    assert.equal(include.contracts.where.horse.deletedAt, null);
     return [{ id, number: '1', horseId: null, contracts: [{ status: 'ACTIVE' }] }];
   };
   const rooms = await service.map();
