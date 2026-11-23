@@ -81,6 +81,25 @@ for (const resource of ['clients', 'horses', 'trainers']) {
     const title = resource === 'clients' ? 'Карточка клиента' : resource === 'horses' ? 'Карточка лошади' : 'Карточка тренера'
     await expect(page.getByRole('dialog', { name: title })).toBeVisible()
     await expect(input).toHaveValue('Анна')
+    await expect.poll(() => queries.at(-1)).toBe('Анна')
+    await page.clock.fastForward(400)
+    await expect(page.getByRole('dialog', { name: title })).toBeVisible()
+    if (resource === 'clients') {
+      await expect(page).toHaveURL(new RegExp(`clientId=${rows[0].id}`))
+      await page.getByRole('dialog', { name: title }).getByRole('button', { name: 'Close', exact: true }).click()
+      await expect(page.getByRole('dialog', { name: title })).toHaveCount(0)
+      await expect(page).not.toHaveURL(/clientId=/)
+      await input.fill('Ан')
+      await expect(page.locator('.ant-select-item-option-content mark')).toHaveText('Ан')
+      await input.press('ArrowDown')
+      await input.press('Enter')
+      await expect(page.getByRole('dialog', { name: title })).toBeVisible()
+      await expect(input).toHaveValue('Анна')
+      await expect.poll(() => queries.at(-1)).toBe('Анна')
+      await page.clock.fastForward(400)
+      await expect(page).toHaveURL(new RegExp(`clientId=${rows[0].id}`))
+      await expect(page.getByRole('dialog', { name: title })).toBeVisible()
+    }
   })
 }
 

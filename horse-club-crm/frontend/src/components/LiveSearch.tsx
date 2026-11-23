@@ -65,7 +65,9 @@ export function LiveSearch({ value = '', onChange, onSearch, suggestions = [], o
     onSelect={id => {
       const item = suggestions.find(row => row.id === id)
       if (!item) return
-      cancel(); latestValue.current = item.text; onChange?.(item.text); commit(item.text); onSelectSuggestion?.(id)
+      // Open the card now; let the controlled-value effect commit the search.
+      // Submitting here races the table's URL sync against the card's navigation.
+      cancel(); setPending(item.text !== value); onChange?.(item.text); onSelectSuggestion?.(id)
     }} notFoundContent={pending || loading ? 'Поиск…' : 'Совпадений нет'}>
     <Input {...inputProps} ref={input} id={id} aria-label={ariaLabel} placeholder={placeholder} prefix={<SearchOutlined />}
       suffix={value ? <Button ref={clearButton} type="text" size="small" aria-label="Очистить поиск" onKeyDown={event => event.stopPropagation()} onClick={() => {
@@ -73,6 +75,11 @@ export function LiveSearch({ value = '', onChange, onSearch, suggestions = [], o
       }}>×</Button> : <span />}
       onCompositionStart={() => { composing.current = true; cancel() }}
       onCompositionEnd={event => { composing.current = false; schedule(event.currentTarget.value) }}
-      onPressEnter={event => { event.preventDefault(); if (!composing.current && !event.nativeEvent.isComposing) commit(value) }} />
+      onPressEnter={event => {
+        event.preventDefault()
+        const selectsOption = options.length > 0 && event.currentTarget.getAttribute('aria-expanded') === 'true'
+          && Boolean(event.currentTarget.getAttribute('aria-activedescendant'))
+        if (!selectsOption && !composing.current && !event.nativeEvent.isComposing) commit(value)
+      }} />
   </AutoComplete>
 }
