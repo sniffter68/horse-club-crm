@@ -31,9 +31,9 @@
 .board-continuation { display: block; font-size: 12px; padding: 6px 0; color: var(--crm-ink); }
 .admin-workspace.gap-6 { display: flex; flex-direction: column; gap: 1.5rem; }
 .admin-workspace > .workspace-toolbar { margin-bottom: 0; }
-.admin-workspace-columns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 24px; align-items: stretch; }
+.admin-workspace-columns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 24px; align-items: start; }
 .admin-workspace-columns-single { grid-template-columns: minmax(0, 1fr); }
-.workspace-main-card { min-width: 0; height: 100%; display: flex; flex-direction: column; }
+.workspace-main-card { min-width: 0; display: flex; flex-direction: column; }
 .workspace-main-card > .ant-card-body { flex: 1; }
 .workspace-finance-card > .ant-card-body { display: flex; flex-direction: column; }
 .workspace-finance-card .workspace-finance { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }

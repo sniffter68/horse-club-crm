@@ -602,9 +602,15 @@ test('workspace refresh shows an externally completed lesson and its audit entry
 for (const width of [1440, 1024, 390]) test(`dashboard shift journal toggles independently of main cards at ${width}px`, async ({ page }) => {
   await setup(page)
   await page.setViewportSize({ width, height: 844 })
+  const trainer = { id: '00000000-0000-4000-8000-000000000001', name: 'Мария' }
   const actions = Array.from({ length: 20 }, (_, index) => ({ id: `action-${index}`, action: 'LESSON_COMPLETED', actorName: `Администратор ${index}`, createdAt: `2026-10-20T09:${String(index).padStart(2, '0')}:00Z` }))
   await page.route('**/api/workspace/admin-summary', route => route.fulfill({ json: workspaceSummary({
     finance: { accrued: '3000', paid: '1000', debt: '2000', mainBalance: 1000, boardingBalance: 2000, recognizedMembershipRevenue: '500' }, actions,
+    week: Array.from({ length: 20 }, (_, index) => ({
+      id: `lesson-${index}`, trainerId: trainer.id, trainer, arena: null, trainerNote: null,
+      startTime: '2026-10-20T08:00:00Z', endTime: '2026-10-20T09:00:00Z',
+      status: 'SCHEDULED', bookings: [],
+    })),
   }) }))
   await page.goto('/dashboard')
   const toggle = page.getByRole('button', { name: /Журнал действий смены/ })
@@ -630,14 +636,22 @@ for (const width of [1440, 1024, 390]) test(`dashboard shift journal toggles ind
   }
   await expectSectionGaps()
   const mainCards = page.locator('.admin-workspace-columns > .workspace-main-card')
+  const financeCard = page.locator('.workspace-finance-card')
+  const initialFinanceHeight = await financeCard.evaluate(card => card.getBoundingClientRect().height)
+  await page.getByText('Неделя', { exact: true }).click()
+  await expect(page.locator('.workspace-lesson')).toHaveCount(20)
+  expect(await financeCard.evaluate(card => card.getBoundingClientRect().height)).toBeCloseTo(initialFinanceHeight, 0)
+  await expectSectionGaps()
   const initialRects = await mainCards.evaluateAll(cards => cards.map(card => {
     const { top, bottom } = card.getBoundingClientRect()
     return { top, bottom }
   }))
   expect(initialRects).toHaveLength(2)
   if (width > 800) {
-    expect(Math.abs(initialRects[0].bottom - initialRects[1].bottom)).toBeLessThanOrEqual(2)
+    expect(initialRects[0].bottom).toBeGreaterThan(initialRects[1].bottom + 100)
     expect(Math.abs(initialRects[0].top - initialRects[1].top)).toBeLessThanOrEqual(2)
+  } else {
+    expect(initialRects[1].top - initialRects[0].bottom).toBeCloseTo(24, 0)
   }
   await toggle.click()
   await expect(toggle).toHaveAttribute('aria-expanded', 'true')
@@ -646,7 +660,7 @@ for (const width of [1440, 1024, 390]) test(`dashboard shift journal toggles ind
   expect(await list.evaluate(node => node.clientHeight <= 320 && node.scrollHeight > node.clientHeight && getComputedStyle(node).overflowY === 'auto')).toBe(true)
   const mainBottom = await mainCards.evaluateAll(cards => Math.max(...cards.map(card => card.getBoundingClientRect().bottom + window.scrollY)))
   expect(await page.locator('.workspace-actions-card').evaluate(node => node.getBoundingClientRect().top + window.scrollY)).toBeGreaterThanOrEqual(mainBottom)
-  if (width > 800) expect(await mainCards.evaluateAll(cards => Math.abs(cards[0].getBoundingClientRect().bottom - cards[1].getBoundingClientRect().bottom))).toBeLessThanOrEqual(2)
+  expect(await financeCard.evaluate(card => card.getBoundingClientRect().height)).toBeCloseTo(initialFinanceHeight, 0)
   await page.screenshot({ path: `test-results/dashboard-journal-${width}.png`, fullPage: true })
   await toggle.focus()
   await toggle.press('Enter')
