@@ -1,3 +1,4 @@
+import { isMembershipActive } from '../memberships/activity'
 import { useRoleAccess } from '../../access'
 import { SearchSelect } from '../../components/SearchSelect'
 import { useCallback, useEffect, useState } from 'react'
@@ -107,7 +108,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
   const eligibleMemberships = memberships.filter(membership => {
     if (!from) return false
     const at = +new Date(from)
-    return membership.isActive && (!membership.status || membership.status === 'active') && membership.type !== 'boarding' && membership.type !== 'deposit'
+    return isMembershipActive(membership) && membership.type !== 'boarding' && membership.type !== 'deposit'
       && Number(membership.remainingUnits ?? membership.remainedLessons) > 0
       && (!membership.validFrom || +new Date(membership.validFrom) <= at)
       && (!(membership.validTo || membership.validUntil) || +new Date(membership.validTo || membership.validUntil) >= at)

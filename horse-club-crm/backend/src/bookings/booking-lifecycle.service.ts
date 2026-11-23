@@ -118,7 +118,7 @@ export class BookingLifecycleService {
   }
 
   private usable(m: Membership, discipline: string, now: Date) {
-    return !m.deletedAt && ['fixed_lessons', 'deposit'].includes(m.type) && m.status === 'active'
+    return !m.deletedAt && !m.cancelledAt && ['fixed_lessons', 'deposit'].includes(m.type) && m.status === 'active'
       && m.validFrom <= now && m.validTo >= now && (!m.allowedDisciplines.length || m.allowedDisciplines.includes(discipline));
   }
   private async lockMembership(tx: Prisma.TransactionClient, id: string) {

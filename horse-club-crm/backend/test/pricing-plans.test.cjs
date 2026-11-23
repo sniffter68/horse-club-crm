@@ -25,7 +25,7 @@ test('membership issue uses selected pricing plan values', async () => {
     pricingPlan: { findUnique: async () => ({ id: 'plan-1', name: '8 занятий', totalLessons: 8, validDays: 30, price: 24000 }) },
     membership: { create: async ({ data }) => {
       saved = data;
-      return { id: 'membership-1', ...data, client: { id: 'client-1' }, pricingPlan: { id: 'plan-1' }, createdAt: new Date(), updatedAt: new Date() };
+      return { id: 'membership-1', ...data, validFrom: new Date(), client: { id: 'client-1' }, pricingPlan: { id: 'plan-1' }, createdAt: new Date(), updatedAt: new Date() };
     } },
   };
   prisma.ledgerTransaction = { create: async () => ({}) };

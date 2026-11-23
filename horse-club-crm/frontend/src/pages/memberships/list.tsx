@@ -42,6 +42,7 @@ export function MembershipList() {
   const { tableProps, searchFormProps, tableQuery } = useTable<Membership, HttpError, { q?: string; state?: string; payment?: string }>({
     resource: 'memberships', pagination: { pageSize: 10 },
     sorters: { mode: 'off' },
+    filters: { initial: [{ field: 'state', operator: 'eq', value: 'active' }] },
     onSearch: ({ q, state, payment }) => [{ field: 'q', operator: 'contains', value: q?.trim() ?? '' },
       { field: 'state', operator: 'eq', value: state }, { field: 'payment', operator: 'eq', value: payment }],
   })
@@ -60,16 +61,17 @@ export function MembershipList() {
 
   return <>
     <RefineList title="Абонементы" headerButtons={<CreateButton disabled={!canSell}>Продать абонемент</CreateButton>}>
-      <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q">
+      <Form noValidate {...searchFormProps} initialValues={{ state: 'active' }} layout="inline" style={{ marginBottom: 20 }}><Form.Item name="q">
         <LiveSearch loading={tableQuery.isFetching} suggestions={(tableProps.dataSource ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })} placeholder="Клиент, телефон или услуга" onSearch={() => searchFormProps.form?.submit()} />
       </Form.Item>
-        <Form.Item name="state"><Select aria-label="Статус абонемента" placeholder="Все статусы" allowClear style={{ minWidth: 180 }} onChange={() => searchFormProps.form?.submit()} options={[
+        <Form.Item name="state"><Select aria-label="Статус абонемента" style={{ minWidth: 180 }} onChange={() => searchFormProps.form?.submit()} options={[
+          { value: 'all', label: 'Все статусы' },
           { value: 'active', label: 'Активные' }, { value: 'exhausted', label: 'Закончились' }, { value: 'expired', label: 'Истёк срок' }, { value: 'archived', label: 'Отменённые / Архив' },
         ]} /></Form.Item>
         <Form.Item name="payment"><Select aria-label="Оплата абонемента" placeholder="Любая оплата" allowClear style={{ minWidth: 180 }} onChange={() => searchFormProps.form?.submit()} options={[
           { value: 'paid', label: 'Оплачен' }, { value: 'debt', label: 'Не оплачен / Долг' },
         ]} /></Form.Item>
-        <Button onClick={() => { searchFormProps.form?.setFieldsValue({ q: '', state: undefined, payment: undefined }); searchFormProps.form?.submit() }}>Сбросить фильтры</Button>
+        <Button onClick={() => { searchFormProps.form?.setFieldsValue({ q: '', state: 'active', payment: undefined }); searchFormProps.form?.submit() }}>Сбросить фильтры</Button>
       </Form>
       <Typography.Paragraph role="status">Найдено: {tableProps.pagination && tableProps.pagination.total || 0}</Typography.Paragraph>
       <Typography.Paragraph type="secondary">Сортировка по заголовкам применяется к текущей странице.</Typography.Paragraph>

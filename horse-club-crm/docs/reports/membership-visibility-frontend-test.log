@@ -1,0 +1,11 @@
+npm notice run frontend@0.0.0 test
+npm notice run vitest run
+
+ RUN  v5.0.0 C:/Users/Валерий/Desktop/HorseCRM2026/horse-club-crm/frontend
+
+
+ Test Files  25 passed (25)
+      Tests  209 passed (209)
+   Start at  01:23:42
+   Duration  7.60s (import 75%, transform 19%, tests 3%, worker 2%)
+

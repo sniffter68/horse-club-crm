@@ -38,7 +38,7 @@ const clientMembershipSelect = {
   pricePerLesson: true, revenueRecognitions: { select: { amount: true } },
   clientId: true, client: { select: { name: true, firstName: true, lastName: true } },
   members: { include: { client: { select: { id: true, name: true, firstName: true, lastName: true } } } },
-  deletedAt: true, _count: { select: { bookings: true, operations: true, transactions: true, payments: true } }, totalPrice: true, type: true, title: true, initialUnits: true, remainingUnits: true, validFrom: true, validTo: true, status: true,
+  deletedAt: true, cancelledAt: true, _count: { select: { bookings: true, operations: true, transactions: true, payments: true } }, totalPrice: true, type: true, title: true, initialUnits: true, remainingUnits: true, validFrom: true, validTo: true, status: true,
   id: true,
   serviceId: true,
   totalLessons: true,
@@ -113,15 +113,18 @@ export type ClientLedgerOperation = Omit<LedgerRow, 'amount'> & { amount: number
 @Injectable()
 export class ClientsService {
   async bookingMemberships(clientId: string, query: BookingMembershipsQueryDto) {
+    const now = new Date();
     const from = new Date(query.from), to = new Date(query.to);
     if (!Number.isFinite(+from) || !Number.isFinite(+to) || from >= to) throw new BadRequestException('Некорректный интервал занятия');
     const service = await this.prisma.service.findUnique({ where: { id: query.serviceId }, select: { allowMembership: true, isPerPerson: true, name: true, title: true } });
     if (!service) throw new NotFoundException('Услуга не найдена');
     if (!service.allowMembership || service.isPerPerson || /экскурс|excursion/i.test(`${service.title} ${service.name}`)) return [];
     return this.prisma.membership.findMany({
-      where: { AND: [membershipAccessWhere(clientId), { OR: [{ serviceId: query.serviceId }, { serviceId: null }] }],
-        client: { deletedAt: null }, deletedAt: null, status: 'active', type: 'fixed_lessons',
-        remainedLessons: { gt: 0 }, validFrom: { lte: from }, validUntil: { gte: to } },
+      where: {
+        client: { deletedAt: null }, deletedAt: null, cancelledAt: null, status: 'active', type: 'fixed_lessons',
+        remainingUnits: { gt: 0 }, validFrom: { lte: from }, validTo: { gte: to },
+        AND: [membershipAccessWhere(clientId), { OR: [{ serviceId: query.serviceId }, { serviceId: null }] },
+          { validFrom: { lte: now }, validTo: { gte: now } }] },
       select: { id: true, title: true },
       orderBy: [{ validUntil: 'asc' }, { id: 'asc' }],
     });
@@ -163,7 +166,7 @@ export class ClientsService {
         skip: options.skip,
         take: options.take,
         include: { ...preferredResourcesInclude, memberships: {
-          where: { deletedAt: null, type: 'fixed_lessons', status: 'active', validFrom: { lte: now }, remainedLessons: { gt: 0 }, validUntil: { gte: now } },
+          where: { deletedAt: null, cancelledAt: null, type: 'fixed_lessons', status: 'active', validFrom: { lte: now }, remainingUnits: { gt: 0 }, validTo: { gte: now } },
           orderBy: [{ validUntil: 'asc' }, { id: 'asc' }], take: 1,
           select: { id: true, serviceTitle: true, remainedLessons: true, totalLessons: true, validUntil: true, pricingPlan: { select: { name: true } } },
         } },
@@ -214,9 +217,9 @@ export class ClientsService {
         ownerClientId: membership.clientId,
         isShared: membership.clientId !== id,
         ownerName: membership.client?.name || [membership.client?.firstName, membership.client?.lastName].filter(Boolean).join(' '),
-        isActive: !membership.deletedAt && membership.status === 'active'
-          && (membership.type === 'deposit' ? Number(membership.remainingUnits) > 0 : membership.remainedLessons > 0)
-          && membership.validFrom <= now && membership.validUntil >= now,
+        isActive: !membership.deletedAt && !membership.cancelledAt && membership.status === 'active'
+          && Number(membership.remainingUnits) > 0
+          && membership.validFrom <= now && membership.validTo >= now,
       })),
     };
   }

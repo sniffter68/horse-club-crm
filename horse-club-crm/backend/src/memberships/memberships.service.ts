@@ -68,14 +68,17 @@ export class MembershipsService {
     } : {};
     if (query.archivedOnly) where.deletedAt = { not: null };
     else if (!query.includeArchived) where.deletedAt = null;
-    const today = DateTime.now().setZone('Europe/Moscow').startOf('day').toJSDate();
-    if (query.state === 'archived') { delete where.deletedAt; where.AND = [{ OR: [{ deletedAt: { not: null } }, { cancelledAt: { not: null } }] }]; }
-    else if (query.state) {
+    const now = new Date();
+    const state = query.state ?? (query.archivedOnly ? 'archived' : 'active');
+    if (state === 'archived') { delete where.deletedAt; where.AND = [{ OR: [{ deletedAt: { not: null } }, { cancelledAt: { not: null } }] }]; }
+    else if (state !== 'all') {
+      where.deletedAt = null;
       where.cancelledAt = null;
-      if (query.state === 'active') Object.assign(where, { status: 'active', remainedLessons: { gt: 0 }, validUntil: { gte: today } });
-      if (query.state === 'exhausted') where.remainedLessons = 0;
-      if (query.state === 'expired') where.validUntil = { lt: today };
+      if (state === 'active') Object.assign(where, { status: 'active', remainingUnits: { gt: 0 }, validFrom: { lte: now }, validTo: { gte: now } });
+      if (state === 'exhausted') where.remainingUnits = { lte: 0 };
+      if (state === 'expired') where.validTo = { lt: now };
     }
+    else where.deletedAt = null;
     // Unpaid invoices remain authoritative for deferred sales; sold receipts have no pending invoice.
     if (query.payment === 'debt') where.payments = { some: { status: 'PENDING', archivedAt: null } };
     if (query.payment === 'paid') where.payments = { some: { status: 'PAID', archivedAt: null }, none: { status: 'PENDING', archivedAt: null } };
@@ -245,7 +248,8 @@ export class MembershipsService {
   private addDays(days: number): Date {
     return DateTime.now().setZone('Europe/Moscow').plus({ days }).toJSDate();
   }
-  private withActive<T extends { remainedLessons: number; validUntil: Date; deletedAt: Date | null; status: string }>(membership: T): T & { isActive: boolean } {
-    return { ...membership, isActive: !membership.deletedAt && membership.status === 'active' && membership.remainedLessons > 0 && membership.validUntil >= DateTime.now().setZone('Europe/Moscow').startOf('day').toJSDate() };
+  private withActive<T extends { remainingUnits: Prisma.Decimal; validFrom: Date; validTo: Date; cancelledAt: Date | null; deletedAt: Date | null; status: string }>(membership: T): T & { isActive: boolean } {
+    const now = new Date();
+    return { ...membership, isActive: !membership.deletedAt && !membership.cancelledAt && membership.status === 'active' && Number(membership.remainingUnits) > 0 && membership.validFrom <= now && membership.validTo >= now };
   }
 }

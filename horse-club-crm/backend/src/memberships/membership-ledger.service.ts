@@ -188,7 +188,7 @@ export class MembershipLedgerService {
 
     const membership = await tx.membership.findUnique({
       where: { id: membershipId },
-      select: { id: true, clientId: true, remainedLessons: true, validFrom: true, validUntil: true, type: true, status: true, deletedAt: true },
+      select: { id: true, clientId: true, remainedLessons: true, validFrom: true, validUntil: true, type: true, status: true, deletedAt: true, cancelledAt: true },
     });
     if (!membership) {
       throw new NotFoundException('Абонемент не найден');
@@ -210,7 +210,7 @@ export class MembershipLedgerService {
     }
 
     const now = await this.databaseNow(tx);
-    if (membership.deletedAt || membership.type === 'deposit' || membership.type === 'boarding' || membership.status !== 'active') {
+    if (membership.deletedAt || membership.cancelledAt || membership.type === 'deposit' || membership.type === 'boarding' || membership.status !== 'active') {
       throw new ConflictException('Абонемент недоступен для списания в прежнем журнале занятий');
     }
     if (membership.remainedLessons <= 0) {
@@ -229,6 +229,7 @@ export class MembershipLedgerService {
       where: {
         id: membershipId,
         deletedAt: null,
+        cancelledAt: null,
         remainedLessons: { gt: 0 },
         validUntil: { gte: now },
         validFrom: { lte: now },

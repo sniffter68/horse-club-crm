@@ -31,7 +31,7 @@ function fixture(options = {}) {
       membership: {
         findUnique: async ({ where }) => staged.memberships.find(row => row.saleRequestId === where.saleRequestId),
         create: async ({ data }) => {
-          const row = { ...data, id: 'membership', client: { id: sale.clientId }, pricingPlan: null };
+          const row = { ...data, validFrom: new Date(), cancelledAt: null, deletedAt: null, id: 'membership', client: { id: sale.clientId }, pricingPlan: null };
           staged.memberships.push(row);
           // Simulate the database's AFTER INSERT trigger, including its unique source.
           if (options.creditError) throw new Error('credit projection unavailable');

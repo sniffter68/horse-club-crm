@@ -1,5 +1,25 @@
 import { test, expect, type Page } from './fixtures'
 
+for (const width of [1280, 390]) test(`client memberships hide completed records until disclosure at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  const clientId = '00000000-0000-4000-8000-000000000091'
+  await page.route('**/api/clients?*', route => route.fulfill({ json: [{ ...client, id: clientId }], headers: { 'x-total-count': '1' } }))
+  await page.route(`**/api/clients/${clientId}`, route => route.fulfill({ json: { ...client, id: clientId, memberships: [
+    { id: 'active', isActive: true, totalLessons: 8, remainedLessons: 1, validUntil: '2099-01-01', pricingPlan: { name: 'Действующий тариф' }, payments: [] },
+    { id: 'exhausted', isActive: false, totalLessons: 8, remainedLessons: 0, validUntil: '2099-01-01', pricingPlan: { name: 'Завершённый тариф' }, payments: [] },
+  ], boardingContracts: [], payments: [], bookings: [] } }))
+  await page.goto('/clients')
+  await page.getByRole('button', { name: 'Анна Орлова', exact: true }).first().click()
+  const dialog = page.getByRole('dialog', { name: 'Карточка клиента' })
+  await expect(dialog.getByText('Завершённый тариф', { exact: true })).toBeHidden()
+  const show = dialog.getByRole('button', { name: 'Показать завершённые (1)', exact: true })
+  await expect(show).toHaveAttribute('aria-expanded', 'false')
+  await show.focus(); await show.press('Enter')
+  await expect(dialog.getByText('Завершённый тариф', { exact: true })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Скрыть завершённые', exact: true }).click()
+  await expect(dialog.getByText('Завершённый тариф', { exact: true })).toBeHidden()
+})
+
 for (const width of [1280, 390]) test(`family membership access adds, retries and revokes at ${width}px`, async ({ page }) => {
   test.setTimeout(45000)
   await page.setViewportSize({ width, height: 900 })
@@ -340,7 +360,7 @@ test('issue membership opens the existing form with the correct client selected'
   await page.goto('/clients')
   await page.getByRole('link', { name: '+ Выдать абонемент' }).click()
   await expect(page).toHaveURL(/\/memberships\/new\?clientId=client-b/)
-  await expect(page.locator('.ant-select-selection-item').first()).toHaveText('Борис Иванов · +79991234567')
+  await expect(page.getByRole('dialog').locator('.ant-select-selection-item').first()).toHaveText('Борис Иванов · +79991234567')
 })
 
 test('client type filter and conversion preserve the client record', async ({ page }) => {
@@ -393,7 +413,7 @@ test('creates and selects a regular rider with an optional level inside membersh
   await level.press('Enter')
   await create.getByRole('button', { name: 'Создать и выбрать', exact: true }).click()
   await expect(create).not.toBeVisible()
-  await expect(page.locator('.ant-select-selection-item').first()).toContainText('Новый всадник')
+  await expect(page.getByRole('dialog').locator('.ant-select-selection-item').first()).toContainText('Новый всадник')
   expect(posts).toEqual([{ name: 'Новый всадник', isOneTime: false, riderLevel: 'BEGINNER' }])
 })
 

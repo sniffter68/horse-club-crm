@@ -5,10 +5,10 @@ import type { PrismaService } from '../../prisma/prisma.service';
 export async function activeTelegramMembership(prisma: Pick<PrismaService, 'membership'>, clientId: string, now = new Date()) {
   const row = await prisma.membership.findFirst({
     where: {
-      deletedAt: null, type: 'fixed_lessons',
+      deletedAt: null, cancelledAt: null, type: 'fixed_lessons',
       // Match supported enum spellings without passing invalid values to Prisma.
       status: { in: Object.values(MembershipStatus).filter(status => status.toLowerCase() === 'active') },
-      validFrom: { lte: now }, validUntil: { gte: now }, remainedLessons: { gt: 0 },
+      validFrom: { lte: now }, validTo: { gte: now }, remainingUnits: { gt: 0 },
       OR: [{ clientId }, { members: { some: { clientId } } }],
     },
     orderBy: [{ validUntil: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],

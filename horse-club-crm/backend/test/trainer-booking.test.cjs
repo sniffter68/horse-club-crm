@@ -135,7 +135,12 @@ test('booking membership catalog selects only safe fields and scopes owner/famil
   assert.deepEqual(query.select, { id: true, title: true });
   assert.deepEqual(query.where.AND[0], membershipAccessWhere(id(4)));
   assert.equal(query.where.status, 'active'); assert.equal(query.where.type, 'fixed_lessons');
-  assert.equal(query.where.validUntil.gte.toISOString(), new Date(interval.to).toISOString());
+  assert.equal(query.where.validTo.gte.toISOString(), new Date(interval.to).toISOString());
+  assert.equal(query.where.cancelledAt, null);
+  assert.equal(query.where.deletedAt, null);
+  assert.deepEqual(query.where.remainingUnits, { gt: 0 });
+  assert.ok(query.where.AND[2].validFrom.lte instanceof Date);
+  assert.ok(query.where.AND[2].validTo.gte instanceof Date);
   await assert.rejects(service.bookingMemberships(id(4), { ...interval, to: interval.from }), error => error.getStatus() === 400);
 });
 

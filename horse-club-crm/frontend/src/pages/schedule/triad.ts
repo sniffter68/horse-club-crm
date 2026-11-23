@@ -1,3 +1,4 @@
+import { isMembershipActive } from '../memberships/activity'
 import { DateTime } from 'luxon'
 import type { ApiError } from '../../httpClient'
 import type { Arena, Client, Horse, Trainer } from '../catalogs/types'
@@ -75,8 +76,7 @@ export function membershipBalance(m: MembershipSummary): { remaining: number; to
   const remaining = Number(legacy ? m.remainedLessons : m.remainingUnits ?? 0)
   const total = Number(legacy ? m.totalLessons : m.initialUnits ?? 0)
   const until = legacy ? m.validUntil : m.validTo || m.validUntil
-  const active = m.type !== 'boarding' && (legacy ? m.status !== 'frozen' : !m.status || m.status === 'active') && remaining > 0 && +new Date(until) >= Date.now()
-    && (!m.validFrom || +new Date(m.validFrom) <= Date.now())
+  const active = m.type !== 'boarding' && isMembershipActive(m)
   const label = m.type === 'deposit' ? `${remaining.toLocaleString('ru-RU')} ₽ на депозите` : `${remaining} / ${total} занятий`
   return { remaining, total, until, label, active }
 }

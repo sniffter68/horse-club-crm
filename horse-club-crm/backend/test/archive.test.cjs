@@ -90,8 +90,8 @@ test('used or cash-posted membership is archived even without remaining relation
 test('list archive filters apply equally to counts and records, preserving searches', async () => {
   for (const kind of ['client', 'membership']) for (const [query, expected] of [[{}, null], [{ includeArchived: true }, undefined], [{ archivedOnly: true }, { not: null }]]) {
     const prisma = { $transaction: async queries => Promise.all(queries), [kind]: {
-      count: async ({ where }) => { assert.deepEqual(where.deletedAt, expected); return 0; },
-      findMany: async ({ where }) => { assert.deepEqual(where.deletedAt, expected); return []; },
+      count: async ({ where }) => { assert.deepEqual(where.deletedAt, kind === 'membership' ? (query.archivedOnly ? undefined : null) : expected); return 0; },
+      findMany: async ({ where }) => { assert.deepEqual(where.deletedAt, kind === 'membership' ? (query.archivedOnly ? undefined : null) : expected); return []; },
     } };
     await (kind === 'client' ? new ClientsService(prisma) : new MembershipsService(prisma)).findAll(query);
   }

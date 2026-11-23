@@ -4,6 +4,7 @@ require('reflect-metadata');
 
 const { Prisma } = require('@prisma/client');
 const { MembershipLedgerService } = require('../dist/memberships/membership-ledger.service');
+const { MembershipsService } = require('../dist/memberships/memberships.service');
 
 function createPrisma({
   balance = 2,
@@ -73,6 +74,25 @@ function createPrisma({
 
 const isStatus = (status, message) => (error) =>
   error.getStatus() === status && (!message || error.message === message);
+
+test('last lesson debit hides membership and transactional refund restores API activity', async () => {
+  const { prisma, state } = createPrisma({ balance: 1 });
+  const ledger = new MembershipLedgerService(prisma);
+  const memberships = new MembershipsService({
+    membership: { findUnique: async () => ({ ...state.membership,
+      // Mirrors Membership_sync_balances, already installed in PostgreSQL.
+      remainingUnits: new Prisma.Decimal(state.membership.remainedLessons),
+      validTo: state.membership.validUntil, validFrom: new Date('2020-01-01'),
+      deletedAt: null, cancelledAt: null,
+      status: state.membership.remainedLessons > 0 ? 'active' : 'exhausted',
+    }) }, revenueRecognition: { aggregate: async () => ({ _sum: { amount: null } }) },
+  });
+  assert.equal((await memberships.findOne('membership-1')).isActive, true);
+  await ledger.debitLesson('membership-1', 'lesson-1', 'Посещение');
+  assert.equal((await memberships.findOne('membership-1')).isActive, false);
+  await ledger.refundLesson('membership-1', 'lesson-1', 'Отмена занятия');
+  assert.equal((await memberships.findOne('membership-1')).isActive, true);
+});
 
 test('debit atomically decrements once and writes one DEBIT', async () => {
   const { prisma, state } = createPrisma({ balance: 1 });

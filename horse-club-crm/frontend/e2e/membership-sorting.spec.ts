@@ -45,3 +45,29 @@ test('membership cards retain readable labels on mobile', async ({ page }) => {
   await expect(page.locator('.responsive-record-label').filter({ hasText: 'Услуга / тариф' })).toHaveCount(2)
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)
 })
+
+test('membership list defaults to active, explicit statuses survive reload and reset restores active', async ({ page }) => {
+  const requests: URLSearchParams[] = []
+  await page.route('**/api/memberships?*', route => {
+    const params = new URL(route.request().url()).searchParams
+    requests.push(params)
+    const data = params.get('state') === 'active' ? rows.filter(row => row.isActive) : rows
+    return route.fulfill({ json: data, headers: { 'x-total-count': String(data.length) } })
+  })
+  await page.goto('/memberships')
+  await expect.poll(() => requests.at(-1)?.get('state')).toBe('active')
+  await expect(page.locator('tbody tr.ant-table-row')).toHaveCount(1)
+  const status = page.getByRole('combobox', { name: 'Статус абонемента' })
+  for (const [value, label] of [['all', 'Все статусы'], ['exhausted', 'Закончились'], ['expired', 'Истёк срок'], ['archived', 'Отменённые / Архив']]) {
+    await status.focus(); await status.press('ArrowDown')
+    await page.locator('.ant-select-dropdown:visible').getByText(label, { exact: true }).click()
+    await expect.poll(() => requests.at(-1)?.get('state')).toBe(value)
+  }
+  await page.reload()
+  await expect.poll(() => requests.at(-1)?.get('state')).toBe('archived')
+  await page.getByRole('button', { name: 'Сбросить фильтры' }).click()
+  await expect.poll(() => requests.at(-1)?.get('state')).toBe('active')
+  expect(requests.at(-1)?.get('q') || '').toBe('')
+  expect(requests.at(-1)?.get('payment')).toBeNull()
+  await expect(page.locator('tbody tr.ant-table-row')).toHaveCount(1)
+})

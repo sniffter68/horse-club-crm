@@ -80,7 +80,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
   const overweight = Boolean(horse && weight !== undefined && weight > (horse.maxRiderWeight ?? 85))
   const workload = availability.data?.horseWorkloads.find(h => h.horseId === horseId)
   const occupancy = availability.data?.arenaOccupancy.find(a => a.arenaId === arenaId)
-  const suitableMemberships = memberships.filter(m => membershipBalance(m).active || m.id === booking?.membershipId)
+  const suitableMemberships = memberships.filter(m => membershipBalance(m).active)
 
   function close() {
     if (lock.current) return

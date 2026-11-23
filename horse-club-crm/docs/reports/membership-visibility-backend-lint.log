@@ -1,0 +1,5 @@
+npm notice run lint
+npm notice run node ../frontend/node_modules/oxlint/bin/oxlint src test
+test/audit-http-20261019.cjs:12:114: warning unicorn(no-invalid-fetch-options): "body" is not allowed when method is "GET"
+test/dashboard.test.cjs:15:35: warning eslint(no-unused-vars): Parameter 'role' is declared but never used. Unused parameters should start with a '_'. help: Consider removing this parameter.
+test/vet-records.test.cjs:112:140: warning unicorn(no-invalid-fetch-options): "body" is not allowed when method is "GET"

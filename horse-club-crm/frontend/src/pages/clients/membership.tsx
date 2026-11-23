@@ -5,6 +5,23 @@ import { Link } from 'react-router-dom'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { useCatalogPermissions } from '../catalogs/permissions'
 import { dateOnly, dateTime } from '../cards/format'
+import { useState, type ReactNode } from 'react'
+
+export function MembershipVisibility<T extends { isActive: boolean }>({ memberships, children }: {
+  memberships: T[]; children: (visible: T[]) => ReactNode;
+}) {
+  const [showCompleted, setShowCompleted] = useState(false)
+  const completedCount = memberships.filter(membership => !membership.isActive).length
+  const visible = showCompleted ? memberships : memberships.filter(membership => membership.isActive)
+  return <>
+    {completedCount > 0 && <Button size="small" type="link" aria-expanded={showCompleted}
+      onClick={() => setShowCompleted(value => !value)}>
+      {showCompleted ? 'Скрыть завершённые' : `Показать завершённые (${completedCount})`}
+    </Button>}
+    {visible.length ? children(visible) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
+      description={memberships.length ? 'Нет активных абонементов' : 'Абонементов нет'} />}
+  </>
+}
 
 export type ActiveMembership = {
   id: string; planName: string; remainingUnits: number; totalUnits: number;

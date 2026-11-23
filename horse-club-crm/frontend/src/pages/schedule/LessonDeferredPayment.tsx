@@ -1,3 +1,4 @@
+import { isMembershipActive } from '../memberships/activity'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, Select, Space, Typography } from 'antd'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
@@ -48,7 +49,7 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
       const now = Date.now()
       setSelectionTime(now)
       const start = +new Date(lesson.startTime)
-      const rows = data.memberships.filter(m => m.isActive && (!m.status || m.status === 'active')
+      const rows = data.memberships.filter(m => isMembershipActive(m, now)
         && m.type === 'fixed_lessons' && m.remainedLessons > 0 && (!m.serviceId || m.serviceId === lesson.service.id)
         && (!m.validFrom || +new Date(m.validFrom) <= now) && +new Date(m.validUntil) >= now
         && (start <= now || ((!m.validFrom || +new Date(m.validFrom) <= start) && +new Date(m.validUntil) >= +new Date(lesson.endTime))))

@@ -10,8 +10,8 @@ const row = { id: 'package', title: 'Манеж <8> & тренер', totalLesson
 
 test('membership lookup restricts owner/family, active dates, lesson units and balance; selects latest expiry deterministically', async () => {
   const membership = await activeTelegramMembership({ membership: { findFirst: async args => {
-    assert.deepEqual(args.where, { deletedAt: null, type: 'fixed_lessons', status: { in: ['active'] },
-      validFrom: { lte: now }, validUntil: { gte: now }, remainedLessons: { gt: 0 },
+    assert.deepEqual(args.where, { deletedAt: null, cancelledAt: null, type: 'fixed_lessons', status: { in: ['active'] },
+      validFrom: { lte: now }, validTo: { gte: now }, remainingUnits: { gt: 0 },
       OR: [{ clientId: 'signed-client' }, { members: { some: { clientId: 'signed-client' } } }] });
     assert.deepEqual(args.orderBy, [{ validUntil: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }]);
     assert.equal(args.select.remainedLessons, true);

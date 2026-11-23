@@ -85,6 +85,6 @@ test('membership filters precede pagination and share count predicate', async ()
   const service = new MembershipsService({ ...tx, $transaction: promises => Promise.all(promises) });
   const result = await service.findAll({ q: '7999', state: 'active', payment: 'debt', _start: 10, _end: 20 });
   assert.equal(result.total, 25); assert.equal(list.skip, 10); assert.equal(list.take, 10);
-  assert.equal(list.where, countWhere); assert.deepEqual(list.where.remainedLessons, { gt: 0 });
+  assert.equal(list.where, countWhere); assert.deepEqual(list.where.remainingUnits, { gt: 0 });
   assert.equal(list.where.payments.some.status, 'PENDING'); assert.ok(JSON.stringify(list.where.OR).includes('phone'));
 });

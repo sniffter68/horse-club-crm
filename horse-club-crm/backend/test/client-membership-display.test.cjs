@@ -8,7 +8,7 @@ const { ClientsController } = require('../dist/clients/clients.controller');
 test('client payment selector receives every currently active owned and shared membership, including later purchases', async () => {
   const now = Date.now();
   const membership = { id: 'owned', clientId: 'client', type: 'fixed_lessons', status: 'active', deletedAt: null,
-    remainedLessons: 4, validFrom: new Date(now - 60000), validUntil: new Date(now + 86400000), serviceId: 'service' };
+    remainingUnits: new Prisma.Decimal(4), validTo: new Date(now + 86400000), cancelledAt: null, remainedLessons: 4, validFrom: new Date(now - 60000), validUntil: new Date(now + 86400000), serviceId: 'service' };
   const service = new ClientsService({ client: { findUnique: async ({ include }) => {
     assert.equal(include.memberships.select.serviceId, true);
     assert.equal(include.sharedMemberships.include.membership.select.serviceId, true);
@@ -28,8 +28,8 @@ test('client list includes nearest active membership and returns an explicit emp
     client: {
       count: async () => 2,
       findMany: async (args) => {
-        assert.equal(args.include.memberships.where.remainedLessons.gt, 0);
-        assert.ok(args.include.memberships.where.validUntil.gte instanceof Date);
+        assert.equal(args.include.memberships.where.remainingUnits.gt, 0);
+        assert.ok(args.include.memberships.where.validTo.gte instanceof Date);
         assert.deepEqual(args.include.memberships.orderBy, [{ validUntil: 'asc' }, { id: 'asc' }]);
         assert.equal(args.include.memberships.take, 1);
         return [{ id: 'a', memberships: [{ id: 'm', remainedLessons: 5, totalLessons: 8, validUntil, pricingPlan: { name: '8 занятий' } }] },

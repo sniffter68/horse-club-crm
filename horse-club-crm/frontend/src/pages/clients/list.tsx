@@ -23,7 +23,7 @@ import { money } from '../catalogs/format'
 import type { Client, RelationBooking, RelationPayment } from '../catalogs/types'
 import { dateOnly, dateTime } from '../cards/format'
 import { useCatalogPermissions } from '../catalogs/permissions'
-import { ClientLedger, MembershipBalance, type ActiveMembership } from './membership'
+import { ClientLedger, MembershipBalance, MembershipVisibility, type ActiveMembership } from './membership'
 import { disciplines } from '../schedule/triad'
 
 type ClientRow = Client & { membership: ActiveMembership | null }
@@ -176,8 +176,8 @@ export function ClientList() {
 
         <div>
           <Typography.Title level={5}>Абонементы</Typography.Title>
-          {client.memberships.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Абонементов нет" /> :
-            <List<ClientMembership> dataSource={client.memberships} renderItem={membership => <List.Item>
+          <MembershipVisibility key={client.id} memberships={client.memberships}>{visible =>
+            <List<ClientMembership> dataSource={visible} renderItem={membership => <List.Item>
               <div style={{ width: '100%' }}>
                 <Space style={{ width: '100%', justifyContent: 'space-between' }} align="start">
                   <Typography.Text strong>{membership.pricingPlan?.name || 'Индивидуальный абонемент'}</Typography.Text>
@@ -216,7 +216,7 @@ export function ClientList() {
                   { key: 'carry', label: 'Переходит на следующий месяц', children: money(deferredBalance(membership)) },
                 ]} />
               </div>
-            </List.Item>} />}
+            </List.Item>} />}</MembershipVisibility>
         </div>
         <div>
           <Typography.Title level={5}>Постой</Typography.Title>

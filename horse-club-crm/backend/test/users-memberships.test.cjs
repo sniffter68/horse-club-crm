@@ -26,7 +26,7 @@ test('membership issue creates balance and initial CREDIT operation atomically',
     pricingPlan: { findUnique: async () => null },
     membership: { create: async ({ data }) => {
       saved = data;
-      return { id: 'membership-1', ...data, client: { id: 'client-1', name: 'Иван Иванов' }, pricingPlan: null, createdAt: new Date(), updatedAt: new Date() };
+      return { id: 'membership-1', ...data, validFrom: new Date(), client: { id: 'client-1', name: 'Иван Иванов' }, pricingPlan: null, createdAt: new Date(), updatedAt: new Date() };
     } },
   };
   prisma.ledgerTransaction = { create: async () => ({}) };
