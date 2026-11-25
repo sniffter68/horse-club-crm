@@ -5,6 +5,11 @@ import { IsBoolean, IsUUID, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength,
 import { HorseOwnerType, HorseSex, HorseStatus } from '@prisma/client';
 
 export class CreateHorseDto extends PublicationDto {
+  @ApiPropertyOptional({ default: true }) @IsOptional() @IsBoolean() allowIndividual?: boolean;
+  @ApiPropertyOptional({ default: true }) @IsOptional() @IsBoolean() allowGroup?: boolean;
+  @ApiPropertyOptional({ default: true }) @IsOptional() @IsBoolean() allowWalk?: boolean;
+  @ApiPropertyOptional({ default: true }) @IsOptional() @IsBoolean() allowSpecial?: boolean;
+
   @IsOptional() @IsString() @MaxLength(150) coat?: string | null;
   @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsEnum(HorseOwnerType) ownerType?: HorseOwnerType;
   @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsUUID() ownerId?: string | null;

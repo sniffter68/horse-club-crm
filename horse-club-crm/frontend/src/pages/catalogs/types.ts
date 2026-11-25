@@ -18,6 +18,7 @@ export interface Client extends Omit<ClientValues, 'phone' | 'preferences' | 'me
   id: string; createdAt: string; phone: string | null; preferences: string | null; medicalNotes?: string | null;
 }
 export interface HorseValues extends PublicationValues {
+  allowIndividual?: boolean; allowGroup?: boolean; allowWalk?: boolean; allowSpecial?: boolean;
   status?: 'active' | 'rest' | 'sick' | 'quarantine';
   coat?: string | null; ownerType?: 'club' | 'private'; ownerId?: string | null;
   sex?: 'STALLION' | 'MARE' | 'GELDING' | null;

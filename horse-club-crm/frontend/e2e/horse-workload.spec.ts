@@ -40,7 +40,9 @@ test.beforeEach(async ({ page }) => {
 })
 
 async function selectOption(page: Page, modal: Locator, label: string, text: string) {
-  await modal.getByLabel(label, { exact: true }).last().click()
+  const input = modal.getByLabel(label, { exact: true }).last()
+  await input.focus()
+  await input.press('ArrowDown')
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: text }).last().click()
 }
 
@@ -168,4 +170,19 @@ test('slow date lookup disables save and a superseded response cannot replace th
   release()
   await expect(modal.locator('.ant-picker-input input').first()).toHaveValue('10.10.2026 12:00')
   await expect(modal.getByRole('button', { name: 'Записать на тренировку', exact: true })).toBeEnabled()
+})
+
+test('service availability is a soft warning and refreshes when the service changes', async ({ page }) => {
+  const horses = [{ ...horse, allowGroup: false, allowWalk: true }]
+  await page.route('**/api/horses?*', route => route.fulfill({ json: horses, headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/services?*', route => route.fulfill({ json: [service,
+    { ...service, id: '00000000-0000-4000-8000-000000000908', title: 'Прогулка', name: 'Прогулка' }], headers: { 'x-total-count': '2' } }))
+  test.setTimeout(40_000)
+  const modal = await test.step('open booking with flagged horse', () => openBooking(page))
+  await expect(modal.getByRole('status').filter({ hasText: 'отключено в карточке лошади' })).toContainText('Групповые занятия')
+  await expect(modal.getByTitle('Валдай · направление отключено', { exact: true })).toBeVisible()
+  const availability = page.waitForRequest(request => request.url().includes('/bookings/availability?') && new URL(request.url()).searchParams.get('serviceDirection') === 'allowWalk')
+  await test.step('change service', () => selectOption(page, modal, 'Услуга', 'Прогулка'))
+  await test.step('refresh availability for walk', () => availability)
+  await expect(modal.getByRole('status').filter({ hasText: 'отключено в карточке лошади' })).toHaveCount(0)
 })

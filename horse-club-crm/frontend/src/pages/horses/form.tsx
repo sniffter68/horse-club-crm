@@ -1,3 +1,5 @@
+import { ToggleSettingRow } from '../../components/ToggleSettingRow'
+import { horseServiceSettings } from './serviceAvailability'
 import { PublicationFields } from '../catalogs/PublicationFields'
 import { CatalogForm, NumberField, TextField } from '../catalogs/shared'
 import type { Horse, HorseValues } from '../catalogs/types'
@@ -13,7 +15,7 @@ export function HorseForm({ action }: { action: 'create' | 'edit' }) {
   const { id } = useParams()
   return <CatalogForm<Horse, HorseValues> resource="horses" action={action}
     title={action === 'create' ? 'Новая лошадь' : 'Редактирование лошади'}
-    defaults={{ isPublic: true, order: 0, maxRiderWeight: 85, maxDailyMinutes: 240, minRestMinutes: 15, status: 'active', isUnavailable: false, ownerType: 'club' }}
+    defaults={{ allowIndividual: true, allowGroup: true, allowWalk: true, allowSpecial: true, isPublic: true, order: 0, maxRiderWeight: 85, maxDailyMinutes: 240, minRestMinutes: 15, status: 'active', isUnavailable: false, ownerType: 'club' }}
     toPayload={({ isUnavailable, ...values }) => ({ ...values, isUnavailable: values.status ? values.status !== 'active' : isUnavailable, ownerId: values.ownerType === 'club' ? null : values.ownerId })}>
     <NumberField name="maxRiderWeight" label="Максимальный вес всадника, кг" min={1} max={1000} />
     <TextField name="name" label="Кличка" required />
@@ -31,6 +33,12 @@ export function HorseForm({ action }: { action: 'create' | 'edit' }) {
     <NumberField name="maxDailyMinutes" label="Суточный лимит нагрузки, мин" min={1} />
     <NumberField name="minRestMinutes" label="Минимальный отдых, мин" />
     {action === 'edit' && id && <HorseIssues horseId={id} readOnly />}
+    <fieldset className="horse-service-settings">
+      <legend>Доступность для занятий</legend>
+      {horseServiceSettings.map(setting => <Form.Item key={setting.key} name={setting.key} valuePropName="checked" initialValue={true}>
+        <ToggleSettingRow title={setting.title} description={setting.description} data-testid={`horse-${setting.key}`} />
+      </Form.Item>)}
+    </fieldset>
     <PublicationFields />
   </CatalogForm>
 }

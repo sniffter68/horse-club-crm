@@ -1,3 +1,4 @@
+import { horseServiceSettings } from './serviceAvailability'
 import { ProfileHeader, ProfileSection, ProfileFields } from '../cards/ProfileDetails'
 import { Link, useSearchParams } from 'react-router-dom'
 import { isUuid } from '../../uuid'
@@ -45,6 +46,10 @@ export function HorseList() {
         badges={horse.deletedAt ? <Tag>Лошадь в архиве</Tag> : <Tag className={`crm-tag crm-tag--${horse.status === 'sick' || horse.status === 'quarantine' ? 'danger' : horse.isUnavailable ? 'warning' : 'success'}`}>{horse.status ? horseStatuses[horse.status] : horse.isUnavailable ? 'Недоступна' : 'Доступна'}</Tag>}
         actions={!horse.deletedAt && <><CatalogEditAction resource="horses" id={horse.id}><HorseForm action="edit" /></CatalogEditAction>{canManage && <HorseStatusEditor horse={horse} cardAction />}</>} />} >
       {(horse, ready) => <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <ProfileSection title="Доступность для занятий"><Space wrap>
+          {horseServiceSettings.filter(setting => horse[setting.key] !== false).map(setting => <Tag className="crm-tag crm-tag--success" key={setting.key}>{setting.title}</Tag>)}
+          {horseServiceSettings.every(setting => horse[setting.key] === false) && <span>Все направления отключены</span>}
+        </Space></ProfileSection>
         {horse.deletedAt && <Alert type="info" showIcon message="Лошадь в архиве" description="История занятий, постоя и ветеринарные записи сохранены. Назначение на занятия недоступно." />}
         <ProfileSection title="Основная информация"><ProfileFields items={[
           { label: 'Пол', value: horse.sex ? sexes[horse.sex] : 'Не указан' },

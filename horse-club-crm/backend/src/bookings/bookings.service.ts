@@ -226,6 +226,8 @@ export class BookingsService {
 
   async availability(query: BookingAvailabilityDto) {
     const { start, end } = this.interval(query);
+    const direction = query.serviceDirection ?? (query.serviceType === undefined ? undefined
+      : query.serviceType === 'walks' ? 'allowWalk' : query.serviceType === 'photoshoot' ? 'allowSpecial' : 'allowIndividual');
     const zone = process.env.CLUB_TIME_ZONE || 'Europe/Moscow';
     const day = DateTime.fromJSDate(start, { zone }).startOf('day');
     const dayStart = day.toJSDate(), dayEnd = day.plus({ days: 1 }).toJSDate();
@@ -244,6 +246,8 @@ export class BookingsService {
       return { date: day.toISODate(), horseWorkloads: horses.map(h => {
         const used = rows.filter(r => r.horseIds.includes(h.id)).reduce((sum, r) => sum + Math.max(0, Math.min(+r.end, +dayEnd) - Math.max(+r.start, +dayStart)), 0) / 60000;
         return { horseId: h.id, horseName: h.name, currentWorkloadMinutes: used, maxDailyWorkloadMinutes: h.maxDailyWorkloadMinutes,
+          serviceAvailability: { allowIndividual: h.allowIndividual !== false, allowGroup: h.allowGroup !== false, allowWalk: h.allowWalk !== false, allowSpecial: h.allowSpecial !== false },
+          ...(direction ? { serviceAllowed: h[direction] !== false, warnings: h[direction] === false ? ['HORSE_SERVICE_DISABLED'] : [] } : {}),
           status: h.status !== 'active' || h.isUnavailable ? 'UNAVAILABLE' : used > h.maxDailyWorkloadMinutes ? 'OVERLOADED' : used === h.maxDailyWorkloadMinutes ? 'AT_LIMIT' : 'AVAILABLE' };
       }), arenaOccupancy: arenas.map(a => {
         const events = rows.filter(r => r.arenaId === a.id && r.start < end && r.end > start).flatMap(r => [

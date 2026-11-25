@@ -539,7 +539,7 @@ html[data-theme='dark'] .vk-invite-command { background: var(--crm-paper); borde
 .module-permissions-table caption { text-align: left; padding: 12px 16px; }
 
 .dashboard-quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.entry-drawer { --crm-paper: #241e1c; --crm-ink: #faf7f2; --crm-border: rgb(255 255 255 / 16%); --crm-hairline: rgb(255 255 255 / 8%); --crm-alabaster: #181311; color: var(--crm-ink); }
+.entry-drawer { --crm-text-secondary: #c8bcb5; --crm-paper: #241e1c; --crm-ink: #faf7f2; --crm-border: rgb(255 255 255 / 16%); --crm-hairline: rgb(255 255 255 / 8%); --crm-alabaster: #181311; color: var(--crm-ink); }
 .entry-drawer .ant-drawer-title, .entry-drawer .ant-drawer-close { color: var(--crm-ink); }
 .entry-drawer .ant-typography { color: #c8bcb5; }
 .entry-drawer .ant-btn-primary { border-color: #80695d; }
@@ -602,3 +602,22 @@ html[data-theme='dark'] .dashboard-quick-actions .ant-btn-default { color: var(-
 .crm-entity-table .ant-tag { max-width: 100%; margin-inline-end: 0; white-space: normal; }
 .crm-entity-table .ant-table-cell { font-variant-numeric: tabular-nums; }
 .table-cell-text { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Shared setting plates inherit the active Horse Club OS theme, including drawers. */
+.toggle-setting-row { border: 1px solid var(--crm-border); border-radius: 1rem; background: var(--crm-paper); color: var(--crm-ink); }
+.toggle-setting-row__control { display: flex; align-items: center; gap: 1rem; padding: 1rem; cursor: pointer; }
+.toggle-setting-row__label { flex: 1; min-width: 0; cursor: pointer; }
+.toggle-setting-row__title, .toggle-setting-row__description { display: block; }
+.toggle-setting-row__title { font-weight: 600; }
+.toggle-setting-row__description { margin-top: .25rem; color: var(--crm-text-secondary); font-size: .875rem; }
+.toggle-setting-row .ant-switch { flex: none; min-width: 52px; height: 28px; background: color-mix(in srgb, var(--crm-ink) 20%, var(--crm-paper)); box-shadow: inset 0 0 0 1px var(--crm-text-secondary); }
+.toggle-setting-row .ant-switch.ant-switch-checked { background: var(--crm-saddle); }
+.toggle-setting-row .ant-switch .ant-switch-handle { width: 24px; height: 24px; }
+.toggle-setting-row .ant-switch.ant-switch-checked .ant-switch-handle { inset-inline-start: calc(100% - 26px); }
+.toggle-setting-row:not([data-disabled]):hover { border-color: var(--crm-saddle); background: var(--crm-alabaster); }
+.toggle-setting-row:focus-within { outline: 2px solid var(--crm-ink); outline-offset: 2px; }
+.toggle-setting-row[data-disabled] { opacity: .6; }
+.toggle-setting-row[data-disabled] .toggle-setting-row__control, .toggle-setting-row[data-disabled] .toggle-setting-row__label { cursor: not-allowed; }
+.toggle-setting-row__children { padding: 1rem; border-top: 1px solid var(--crm-border); }
+.horse-service-settings { border: 0; padding: 0; margin: 0 0 1.5rem; min-width: 0; }
+.horse-service-settings legend { color: var(--crm-ink); font-weight: 600; margin-bottom: 1rem; }

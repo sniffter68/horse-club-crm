@@ -1,3 +1,4 @@
+import { horseServiceDirection, horseServiceWarning } from '../horses/serviceAvailability'
 import { isMembershipActive } from '../memberships/activity'
 import { useRoleAccess } from '../../access'
 import { SearchSelect } from '../../components/SearchSelect'
@@ -99,7 +100,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
     })()
     return () => controller.abort()
   }, [allowMembership, clientId, form, revision, isTrainer, serviceId, from, to])
-  const availability = useTriadAvailability(from, to, revision + resourceRevision, report)
+  const availability = useTriadAvailability(from, to, revision + resourceRevision, report, undefined, horseServiceDirection(catalogs.services.find(row => row.id === serviceId)))
   const conflicts = useScheduleConflicts(from, to, undefined, revision + resourceRevision)
   const trainerLimit = catalogs.trainers.find(row => row.id === trainerId)?.maxParallelLessons ?? 4
   const occupiedTrainerPlaces = trainerId ? conflicts.trainerOccupancy(trainerId) : undefined
@@ -114,6 +115,8 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
       && (!(membership.validTo || membership.validUntil) || +new Date(membership.validTo || membership.validUntil) >= at)
   })
   const selectedService = catalogs.services.find(row => row.id === serviceId)
+  const direction = horseServiceDirection(selectedService)
+  const serviceWarning = horseServiceWarning(catalogs.horses.find(row => row.id === horseId), direction)
   const commissionPercent = Number(catalogs.trainers.find(row => row.id === trainerId)?.commissionPercent ?? 30)
   const nominalPrice = Number(selectedService?.price ?? 0)
   const blockedHorse = (id: string) => {
@@ -168,8 +171,9 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
     {conflicts.error && <Alert type="warning" showIcon message="Не удалось проверить свободные места тренера" description="При сохранении сервер повторно проверит вместимость."
       action={<Button onClick={() => retry(n => n + 1)}>Повторить</Button>} />}
     <Form.Item name="horseId" label="Лошадь" extra={perPerson ? 'Для экскурсий выбор лошади необязателен' : 'Можно назначить лошадь позже в карточке занятия'}><SearchSelect allowClear placeholder="Назначить позже / Не выбрана" onChange={preferences.horseChanged} onInputKeyDown={stopPopupEscape} aria-label="Лошадь" loading={catalogs.loading || availability.loading} showSearch optionFilterProp="label"
-      options={[{ value: '', label: 'Назначить позже / Не выбрана' }, ...catalogs.horses.map(row => ({ value: row.id, label: row.name, disabled: !from || availability.loading || blockedHorse(row.id) }))]} /></Form.Item>
+      options={[{ value: '', label: 'Назначить позже / Не выбрана' }, ...catalogs.horses.map(row => ({ value: row.id, label: `${row.name}${horseServiceWarning(row, direction) ? ' · направление отключено' : ''}`, disabled: !from || availability.loading || blockedHorse(row.id) }))]} /></Form.Item>
     {horseId && !availability.loading && blockedHorse(horseId) && <Alert type="warning" showIcon message="Лошадь недоступна или превышен дневной лимит. Выберите другую лошадь или время." />}
+    {serviceWarning && <Alert type="warning" showIcon role="status" message={serviceWarning} />}
     {horseConflict && <Alert type="error" showIcon message="Лошадь занята в выбранный интервал. Выберите другое время или лошадь." />}
     <Form.Item name="arenaId" label="Манеж / локация"><Select onInputKeyDown={stopPopupEscape} allowClear showSearch optionFilterProp="label" loading={catalogs.loading}
       options={catalogs.arenas.map(row => ({ value: row.id, label: row.name }))} /></Form.Item>

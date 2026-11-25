@@ -1,3 +1,4 @@
+import { disciplineDirection, horseServiceWarning } from '../horses/serviceAvailability'
 import { SearchSelect } from '../../components/SearchSelect'
 import { ScheduleConflictNotice } from './ScheduleConflictNotice'
 import { scheduleConflicts } from './triad'
@@ -36,6 +37,8 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const clientId = Form.useWatch('clientId', form) as string | undefined
   const trainerId = Form.useWatch('trainerId', form) as string | undefined
+  const serviceType = Form.useWatch('serviceType', form) as string | undefined
+  const direction = disciplineDirection(serviceType)
   const horseId = Form.useWatch('horseId', form) as string | undefined
   const arenaId = Form.useWatch('arenaId', form) as string | undefined
   const startTime = Form.useWatch('startTime', form) as string | undefined
@@ -72,7 +75,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
   const occupiedTrainerPlaces = trainerId ? trainerOccupancy(trainerId) : undefined
   const trainerFull = occupiedTrainerPlaces !== undefined && occupiedTrainerPlaces >= trainerLimit
   const horseBusy = scheduleConflicts(conflicts.entries, trainerId, horseId ? [horseId] : []).horses.length > 0
-  const availability = useTriadAvailability(from, to, revision, report, booking?.id)
+  const availability = useTriadAvailability(from, to, revision, report, booking?.id, direction)
   const client = loadedClient?.id === clientId ? loadedClient : clients.find(c => c.id === clientId)
   const preferences = useClientPreferences(form, client, horses, trainers, ['horseId'], Boolean(booking))
   const horse = horses.find(h => h.id === horseId)
@@ -139,9 +142,10 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
         <SearchSelect onInputKeyDown={stopPopupEscape} onChange={preferences.horseChanged} id="triad_horseId" aria-label="Лошадь" showSearch allowClear optionFilterProp="label" placeholder="Выберите активную лошадь" loading={availability.loading} options={horses.filter(activePreferredHorse).map(h => {
           const load = availability.data?.horseWorkloads.find(w => w.horseId === h.id)
           const unsuitable = weight !== undefined && weight > (h.maxRiderWeight ?? 85)
-          return { value: h.id, disabled: unsuitable, label: `${h.name} — ${load ? `${formatMinutes(load.currentWorkloadMinutes)} / ${load.maxDailyWorkloadMinutes} мин` : 'нагрузка уточняется'}${unsuitable ? ` · вес до ${h.maxRiderWeight ?? 85} кг` : ''}` }
+          return { value: h.id, disabled: unsuitable, label: `${h.name}${horseServiceWarning(h, direction) ? ' · направление отключено' : ''} — ${load ? `${formatMinutes(load.currentWorkloadMinutes)} / ${load.maxDailyWorkloadMinutes} мин` : 'нагрузка уточняется'}${unsuitable ? ` · вес до ${h.maxRiderWeight ?? 85} кг` : ''}` }
         })} />
       </Form.Item>
+      {horseServiceWarning(horse, direction) && <Alert type="warning" showIcon role="status" message={horseServiceWarning(horse, direction)} />}
       {overweight && <Alert className="horse-workload-warning" type="error" showIcon role="alert" message="Вес всадника превышает допустимый лимит для выбранной лошади. Выберите другую лошадь." />}
       {workload && <Typography.Paragraph className="triad-load" role="status">Нагрузка за {availability.data?.date?.split('-').reverse().join('.')}: {formatMinutes(workload.currentWorkloadMinutes)} / {workload.maxDailyWorkloadMinutes} мин</Typography.Paragraph>}
       <ScheduleConflictNotice entries={conflicts.entries} trainerId={trainerId} horseIds={horseId ? [horseId] : []} error={conflicts.error} />

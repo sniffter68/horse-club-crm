@@ -26,6 +26,9 @@ export interface ClientWithMemberships extends Client { memberships: MembershipS
 export interface ClubSchedule { openTime: string; closeTime: string; daysOfWeekOff: number[] }
 export interface Workload { maxDailyMinutes: number; usedMinutes: number; remainingMinutes: number }
 export interface DailyHorseWorkload {
+  serviceAvailability?: { allowIndividual: boolean; allowGroup: boolean; allowWalk: boolean; allowSpecial: boolean };
+  serviceAllowed?: boolean;
+  warnings?: string[];
   horseId: string; horseName: string; currentWorkloadMinutes: number; maxDailyWorkloadMinutes: number;
   status: 'AVAILABLE' | 'AT_LIMIT' | 'OVERLOADED' | 'UNAVAILABLE';
 }

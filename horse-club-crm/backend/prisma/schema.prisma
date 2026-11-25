@@ -308,6 +308,10 @@ model Trainer {
 }
 
 model Horse {
+  allowIndividual Boolean @default(true)
+  allowGroup Boolean @default(true)
+  allowWalk Boolean @default(true)
+  allowSpecial Boolean @default(true)
   deletedAt DateTime? @db.Timestamptz(6)
   @@index([deletedAt])
   preferredByClients Client[] @relation("ClientPreferredHorse")
