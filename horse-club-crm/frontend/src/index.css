@@ -605,19 +605,19 @@ html[data-theme='dark'] .dashboard-quick-actions .ant-btn-default { color: var(-
 
 /* Shared setting plates inherit the active Horse Club OS theme, including drawers. */
 .toggle-setting-row { border: 1px solid var(--crm-border); border-radius: 1rem; background: var(--crm-paper); color: var(--crm-ink); }
-.toggle-setting-row__control { display: flex; align-items: center; gap: 1rem; padding: 1rem; cursor: pointer; }
+.toggle-setting-row__control { display: flex; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; }
 .toggle-setting-row__label { flex: 1; min-width: 0; cursor: pointer; }
 .toggle-setting-row__title, .toggle-setting-row__description { display: block; }
 .toggle-setting-row__title { font-weight: 600; }
 .toggle-setting-row__description { margin-top: .25rem; color: var(--crm-text-secondary); font-size: .875rem; }
-.toggle-setting-row .ant-switch { flex: none; min-width: 52px; height: 28px; background: color-mix(in srgb, var(--crm-ink) 20%, var(--crm-paper)); box-shadow: inset 0 0 0 1px var(--crm-text-secondary); }
+.toggle-setting-row .ant-switch { flex: none; width: 38px; min-width: 38px; height: 22px; line-height: 22px; background: color-mix(in srgb, var(--crm-ink) 20%, var(--crm-paper)); box-shadow: inset 0 0 0 1px var(--crm-text-secondary); }
 .toggle-setting-row .ant-switch.ant-switch-checked { background: var(--crm-saddle); }
-.toggle-setting-row .ant-switch .ant-switch-handle { width: 24px; height: 24px; }
-.toggle-setting-row .ant-switch.ant-switch-checked .ant-switch-handle { inset-inline-start: calc(100% - 26px); }
+.toggle-setting-row .ant-switch .ant-switch-handle { width: 18px; height: 18px; }
+.toggle-setting-row .ant-switch.ant-switch-checked .ant-switch-handle { inset-inline-start: calc(100% - 20px); }
 .toggle-setting-row:not([data-disabled]):hover { border-color: var(--crm-saddle); background: var(--crm-alabaster); }
 .toggle-setting-row:focus-within { outline: 2px solid var(--crm-ink); outline-offset: 2px; }
 .toggle-setting-row[data-disabled] { opacity: .6; }
 .toggle-setting-row[data-disabled] .toggle-setting-row__control, .toggle-setting-row[data-disabled] .toggle-setting-row__label { cursor: not-allowed; }
-.toggle-setting-row__children { padding: 1rem; border-top: 1px solid var(--crm-border); }
+.toggle-setting-row__children { padding: 10px 14px; border-top: 1px solid var(--crm-border); }
 .horse-service-settings { border: 0; padding: 0; margin: 0 0 1.5rem; min-width: 0; }
 .horse-service-settings legend { color: var(--crm-ink); font-weight: 600; margin-bottom: 1rem; }
