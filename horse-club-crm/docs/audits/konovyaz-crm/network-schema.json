@@ -1,0 +1,2064 @@
+{
+  "policy": "GET schemas only; no primitive response values, query values, cookies or headers; numeric record paths anonymized",
+  "responses": [
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/companies/current",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "company": {
+            "id": "number"
+          },
+          "stables": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "name": "string",
+                "status": "string",
+                "phone": "null",
+                "address": "null",
+                "photoFilename": "null"
+              }
+            ]
+          },
+          "activeStableId": "number"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/info?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "stable": {
+            "id": "number",
+            "name": "string",
+            "description": "null",
+            "address": "null",
+            "latitude": "null",
+            "longitude": "null",
+            "status": "string",
+            "phone": "null"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/amenities?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "amenities": "null"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/working-hours?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "workingHours": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/photos/main?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "photos": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/companies/current",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "company": {
+            "id": "number"
+          },
+          "stables": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "name": "string",
+                "status": "string",
+                "phone": "null",
+                "address": "null",
+                "photoFilename": "null"
+              }
+            ]
+          },
+          "activeStableId": "number"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/services",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "services": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/horses",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "horses": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "stableId": "number",
+                "name": "string",
+                "birthdate": "null",
+                "breed": "null",
+                "suit": "null",
+                "height": "null",
+                "description": "null",
+                "character": "null",
+                "rating": "number",
+                "status": "string",
+                "isRideAvailable": "boolean",
+                "isPhotoAvailable": "boolean",
+                "isHippoAvailable": "boolean",
+                "isLessonsAvailable": "boolean",
+                "isRentAvailable": "boolean",
+                "isRented": "boolean",
+                "vetNote": "null",
+                "createdAt": "string",
+                "updatedAt": "string",
+                "media": {
+                  "type": "array",
+                  "length": 0,
+                  "items": []
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/horses/:id",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "horse": {
+            "id": "number",
+            "stableId": "number",
+            "name": "string",
+            "birthdate": "null",
+            "breed": "null",
+            "suit": "null",
+            "height": "null",
+            "description": "null",
+            "character": "null",
+            "rating": "number",
+            "status": "string",
+            "isRideAvailable": "boolean",
+            "isPhotoAvailable": "boolean",
+            "isHippoAvailable": "boolean",
+            "isLessonsAvailable": "boolean",
+            "isRentAvailable": "boolean",
+            "isRented": "boolean",
+            "vetNote": "null",
+            "createdAt": "string",
+            "updatedAt": "string",
+            "media": {
+              "type": "array",
+              "length": 0,
+              "items": []
+            }
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/staff",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "staff": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "stableId": "number",
+                "firstName": "string",
+                "lastName": "string",
+                "phone": "string",
+                "email": "string",
+                "avatarFilename": "null",
+                "avatarMeta": "null",
+                "isRideAvailable": "boolean",
+                "isPhotoAvailable": "boolean",
+                "isHippoAvailable": "boolean",
+                "isLessonsAvailable": "boolean",
+                "isActive": "boolean",
+                "status": "string",
+                "position": "string",
+                "middleName": "string",
+                "adminNote": "null",
+                "hasAccessToAdmin": "boolean",
+                "passwordHash": "null",
+                "createdAt": "string",
+                "updatedAt": "string"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/staff/:id",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "staff": {
+            "id": "number",
+            "stableId": "number",
+            "firstName": "string",
+            "lastName": "string",
+            "phone": "string",
+            "email": "string",
+            "avatarFilename": "null",
+            "avatarMeta": "null",
+            "isRideAvailable": "boolean",
+            "isPhotoAvailable": "boolean",
+            "isHippoAvailable": "boolean",
+            "isLessonsAvailable": "boolean",
+            "isActive": "boolean",
+            "status": "string",
+            "position": "string",
+            "middleName": "string",
+            "adminNote": "null",
+            "hasAccessToAdmin": "boolean",
+            "passwordHash": "null",
+            "createdAt": "string",
+            "updatedAt": "string"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/staff/schedule?from=[redacted]&to=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "days": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/bookings/timeline?date=[redacted]&view=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "bookings": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "schedule": "null",
+          "timezone": "string",
+          "horses": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "name": "string"
+              }
+            ]
+          },
+          "staff": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "firstName": "string",
+                "lastName": "string"
+              }
+            ]
+          },
+          "staffScheduleDays": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/bookings/timeline?date=[redacted]&view=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "bookings": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "schedule": "null",
+          "timezone": "string",
+          "horses": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "name": "string"
+              }
+            ]
+          },
+          "staff": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "firstName": "string",
+                "lastName": "string"
+              }
+            ]
+          },
+          "staffScheduleDays": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/bookings/timeline?date=[redacted]&view=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "bookings": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "schedule": "null",
+          "timezone": "string",
+          "horses": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "name": "string"
+              }
+            ]
+          },
+          "staff": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "firstName": "string",
+                "lastName": "string"
+              }
+            ]
+          },
+          "staffScheduleDays": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/bookings/timeline?date=[redacted]&view=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "bookings": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "schedule": "null",
+          "timezone": "string",
+          "horses": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "name": "string"
+              }
+            ]
+          },
+          "staff": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "firstName": "string",
+                "lastName": "string"
+              }
+            ]
+          },
+          "staffScheduleDays": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/photos/main?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "photos": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/info?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "stable": {
+            "id": "number",
+            "name": "string",
+            "description": "null",
+            "address": "null",
+            "latitude": "null",
+            "longitude": "null",
+            "status": "string",
+            "phone": "null"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/amenities?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "amenities": "null"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/working-hours?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "workingHours": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/user/clients?limit=[redacted]&offset=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "clients": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "stats": {
+            "total": "number",
+            "newThisMonth": "number",
+            "regular": "number",
+            "oneTime": "number"
+          },
+          "total": "number"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/aboniments",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "templates": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/aboniments/issued?limit=[redacted]&offset=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "aboniments": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "total": "number",
+          "stats": {
+            "total": "number",
+            "thisMonth": "number",
+            "activeTotal": "number",
+            "popular": "string"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/aboniments",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "templates": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/finances/recent",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "type": "array",
+          "length": 0,
+          "items": []
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/finances/stats",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "total": {
+            "value": "string",
+            "trendDirection": "string",
+            "trend": "number"
+          },
+          "cash": {
+            "value": "string",
+            "trendDirection": "string",
+            "trend": "number"
+          },
+          "cashless": {
+            "value": "string",
+            "trendDirection": "string",
+            "trend": "number"
+          },
+          "aboniments": {
+            "value": "string",
+            "trendDirection": "string",
+            "trend": "number"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/staff/accruals?month=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "period": {
+            "start": "string",
+            "end": "string",
+            "generatedAt": "string"
+          },
+          "items": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "staffId": "number",
+                "staffName": "string",
+                "position": "string",
+                "hours": "number",
+                "shiftsCount": "number",
+                "model": "null",
+                "modelLabel": "null",
+                "formula": "string",
+                "base": "null",
+                "bonus": "null",
+                "total": "null",
+                "payoutStatus": "string"
+              }
+            ]
+          },
+          "totals": {
+            "staffCount": "number",
+            "hours": "number",
+            "base": "number",
+            "bonus": "number",
+            "total": "number",
+            "unpaidCount": "number"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/finances/recent?limit=[redacted]&from=[redacted]&to=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "type": "array",
+          "length": 0,
+          "items": []
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/staff/accruals?month=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "period": {
+            "start": "string",
+            "end": "string",
+            "generatedAt": "string"
+          },
+          "items": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "staffId": "number",
+                "staffName": "string",
+                "position": "string",
+                "hours": "number",
+                "shiftsCount": "number",
+                "model": "null",
+                "modelLabel": "null",
+                "formula": "string",
+                "base": "null",
+                "bonus": "null",
+                "total": "null",
+                "payoutStatus": "string"
+              }
+            ]
+          },
+          "totals": {
+            "staffCount": "number",
+            "hours": "number",
+            "base": "number",
+            "bonus": "number",
+            "total": "number",
+            "unpaidCount": "number"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/reviews",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "reviews": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "stats": {
+            "average": "number",
+            "total": "number",
+            "trendDirection": "string",
+            "trend": "number",
+            "distribution": {
+              "1": "number",
+              "2": "number",
+              "3": "number",
+              "4": "number",
+              "5": "number"
+            }
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/analytics/stats?period=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "income": {
+            "value": "string",
+            "trendDirection": "string",
+            "trend": "number"
+          },
+          "orders": {
+            "value": "number",
+            "trendDirection": "string",
+            "trend": "number"
+          },
+          "clients": {
+            "value": "number",
+            "trendDirection": "string",
+            "trend": "number"
+          },
+          "popularService": {
+            "value": "string",
+            "trendDirection": "string",
+            "trend": "number"
+          },
+          "period": "string"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/analytics/income?period=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "type": "array",
+          "length": 7,
+          "items": [
+            {
+              "label": "string",
+              "value": "number"
+            },
+            {
+              "label": "string",
+              "value": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/analytics/service-orders?period=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "type": "array",
+          "length": 0,
+          "items": []
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/analytics/orders?period=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "type": "array",
+          "length": 7,
+          "items": [
+            {
+              "label": "string",
+              "value": "number"
+            },
+            {
+              "label": "string",
+              "value": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/analytics/service-income?period=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "type": "array",
+          "length": 0,
+          "items": []
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/notify?type=[redacted]&limit=[redacted]&offset=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "items": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "total": "number",
+          "unreadCount": "number"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/user/settings",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "settings": {
+            "id": "number",
+            "stableId": "number",
+            "clientNotificationsEnabled": "boolean",
+            "staffNotificationsEnabled": "boolean",
+            "adminNotificationsEnabled": "boolean",
+            "reminderNotificationsEnabled": "boolean",
+            "checkBookingNotificationsEnabled": "boolean",
+            "notificationFieldsEnabled": "boolean",
+            "notificationFields": {
+              "name": "string",
+              "value": "string"
+            },
+            "adminPhone": "null",
+            "createdAt": "string",
+            "updatedAt": "string"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/staff",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "staff": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "stableId": "number",
+                "firstName": "string",
+                "lastName": "string",
+                "phone": "string",
+                "email": "string",
+                "avatarFilename": "null",
+                "avatarMeta": "null",
+                "isRideAvailable": "boolean",
+                "isPhotoAvailable": "boolean",
+                "isHippoAvailable": "boolean",
+                "isLessonsAvailable": "boolean",
+                "isActive": "boolean",
+                "status": "string",
+                "position": "string",
+                "middleName": "string",
+                "adminNote": "null",
+                "hasAccessToAdmin": "boolean",
+                "passwordHash": "null",
+                "createdAt": "string",
+                "updatedAt": "string"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/tickets/all?status=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "tickets": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/companies/current",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "company": {
+            "id": "number"
+          },
+          "stables": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "name": "string",
+                "status": "string",
+                "phone": "null",
+                "address": "null",
+                "photoFilename": "null"
+              }
+            ]
+          },
+          "activeStableId": "number"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/bookings/timeline?date=[redacted]&view=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "bookings": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "schedule": "null",
+          "timezone": "string",
+          "horses": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "name": "string"
+              }
+            ]
+          },
+          "staff": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "firstName": "string",
+                "lastName": "string"
+              }
+            ]
+          },
+          "staffScheduleDays": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/aboniments",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "templates": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/aboniments/issued?limit=[redacted]&offset=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "aboniments": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "total": "number",
+          "stats": {
+            "total": "number",
+            "thisMonth": "number",
+            "activeTotal": "number",
+            "popular": "string"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/finances/stats",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "total": {
+            "value": "string",
+            "trendDirection": "string",
+            "trend": "number"
+          },
+          "cash": {
+            "value": "string",
+            "trendDirection": "string",
+            "trend": "number"
+          },
+          "cashless": {
+            "value": "string",
+            "trendDirection": "string",
+            "trend": "number"
+          },
+          "aboniments": {
+            "value": "string",
+            "trendDirection": "string",
+            "trend": "number"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/finances/recent",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "type": "array",
+          "length": 0,
+          "items": []
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/staff/accruals?month=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "period": {
+            "start": "string",
+            "end": "string",
+            "generatedAt": "string"
+          },
+          "items": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "staffId": "number",
+                "staffName": "string",
+                "position": "string",
+                "hours": "number",
+                "shiftsCount": "number",
+                "model": "null",
+                "modelLabel": "null",
+                "formula": "string",
+                "base": "null",
+                "bonus": "null",
+                "total": "null",
+                "payoutStatus": "string"
+              }
+            ]
+          },
+          "totals": {
+            "staffCount": "number",
+            "hours": "number",
+            "base": "number",
+            "bonus": "number",
+            "total": "number",
+            "unpaidCount": "number"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/staff/accruals?month=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "period": {
+            "start": "string",
+            "end": "string",
+            "generatedAt": "string"
+          },
+          "items": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "staffId": "number",
+                "staffName": "string",
+                "position": "string",
+                "hours": "number",
+                "shiftsCount": "number",
+                "model": "null",
+                "modelLabel": "null",
+                "formula": "string",
+                "base": "null",
+                "bonus": "null",
+                "total": "null",
+                "payoutStatus": "string"
+              }
+            ]
+          },
+          "totals": {
+            "staffCount": "number",
+            "hours": "number",
+            "base": "number",
+            "bonus": "number",
+            "total": "number",
+            "unpaidCount": "number"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/aboniments",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "templates": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/aboniments/issued?limit=[redacted]&offset=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "aboniments": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "total": "number",
+          "stats": {
+            "total": "number",
+            "thisMonth": "number",
+            "activeTotal": "number",
+            "popular": "string"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/user/clients?limit=[redacted]&offset=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "clients": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "stats": {
+            "total": "number",
+            "newThisMonth": "number",
+            "regular": "number",
+            "oneTime": "number"
+          },
+          "total": "number"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/companies/current",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "company": {
+            "id": "number"
+          },
+          "stables": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "name": "string",
+                "status": "string",
+                "phone": "null",
+                "address": "null",
+                "photoFilename": "null"
+              }
+            ]
+          },
+          "activeStableId": "number"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/info?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "stable": {
+            "id": "number",
+            "name": "string",
+            "description": "null",
+            "address": "null",
+            "latitude": "null",
+            "longitude": "null",
+            "status": "string",
+            "phone": "null"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/amenities?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "amenities": "null"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/photos/main?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "photos": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/working-hours?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "workingHours": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/staff",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "staff": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "stableId": "number",
+                "firstName": "string",
+                "lastName": "string",
+                "phone": "string",
+                "email": "string",
+                "avatarFilename": "null",
+                "avatarMeta": "null",
+                "isRideAvailable": "boolean",
+                "isPhotoAvailable": "boolean",
+                "isHippoAvailable": "boolean",
+                "isLessonsAvailable": "boolean",
+                "isActive": "boolean",
+                "status": "string",
+                "position": "string",
+                "middleName": "string",
+                "adminNote": "null",
+                "hasAccessToAdmin": "boolean",
+                "passwordHash": "null",
+                "createdAt": "string",
+                "updatedAt": "string"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/staff/schedule?from=[redacted]&to=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "days": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/notify?type=[redacted]&limit=[redacted]&offset=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "items": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          },
+          "total": "number",
+          "unreadCount": "number"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/user/settings",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "settings": {
+            "id": "number",
+            "stableId": "number",
+            "clientNotificationsEnabled": "boolean",
+            "staffNotificationsEnabled": "boolean",
+            "adminNotificationsEnabled": "boolean",
+            "reminderNotificationsEnabled": "boolean",
+            "checkBookingNotificationsEnabled": "boolean",
+            "notificationFieldsEnabled": "boolean",
+            "notificationFields": {
+              "name": "string",
+              "value": "string"
+            },
+            "adminPhone": "null",
+            "createdAt": "string",
+            "updatedAt": "string"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/staff",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "staff": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "stableId": "number",
+                "firstName": "string",
+                "lastName": "string",
+                "phone": "string",
+                "email": "string",
+                "avatarFilename": "null",
+                "avatarMeta": "null",
+                "isRideAvailable": "boolean",
+                "isPhotoAvailable": "boolean",
+                "isHippoAvailable": "boolean",
+                "isLessonsAvailable": "boolean",
+                "isActive": "boolean",
+                "status": "string",
+                "position": "string",
+                "middleName": "string",
+                "adminNote": "null",
+                "hasAccessToAdmin": "boolean",
+                "passwordHash": "null",
+                "createdAt": "string",
+                "updatedAt": "string"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/services",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "services": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/horses",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "horses": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "stableId": "number",
+                "name": "string",
+                "birthdate": "null",
+                "breed": "null",
+                "suit": "null",
+                "height": "null",
+                "description": "null",
+                "character": "null",
+                "rating": "number",
+                "status": "string",
+                "isRideAvailable": "boolean",
+                "isPhotoAvailable": "boolean",
+                "isHippoAvailable": "boolean",
+                "isLessonsAvailable": "boolean",
+                "isRentAvailable": "boolean",
+                "isRented": "boolean",
+                "vetNote": "null",
+                "createdAt": "string",
+                "updatedAt": "string",
+                "media": {
+                  "type": "array",
+                  "length": 0,
+                  "items": []
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/horses/:id",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "horse": {
+            "id": "number",
+            "stableId": "number",
+            "name": "string",
+            "birthdate": "null",
+            "breed": "null",
+            "suit": "null",
+            "height": "null",
+            "description": "null",
+            "character": "null",
+            "rating": "number",
+            "status": "string",
+            "isRideAvailable": "boolean",
+            "isPhotoAvailable": "boolean",
+            "isHippoAvailable": "boolean",
+            "isLessonsAvailable": "boolean",
+            "isRentAvailable": "boolean",
+            "isRented": "boolean",
+            "vetNote": "null",
+            "createdAt": "string",
+            "updatedAt": "string",
+            "media": {
+              "type": "array",
+              "length": 0,
+              "items": []
+            }
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/info?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "stable": {
+            "id": "number",
+            "name": "string",
+            "description": "null",
+            "address": "null",
+            "latitude": "null",
+            "longitude": "null",
+            "status": "string",
+            "phone": "null"
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/amenities?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "amenities": "null"
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/photos/main?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "photos": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/stables/working-hours?stableId=[redacted]",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "workingHours": {
+            "type": "array",
+            "length": 0,
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "url": "https://api.konovyaz.ru/v1/admin/companies/current",
+      "status": 200,
+      "resourceType": "xhr",
+      "schema": {
+        "status": "string",
+        "data": {
+          "company": {
+            "id": "number"
+          },
+          "stables": {
+            "type": "array",
+            "length": 1,
+            "items": [
+              {
+                "id": "number",
+                "name": "string",
+                "status": "string",
+                "phone": "null",
+                "address": "null",
+                "photoFilename": "null"
+              }
+            ]
+          },
+          "activeStableId": "number"
+        }
+      }
+    }
+  ],
+  "captures": [
+    {
+      "file": "01-stables.png",
+      "url": "https://admin.konovyaz.ru/stables",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "02-stable-edit.png",
+      "url": "https://admin.konovyaz.ru/stable/:id",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "03-services.png",
+      "url": "https://admin.konovyaz.ru/services",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "04-service-create.png",
+      "url": "https://admin.konovyaz.ru/services",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "05-horses.png",
+      "url": "https://admin.konovyaz.ru/horses",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "06-horse-edit.png",
+      "url": "https://admin.konovyaz.ru/horses",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "07-horse-create.png",
+      "url": "https://admin.konovyaz.ru/horses",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "08-staff.png",
+      "url": "https://admin.konovyaz.ru/staff",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "09-staff-edit.png",
+      "url": "https://admin.konovyaz.ru/staff",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "10-staff-schedule.png",
+      "url": "https://admin.konovyaz.ru/staff",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "11-orders-staff.png",
+      "url": "https://admin.konovyaz.ru/orders",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "12-orders-horses.png",
+      "url": "https://admin.konovyaz.ru/orders",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "13-orders-list.png",
+      "url": "https://admin.konovyaz.ru/orders",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "14-clients.png",
+      "url": "https://admin.konovyaz.ru/clients",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "15-client-create.png",
+      "url": "https://admin.konovyaz.ru/clients",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "16-memberships-issued.png",
+      "url": "https://admin.konovyaz.ru/aboniments",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "17-memberships-templates.png",
+      "url": "https://admin.konovyaz.ru/aboniments",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "18-membership-template-create.png",
+      "url": "https://admin.konovyaz.ru/aboniments",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "19-finances-overview.png",
+      "url": "https://admin.konovyaz.ru/finances",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "20-finances-payments.png",
+      "url": "https://admin.konovyaz.ru/finances",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "21-finances-payroll.png",
+      "url": "https://admin.konovyaz.ru/finances",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "22-reviews.png",
+      "url": "https://admin.konovyaz.ru/reviews",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "23-analytics.png",
+      "url": "https://admin.konovyaz.ru/analytics",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "24-notifications.png",
+      "url": "https://admin.konovyaz.ru/notifications",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "25-settings-general.png",
+      "url": "https://admin.konovyaz.ru/settings",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "26-settings-administration.png",
+      "url": "https://admin.konovyaz.ru/settings",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "27-support.png",
+      "url": "https://admin.konovyaz.ru/support",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "28-knowledge-base.png",
+      "url": "https://admin.konovyaz.ru/tutorials",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "29-subscription.png",
+      "url": "https://admin.konovyaz.ru/subscription",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "30-subscription-yearly.png",
+      "url": "https://admin.konovyaz.ru/subscription",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "31-branch-license-gate.png",
+      "url": "https://admin.konovyaz.ru/stables",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "32-mobile-stables.png",
+      "url": "https://admin.konovyaz.ru/stables",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "33-mobile-menu.png",
+      "url": "https://admin.konovyaz.ru/stables",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "34-mobile-orders.png",
+      "url": "https://admin.konovyaz.ru/orders",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "35-mobile-memberships.png",
+      "url": "https://admin.konovyaz.ru/aboniments",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "36-mobile-membership-form.png",
+      "url": "https://admin.konovyaz.ru/aboniments",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "37-mobile-finances.png",
+      "url": "https://admin.konovyaz.ru/finances",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "38-mobile-payroll.png",
+      "url": "https://admin.konovyaz.ru/finances",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "39-mobile-client-form.png",
+      "url": "https://admin.konovyaz.ru/clients",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "40-mobile-stable-settings.png",
+      "url": "https://admin.konovyaz.ru/stable/:id",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "41-staff-create.png",
+      "url": "https://admin.konovyaz.ru/staff",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "42-staff-shift-editor.png",
+      "url": "https://admin.konovyaz.ru/staff",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "43-mobile-notification-settings.png",
+      "url": "https://admin.konovyaz.ru/settings",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "44-mobile-access.png",
+      "url": "https://admin.konovyaz.ru/settings",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "45-service-group-fields.png",
+      "url": "https://admin.konovyaz.ru/services",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "46-horse-vet-note.png",
+      "url": "https://admin.konovyaz.ru/horses",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "47-stable-photos.png",
+      "url": "https://admin.konovyaz.ru/stable/:id",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    }
+  ]
+}

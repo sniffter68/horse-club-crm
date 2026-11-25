@@ -1,0 +1,314 @@
+{
+  "date": "2026-11-25",
+  "backend": {
+    "typecheck": 0,
+    "lint": 0,
+    "lintWarnings": 3,
+    "build": 0,
+    "tests": {
+      "passed": 930,
+      "skipped": 27,
+      "failed": 0
+    }
+  },
+  "frontend": {
+    "typecheck": 0,
+    "lint": 0,
+    "build": 0,
+    "testFiles": 25,
+    "tests": {
+      "passed": 209,
+      "failed": 0
+    }
+  },
+  "mockPlaywright": {
+    "passed": 8,
+    "failed": 0
+  },
+  "prismaMigrationRequired": false,
+  "artifacts": [
+    {
+      "file": "01-stables.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "971203d988cf8b9507e1747e4a4d7fcc7f6d0cec3628361e8def1c474ef69f4b"
+    },
+    {
+      "file": "02-stable-edit.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "64d9504c82d5663a573681c112c28883a99a6df26d1b84c3821d48f54433888f"
+    },
+    {
+      "file": "03-services.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "eb8b56b0c5c97a48e50dc929027ff0a97f9266a773c3ee887d9e2d681917ade6"
+    },
+    {
+      "file": "04-service-create.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "2adf92ee004a38c183f5e57e18d5bb9d7a1df532dddd17ce1d8e6cec11b8a42e"
+    },
+    {
+      "file": "05-horses.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "fe678b34b4d594a35d84f9f4c72bb8dc3b0b9ab02d3b55bb23113c2aff823444"
+    },
+    {
+      "file": "06-horse-edit.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "f455fd242d7a9982123a8ccbf724a5c7c046599ab1657483aebc22e365cdf8e9"
+    },
+    {
+      "file": "07-horse-create.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "bbff4b62b7f2cbec24fd023a4855eada5362d8dcacc35321729602654ef60be8"
+    },
+    {
+      "file": "08-staff.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "3e4f7caf3ab889eeba03f38fb76f48493e53cfbbdc2861acbada9d6c7931cd4c"
+    },
+    {
+      "file": "09-staff-edit.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "a1166e6f31a28a6da0a212cd2aade11c79d9f4d76c5714bd0e629e0b62b5d01e"
+    },
+    {
+      "file": "10-staff-schedule.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "a0c65db5aa7db9c4fa71f3766312b981a9b50d818ff6fcda306a639cf7b26602"
+    },
+    {
+      "file": "11-orders-staff.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "d4c78d036ea17fdce64ff3c4a66fe4bd7614dbd3e719a0ea743fa5dbd45a67fa"
+    },
+    {
+      "file": "12-orders-horses.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "9053ea564a114bdd5e6fcd92aa832db58d43a70a808a022f4858dba64737caf8"
+    },
+    {
+      "file": "13-orders-list.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "dc7ac83fbbe699ec9c1edaee1584b32b89d12f4ee3fc2492bfe98f30d0cb01b2"
+    },
+    {
+      "file": "14-clients.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "7d6c8161220a066a0da454a0b674424f34c384ab5f2b50d2d2225aed9a58d30a"
+    },
+    {
+      "file": "15-client-create.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "dab61df6c93502c13e4b58aaee9816f92e3953418a3513e54176c120992cc4d3"
+    },
+    {
+      "file": "16-memberships-issued.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "536dfb4bfeb7584322c8a775d7f2be698a2e4f09231c78c07c9a90de88853a33"
+    },
+    {
+      "file": "17-memberships-templates.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "0efe93462b1724e443687959e6ef290bd344fa0ef373c575e0a987879291d1e0"
+    },
+    {
+      "file": "18-membership-template-create.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "b58b62bdcc0ba7ddcc3a9e5ba4174a67eafc091ce696151ac5f26c9e29e14ba4"
+    },
+    {
+      "file": "19-finances-overview.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "3b4f5eefc441b08b13d0b2a9738c0486149c73d27b4d4f4957c68482dc384bfb"
+    },
+    {
+      "file": "20-finances-payments.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "838d2aa65381db155eb24cfa93d56aaace1697178a872ee8c0d977be89549ea8"
+    },
+    {
+      "file": "21-finances-payroll.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "1ce478238910ec52247fbb8381790a1489dddcd216f2aebf9679a097fa566010"
+    },
+    {
+      "file": "22-reviews.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "c0ffbc086e83d96f766cb60d9c048f5470e55dfba2758adb988cb825acd3b542"
+    },
+    {
+      "file": "23-analytics.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "c83bf9ca191679b03bebc0264d6e466de19c5ec50ae00ea02178ac2e87c95ec8"
+    },
+    {
+      "file": "24-notifications.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "36926f44cc37ba680ca7bd81c29b7f26739a92b1388ea0bca89c34e9a3fc5e86"
+    },
+    {
+      "file": "25-settings-general.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "d0390098f20bb7682e55ed9b37be066572827979ee24fa399ba26276453e3157"
+    },
+    {
+      "file": "26-settings-administration.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "f9e86cd0bd0ef326b1f4ec93586925291bcee302994c74127f124f08340f8888"
+    },
+    {
+      "file": "27-support.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "e5f5159f319ddedeb91d6c7d8f95fc57da3c1e2004dd07198bdcf832346696d7"
+    },
+    {
+      "file": "28-knowledge-base.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "50587e05523e298692384c1c0f2d060ecb473a78e134c633e20858178d410342"
+    },
+    {
+      "file": "29-subscription.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "5eaa870e264d317b3f301941ae3ebbc70e9b17ca6d7c6bd4230b385c8aeab1f3"
+    },
+    {
+      "file": "30-subscription-yearly.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "7748eb1c5c0f19a414f68f57c15c5ddfcee8fe7891cb770c5d858abe8f612fb5"
+    },
+    {
+      "file": "31-branch-license-gate.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "a08fa1325c6976883bd570cefa02a9c380dc2adf2a5beefca70ec0dabe67c77f"
+    },
+    {
+      "file": "32-mobile-stables.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "fe786279a65053ff5d03c9f7fa17707f489bbcf8fa481108f2a544e417faef02"
+    },
+    {
+      "file": "33-mobile-menu.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "7807eeac3ae772029f831eedfae6917674eb14c0649345eff51a1e07c951aa92"
+    },
+    {
+      "file": "34-mobile-orders.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "8b2e3b50ffa393f776e0885b0b6b1826245867f301011c2b0c0db154ffcc332a"
+    },
+    {
+      "file": "35-mobile-memberships.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "8f5974363bf1ec838bfcb67d42d497af7c19776987f150fcfba198892af770b1"
+    },
+    {
+      "file": "36-mobile-membership-form.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "d1ebc54aeec57c8c9c4fa32483a36bd163ae3cded4af6640168b199b24451ee4"
+    },
+    {
+      "file": "37-mobile-finances.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "254bd0d85dde079e4ba17f7afc6909e2ec8b8873a81baaa2327175447cc916d8"
+    },
+    {
+      "file": "38-mobile-payroll.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "c4b934af0b54eb5367766c7dc84bcc298453fc275b99631f84e68e434d3db167"
+    },
+    {
+      "file": "39-mobile-client-form.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "148f74e476e1235579c67c3487180322b1665269a5000d7a1e061c5a9b451ff8"
+    },
+    {
+      "file": "40-mobile-stable-settings.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "6891205771ec5e82157b9544daec357a1dd9c58aad20108c10e187b853da1362"
+    },
+    {
+      "file": "41-staff-create.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "f0c8ef8b15e5171ad00e00c5f99e7462389967d085465dbf4ae81656ca49a351"
+    },
+    {
+      "file": "42-staff-shift-editor.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "c570ceac4b30ea8e54e476421a2537c182c6a68c815b0f398946d69140488a17"
+    },
+    {
+      "file": "43-mobile-notification-settings.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "2c3b8ef0abb8ca136305861a9fcb7aa36835bd9ab0cea09c4f31dd7908f8ea2a"
+    },
+    {
+      "file": "44-mobile-access.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "8330a82449d76253042ce0d2c393ae7b0229ccc7df1075a262ff9127405fe292"
+    },
+    {
+      "file": "45-service-group-fields.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "02d35d154a7743e09a79f1d503a3e0b7e1da0ae8622a42b57cbd2221923384f0"
+    },
+    {
+      "file": "46-horse-vet-note.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "b7bda2cc139a584e98d738c6b394b4e603bbbc9a4bf35b40dcb8ff7b3adc5406"
+    },
+    {
+      "file": "47-stable-photos.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "e3140f87f532530c1cb2116e00db1844106f8e0eb4a0e1e323b9fbbe87e7fd64"
+    }
+  ],
+  "brokenReportLinks": []
+}
