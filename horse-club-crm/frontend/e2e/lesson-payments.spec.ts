@@ -1,6 +1,33 @@
 import { test, expect, type Page, type Locator } from './fixtures'
 import type { Lesson } from '../src/pages/schedule/types'
 
+test('lesson horse warnings follow explicit service direction before name and capacity', async ({ page }) => {
+  await setup(page)
+  const horseId = id(70)
+  const horse = { id: horseId, name: 'Валдай', status: 'active', isUnavailable: false, maxDailyMinutes: 240,
+    maxDailyWorkloadMinutes: 240, maxRiderWeight: 100, allowWalk: false, allowGroup: false, allowSpecial: true }
+  const walk = { ...service, title: 'Фотосессия', name: 'Фотосессия', maxCapacity: 6, serviceDirection: 'allowWalk' }
+  const special = { ...service, id: id(71), title: 'Прогулка', name: 'Прогулка', serviceDirection: 'allowSpecial' }
+  await page.route('**/api/services?*', route => route.fulfill({ json: [walk, special], headers: { 'x-total-count': '2' } }))
+  await page.route('**/api/horses?*', route => route.fulfill({ json: [horse], headers: { 'x-total-count': '1' } }))
+  const directions: string[] = []
+  await page.route('**/api/bookings/availability?*', route => {
+    const params = new URL(route.request().url()).searchParams
+    if (params.get('serviceId')) directions.push(`${params.get('serviceId')}:${params.get('serviceDirection')}`)
+    return route.fulfill({ json: { horseWorkloads: [{ horseId, status: 'AVAILABLE', currentWorkloadMinutes: 0, maxDailyWorkloadMinutes: 240 }], arenaOccupancy: [] } })
+  })
+  await page.goto('/schedule')
+  await page.getByRole('button', { name: 'Записать на тренировку', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: 'Записать на тренировку', exact: true })
+  await choose(page, drawer, 'Услуга', walk.name)
+  await expect.poll(() => directions.includes(`${walk.id}:allowWalk`)).toBe(true)
+  await choose(page, drawer, 'Лошадь', 'Валдай · направление отключено')
+  await expect(drawer.getByRole('status').filter({ hasText: 'Направление «Прогулки и выезды» отключено' })).toBeVisible()
+  await choose(page, drawer, 'Услуга', special.name)
+  await expect.poll(() => directions.includes(`${special.id}:allowSpecial`)).toBe(true)
+  await expect(drawer.getByRole('status').filter({ hasText: 'Направление «Прогулки и выезды» отключено' })).toHaveCount(0)
+})
+
 for (const width of [1440, 390]) test(`optional horse creates an unpaid individual lesson at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 })
   const state = await setup(page)

@@ -11,6 +11,8 @@ export class HorseIssuesQueryDto extends RefineQueryDto {
   @IsOptional() @IsUUID() horseId?: string;
 }
 export class BookingAvailabilityDto extends BookingRangeDto {
+  @Transform(({ value }: { value: unknown }) => value === '' ? undefined : value)
+  @IsOptional() @IsUUID() serviceId?: string;
   @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional() @IsIn(['allowIndividual', 'allowGroup', 'allowWalk', 'allowSpecial'])
   serviceDirection?: 'allowIndividual' | 'allowGroup' | 'allowWalk' | 'allowSpecial';

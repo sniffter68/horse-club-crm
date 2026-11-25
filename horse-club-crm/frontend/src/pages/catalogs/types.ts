@@ -60,6 +60,7 @@ export interface Trainer extends Omit<TrainerValues, 'baseRate' | 'phone' | 'qua
   id: string; baseRate?: string | number; phone: string | null; qualification: string | null;
 }
 export interface ServiceValues extends PublicationValues {
+  serviceDirection?: 'allowIndividual' | 'allowGroup' | 'allowWalk' | 'allowSpecial' | null;
   name?: string; title: string; durationMinutes: number; maxCapacity: number;
   isPerPerson?: boolean; price?: number; cancellationWindowHours: number; allowMembership: boolean;
 }

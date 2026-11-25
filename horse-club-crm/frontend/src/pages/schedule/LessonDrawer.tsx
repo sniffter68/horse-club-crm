@@ -100,7 +100,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
     })()
     return () => controller.abort()
   }, [allowMembership, clientId, form, revision, isTrainer, serviceId, from, to])
-  const availability = useTriadAvailability(from, to, revision + resourceRevision, report, undefined, horseServiceDirection(catalogs.services.find(row => row.id === serviceId)))
+  const availability = useTriadAvailability(from, to, revision + resourceRevision, report, undefined, horseServiceDirection(catalogs.services.find(row => row.id === serviceId)), serviceId)
   const conflicts = useScheduleConflicts(from, to, undefined, revision + resourceRevision)
   const trainerLimit = catalogs.trainers.find(row => row.id === trainerId)?.maxParallelLessons ?? 4
   const occupiedTrainerPlaces = trainerId ? conflicts.trainerOccupancy(trainerId) : undefined

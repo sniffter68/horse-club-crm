@@ -1,9 +1,15 @@
 import { PublicationDto } from '../../common/dto/publication.dto';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { ServiceDirection } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class CreateServiceDto extends PublicationDto {
+  @ApiPropertyOptional({ enum: ServiceDirection, nullable: true })
+  @Transform(({ value }: { value: unknown }) => value === '' ? undefined : value)
+  @IsOptional()
+  @IsEnum(ServiceDirection)
+  serviceDirection?: ServiceDirection | null;
   @ApiPropertyOptional({ default: false })
   @IsOptional()
   @IsBoolean()

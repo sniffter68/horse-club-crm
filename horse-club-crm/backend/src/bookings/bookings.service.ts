@@ -1,4 +1,5 @@
 import { assertScheduleInterval } from '../settings/club-schedule';
+import { resolveServiceDirection } from '../services/service-direction';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { canUseMembership } from '../memberships/membership-access';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
@@ -228,13 +229,16 @@ export class BookingsService {
 
   async availability(query: BookingAvailabilityDto) {
     const { start, end } = this.interval(query);
-    const direction = query.serviceDirection ?? (query.serviceType === undefined ? undefined
+    const requestedDirection = query.serviceDirection ?? (query.serviceType === undefined ? undefined
       : query.serviceType === 'walks' ? 'allowWalk' : query.serviceType === 'photoshoot' ? 'allowSpecial' : 'allowIndividual');
     const zone = process.env.CLUB_TIME_ZONE || 'Europe/Moscow';
     const day = DateTime.fromJSDate(start, { zone }).startOf('day');
     const dayStart = day.toJSDate(), dayEnd = day.plus({ days: 1 }).toJSDate();
     const windowStart = new Date(Math.min(+start, +dayStart)), windowEnd = new Date(Math.max(+end, +dayEnd));
     return this.prisma.$transaction(async tx => {
+      const service = query.serviceId ? await tx.service.findUnique({ where: { id: query.serviceId } }) : null;
+      if (query.serviceId && !service) throw new NotFoundException('Услуга не найдена');
+      const direction = service ? resolveServiceDirection(service) : requestedDirection;
       const horses = await tx.horse.findMany({ where: { deletedAt: null } });
       const arenas = await tx.arena.findMany();
       const direct = await tx.booking.findMany({ where: { lessonId: null, status: { in: ['scheduled', 'completed'] }, startTime: { lt: windowEnd }, endTime: { gt: windowStart },

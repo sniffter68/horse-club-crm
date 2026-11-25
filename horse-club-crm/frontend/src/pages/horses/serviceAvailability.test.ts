@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { disciplineDirection, horseServiceDirection, horseServiceWarning } from './serviceAvailability'
 
 describe('horse service availability', () => {
+  it('uses the explicit direction before name and group capacity', () => {
+    expect(horseServiceDirection({ title: 'Фотосессия', maxCapacity: 4, serviceDirection: 'allowIndividual' })).toBe('allowIndividual')
+    expect(horseServiceDirection({ title: 'Тренировка', maxCapacity: 1, serviceDirection: 'allowWalk' })).toBe('allowWalk')
+    expect(horseServiceDirection({ title: 'Прогулка', maxCapacity: 4, serviceDirection: null })).toBe('allowWalk')
+  })
   it.each([
     ['Индивидуальная тренировка', 1, 'allowIndividual'], ['Выездка', 1, 'allowIndividual'],
     ['Групповое занятие', 5, 'allowGroup'], ['Тренировка', 3, 'allowGroup'],

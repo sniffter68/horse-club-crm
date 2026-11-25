@@ -1,10 +1,12 @@
 import type { HorseServiceDirection } from '../horses/serviceAvailability'
+import { isUuid } from '../../uuid'
 import { useEffect, useState } from 'react'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import type { TriadAvailability } from './triad'
 
-export function useTriadAvailability(from: string | undefined, to: string | undefined, revision: number, report: (cause: unknown) => void, excludeBookingId?: string, serviceDirection?: HorseServiceDirection) {
-  const key = `${from ?? ''}|${to ?? ''}|${revision}|${excludeBookingId ?? ''}|${serviceDirection ?? ''}`
+export function useTriadAvailability(from: string | undefined, to: string | undefined, revision: number, report: (cause: unknown) => void, excludeBookingId?: string, serviceDirection?: HorseServiceDirection, serviceId?: string) {
+  const validServiceId = serviceId && isUuid(serviceId) ? serviceId : undefined
+  const key = `${from ?? ''}|${to ?? ''}|${revision}|${excludeBookingId ?? ''}|${serviceDirection ?? ''}|${validServiceId ?? ''}`
   const enabled = Boolean(from && to)
   const [state, setState] = useState<{ key: string; data?: TriadAvailability; loading: boolean; error?: string }>({ key: '', loading: false })
   useEffect(() => {
@@ -12,7 +14,7 @@ export function useTriadAvailability(from: string | undefined, to: string | unde
     const timer = window.setTimeout(() => {
       if (!enabled) return
       setState({ key, loading: true })
-      void httpClient.get<TriadAvailability>(`${API_URL}/bookings/availability`, { signal: controller.signal, params: { from, to, excludeBookingId, serviceDirection } })
+      void httpClient.get<TriadAvailability>(`${API_URL}/bookings/availability`, { signal: controller.signal, params: { from, to, excludeBookingId, serviceDirection, serviceId: validServiceId } })
         .then(response => {
           if (!Array.isArray(response.data.horseWorkloads) || !Array.isArray(response.data.arenaOccupancy)) throw new Error('Не удалось прочитать доступность ресурсов')
           if (!controller.signal.aborted) setState({ key, data: response.data, loading: false })
@@ -24,6 +26,6 @@ export function useTriadAvailability(from: string | undefined, to: string | unde
         })
     }, 200)
     return () => { window.clearTimeout(timer); controller.abort() }
-  }, [enabled, excludeBookingId, from, key, report, serviceDirection, to])
+  }, [enabled, excludeBookingId, from, key, report, serviceDirection, to, validServiceId])
   return enabled && state.key === key ? state : { key, loading: enabled }
 }

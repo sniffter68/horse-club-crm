@@ -8,9 +8,10 @@ export const horseServiceSettings = [
 ] as const
 export type HorseServiceDirection = typeof horseServiceSettings[number]['key']
 
-// Service has no category field: explicit special/walk names take precedence over capacity.
-export function horseServiceDirection(service?: Pick<Service, 'title' | 'name' | 'maxCapacity' | 'isPerPerson'>): HorseServiceDirection | undefined {
+// Legacy services retain the name/capacity fallback until a direction is selected.
+export function horseServiceDirection(service?: Pick<Service, 'title' | 'name' | 'maxCapacity' | 'isPerPerson' | 'serviceDirection'>): HorseServiceDirection | undefined {
   if (!service) return undefined
+  if (service.serviceDirection) return service.serviceDirection
   const name = `${service.title} ${service.name ?? ''}`
   if (/иппо|фото|мероприят|экскурс|hippo|photo|event|excursion/i.test(name)) return 'allowSpecial'
   if (/прогул|выезд(?!к)|поход|walk|trail/i.test(name)) return 'allowWalk'

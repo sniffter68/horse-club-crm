@@ -256,7 +256,15 @@ model TelegramNotification {
   @@index([sentAt, nextAttemptAt])
 }
 
+enum ServiceDirection {
+  allowIndividual
+  allowGroup
+  allowWalk
+  allowSpecial
+}
+
 model Service {
+  serviceDirection ServiceDirection?
   isPerPerson Boolean @default(false)
   memberships Membership[]
   isPublic Boolean @default(true)
