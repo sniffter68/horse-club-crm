@@ -160,3 +160,22 @@ test('ADMIN updates club schedule while TRAINER receives 403', async () => {
     .send({ openTime: '10:00' })
     .expect(403);
 });
+
+test('weekly schedule HTTP round trip validates seven unique days and preserves legacy output', async () => {
+  const weekDays = Array.from({ length: 7 }, (_, index) => ({ dayOfWeek: index + 1,
+    isWorkingDay: index < 5, openTime: index === 0 ? '10:30' : '09:00', closeTime: '19:00' }));
+  const saved = await request(app.getHttpServer()).patch('/api/settings/club-schedule')
+    .set('x-test-role', Role.ADMIN).send({ weekDays }).expect(200);
+  assert.deepEqual(saved.body.weekDays, weekDays);
+  assert.deepEqual(saved.body.daysOfWeekOff, [0, 6]);
+  const read = await request(app.getHttpServer()).get('/api/settings/club-schedule')
+    .set('x-test-role', Role.TRAINER).expect(200);
+  assert.deepEqual(read.body.weekDays, weekDays);
+  for (const invalid of [weekDays.slice(1), weekDays.map(row => ({ ...row, dayOfWeek: 1 })),
+    weekDays.map(row => ({ ...row, isWorkingDay: 'false' })), weekDays.map(row => ({ ...row, closeTime: '08:00' }))]) {
+    await request(app.getHttpServer()).patch('/api/settings/club-schedule')
+      .set('x-test-role', Role.ADMIN).send({ weekDays: invalid }).expect(400);
+  }
+  await request(app.getHttpServer()).patch('/api/settings/club-schedule')
+    .set('x-test-role', Role.TRAINER).send({ weekDays }).expect(403);
+});

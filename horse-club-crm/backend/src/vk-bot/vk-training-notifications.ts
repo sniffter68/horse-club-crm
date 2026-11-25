@@ -23,6 +23,15 @@ const personName = (person?: VkPerson | null) => person?.name?.trim() || person?
   || [person?.firstName, person?.lastName].filter(Boolean).join(' ').trim() || 'не указан';
 const horseName = (horse?: { name: string } | null) => horse?.name?.trim() || 'не назначена';
 
+export async function queueTrainerCancellation(tx: Prisma.TransactionClient, key: string, trainerId: string, startTime: Date | null): Promise<void> {
+  const settings = await tx.clubNotificationSettings.findUnique({ where: { id: 1 } });
+  if (settings?.trainerCancellation === false) return;
+  const trainer = await tx.trainer.findUnique({ where: { id: trainerId }, select: { vkId: true } });
+  if (!trainer?.vkId) return;
+  const when = startTime ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Moscow' }).format(startTime) : 'время не указано';
+  await queueVkNotification(tx, `${key}:trainer:${trainer.vkId}`, trainer.vkId, `Тренировка отменена: ${when} (Москва)`);
+}
+
 // Only persist here. The worker contacts VK after the business transaction commits.
 export async function queueTrainingConfirmation(tx: Prisma.TransactionClient, key: string, training: TrainingNotification): Promise<void> {
   if (!training.trainer?.vkId && !training.participants.some(row => row.client?.vkUserId)) return;
@@ -31,7 +40,8 @@ export async function queueTrainingConfirmation(tx: Prisma.TransactionClient, ke
     dateStyle: 'short', timeStyle: 'short', timeZone: zone,
   }).format(date);
   const when = `${format(training.startTime)} — ${format(training.endTime)} (${zone})`;
-  if (training.trainer?.vkId) {
+  const settings = training.trainer?.vkId ? await tx.clubNotificationSettings.findUnique({ where: { id: 1 } }) : null;
+  if (training.trainer?.vkId && settings?.trainerNewBooking !== false) {
     const participants = training.participants.length ? training.participants.map(row =>
       `• Клиент: ${personName(row.client)} (${row.client?.phone?.trim() || 'телефон не указан'})\n• Лошадь: ${horseName(row.horse)}`
     ).join('\n') : '• Клиент: пока не записан\n• Лошадь: не назначена';

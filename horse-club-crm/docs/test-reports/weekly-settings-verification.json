@@ -1,0 +1,53 @@
+{
+  "feature": "Weekly club schedule and notification toggles",
+  "date": "2026-11-25",
+  "timeZone": "Europe/Moscow",
+  "checks": [
+    { "command": "npm --prefix backend run lint", "exitCode": 0, "notes": "Three existing warnings in unrelated test files; no errors." },
+    { "command": "npm --prefix backend run typecheck", "exitCode": 0 },
+    { "command": "npm --prefix backend run build", "exitCode": 0 },
+    { "command": "npm --prefix backend test", "exitCode": 0, "passed": 946, "skipped": 27, "failed": 0 },
+    { "command": "npm --prefix frontend run lint", "exitCode": 0 },
+    { "command": "npm --prefix frontend run typecheck", "exitCode": 0 },
+    { "command": "npm --prefix frontend run build", "exitCode": 0 },
+    { "command": "npm --prefix frontend test", "exitCode": 0, "passed": 221, "testFiles": 27, "failed": 0 },
+    { "command": "npx prisma generate", "cwd": "backend", "exitCode": 0, "version": "6.19.3" },
+    { "command": "npx --prefix frontend playwright test --config=frontend/playwright.crm.config.ts --project=mock weekly-settings.spec.ts schedule-interactions.spec.ts", "exitCode": 0, "passed": 14, "failed": 0 }
+  ],
+  "coverage": [
+    "Legacy schedule expansion without losing clocks or day-off indexes",
+    "Seven-day HTTP save/read, duplicate and invalid day rejection, role restrictions",
+    "Working-hour boundaries, holidays, Moscow date rollover and empty holiday slots",
+    "Legacy schedule PATCH compatibility and legacy frontend fallback",
+    "Notification settings validation, false values and administrator recipients",
+    "Independent VK reminders, suppression of queued disabled reminders, trainer notifications",
+    "Idempotent daily Telegram digest and recipient/settings revalidation at delivery",
+    "Weekly switches, apply-to-working-days, failure recovery and read-only controls",
+    "All days closed, unfinished time edits and retention of saved hours",
+    "Closed-day notice and navigation to schedule settings",
+    "Existing schedule booking, dragging, rollback, capacity, focus and read-only scenarios",
+    "Visual inspection at 390px light and 1440px dark, authored time/recipient controls"
+  ],
+  "migration": {
+    "path": "backend/prisma/migrations/20261125140000_weekly_schedule_notifications/migration.sql",
+    "applied": false,
+    "requiresDeployment": true,
+    "idempotentSql": true,
+    "prismaClientGenerated": true,
+    "notes": "Apply on the server before starting the new backend. Direct psql application requires recording/resolving the migration in Prisma history through the project's deployment procedure. No production or local database was modified."
+  },
+  "uiAudit": {
+    "rawReport": "docs/test-reports/weekly-settings-premium-audit.json",
+    "classifiedReport": "docs/test-reports/weekly-settings-ui-audit-classified.json",
+    "rawFindings": 269,
+    "confirmedFalsePositives": 269,
+    "unreviewed": 0,
+    "actualFormsWithoutNoValidate": 0,
+    "notes": "The static HTML parser misidentifies Ant Design Form.Item and Select JSX; the existing TypeScript AST classifier verified ownership. Existing DESIGN.md, UX-CONTRACT.md and runtime tokens were retained."
+  },
+  "limitations": [
+    "The 27 environment-gated PostgreSQL tests were skipped; migration application and repeated execution were not exercised against PostgreSQL.",
+    "settings.live.spec.ts was updated for the weekly UI but was not run against a live database.",
+    "Notification delivery was tested through mocked outboxes/APIs; no real VK or Telegram messages were sent."
+  ]
+}

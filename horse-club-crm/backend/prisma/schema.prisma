@@ -1012,7 +1012,20 @@ model ClubSchedule {
   openTime      String   @default("09:00")
   closeTime     String   @default("21:00")
   daysOfWeekOff Int[]    @default([1])
+  weekDays      Json?
   updatedAt     DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+model ClubNotificationSettings {
+  id Int @id @default(1)
+  clientReminder24h Boolean @default(true)
+  clientReminder2h Boolean @default(true)
+  trainerNewBooking Boolean @default(true)
+  trainerCancellation Boolean @default(true)
+  adminDigest Boolean @default(false)
+  adminDigestTime String @default("20:00")
+  adminRecipientIds String[] @default([]) @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 }
 
 model BoardingDailyLog {

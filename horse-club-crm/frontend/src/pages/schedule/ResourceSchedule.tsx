@@ -1,3 +1,4 @@
+import { clubHoursForDate } from './clubHours'
 import { useRef, useState, type ReactNode } from 'react'
 import type { ScheduleMove } from './reschedule'
 import { parallelLayout } from './parallelLayout'
@@ -23,7 +24,8 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
   const drag = useRef<{ entry: ScheduleEntry; offset: number } | null>(null)
   const suppressClick = useRef(false)
   const quickAnchor = useRef<HTMLButtonElement | null>(null)
-  const start = +new Date(toInstant(`${date}T${schedule.openTime}`)), end = +new Date(toInstant(`${date}T${schedule.closeTime}`))
+  const hours = clubHoursForDate(schedule, date)
+  const start = +new Date(toInstant(`${date}T${hours.openTime}`)), end = +new Date(toInstant(`${date}T${hours.closeTime}`))
   const scale = 3 // px per minute; preserve the resource timeline scale.
   const height = (end - start) / 60000 * scale
   const resources = grouping === 'trainers' ? trainers.map(t => ({ id: t.id, name: t.fullName || t.name })) : grouping === 'horses' ? [...horses, { id: 'unassigned', name: 'Без лошади' }] : arenas
@@ -99,6 +101,6 @@ export function ResourceSchedule({ grouping, date, schedule, entries, trainers, 
         })}
       </div>
     </div>
-    {canManage && <Button className="resource-book-action" onClick={() => onBook({ startTime: `${date}T${schedule.openTime}` })}>Выбрать время бронирования</Button>}
+    {canManage && <Button disabled={isDayOff} className="resource-book-action" onClick={() => onBook({ startTime: `${date}T${hours.openTime}` })}>Выбрать время бронирования</Button>}
   </div>
 }

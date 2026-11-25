@@ -10,6 +10,7 @@ const at = time => new Date(`2026-10-09T${time}:00Z`);
 function fixture({ horse = {}, client = {}, arena = {}, trainer = {}, bookings = [], lessons = [] } = {}) {
   const locks = [], writes = [];
   const tx = {
+    clubSchedule: { findUnique: async () => ({ openTime: '00:00', closeTime: '23:59', daysOfWeekOff: [] }) },
     bookingHorseChange: { create: async () => ({}) },
     $queryRaw: async sql => { locks.push({ query: sql.text, values: sql.values }); return []; },
     horse: { findMany: async () => [{ id: 'horse', status: 'active', isUnavailable: false, maxRiderWeight: 85, maxDailyWorkloadMinutes: 120, requiredRestMinutes: 45, ...horse }] },

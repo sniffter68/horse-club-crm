@@ -22,6 +22,7 @@ function harness(bookings = [booking()]) {
   const rows = new Map(), queries = [], warnings = [], logs = [], upserts = [];
   const inRange = (date, range) => date >= range.gte && date <= range.lte;
   const prisma = {
+    clubNotificationSettings: { findUnique: async () => null },
     booking: { findUnique: async ({ where }) => bookings.find(row => row.id === where.id) || null,
       findMany: async query => {
       queries.push(query);
@@ -44,6 +45,17 @@ function harness(bookings = [booking()]) {
   service.logger.log = entry => logs.push(entry);
   return { service, prisma, rows, queries, warnings, logs, upserts };
 }
+
+test('club settings disable each reminder independently', async () => {
+  const h = harness();
+  h.prisma.clubNotificationSettings.findUnique = async () => ({ clientReminder24h: false, clientReminder2h: false });
+  await h.service.tick(now);
+  assert.equal(h.queries.length, 0);
+  h.prisma.clubNotificationSettings.findUnique = async () => ({ clientReminder24h: false, clientReminder2h: true });
+  await h.service.tick(now);
+  assert.equal(h.queries.length, 1);
+  assert.equal(+h.queries[0].where.OR[0].lesson.is.startTime.gte - +now, 90 * 60000);
+});
 
 test('24-hour window includes both boundaries and excludes cancelled, completed and attended bookings', async () => {
   const h = harness([
@@ -180,7 +192,7 @@ test('blocked VK delivery records a single attempt, logs a warning and sends the
   const h = harness([booking(), booking({ id: 'booking-2', client: { firstName: 'Мария', name: '', vkUserId: 43n } })]);
   await h.service.tick(now);
   const warnings = [], sent = [];
-  const delivery = new VkNotifications({ booking: h.prisma.booking, vkNotification: {
+  const delivery = new VkNotifications({ clubNotificationSettings: h.prisma.clubNotificationSettings, booking: h.prisma.booking, vkNotification: {
     findMany: async () => [...h.rows.values()].filter(row => !row.sentAt && row.attemptCount === 0),
     updateMany: async ({ where }) => {
       const row = h.rows.get(where.id);
@@ -208,7 +220,7 @@ test('blocked VK delivery records a single attempt, logs a warning and sends the
   assert.equal(h.upserts.length, 2);
 });
 
-for (const kind of ['24h', '2h']) for (const change of ['cancelled', 'rescheduled', 'unlinked', 'started', 'deleted']) {
+for (const kind of ['24h', '2h']) for (const change of ['cancelled', 'rescheduled', 'unlinked', 'started', 'deleted', 'settings-disabled']) {
   test(`pending ${kind} reminder is discarded without sending when training is ${change}`, async t => {
     const checkTime = kind === '24h' ? now : new Date(+start - 2 * 3600000);
     t.mock.timers.enable({ apis: ['Date'], now: +checkTime });
@@ -221,8 +233,9 @@ for (const kind of ['24h', '2h']) for (const change of ['cancelled', 'reschedule
     if (change === 'unlinked') value.client.vkUserId = null;
     if (change === 'started') t.mock.timers.setTime(+start);
     if (change === 'deleted') bookings.length = 0;
+    if (change === 'settings-disabled') h.prisma.clubNotificationSettings.findUnique = async () => ({ clientReminder24h: false, clientReminder2h: false });
     const sent = [], warnings = [], updates = [];
-    const delivery = new VkNotifications({ booking: h.prisma.booking, vkNotification: {
+    const delivery = new VkNotifications({ clubNotificationSettings: h.prisma.clubNotificationSettings, booking: h.prisma.booking, vkNotification: {
       findMany: async () => [...h.rows.values()],
       deleteMany: async ({ where }) => { assert.equal(where.sentAt, null); h.rows.delete(where.id); },
       update: async args => updates.push(args),
@@ -288,7 +301,7 @@ for (const kind of ['24h', '2h']) {
     const h = harness();
     await h.service.tick(checkTime);
     let sends = 0;
-    const prisma = { booking: h.prisma.booking, vkNotification: {
+    const prisma = { clubNotificationSettings: h.prisma.clubNotificationSettings, booking: h.prisma.booking, vkNotification: {
       findMany: async query => {
         assert.equal(query.where.OR[1].attemptCount, 0);
         return [...h.rows.values()].filter(row => !row.sentAt && row.attemptCount === 0);

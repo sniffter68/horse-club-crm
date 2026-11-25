@@ -189,7 +189,7 @@ for (const kind of ['24h', '2h']) test(`${kind} outbox delivery attaches the inl
   const h = harness();
   const sent = [];
   const row = { id: 'notification', key: `reminder${kind}:${id}:${h.booking.startTime.toISOString()}:42`, peerId: 42n, message: 'Напоминание', attemptCount: 0 };
-  const delivery = new VkNotifications({ booking: h.prisma.booking, vkNotification: {
+  const delivery = new VkNotifications({ clubNotificationSettings: { findUnique: async () => null }, booking: h.prisma.booking, vkNotification: {
     findMany: async () => [row], updateMany: async () => ({ count: 1 }), update: async () => {},
   } });
   delivery.vk = { api: { messages: { send: async args => sent.push(args) } } };

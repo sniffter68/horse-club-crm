@@ -1,3 +1,5 @@
+import { clubHoursForDate, clubWeekDays } from './clubHours'
+import { ClubClosedNotice } from './ClubClosedNotice'
 import { QuickSlotBooking } from './QuickSlotBooking'
 import { moveConflict, type ScheduleMove } from './reschedule'
 import { bookingFailure } from './triad'
@@ -43,7 +45,7 @@ import { catalog } from '../catalogs/loadCatalog'
 export function SchedulePage() {
   const screens = Grid.useBreakpoint()
   const compactLayout = !screens.md
-  const { canManage } = useCatalogPermissions('schedule')
+  const { canManage, role } = useCatalogPermissions('schedule')
   const { message } = App.useApp()
   const { mutate: onError } = useOnError()
   const errorHandler = useRef(onError)
@@ -182,7 +184,7 @@ export function SchedulePage() {
 
   function openTriad(values: Partial<TriadValues> = {}, booking?: TriadBooking) {
     if (!canManage || !ready) return
-    const startTime = values.startTime ?? `${workloadDate}T${schedule?.openTime ?? '09:00'}`
+    const startTime = values.startTime ?? `${workloadDate}T${(schedule ? clubHoursForDate(schedule, workloadDate).openTime : '09:00')}`
     setEditingTriad(booking); setTriadDetail(undefined)
     setTriadSeed({ trainerId, horseId, arenaId, startTime, endTime: DateTime.fromISO(startTime, { zone: CLUB_TIME_ZONE }).plus({ minutes: 60 }).toFormat("yyyy-MM-dd'T'HH:mm"), ...values })
   }
@@ -228,7 +230,7 @@ export function SchedulePage() {
 
   function openBooking(values: Partial<TriadValues> = {}, minutes = 60) {
     if (!canManage || !ready || savingRef.current) return
-    setLessonSeed({ initialDateTime: values.startTime ?? `${workloadDate}T${schedule?.openTime ?? '09:00'}`,
+    setLessonSeed({ initialDateTime: values.startTime ?? `${workloadDate}T${(schedule ? clubHoursForDate(schedule, workloadDate).openTime : '09:00')}`,
       initialTrainerId: values.trainerId ?? trainerId, initialArenaId: values.arenaId ?? arenaId,
       initialHorseId: values.horseId ?? horseId, initialDurationMinutes: minutes })
   }
@@ -278,6 +280,7 @@ export function SchedulePage() {
   const horseOptions = horses.map(row => ({ value: row.id, label: row.name, disabled: row.isUnavailable }))
   const arenaOptions = arenas.map(row => ({ value: row.id, label: row.name, disabled: row.isUnavailable }))
   const failure = error ? <Alert type="error" showIcon message={error} /> : null
+  const selectedHours = schedule ? clubHoursForDate(schedule, workloadDate) : undefined
   return <Space className="schedule-page" direction="vertical" size="middle" style={{ width: '100%' }}>
     {completing && <CompleteLessonModal lesson={completing} onClose={() => { setDetail(completing); setCompleting(undefined) }} onSaved={updated => { setCompleting(undefined); setDetail(updated); setRevision(v => v + 1) }} />}
     <Typography.Title level={2}>Расписание занятий</Typography.Title>
@@ -306,6 +309,7 @@ export function SchedulePage() {
     {dayWorkloads.error && <Alert type="error" showIcon message="Не удалось загрузить нагрузку лошадей" description={dayWorkloads.error}
       action={<Button onClick={() => setWorkloadRevision(value => value + 1)}>Повторить</Button>} />}
     <Space wrap>{Object.entries(statuses).map(([status, item]) => <Tag className={`crm-tag crm-tag--${item.badge}`} bordered={false} key={status}>{item.label}</Tag>)}</Space>
+    {selectedHours && !selectedHours.isWorkingDay && <ClubClosedNotice canConfigure={role === 'ADMIN' || role === 'MANAGER'} />}
     <Card className="schedule-calendar"><Spin spinning={loading || triadLoading || (!ready && !error)}>
       {grouping !== 'calendar' && schedule && <ResourceSchedule grouping={grouping} date={workloadDate} schedule={schedule} entries={entries}
         trainers={trainers.filter(t => !trainerId || t.id === trainerId)} horses={horses.filter(h => !horseId || h.id === horseId)} arenas={arenas.filter(a => !arenaId || a.id === arenaId)}
@@ -316,13 +320,20 @@ export function SchedulePage() {
         timeZone={CLUB_TIME_ZONE} initialView={compactLayout ? 'timeGridDay' : 'timeGridWeek'}
         headerToolbar={compactLayout ? { left: 'prev,next', center: 'title', right: 'today' } : { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' }}
         buttonText={{ today: 'Сегодня', week: 'Неделя', day: 'День' }} firstDay={1} allDaySlot={false} nowIndicator height="auto"
-        slotMinTime={schedule.openTime} slotMaxTime={schedule.closeTime} hiddenDays={schedule.daysOfWeekOff}
+        slotMinTime={schedule.openTime} slotMaxTime={schedule.closeTime} businessHours={clubWeekDays(schedule).filter(day => day.isWorkingDay).map(day => ({ daysOfWeek: [day.dayOfWeek % 7], startTime: day.openTime, endTime: day.closeTime }))}
         selectable={canManage && ready} selectMirror selectOverlap={true} slotEventOverlap={false} eventMinHeight={0} eventDisplay="block"
         datesSet={({ start, end, view }) => {
           setRange(previous => previous?.from === start.toISOString() && previous.to === end.toISOString() ? previous : { from: start.toISOString(), to: end.toISOString() })
           setWorkloadDate(toLocalInput(view.calendar.getDate()).slice(0, 10))
         }}
-        select={({ start, end, view }) => { openBooking({ startTime: toLocalInput(start) }, Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000))); view.calendar.unselect() }}
+        dateClick={({ date }) => setWorkloadDate(toLocalInput(date).slice(0, 10))}
+        select={({ start, end, view }) => {
+          const date = toLocalInput(start).slice(0, 10)
+          setWorkloadDate(date)
+          if (clubHoursForDate(schedule, date).isWorkingDay)
+            openBooking({ startTime: toLocalInput(start) }, Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000)))
+          view.calendar.unselect()
+        }}
         events={entries.map(entry => ({ id: entry.source === 'booking' ? `triad:${entry.id}` : entry.id,
           title: eventSummary(entry), start: entry.startTime, end: entry.endTime,
           backgroundColor: entry.source === 'lesson' ? statuses[entry.status as Status].event : entry.completed ? 'var(--crm-success)' : entry.active ? 'var(--crm-saddle)' : 'var(--crm-warning)',

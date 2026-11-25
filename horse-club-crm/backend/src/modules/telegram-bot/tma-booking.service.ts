@@ -1,3 +1,4 @@
+import { scheduleForDay } from '../../settings/club-schedule';
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, ConflictException, HttpException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -52,7 +53,7 @@ export class TmaBookingService {
   }
 
   private async withinHours(tx: Prisma.TransactionClient, start: DateTime, minutes: number): Promise<boolean> {
-    const schedule = await this.schedule(tx);
+    const schedule = scheduleForDay(await this.schedule(tx), start.weekday);
     const open = schedule.openTime, close = schedule.closeTime;
     const off = schedule.daysOfWeekOff;
     const end = start.plus({ minutes });
@@ -77,7 +78,7 @@ export class TmaBookingService {
       const service = await this.service(tx, query.serviceId);
       const trainers = await tx.trainer.findMany({ where: { isPublic: true, isActive: true, ...(query.trainerId ? { id: query.trainerId } : {}) },
         orderBy: [{ order: 'asc' }, { id: 'asc' }], take: 50, select: { id: true, name: true } });
-      const schedule = await this.schedule(tx);
+      const schedule = scheduleForDay(await this.schedule(tx), day.weekday);
       if (schedule.daysOfWeekOff.includes(day.weekday % 7)) return { slots: [] };
       const slots: { startTime: string; endTime: string; trainers: { id: string; name: string }[] }[] = [];
       const open = DateTime.fromISO(`${query.date}T${schedule.openTime}`, { zone: ZONE });
@@ -148,7 +149,7 @@ export class TmaBookingService {
       if (!start.isValid) throw new BadRequestException('Некорректное время');
       this.date(start.toISODate()!);
       const service = await this.service(tx, dto.serviceId);
-      const schedule = await this.schedule(tx);
+      const schedule = scheduleForDay(await this.schedule(tx), start.weekday);
       const open = DateTime.fromISO(`${start.toISODate()}T${schedule.openTime}`, { zone: ZONE });
       if (start.second !== 0 || start.millisecond !== 0 || start.diff(open, 'minutes').minutes % 30 !== 0
         || !await this.withinHours(tx, start, service.durationMinutes)) throw new ConflictException('Время недоступно. Выберите другой слот');

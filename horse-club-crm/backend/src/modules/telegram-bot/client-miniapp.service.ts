@@ -1,3 +1,4 @@
+import { scheduleForDay } from '../../settings/club-schedule';
 import { randomUUID } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -61,7 +62,8 @@ export class ClientMiniappService {
       throw new BadRequestException('Выберите время в ближайшие 30 дней');
     const duration = +(row.lesson?.endTime ?? row.endTime) - +(row.lesson?.startTime ?? row.startTime);
     const end = start.plus({ milliseconds: duration });
-    const schedule = await tx.clubSchedule.findUnique({ where: { id: 1 } });
+    const storedSchedule = await tx.clubSchedule.findUnique({ where: { id: 1 } });
+    const schedule = storedSchedule ? scheduleForDay(storedSchedule, start.weekday) : null;
     if (!schedule || schedule.daysOfWeekOff.includes(start.weekday % 7) || start.toISODate() !== end.toISODate()
       || start.toFormat('HH:mm') < schedule.openTime || end.toFormat('HH:mm') > schedule.closeTime)
       throw new ConflictException('Клуб закрыт в выбранное время');

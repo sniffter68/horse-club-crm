@@ -60,11 +60,13 @@ export class VkNotifications implements OnModuleInit, OnModuleDestroy {
   private async discardStaleReminder(row: { id: string; key: string; peerId: bigint }): Promise<boolean> {
     const kind = reminderKind(row.key);
     if (!kind) return false;
+    const settings = await this.prisma.clubNotificationSettings.findUnique({ where: { id: 1 } });
+    const enabled = (kind === '24h' ? settings?.clientReminder24h : settings?.clientReminder2h) !== false;
     const booking = await this.prisma.booking.findUnique({
       where: { id: row.key.split(':')[1] }, include: { lesson: true, client: true },
     });
     const start = booking?.lesson?.startTime || booking?.startTime;
-    if (booking && start && start > new Date() && booking.status === 'scheduled' && booking.attendanceStatus === 'PENDING' && !booking.clientCancellationRequested
+    if (enabled && booking && start && start > new Date() && booking.status === 'scheduled' && booking.attendanceStatus === 'PENDING' && !booking.clientCancellationRequested
       && (!booking.lesson || booking.lesson.status === 'SCHEDULED') && booking.client.vkUserId === row.peerId
       && reminderKey(kind, booking.id, start, row.peerId) === row.key) return false;
     await this.prisma.vkNotification.deleteMany({ where: { id: row.id, sentAt: null } });

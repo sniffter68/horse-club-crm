@@ -41,8 +41,12 @@ export class TelegramDelivery implements OnModuleInit, OnModuleDestroy {
           this.prisma.client.findUnique({ where: { telegramUserId: row.peerId } }),
           this.prisma.user.findUnique({ where: { telegramUserId: row.peerId }, include: { staffProfile: true } }),
         ]);
-        const allowed = row.key.startsWith('admin:') ? user?.role === 'ADMIN' && user.staffProfile?.isActive !== false
+        let allowed = row.key.startsWith('admin:') ? user?.role === 'ADMIN' && user.staffProfile?.isActive !== false
           : client && !client.deletedAt && row.key.startsWith(`client:${client.id}:`);
+        if (allowed && row.key.startsWith('admin:digest:')) {
+          const settings = await this.prisma.clubNotificationSettings.findUnique({ where: { id: 1 } });
+          allowed = Boolean(settings?.adminDigest && user?.crmAccess && settings.adminRecipientIds.includes(user.id));
+        }
         if (!allowed) { await this.prisma.telegramNotification.update({ where: { key: row.key }, data: { attempts: 5 } }); continue; }
         const claimed = await this.prisma.telegramNotification.updateMany({ where: { key: row.key, sentAt: null, attempts: row.attempts },
           data: { attempts: { increment: 1 }, nextAttemptAt: new Date(Date.now() + 60_000 * (row.attempts + 1)) } });

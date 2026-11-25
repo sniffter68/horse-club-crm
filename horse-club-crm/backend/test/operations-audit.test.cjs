@@ -60,7 +60,7 @@ for (const failAudit of [false, true]) test(`unlink completed lesson refunds ato
 
 test('club cancellation of completed standalone booking restores exact units once', async () => {
   const state = { booking: { id: 'b', status: 'completed', lessonId: null, membershipId: 'm', clientId: 'c' }, balance: 0, refunds: 0, audits: 0 };
-  const tx = { $queryRaw: async () => [], booking: { findUnique: async () => state.booking,
+  const tx = { clubNotificationSettings: { findUnique: async () => ({ trainerCancellation: false }) }, $queryRaw: async () => [], booking: { findUnique: async () => state.booking,
     update: async ({ data }) => Object.assign(state.booking, data) },
     membership: { findUnique: async () => ({ id: 'm', clientId: 'c', status: 'exhausted', validTo: new Date('2099-01-01') }),
       update: async ({ data }) => { state.balance += Number(data.remainingUnits.increment); } },

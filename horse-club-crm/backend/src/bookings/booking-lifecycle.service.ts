@@ -7,6 +7,7 @@ import { isSerializationFailure } from '../common/serialization-failure';
 import { BookingValidationError } from './booking-validation.error';
 import type { CancelBookingDto } from './dto/cancel-booking.dto';
 import { randomUUID } from 'node:crypto';
+import { queueTrainerCancellation } from '../vk-bot/vk-training-notifications';
 
 export const cancellationStatus = (start: Date, now: Date): BookingStatus =>
   +start - +now >= 12 * 60 * 60 * 1000 ? 'cancelled_client' : 'penalty_cancellation';
@@ -54,6 +55,7 @@ export class BookingLifecycleService {
             await tx.$queryRaw`SELECT reverse_booking_revenue(${id}::uuid)::text`;
             await tx.cashAuditLog.create({ data: { requestId: randomUUID(), action: 'BOOKING_MEMBERSHIP_REFUNDED', actorId, actorName: actorId,
               details: { bookingId: id, membershipId: membership.id, reason: cancellation.reason } } });
+            await queueTrainerCancellation(tx, `booking:${id}:cancelled`, initial.trainerId, initial.startTime);
             return tx.booking.update({ where: { id }, data: { status: 'cancelled_club', cancellationReason: cancellation.reason,
               attended: false, attendanceStatus: 'PENDING', financialActorId: actorId } });
           }
@@ -100,6 +102,7 @@ export class BookingLifecycleService {
             const validTo = DateTime.fromJSDate(membership.validTo, { zone: process.env.CLUB_TIME_ZONE || 'Europe/Moscow' }).plus({ days: 7 }).toJSDate();
             await tx.membership.update({ where: { id: membership.id }, data: { validTo } });
           }
+          if (action === 'cancel') await queueTrainerCancellation(tx, `booking:${id}:cancelled`, initial.trainerId, initial.startTime);
           return tx.booking.update({ where: { id }, data: {
             ...(actorId ? { financialActorId: actorId } : {}),
             status, membershipId: billable ? membership?.id ?? initial.membershipId : initial.membershipId,

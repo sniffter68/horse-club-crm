@@ -27,7 +27,7 @@ function harness({ existing = false, collision, failLeadUpdate = false, missingS
     transactionCount++;
     assert.equal(options.isolationLevel, Prisma.TransactionIsolationLevel.Serializable);
     const draft = structuredClone(state);
-    const tx = {
+    const tx = { clubNotificationSettings: { findUnique: async () => null },
       $queryRaw: async () => [],
       leadRequest: {
         findUnique: async () => draft.lead,

@@ -22,7 +22,10 @@ export class VkReminders implements OnModuleInit {
     if (this.running) return;
     this.running = true;
     try {
-      for (const kind of ['24h', '2h'] as const) await this.queueWindow(now, kind);
+      const settings = await this.prisma.clubNotificationSettings.findUnique({ where: { id: 1 } });
+      for (const kind of ['24h', '2h'] as const) {
+        if ((kind === '24h' ? settings?.clientReminder24h : settings?.clientReminder2h) !== false) await this.queueWindow(now, kind);
+      }
     } catch {
       this.logger.warn({ event: 'vk_reminders_unavailable', message: 'Не удалось проверить напоминания о тренировках' });
     } finally { this.running = false; }

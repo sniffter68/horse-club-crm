@@ -1,3 +1,4 @@
+import { scheduleForDay } from '../settings/club-schedule';
 import { telegramCancellation } from '../modules/telegram-bot/telegram-cancellation';
 import { DateTime } from 'luxon';
 import type { TrainerTmaRescheduleDto, TrainerTmaRescheduleQuery } from '../modules/telegram-bot/trainer-tma.dto';
@@ -68,6 +69,7 @@ type WorkloadReader =
   | PrismaService;
 
 interface ClubScheduleConfig {
+  weekDays?: unknown;
   openTime: string;
   closeTime: string;
   daysOfWeekOff: number[];
@@ -257,6 +259,7 @@ export class LessonsService {
     if (!day.isValid || day.toISODate() !== query.date) throw new BadRequestException('Некорректная дата');
     const schedule = await this.getClubSchedule(tx);
     const slots: { startTime: string; available: boolean; reason?: string }[] = [];
+    if (scheduleForDay(schedule, day.weekday).daysOfWeekOff.length) return { slots };
     const duration = (+lesson.endTime - +lesson.startTime) / 60000;
     const { open, close } = this.getWorkDayBounds(this.parseCalendarDate(query.date), schedule);
     for (let time = +open; time + duration * 60000 <= +close; time += 30 * 60000) {
@@ -887,7 +890,8 @@ export class LessonsService {
       return;
     }
     const recipients = new Set<bigint>();
-    if (lesson.trainer?.vkId) recipients.add(lesson.trainer.vkId);
+    const notifications = event === 'cancelled' && lesson.trainer?.vkId ? await tx.clubNotificationSettings.findUnique({ where: { id: 1 } }) : null;
+    if (lesson.trainer?.vkId && (event !== 'cancelled' || notifications?.trainerCancellation !== false)) recipients.add(lesson.trainer.vkId);
     for (const booking of lesson.bookings ?? []) {
       if ((!clientIds || clientIds.includes(booking.clientId)) && booking.client?.vkUserId) recipients.add(booking.client.vkUserId);
     }
@@ -996,7 +1000,7 @@ export class LessonsService {
   ): Promise<ClubScheduleConfig> {
     const schedule = await client.clubSchedule.findUnique({
       where: { id: CLUB_SCHEDULE_ID },
-      select: { openTime: true, closeTime: true, daysOfWeekOff: true },
+      select: { openTime: true, closeTime: true, daysOfWeekOff: true, weekDays: true },
     });
     if (!schedule) {
       throw new InternalServerErrorException('Расписание клуба не настроено');
@@ -1021,7 +1025,7 @@ export class LessonsService {
     const { open, close } = this.getWorkDayBounds(startDate, schedule);
 
     if (
-      schedule.daysOfWeekOff.includes(dayOfWeek) ||
+      scheduleForDay(schedule, dayOfWeek || 7).daysOfWeekOff.includes(dayOfWeek) ||
       !sameLocalDate ||
       startTime < open ||
       endTime > close
@@ -1042,8 +1046,10 @@ export class LessonsService {
     ) {
       throw new InternalServerErrorException('Некорректно настроены выходные дни клуба');
     }
-    const openTime = this.parseClock(schedule.openTime);
-    const closeTime = this.parseClock(schedule.closeTime);
+    const weekday = new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay() || 7;
+    const daily = scheduleForDay(schedule, weekday);
+    const openTime = this.parseClock(daily.openTime);
+    const closeTime = this.parseClock(daily.closeTime);
     if (
       closeTime.hour < openTime.hour ||
       (closeTime.hour === openTime.hour && closeTime.minute <= openTime.minute)

@@ -1,3 +1,5 @@
+import { RequireModule } from '../auth/module-access.guard';
+import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 import { ModuleAccessService } from './module-access.service';
 import { ToggleModuleDto, UpdateModulePermissionsDto } from './dto/module-settings.dto';
 import { Body, Controller, Get, Param, ParseEnumPipe, Patch, Put, UseGuards } from '@nestjs/common';
@@ -57,9 +59,25 @@ export class SettingsController {
   }
 
   @Patch('club-schedule')
+  @RequireModule('SCHEDULE')
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOkResponse({ description: 'График работы клуба обновлён.' })
   updateSchedule(@Body() dto: UpdateClubScheduleDto) {
     return this.settingsService.updateSchedule(dto);
   }
+  @Get('notifications')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  @RequireModule('SCHEDULE')
+  getNotifications() { return this.settingsService.getNotifications(); }
+
+  @Patch('notifications')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  @RequireModule('SCHEDULE')
+  updateNotifications(@Body() dto: UpdateNotificationsDto) { return this.settingsService.updateNotifications(dto); }
+
+  @Get('notification-recipients')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  @RequireModule('SCHEDULE')
+  notificationRecipients() { return this.settingsService.notificationRecipients(); }
+
 }

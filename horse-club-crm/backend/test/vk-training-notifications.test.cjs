@@ -15,7 +15,7 @@ const training = () => ({
 });
 function queue() {
   const rows = new Map();
-  return { rows, tx: { vkNotification: { upsert: async ({ create }) => {
+  return { rows, tx: { clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] }) }, clubNotificationSettings: { findUnique: async () => null }, vkNotification: { upsert: async ({ create }) => {
     if (!rows.has(create.key)) rows.set(create.key, create);
   } } } };
 }
@@ -40,6 +40,14 @@ test('training confirmation sends full trainer card and private individual clien
   assert.match(client.message, /за 15 минут/);
   assert.doesNotMatch(client.message, /Мария|Искра|7999|Первое занятие/);
   assert.doesNotMatch(second.message, /Иван|Гранит|7999/);
+});
+
+test('disabled trainer notification keeps private client confirmations', async () => {
+  const { tx, rows } = queue();
+  tx.clubNotificationSettings.findUnique = async () => ({ trainerNewBooking: false });
+  await queueTrainingConfirmation(tx, 'lesson:1:created', training());
+  assert.equal(rows.size, 2);
+  assert.ok([...rows.values()].every(row => row.key.includes(':client:')));
 });
 
 test('notification time uses CLUB_TIME_ZONE across midnight', async () => {

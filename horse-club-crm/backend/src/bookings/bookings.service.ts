@@ -1,3 +1,4 @@
+import { assertScheduleInterval } from '../settings/club-schedule';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { canUseMembership } from '../memberships/membership-access';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
@@ -165,6 +166,7 @@ export class BookingsService {
           const defined = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
           const dto = { ...(current ? { ...current, startTime: current.startTime?.toISOString(), endTime: current.endTime?.toISOString(), costAmount: Number(current.costAmount) } : {}), ...defined } as CreateBookingDto;
           const { start, end } = this.validateBookingValues(dto);
+          assertScheduleInterval(await tx.clubSchedule.findUnique({ where: { id: 1 } }), start, end);
           await this.rules.validate(tx, { trainerId: dto.trainerId, arenaId: dto.arenaId, participants: [{ clientId: dto.clientId, horseId: dto.horseId }], start, end, excludeBookingId: id });
           if (dto.membershipId) {
             await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Membership" WHERE "id" = ${dto.membershipId}::uuid FOR UPDATE`);
