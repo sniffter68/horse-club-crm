@@ -1,4 +1,5 @@
 import { disciplineDirection, horseServiceWarning } from '../horses/serviceAvailability'
+import { trainerServiceWarning } from '../staff/specialization'
 import { SearchSelect } from '../../components/SearchSelect'
 import { ScheduleConflictNotice } from './ScheduleConflictNotice'
 import { scheduleConflicts } from './triad'
@@ -151,6 +152,7 @@ export function TriadBookingModal({ initial, booking, clients, horses, trainers,
       <ScheduleConflictNotice entries={conflicts.entries} trainerId={trainerId} horseIds={horseId ? [horseId] : []} error={conflicts.error} />
       <Form.Item name="trainerId" label="Тренер" rules={[required]}><Select onInputKeyDown={stopPopupEscape} onChange={preferences.trainerChanged} id="triad_trainerId" aria-label="Тренер" showSearch allowClear optionFilterProp="label" placeholder="Выберите тренера"
         loading={conflicts.loading} options={trainers.filter(t => t.isActive !== false).map(t => ({ value: t.id, label: `${t.fullName || t.name} (занято ${trainerOccupancy(t.id) ?? '…'}/${t.maxParallelLessons ?? 4})${t.specializations?.length ? ` · ${t.specializations.join(', ')}` : t.qualification ? ` · ${t.qualification}` : ''}` }))} /></Form.Item>
+      {trainerServiceWarning(selectedTrainer, direction) && <Alert type="warning" showIcon role="status" message={trainerServiceWarning(selectedTrainer, direction)} />}
       {occupiedTrainerPlaces !== undefined && <Typography.Paragraph role="status">Тренер: занято {occupiedTrainerPlaces}/{trainerLimit}, свободно {Math.max(0, trainerLimit - occupiedTrainerPlaces)} мест на выбранный интервал.</Typography.Paragraph>}
       {trainerFull && <Alert className="triad-feedback" type="error" showIcon message={`У тренера достигнут максимум одновременных всадников (${trainerLimit})`} />}
       <Form.Item name="arenaId" label="Локация" rules={[required]}><Select onInputKeyDown={stopPopupEscape} id="triad_arenaId" aria-label="Локация" showSearch allowClear optionFilterProp="label" placeholder="Манеж, плац или маршрут" loading={availability.loading}

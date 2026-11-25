@@ -1,4 +1,5 @@
 import { TrainerStatements } from './TrainerStatements'
+import { CrmAccessToggle } from './CrmAccessToggle'
 import { EditOutlined, LockOutlined } from '@ant-design/icons'
 import { usePermissions as useModules } from '../../modulePermissions'
 import { useEffect, useRef, useState } from 'react'
@@ -177,6 +178,11 @@ export function StaffPage() {
           { key: 'phone', width: 140, fixed: 'left' as const, title: 'Телефон', render: (_, row) => row.phone || '—' },
           { key: 'vk', width: 70, align: 'center', title: 'VK', render: (_, row) => row.user?.vkId ? <a href={`https://vk.com/id${row.user.vkId}`} target="_blank" rel="noreferrer"><Tag color="blue">VK</Tag></a> : '—' },
           { key: 'status', width: 120, align: 'center', title: 'Статус', render: (_, row) => <Tag color={!row.isActive ? undefined : row.shifts?.length ? 'green' : 'orange'}>{!row.isActive ? 'В архиве' : row.shifts?.length ? 'На смене' : 'Выходной'}</Tag> },
+          { key: 'crmAccess', width: 130, align: 'center', title: 'Доступ в CRM', render: (_, row) => <CrmAccessToggle compact name={row.fullName} checked={row.user?.crmAccess ?? false} self={!!row.user?.email && row.user.email === getIdentity()?.email} disabled={!canManage || busy || !row.isActive || !row.user?.email || row.user.email.endsWith('@staff.invalid') || (row.user.role === 'ADMIN' && role !== 'ADMIN')} onChange={next => run(async () => {
+            if (!isUuid(row.id)) throw new Error('Некорректный идентификатор сотрудника')
+            await httpClient.patch(`${API_URL}/staff/${row.id}`, { createCrmAccess: next })
+            void message.success(next ? 'Доступ в CRM включён' : 'Доступ в CRM отключён')
+          })} /> },
           { key: 'actions', width: 180, fixed: 'right' as const, title: 'Действия', render: (_, row) => <Space wrap>
             {canManage && <Button onClick={() => setProfileModal(row)}>Редактировать</Button>}
             {modules.canWrite('STAFF_PAYROLL') && row.isActive && (role === 'ADMIN' || row.user?.email === getIdentity()?.email) && <Button disabled={busy} onClick={() => run(() => { if (!isUuid(row.id)) throw new Error('Некорректный идентификатор сотрудника'); return httpClient.post(`${API_URL}/shifts/${row.shifts?.length ? 'end' : 'start'}`, { staffId: row.id }) })}>{row.shifts?.length ? 'Закончить смену' : 'Начать смену'}</Button>}

@@ -10,6 +10,11 @@ const day = /^\d{4}-\d{2}-\d{2}$/;
 const clock = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export class StaffProfileDto {
+  @PreserveInput() @IsOptional() @IsBoolean() allowIndividual?: boolean;
+  @PreserveInput() @IsOptional() @IsBoolean() allowGroup?: boolean;
+  @PreserveInput() @IsOptional() @IsBoolean() allowWalk?: boolean;
+  @PreserveInput() @IsOptional() @IsBoolean() allowSpecial?: boolean;
+
   @IsOptional() @IsString() @MaxLength(256) vkId?: string | null;
   @IsOptional() @IsString() @MaxLength(40) phone?: string | null;
   @IsOptional() @Matches(/^#[0-9a-fA-F]{6}$/) scheduleColor?: string | null;

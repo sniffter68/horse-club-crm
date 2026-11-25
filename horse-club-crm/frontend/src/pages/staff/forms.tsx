@@ -14,18 +14,25 @@ import { useList, usePermissions } from '@refinedev/core'
 import type { Role } from '../../authStorage'
 import { staffRoles } from './types'
 import { isUuid } from '../../uuid'
+import { getIdentity } from '../../authStorage'
+import { ToggleSettingRow } from '../../components/ToggleSettingRow'
+import { CrmAccessToggle } from './CrmAccessToggle'
+import { trainerServiceSettings, type TrainerDirections } from './specialization'
+import type { Trainer } from '../catalogs/types'
+
+type ProfileValues = TrainerDirections & { userId?: string; trainerId?: string; role: Role; fullName: string; roleTitle: string; email?: string; vkId?: string; phone?: string; temporaryPassword?: string; createCrmAccess?: boolean; isActive: boolean; scheduleColor?: string; shiftRate?: number; lessonRate?: number; groupLessonRate?: number }
 
 const required = [{ required: true, message: 'Заполните поле' }]
 const moneyProps = { min: 0, max: 9999999999.99, precision: 2, style: { width: '100%' } }
 
 export function ProfileModal({ staff, onClose, onSaved, onTelegramChanged }: { staff?: Staff; onClose: () => void; onSaved: () => void; onTelegramChanged?: () => void }) {
-  const [form] = Form.useForm()
+  const [form] = Form.useForm<ProfileValues>()
   const { data: role } = usePermissions<Role>({})
   const access = Form.useWatch('createCrmAccess', form)
   const linkedUser = Form.useWatch('userId', form)
   const staffRole = Form.useWatch('role', form)
-  const { result: trainers } = useList<{ id: string; name: string; phone?: string | null }>({ resource: 'trainers', pagination: { pageSize: 200 }, queryOptions: { enabled: staffRole === 'TRAINER' && !staff?.user?.trainerId } })
-  const [candidates, setCandidates] = useState<Array<{ id: string; role?: string; email: string; vkId?: string | null; trainer?: { fullName: string; name: string } }>>([])
+  const { result: trainers } = useList<Trainer>({ resource: 'trainers', pagination: { pageSize: 200 }, queryOptions: { enabled: staffRole === 'TRAINER' && !staff?.user?.trainerId } })
+  const [candidates, setCandidates] = useState<Array<{ id: string; role?: string; email: string; vkId?: string | null; trainer?: TrainerDirections & { fullName: string; name: string } }>>([])
   const [error, setError] = useState<string>()
   useEffect(() => {
     if (staff) return
@@ -37,6 +44,7 @@ export function ProfileModal({ staff, onClose, onSaved, onTelegramChanged }: { s
     save={values => {
       if ((staff && !isUuid(staff.id)) || (values.userId && !isUuid(values.userId)) || (values.trainerId && !isUuid(values.trainerId))) throw new Error('Некорректный идентификатор сотрудника')
       const payload = { ...values, vkId: values.vkId?.trim() || null, phone: phonePayload(values.phone) }
+      if (values.role !== 'TRAINER') for (const { key } of trainerServiceSettings) delete payload[key]
       if (!values.createCrmAccess) delete payload.temporaryPassword
       if (values.userId) {
         delete payload.createCrmAccess
@@ -52,17 +60,27 @@ export function ProfileModal({ staff, onClose, onSaved, onTelegramChanged }: { s
       form.setFieldValue('role', selected?.role ?? 'OTHER')
       const trainer = selected?.trainer
       if (trainer) form.setFieldValue('fullName', trainer.fullName || trainer.name)
+      for (const { key } of trainerServiceSettings) form.setFieldValue(key, trainer?.[key] ?? true)
     }} /></Form.Item>}
     {staff && <VkProfileLink id={staff.userId} name={staff.fullName} vkId={staff.user?.vkId} kind="STAFF" readOnly />}
     {staff && <TelegramProfileLink id={staff.userId} name={staff.fullName} kind="user" role={staff.user?.role === 'ADMIN' ? 'admin' : staff.user?.role === 'TRAINER' ? 'trainer' : 'staff'} telegramUserId={staff.user?.telegramUserId} telegramUsername={staff.user?.telegramUsername} readOnly={staff.user?.role === 'ADMIN' && role !== 'ADMIN'} onChanged={onTelegramChanged} />}
     <VkProfileField initialValue={staff?.user?.vkId} />
     <Form.Item name="fullName" label="ФИО" initialValue={staff?.fullName} rules={required}><Input aria-label="ФИО" maxLength={150} /></Form.Item>
     <Form.Item name="role" label="Роль" initialValue={staff?.user?.role ?? 'OTHER'} rules={required}><Select aria-label="Роль" options={Object.entries(staffRoles).filter(([value]) => role === 'ADMIN' || value !== 'ADMIN').map(([value, label]) => ({ value, label }))} /></Form.Item>
-    {staffRole === 'TRAINER' && !staff?.user?.trainerId && <Form.Item name="trainerId" label="Существующая карточка тренера" extra="Выберите тренера из расписания, чтобы сохранить занятия и начисления."><Select aria-label="Существующая карточка тренера" virtual={false} allowClear showSearch optionFilterProp="label" options={(trainers?.data ?? []).map(trainer => ({ value: trainer.id, label: `${trainer.name}${trainer.phone ? ` · ${trainer.phone}` : ''}` }))} /></Form.Item>}
+    {staffRole === 'TRAINER' && !staff?.user?.trainerId && <Form.Item name="trainerId" label="Существующая карточка тренера" extra="Выберите тренера из расписания, чтобы сохранить занятия и начисления."><Select aria-label="Существующая карточка тренера" virtual={false} allowClear showSearch optionFilterProp="label" onChange={id => {
+      const trainer = trainers?.data.find(row => row.id === id)
+      for (const { key } of trainerServiceSettings) form.setFieldValue(key, trainer?.[key] ?? true)
+    }} options={(trainers?.data ?? []).map(trainer => ({ value: trainer.id, label: `${trainer.name}${trainer.phone ? ` · ${trainer.phone}` : ''}` }))} /></Form.Item>}
+    {staffRole === 'TRAINER' && <section aria-label="Специализация по направлениям">
+      <Typography.Title level={5}>Специализация по направлениям</Typography.Title>
+      {trainerServiceSettings.map(({ key, title }) => <Form.Item key={key} name={key} valuePropName="checked" initialValue={staff?.user?.trainer?.[key] ?? true}>
+        <ToggleSettingRow title={title} description="Учитывается при назначении тренера в расписании. Несовпадение покажет предупреждение." />
+      </Form.Item>)}
+    </section>}
     {!linkedUser && <>
-      <Form.Item name="createCrmAccess" valuePropName="checked" initialValue={staff?.user?.crmAccess ?? false}><Checkbox>Создать доступ в CRM</Checkbox></Form.Item>
+      <Form.Item name="createCrmAccess" valuePropName="checked" initialValue={staff?.user?.crmAccess ?? false}><CrmAccessToggle name={staff?.fullName} self={!!staff?.user?.email && staff.user.email === getIdentity()?.email} disabled={staff?.isActive === false} /></Form.Item>
       <Form.Item name="email" label="Email" initialValue={staff?.user?.email?.endsWith('@staff.invalid') ? undefined : staff?.user?.email} rules={[{ type: 'email', message: 'Укажите корректный email' }, ...(access ? required : [])]}><Input aria-label="Email" autoComplete="off" /></Form.Item>
-      {access && <Form.Item name="temporaryPassword" label="Временный пароль" rules={[...(!staff || !staff.user?.crmAccess ? required : []), { min: 8, message: 'Не менее 8 символов' }]}><Input.Password aria-label="Временный пароль" autoComplete="new-password" maxLength={72} /></Form.Item>}
+      {access && <Form.Item name="temporaryPassword" label="Временный пароль" rules={[...(!staff || staff.user?.email?.endsWith('@staff.invalid') ? required : []), { min: 8, message: 'Не менее 8 символов' }]}><Input.Password aria-label="Временный пароль" autoComplete="new-password" maxLength={72} /></Form.Item>}
     </>}
     <Form.Item name="roleTitle" label="Должность" initialValue={staff?.roleTitle} rules={required}><Input aria-label="Должность" maxLength={150} /></Form.Item>
     <PhoneField initialValue={staff?.phone} />

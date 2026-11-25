@@ -1,4 +1,5 @@
 import { horseServiceDirection, horseServiceWarning } from '../horses/serviceAvailability'
+import { trainerServiceWarning } from '../staff/specialization'
 import { isMembershipActive } from '../memberships/activity'
 import { useRoleAccess } from '../../access'
 import { SearchSelect } from '../../components/SearchSelect'
@@ -166,6 +167,7 @@ export function LessonDrawer({ initialDateTime, initialTrainerId, initialArenaId
     <Form.Item name="trainerId" label="Тренер" rules={required}><Select disabled={ownOnly || access.loading} onChange={preferences.trainerChanged} onInputKeyDown={stopPopupEscape} aria-label="Тренер" loading={catalogs.loading || conflicts.loading} showSearch optionFilterProp="label"
       options={catalogs.trainers.filter(row => !ownOnly || row.id === ownTrainerId).map(row => ({ value: row.id, label: `${row.fullName || row.name} (занято ${conflicts.trainerOccupancy(row.id) ?? '…'}/${row.maxParallelLessons ?? 4})` }))} /></Form.Item>
     {occupiedTrainerPlaces !== undefined && <Typography.Paragraph role="status">Тренер: занято {occupiedTrainerPlaces}/{trainerLimit}, свободно {Math.max(0, trainerLimit - occupiedTrainerPlaces)} мест на выбранный интервал.</Typography.Paragraph>}
+    {trainerServiceWarning(catalogs.trainers.find(row => row.id === trainerId), direction) && <Alert type="warning" showIcon role="status" message={trainerServiceWarning(catalogs.trainers.find(row => row.id === trainerId), direction)} />}
     {trainerFull && <Alert type="error" showIcon message={`У тренера достигнут максимум одновременных всадников (${trainerLimit})`} />}
     {!trainerFull && occupiedTrainerPlaces !== undefined && occupiedTrainerPlaces > 0 && <Alert type="warning" showIcon message="У тренера есть пересечение по времени" description="Параллельная запись разрешена в пределах вместимости тренера." />}
     {conflicts.error && <Alert type="warning" showIcon message="Не удалось проверить свободные места тренера" description="При сохранении сервер повторно проверит вместимость."

@@ -82,6 +82,20 @@ test('trainer capacity blocks an extra rider and refreshes when the interval cha
   await expect(modal.getByRole('status').filter({ hasText: 'Тренер:' })).toContainText('занято 0/2, свободно 2')
   await expect(modal.getByRole('button', { name: 'Сохранить бронирование', exact: true })).toBeEnabled()
 })
+test('trainer specialization is a soft warning when editing a booking', async ({ page }) => {
+  await page.route('**/api/trainers?*', route => route.fulfill({ json: [{ ...trainer, allowIndividual: false }], headers: { 'x-total-count': '1' } }))
+  await page.route('**/api/bookings?*', route => route.fulfill({ json: [booking], headers: { 'x-total-count': '1' } }))
+  let saves = 0
+  await page.route(`**/api/bookings/${booking.id}`, route => { saves++; return route.fulfill({ json: booking }) })
+  const modal = await openExisting(page)
+  await expect(modal.getByRole('status').filter({ hasText: 'не входит в специализацию тренера' })).toBeVisible()
+  const save = modal.getByRole('button', { name: 'Сохранить бронирование', exact: true })
+  await expect(save).toBeEnabled()
+  await save.click()
+  await expect(modal).toBeHidden()
+  expect(saves).toBe(1)
+})
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/bookings/horse-issues?*', route => route.fulfill({ json: [], headers: { 'x-total-count': '0' } }))
   await page.route('**/api/bookings/00000000-0000-4000-8000-000000001107/available-horses', route => route.fulfill({ json: [{ ...horse, id: '00000000-0000-4000-8000-000000001102', name: 'Буран', maxRiderWeight: 110 }] }))

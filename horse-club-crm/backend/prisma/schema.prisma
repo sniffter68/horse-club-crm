@@ -288,6 +288,11 @@ model Service {
 }
 
 model Trainer {
+  allowIndividual Boolean @default(true)
+  allowGroup Boolean @default(true)
+  allowWalk Boolean @default(true)
+  allowSpecial Boolean @default(true)
+
   payouts TrainerPayout[]
   preferredByClients Client[] @relation("ClientPreferredTrainer")
   scheduleColor String? @db.VarChar(7)

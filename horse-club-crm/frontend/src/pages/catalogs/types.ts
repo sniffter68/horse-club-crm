@@ -53,7 +53,7 @@ export interface HorseDetails extends Horse {
     client: { id: string; name: string; firstName: string; lastName: string } | null; stall: { id: string; number?: string | null; name: string | null } | null; payments: RelationPayment[] }>;
   bookings: Array<RelationBooking & { client: { id: string; name: string; firstName: string; lastName: string } }>;
 }
-export interface TrainerValues extends PublicationValues { commissionPercent?: number | string; name: string; vkId?: string | null; phone?: string | null; scheduleColor?: string | null; qualification?: string; maxDailyLoad: number; maxParallelLessons?: number; baseRate?: number }
+export interface TrainerValues extends PublicationValues { allowIndividual?: boolean; allowGroup?: boolean; allowWalk?: boolean; allowSpecial?: boolean; commissionPercent?: number | string; name: string; vkId?: string | null; phone?: string | null; scheduleColor?: string | null; qualification?: string; maxDailyLoad: number; maxParallelLessons?: number; baseRate?: number }
 export interface Trainer extends Omit<TrainerValues, 'baseRate' | 'phone' | 'qualification'> {
   user?: { id: string; email?: string; crmAccess: boolean } | null;
   fullName?: string; specializations?: string[]; isActive?: boolean;

@@ -23,8 +23,8 @@ const admin = { id: randomUUID(), role: 'ADMIN' };
 function store() {
   const state = { account: null, profile: null, trainer: null, shift: null, trainerCreates: 0, transactions: 0 };
   const tx = {
-    user: { findUnique: async () => state.account, create: async ({ data }) => state.account = { id: randomUUID(), trainerId: null, ...data }, update: async ({ data }) => state.account = { ...state.account, ...data } },
-    trainer: { findMany: async () => state.candidates ?? [], create: async ({ data }) => { state.trainerCreates++; return state.trainer = { id: randomUUID(), ...data }; }, update: async ({ data }) => state.trainer = { ...state.trainer, ...data } },
+    user: { count: async args => { state.adminQuery = args; return state.remainingAdmins ?? 0; }, findUnique: async () => state.account, create: async ({ data }) => state.account = { id: randomUUID(), trainerId: null, ...data }, update: async ({ data }) => state.account = { ...state.account, ...data } },
+    trainer: { findMany: async () => state.candidates ?? [], create: async ({ data }) => { state.trainerCreates++; return state.trainer = { id: randomUUID(), ...data }; }, update: async ({ data }) => state.trainer = { ...state.trainer, ...Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)) } },
     staffProfile: { findUnique: async ({ where }) => where.userId && where.userId !== state.account?.id ? null : state.profile, create: async ({ data }) => state.profile = { id: randomUUID(), isActive: true, ...data }, update: async ({ data }) => state.profile = { ...state.profile, ...data }, findMany: async args => { state.query = args; return []; }, count: async () => 0 },
     workShift: { findUnique: async () => state.shift, create: async ({ data }) => state.shift = { id: randomUUID(), status: 'SCHEDULED', endedAt: null, ...data }, update: async ({ data }) => state.shift = { ...state.shift, ...data }, updateMany: async args => { state.archiveShifts = args; return { count: 0 }; }, findMany: async args => { state.dutyQuery = args; return []; } },
     payrollCalculation: { findMany: async () => state.paid ? [{}] : [] },
@@ -46,6 +46,50 @@ test('employee creation atomically creates linked trainer, normalizes VK and has
   assert.deepEqual(state.vk, { id: state.account.id, vkId: '12345' });
   await service.saveProfile({ fullName: 'Анна Петрова' }, admin, row.id);
   assert.equal(state.trainerCreates, 1); assert.equal(state.trainer.fullName, 'Анна Петрова');
+});
+
+test('specializations persist on the linked trainer and access toggles preserve staff, shifts and trainer activity', async () => {
+  const { service, state } = store();
+  const directions = { allowIndividual: false, allowGroup: true, allowWalk: false, allowSpecial: true };
+  const row = await service.saveProfile({ fullName: 'Trainer', role: 'TRAINER', email: 'trainer@test.local', temporaryPassword: 'temporary-123', createCrmAccess: true, ...directions }, admin);
+  for (const [key, value] of Object.entries(directions)) { assert.equal(state.trainer[key], value); assert.equal(state.profile[key], undefined); }
+  state.shift = { id: randomUUID(), status: 'COMPLETED' };
+  const shift = state.shift, trainerId = state.trainer.id, profileId = row.id;
+  await service.saveProfile({ createCrmAccess: false, allowWalk: true }, admin, row.id);
+  assert.equal(state.account.crmAccess, false); assert.deepEqual(state.account.tokenVersion, { increment: 1 });
+  assert.equal(state.trainer.allowWalk, true); assert.equal(state.trainer.allowIndividual, false);
+  assert.equal(state.trainer.isActive, true); assert.equal(state.profile.isActive, true);
+  assert.equal(state.shift, shift); assert.equal(state.archiveShifts, undefined);
+  assert.equal(state.profile.id, profileId); assert.equal(state.account.trainerId, trainerId);
+  await service.saveProfile({ createCrmAccess: true }, admin, row.id);
+  assert.equal(state.account.crmAccess, true);
+  await assert.rejects(service.saveProfile({ createCrmAccess: false }, { id: state.account.id, role: 'MANAGER' }, row.id), e => e.status === 400);
+});
+
+test('last active administrator cannot lose access, be archived or demoted', async () => {
+  const { service, state } = store();
+  const row = await service.saveProfile({ fullName: 'Admin', role: 'ADMIN', email: 'admin@test.local', temporaryPassword: 'temporary-123', createCrmAccess: true }, admin);
+  for (const change of [{ createCrmAccess: false }, { isActive: false }, { role: 'MANAGER' }]) {
+    await assert.rejects(service.saveProfile(change, admin, row.id), e => e.status === 400 && /администратора/.test(e.message));
+    assert.equal(state.account.crmAccess, true); assert.equal(state.profile.isActive, true);
+  }
+  assert.equal(state.adminQuery.where.id.not, state.account.id);
+  assert.equal(state.adminQuery.where.crmAccess, true);
+  state.remainingAdmins = 1;
+  await service.saveProfile({ createCrmAccess: false }, admin, row.id);
+  assert.equal(state.account.crmAccess, false);
+  assert.equal(state.isolation, 'Serializable');
+});
+
+test('specialization DTO accepts booleans and rejects strings; staff rejects null directions', async () => {
+  for (const key of ['allowIndividual', 'allowGroup', 'allowWalk', 'allowSpecial']) {
+    const valid = plainToInstance(StaffProfileDto, { fullName: 'Trainer', [key]: false });
+    assert.equal((await validate(valid)).length, 0);
+    const invalid = plainToInstance(StaffProfileDto, { fullName: 'Trainer', [key]: 'false' }, { enableImplicitConversion: true });
+    assert.ok((await validate(invalid)).length > 0);
+    const { service } = store();
+    await assert.rejects(service.saveProfile({ fullName: 'Trainer', role: 'TRAINER', [key]: null }, admin), e => e.status === 400);
+  }
 });
 
 test('staff creation reuses an existing catalog trainer and rejects ambiguous or claimed matches', async () => {
@@ -141,6 +185,10 @@ test('disabled staff cannot login or reuse access/refresh tokens; new employee r
   await assert.rejects(auth.refresh(refresh), e => e.status === 401);
   account.crmAccess = true;
   for (const role of ['GROOM', 'VET', 'OTHER']) { account.role = role; assert.equal((await strategy.validate({ ...payload, role })).role, role); }
+  account.role = payload.role; account.tokenVersion = 2;
+  await assert.rejects(strategy.validate(payload), e => e.status === 401);
+  await assert.rejects(auth.refresh(refresh), e => e.status === 401);
+  assert.equal((await auth.validateUser(account.email, 'test-password')).authVersion, '2');
 });
 
 test('HTTP module permissions block READ_ONLY mutations and HIDDEN reads; full employees can open own shift', async () => {
