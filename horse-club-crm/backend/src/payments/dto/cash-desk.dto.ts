@@ -24,6 +24,7 @@ export class CashSummaryQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize = 20;
 }
 export class CashJournalQueryDto extends CashSummaryQueryDto {
+  @Transform(({ value }: { value: unknown }) => value === '' ? undefined : value) @IsOptional() @IsIn(['MEMBERSHIP']) source?: 'MEMBERSHIP';
   @Transform(({ value }: { value: unknown }) => value === '' ? undefined : value) @IsOptional() @IsIn(['MAIN', 'BOARDING']) cashboxType?: 'MAIN' | 'BOARDING';
   @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsIn(['CASH', 'BANK']) paymentMethod?: 'CASH' | 'BANK';
   @Transform(({ value }) => value === '' ? undefined : value) @IsOptional() @IsIn(['INCOME', 'EXPENSE']) operationType?: 'INCOME' | 'EXPENSE';

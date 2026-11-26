@@ -2,7 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import { Role, WorkShiftStatus, ExpensePaymentMethod } from '@prisma/client';
 import { PartialType } from '@nestjs/swagger';
 import { PreserveInput } from '../auth/decorators/preserve-input.decorator';
-import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsEmail, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsEmail, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 
 const empty = ({ value }: { value: unknown }) => value === '' ? undefined : value;
 const emptyNumber = ({ value, obj, key }: { value: unknown; obj: Record<string, unknown>; key: string }) => obj[key] === '' ? undefined : value;
@@ -49,13 +49,20 @@ export class PayrollQueryDto extends ShiftQueryDto {
   @Matches(day) declare from: string;
   @Matches(day) declare to: string;
 }
+export class PlannedShiftDayDto {
+  @Matches(day) date!: string;
+  @IsIn(['WORK', 'OFF', 'VACATION']) kind!: 'WORK' | 'OFF' | 'VACATION';
+  @Matches(clock) startTime!: string;
+  @Matches(clock) endTime!: string;
+}
 export class CreateShiftDto {
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(7) @ValidateNested({ each: true }) @Type(() => PlannedShiftDayDto) days?: PlannedShiftDayDto[];
   @PreserveInput() @IsOptional() @IsBoolean() force?: boolean;
   @IsUUID() staffId!: string;
   @IsOptional() @Matches(day) date?: string;
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(31) @ArrayUnique() @Matches(day, { each: true }) dates?: string[];
-  @Matches(clock) startTime!: string;
-  @Matches(clock) endTime!: string;
+  @ValidateIf((dto: CreateShiftDto) => !dto.days) @Matches(clock) startTime!: string;
+  @ValidateIf((dto: CreateShiftDto) => !dto.days) @Matches(clock) endTime!: string;
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
 }
 export class UpdateShiftDto {

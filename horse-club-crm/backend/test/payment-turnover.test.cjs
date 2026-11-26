@@ -26,8 +26,8 @@ for (const dateBasis of [undefined, 'service', 'payment']) {
       $queryRaw: async statement => {
         statements.push(statement);
         return statement.sql.includes('GROUP BY method')
-          ? [{ method: 'CASH', amount: new Prisma.Decimal('100.10'), count: 10 },
-            { method: 'SBP', amount: new Prisma.Decimal('200.20'), count: 3 }]
+          ? [{ method: 'CASH', amount: new Prisma.Decimal('100.10'), membershipAmount: new Prisma.Decimal('10.10'), count: 10 },
+            { method: 'SBP', amount: new Prisma.Decimal('200.20'), membershipAmount: new Prisma.Decimal('20.20'), count: 3 }]
           : [{ id: 'later' }, { id: 'earlier' }];
       },
       payment: { findMany: async ({ where }) => {
@@ -36,6 +36,7 @@ for (const dateBasis of [undefined, 'service', 'payment']) {
       } },
     }, { dateBasis, cashierId: 'cashier', shiftId: 'shift', page: 2, pageSize: 2 }, range);
     assert.equal(result.totalRevenue.toString(), '300.3');
+    assert.equal(result.totalMemberships.toString(), '30.3');
     assert.equal(result.operationsCount, 13);
     assert.deepEqual(result.operations.map(row => row.id), ['later', 'earlier']);
     const [totals, page] = statements;

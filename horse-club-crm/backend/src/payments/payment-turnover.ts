@@ -19,7 +19,7 @@ export async function paymentTurnover(tx: Prisma.TransactionClient, query: CashS
         WHEN p."membershipId" IS NOT NULL THEN COALESCE(m."validFrom", m."createdAt", p."paidAt", p."createdAt")
         ELSE COALESCE(p."paidAt", p."createdAt") END`;
   const filtered = Prisma.sql`WITH dated AS (
-    SELECT p.id, p.method, p.amount, ${effectiveDate} AS at
+    SELECT p.id, p.method, p.amount, p."membershipId", ${effectiveDate} AS at
     FROM "Payment" p
     LEFT JOIN "Booking" b ON b.id = p."bookingId"
     LEFT JOIN "Lesson" l ON l.id = b."lessonId"
@@ -30,8 +30,8 @@ export async function paymentTurnover(tx: Prisma.TransactionClient, query: CashS
   ), filtered AS (SELECT * FROM dated WHERE TRUE
     ${range.gte ? Prisma.sql`AND at >= ${range.gte}` : Prisma.empty}
     ${range.lt ? Prisma.sql`AND at < ${range.lt}` : Prisma.empty})`;
-  const groups = await tx.$queryRaw<Array<{ method: string; amount: Prisma.Decimal; count: number }>>(
-    Prisma.sql`${filtered} SELECT method, SUM(amount) AS amount, COUNT(*)::int AS count FROM filtered GROUP BY method`,
+  const groups = await tx.$queryRaw<Array<{ method: string; amount: Prisma.Decimal; count: number; membershipAmount?: Prisma.Decimal }>>(
+    Prisma.sql`${filtered} SELECT method, SUM(amount) AS amount, COALESCE(SUM(amount) FILTER (WHERE "membershipId" IS NOT NULL), 0) AS "membershipAmount", COUNT(*)::int AS count FROM filtered GROUP BY method`,
   );
   const ids = await tx.$queryRaw<Array<{ id: string }>>(
     Prisma.sql`${filtered} SELECT id FROM filtered ORDER BY at DESC, id DESC LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}`,
@@ -39,5 +39,5 @@ export async function paymentTurnover(tx: Prisma.TransactionClient, query: CashS
   const payments = ids.length ? await tx.payment.findMany({ where: { id: { in: ids.map(row => row.id) } }, include: paymentInclude }) : [];
   const positions = new Map(ids.map((row, index) => [row.id, index]));
   const operations = payments.sort((a, b) => positions.get(a.id)! - positions.get(b.id)!);
-  return { ...aggregatePaymentMethods(groups.map(row => ({ method: row.method, _sum: { amount: row.amount }, _count: { _all: row.count } }))), operations };
+  return { ...aggregatePaymentMethods(groups.map(row => ({ method: row.method, _sum: { amount: row.amount }, _count: { _all: row.count } }))), totalMemberships: groups.reduce((sum, row) => sum.plus(row.membershipAmount ?? 0), new Prisma.Decimal(0)), operations };
 }

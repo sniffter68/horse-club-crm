@@ -204,6 +204,7 @@ export default function App() {
                 <Route path="staff" element={<StaffPage />} />
                 <Route path="payments" element={<PaymentList />} />
                 <Route path="financial-reports" element={<PermissionGate permission="financeRead"><FinancialReportsPage /></PermissionGate>} />
+                <Route path="finance" element={<PermissionGate permission="financeRead"><FinancialReportsPage /></PermissionGate>} />
                 <Route path="vet" element={<VetCalendarPage />} />
                 <Route path="stable" element={<PermissionGate permission="boardingAccess"><StallMap /></PermissionGate>} />
                 <Route path="*" element={<Result status="404" title="404" subTitle="Страница не найдена" />} />

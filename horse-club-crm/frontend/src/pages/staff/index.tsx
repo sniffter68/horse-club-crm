@@ -15,9 +15,11 @@ import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { ConfigurableTable } from '../../components/ConfigurableTable'
 import { currency } from '../cash-desk/shared'
 import { AdjustmentModal, PayoutModal, ProfileModal, ShiftModal } from './forms'
-import { paidPeriodFor, staffRoles, shiftColors, shiftStatuses, type PaidPeriod, type PayrollStatement, type PageData, type Payroll, type Shift, type Staff } from './types'
+import { paidPeriodFor, staffRoles, type PaidPeriod, type PayrollStatement, type PageData, type Payroll, type Shift, type Staff } from './types'
 import './staff.css'
 import { isUuid } from '../../uuid'
+import { WeekTemplateDrawer } from './WeekTemplateDrawer'
+import { shiftLabel, shiftInterval, shiftColor } from './types'
 
 const validDate = (value: string | null, fallback: string) => value && /^\d{4}-\d{2}-\d{2}$/.test(value) && DateTime.fromISO(value).isValid ? value : fallback
 
@@ -39,6 +41,7 @@ export function StaffPage() {
   const roleFilter = params.get('role') || undefined
   const activity = params.get('activity') || undefined
   const duty = params.get('duty') || undefined
+  const mobileDay = params.get('day') ? validDate(params.get('day'), month) : undefined
   const rawPage = Number(params.get('page') ?? 1)
   const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1
   const update = (values: Record<string, string>) => setParams(current => {
@@ -59,6 +62,7 @@ export function StaffPage() {
   const lock = useRef(false)
   const [profileModal, setProfileModal] = useState<Staff | 'new'>()
   const [shiftModal, setShiftModal] = useState<Shift | 'new'>()
+  const [templateOpen, setTemplateOpen] = useState(false)
   const [adjustment, setAdjustment] = useState<Payroll>()
   const [payout, setPayout] = useState<Payroll>()
   useEffect(() => {
@@ -131,7 +135,7 @@ export function StaffPage() {
     setPayout({ ...row, ...saved.data })
   })
   const shiftActions = (shift: Shift) => canManage && <Space wrap>
-    {shift.status !== 'COMPLETED' && shift.date.slice(0, 10) <= now.toISODate()! && <Button size="small" disabled={busy || !!closedPeriod(shift)} onClick={() => complete(shift)}>Отметить смену отработанной</Button>}
+    {shift.status === 'SCHEDULED' && shift.date.slice(0, 10) <= now.toISODate()! && <Button size="small" disabled={busy || !!closedPeriod(shift)} onClick={() => complete(shift)}>Отметить смену отработанной</Button>}
     <Button size="small" disabled={busy || !!closedPeriod(shift)} onClick={() => setShiftModal(shift)}>Изменить смену</Button>
     {role === 'ADMIN' && <Button size="small" danger disabled={busy || !!closedPeriod(shift)} onClick={() => remove(shift)}>Удалить смену</Button>}
   </Space>
@@ -153,23 +157,24 @@ export function StaffPage() {
           <Select aria-label="Статус присутствия" placeholder="Все смены" allowClear value={duty} style={{ minWidth: 160 }} options={[{ value: 'on', label: 'На смене' }, { value: 'off', label: 'Выходной' }]} onChange={value => update({ duty: value ?? '', page: '1' })} />
         </>}
         {tab === 'shifts' && <><Typography.Text>Месяц</Typography.Text><DatePicker aria-label="Месяц графика" picker="month" locale={ruDatePicker} allowClear={false} value={dayjs(month)} onChange={value => value && update({ month: value.format('YYYY-MM'), page: '1' })} />
-          {canManage && <Button type="primary" disabled={!staff.some(person => person.isActive) || loading || busy} onClick={() => setShiftModal('new')}>Запланировать смену</Button>}</>}
+          {canManage && <><Button type="primary" disabled={!staff.some(person => person.isActive) || loading || busy} onClick={() => setShiftModal('new')}>Запланировать смену</Button><Button disabled={!staff.some(person => person.isActive) || loading || busy} onClick={() => setTemplateOpen(true)}>Применить шаблон</Button></>}</>}
         {tab === 'payroll' && <><DatePicker.RangePicker aria-label="Период расчета" locale={ruDatePicker} format="DD.MM.YYYY" allowClear={false} value={[dayjs(from), dayjs(to)]} onChange={values => values?.[0] && values[1] && update({ from: values[0].format('YYYY-MM-DD'), to: values[1].format('YYYY-MM-DD'), page: '1' })} />
           <Button onClick={() => periodPreset(0)}>Текущий месяц</Button><Button onClick={() => periodPreset(-1)}>Прошлый месяц</Button></>}
         {canManage && <Button type="primary" onClick={() => setProfileModal('new')}>+ Добавить сотрудника</Button>}
         <Button disabled={loading || busy} onClick={() => refresh(value => value + 1)}>{error ? 'Повторить' : 'Обновить'}</Button>
       </Space>
       {error && <Alert className="staff-feedback" showIcon type="error" message="Не удалось выполнить операцию" description={error} />}
+      {tab === 'shifts' && !screens.md && <Space wrap className="staff-toolbar"><Typography.Text>Компактный график</Typography.Text><DatePicker aria-label="День графика" placeholder="Все дни месяца" locale={ruDatePicker} format="DD.MM.YYYY" value={mobileDay ? dayjs(mobileDay) : null} disabledDate={date => date.format('YYYY-MM') !== month.slice(0, 7)} onChange={date => update({ day: date?.format('YYYY-MM-DD') ?? '' })} /></Space>}
       {loading ? <div className="stable-loading"><Spin aria-label="Загрузка персонала" /></div> : !total ? <Empty description={tab === 'statements' ? 'Сформированных ведомостей пока нет' : canManage ? 'Сотрудников пока нет. Нажмите «+ Добавить сотрудника».' : 'Профиль сотрудника пока не создан. Обратитесь к администратору.'} /> : <>
         {tab === 'shifts' && (screens.md ? <div className="staff-grid-scroll"><table className="staff-grid"><caption>График смен за {DateTime.fromISO(month).setLocale('ru').toFormat('LLLL yyyy')}</caption><thead><tr><th scope="col">Сотрудник</th>{dates.map(date => <th scope="col" key={date.day}>{date.day}<small>{date.setLocale('ru').toFormat('ccc')}</small></th>)}</tr></thead>
           <tbody>{staff.map(person => <tr key={person.id}><th scope="row" style={{ borderInlineStart: `4px solid ${person.scheduleColor || 'transparent'}` }}>{person.fullName}{canManage && <Button size="small" icon={<EditOutlined />} aria-label={`Редактировать: ${person.fullName}`} onClick={() => setProfileModal(person)} />}<small>{person.roleTitle}{!person.isActive && ' · Неактивен'}</small></th>{dates.map(date => {
             const shift = shifts.find(row => row.staffId === person.id && row.date.slice(0, 10) === date.toISODate())
             const period = paidPeriodFor(paidPeriods, person.id, date.toISODate()!)
             return <td key={date.day} className={period ? 'staff-day-locked' : undefined}>
-              {period && <Tooltip trigger={['hover', 'focus']} title={closedLabel(period)}><span tabIndex={0} aria-label={closedLabel(period)}><LockOutlined /> Закрыто</span></Tooltip>}{shift ? <div>{canManage ? <Button className="staff-shift-button" size="small" disabled={busy || !!period} onClick={() => setShiftModal(shift)}><Tag color={shiftColors[shift.status]}>{shiftStatuses[shift.status]}<br />{shift.startTime}–{shift.endTime}</Tag></Button> : <Tag color={shiftColors[shift.status]}>{shiftStatuses[shift.status]}<br />{shift.startTime}–{shift.endTime}</Tag>}
+              {period && <Tooltip trigger={['hover', 'focus']} title={closedLabel(period)}><span tabIndex={0} aria-label={closedLabel(period)}><LockOutlined /> Закрыто</span></Tooltip>}{shift ? <div>{canManage ? <Button className="staff-shift-button" size="small" disabled={busy || !!period} onClick={() => setShiftModal(shift)}><Tag color={shiftColor(shift)}>{shiftLabel(shift)}<br />{shiftInterval(shift)}</Tag></Button> : <Tag color={shiftColor(shift)}>{shiftLabel(shift)}<br />{shiftInterval(shift)}</Tag>}
               {canManage && shift.status === 'SCHEDULED' && date.toISODate()! <= now.toISODate()! && <Button size="small" disabled={busy || !!period} aria-label={`Отметить смену отработанной: ${person.fullName}, ${date.toFormat('dd.MM')}`} onClick={() => complete(shift)}>Отработана</Button>}</div> : <span aria-label="Нет смены">—</span>}</td>
-          })}</tr>)}</tbody></table></div> : <ResponsiveTable<Shift> rowKey="id" dataSource={shifts} pagination={{ pageSize: 10 }} locale={{ emptyText: 'В этом месяце смен нет' }} columns={[
-            { title: 'Сотрудник', render: (_, row) => staff.find(person => person.id === row.staffId)?.fullName }, { title: 'Дата', render: (_, row) => <>{dayjs(row.date.slice(0, 10)).format('DD.MM.YYYY')}{closedPeriod(row) && <Typography.Paragraph><LockOutlined /> {closedLabel(closedPeriod(row)!)}</Typography.Paragraph>}</> }, { title: 'Время', render: (_, row) => `${row.startTime}–${row.endTime}` }, { title: 'Статус', render: (_, row) => <Tag color={shiftColors[row.status]}>{shiftStatuses[row.status]}</Tag> }, ...(canManage ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Shift) => shiftActions(row) }] : []),
+          })}</tr>)}</tbody></table></div> : <ResponsiveTable<Shift> rowKey="id" dataSource={mobileDay ? shifts.filter(shift => shift.date.slice(0, 10) === mobileDay) : shifts} pagination={{ pageSize: 10 }} locale={{ emptyText: 'В этом месяце смен нет' }} columns={[
+            { title: 'Сотрудник', render: (_, row) => staff.find(person => person.id === row.staffId)?.fullName }, { title: 'Дата', render: (_, row) => <>{dayjs(row.date.slice(0, 10)).format('DD.MM.YYYY')}{closedPeriod(row) && <Typography.Paragraph><LockOutlined /> {closedLabel(closedPeriod(row)!)}</Typography.Paragraph>}</> }, { title: 'Время', render: (_, row) => shiftInterval(row) }, { title: 'Статус', render: (_, row) => <Tag color={shiftColor(row)}>{shiftLabel(row)}</Tag> }, ...(canManage ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Shift) => shiftActions(row) }] : []),
           ]} />)}
         {tab === 'employees' && <ConfigurableTable<Staff> storageKey="horse_crm_staff_columns_v1" defaultHiddenColumns={['vk', 'roleTitle']} rowKey="id" dataSource={staff} pagination={false} columns={[
           { key: 'fullName', width: 180, fixed: 'left' as const, title: 'ФИО', dataIndex: 'fullName' },
@@ -214,6 +219,7 @@ export function StaffPage() {
         <Pagination className="staff-pagination" current={page} pageSize={10} total={total} showSizeChanger={false} showTotal={count => `${tab === 'statements' ? 'Ведомостей' : 'Сотрудников'}: ${count}`} onChange={next => update({ page: String(next) })} />
       </>}
     </Card>}
+    {templateOpen && <WeekTemplateDrawer staff={staff} date={month.slice(0, 7) === now.toFormat('yyyy-MM') ? now.toISODate()! : month} onClose={() => setTemplateOpen(false)} onSaved={() => { setTemplateOpen(false); changed() }} />}
     {profileModal && <ProfileModal staff={profileModal === 'new' ? undefined : profileModal} onClose={() => setProfileModal(undefined)} onSaved={changed} onTelegramChanged={() => refresh(value => value + 1)} />}
     {shiftModal && <ShiftModal variant="drawer" staff={staff} shift={shiftModal === 'new' ? undefined : shiftModal} selectedDate={month.slice(0, 7) === now.toFormat('yyyy-MM') ? now.toISODate()! : month} onClose={() => setShiftModal(undefined)} onSaved={changed} onDelete={role === 'ADMIN' ? remove : undefined} />}
     {adjustment && <AdjustmentModal row={adjustment} from={from} to={to} onClose={() => setAdjustment(undefined)} onSaved={changed} />}

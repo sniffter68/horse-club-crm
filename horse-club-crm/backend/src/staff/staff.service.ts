@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { BCRYPT_ROUNDS } from '../auth/auth.config';
 import { VkIdentityService } from '../vk-bot/vk-identity.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, Role, StaffProfile } from '@prisma/client';
+import { Prisma, Role, StaffProfile, WorkShiftStatus } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../prisma/prisma.service';
 import { isSerializationFailure } from '../common/serialization-failure';
@@ -217,6 +217,7 @@ export class StaffService {
   }
   createShifts(dto: CreateShiftDto, user: AuthUser) {
     this.manage(user);
+    if (dto.days) return this.savePlannedDays(dto, user);
     if (!!dto.date === !!dto.dates) throw new BadRequestException('Укажите одну дату или список дат');
     if (dto.startTime >= dto.endTime) throw new BadRequestException('Окончание смены должно быть позже начала в тот же день');
     const dates = (dto.dates ?? [dto.date!]).map(payrollDay);
@@ -226,6 +227,28 @@ export class StaffService {
       for (const date of dates) await this.shiftUnlocked(tx, dto.staffId, date, user, dto.force);
       await tx.workShift.createMany({ data: dates.map(date => ({ staffId: dto.staffId, date, startTime: dto.startTime, endTime: dto.endTime, notes: dto.notes, createdById: user.id })) });
       return { count: dates.length };
+    });
+  }
+  private savePlannedDays(dto: CreateShiftDto, user: AuthUser) {
+    const days = dto.days!;
+    if (dto.date || dto.dates || new Set(days.map(day => day.date)).size !== days.length) throw new BadRequestException('Укажите уникальные даты плана');
+    if (days.some(day => day.startTime >= day.endTime)) throw new BadRequestException('Окончание смены должно быть позже начала');
+    return this.atomic(async tx => {
+      const staff = await tx.staffProfile.findUnique({ where: { id: dto.staffId } });
+      if (!staff?.isActive) throw new BadRequestException('Выберите активного сотрудника');
+      for (const day of days) {
+        const date = payrollDay(day.date);
+        await this.shiftUnlocked(tx, dto.staffId, date, user);
+        if (await tx.trainerPayout.findFirst({ where: { OR: [{ staffId: dto.staffId }, { trainer: { user: { staffProfile: { id: dto.staffId } } } }], status: 'PAID', periodStart: { lte: date }, periodEnd: { gte: date } } })) throw new ConflictException('Дата входит в оплаченную ведомость тренера');
+        const existing = await tx.workShift.findUnique({ where: { staffId_date: { staffId: dto.staffId, date } } });
+        const comment = existing?.notes?.replace(/^\[plan:(OFF|VACATION)\]\n?/, '') || null;
+        const planned = existing?.notes?.startsWith('[plan:OFF]') || existing?.notes?.startsWith('[plan:VACATION]');
+        if (existing && (existing.startedAt || existing.endedAt || existing.status === 'COMPLETED' || existing.status === 'SICK' || existing.status === 'ABSENT' && !planned)) throw new ConflictException('План затрагивает начатую, отработанную смену или отсутствие. Измените её отдельно');
+        // Existing ABSENT status excludes non-working days from payroll. Notes distinguish planned leave from an unplanned absence without a schema migration.
+        const data = { startTime: day.startTime, endTime: day.endTime, status: day.kind === 'WORK' ? WorkShiftStatus.SCHEDULED : WorkShiftStatus.ABSENT, notes: day.kind === 'WORK' ? comment : `[plan:${day.kind}]${comment ? `\n${comment}` : ''}` };
+        await tx.workShift.upsert({ where: { staffId_date: { staffId: dto.staffId, date } }, create: { ...data, staffId: dto.staffId, date, createdById: user.id }, update: data });
+      }
+      return { count: days.length };
     });
   }
   changeShift(id: string, dto: UpdateShiftDto | null, user: AuthUser) {

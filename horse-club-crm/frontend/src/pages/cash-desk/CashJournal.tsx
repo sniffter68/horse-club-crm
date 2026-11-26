@@ -31,8 +31,18 @@ export function CashJournal({ from, to, shiftId, inactive, refresh, cashboxType 
     finally { setEditingId(undefined) }
   }
   const [params, setParams] = useSearchParams()
+  useEffect(() => {
+    if (window.location.hash !== '#cash-journal') return
+    const frame = requestAnimationFrame(() => {
+      const journal = document.getElementById('cash-journal')
+      journal?.scrollIntoView({ block: 'start' })
+      journal?.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [])
   const page = Math.max(1, Number(params.get('page')) || 1)
   const paymentMethod = params.get('method') || '', operationType = params.get('operation') || '', search = params.get('search') || ''
+  const source = params.get('source') === 'MEMBERSHIP' ? 'MEMBERSHIP' : ''
   const requestedShift = params.get('journalShift') || ''
   const invalidShift = Boolean(!shiftId && requestedShift && !isUuid(requestedShift))
   const selectedShift = shiftId || (!invalidShift && requestedShift) || undefined
@@ -58,7 +68,7 @@ export function CashJournal({ from, to, shiftId, inactive, refresh, cashboxType 
     if (inactive || invalidShift) { setResult({ data: [], total: 0 }); setLoading(false); return }
     setLoading(true)
     httpClient.get<{ data: JournalRow[]; total: number }>(`${API_URL}/finance/journal`, {
-      params: { from, to, cashboxType, shiftId: selectedShift, page, pageSize: 20, paymentMethod: paymentMethod || undefined, operationType: operationType || undefined, search: search || undefined }, signal: controller.signal,
+      params: { from, to, cashboxType, shiftId: selectedShift, page, pageSize: 20, source: source || undefined, paymentMethod: paymentMethod || undefined, operationType: operationType || undefined, search: search || undefined }, signal: controller.signal,
     }).then(({ data }) => {
       if (controller.signal.aborted) return
       if (page > 1 && data.total <= (page - 1) * 20) update('page', String(Math.max(1, Math.ceil(data.total / 20))))
@@ -67,10 +77,11 @@ export function CashJournal({ from, to, shiftId, inactive, refresh, cashboxType 
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   // URL primitives own the journal filters.
-  }, [from, to, cashboxType, selectedShift, invalidShift, page, paymentMethod, operationType, search, inactive, refresh, revision, update])
-  return <Card title="Кассовая книга" extra={!error && !loading ? `Операций: ${result?.total ?? 0}` : undefined}>
+  }, [from, to, cashboxType, selectedShift, invalidShift, page, paymentMethod, operationType, source, search, inactive, refresh, revision, update])
+  return <Card id="cash-journal" tabIndex={-1} title="Кассовая книга" extra={!error && !loading ? `Операций: ${result?.total ?? 0}` : undefined}>
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
       <div className="cash-journal-filters">
+        <Select aria-label="Основание операции" value={source} onChange={value => update('source', value)} options={[{ value: '', label: 'Все основания' }, { value: 'MEMBERSHIP', label: 'Продажи абонементов' }]} />
         <LiveSearch value={draft} onChange={setDraft} onSearch={value => { if (value !== search) update('search', value) }} aria-label="Поиск по клиенту или комментарию" placeholder="Клиент или комментарий" />
         <Select aria-label="Способ оплаты журнала" value={paymentMethod} onChange={value => update('method', value)} options={[{ value: '', label: cashboxType ? 'Все каналы' : 'Все способы оплаты' }, { value: 'CASH', label: cashboxType ? 'Касса постоя (нал)' : 'Наличные' }, { value: 'BANK', label: cashboxType ? 'Р/С' : 'Безналичные' }]} />
         <Select aria-label="Тип операции" value={operationType} onChange={value => update('operation', value)} options={[{ value: '', label: 'Все операции' }, { value: 'INCOME', label: 'Приход' }, { value: 'EXPENSE', label: 'Расход' }]} />

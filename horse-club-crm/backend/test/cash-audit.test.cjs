@@ -45,6 +45,16 @@ test('journal builds a parameterized merged ledger with stable pagination, liter
   assert.deepEqual(statements[0].values.slice(-2), [20, 20]);
 });
 
+test('membership source restricts both journal pages and totals to paid membership income', async () => {
+  const dto = plainToInstance(CashJournalQueryDto, { from: '2026-11-01', to: '2026-11-02', source: 'MEMBERSHIP' });
+  assert.equal((await validate(dto)).length, 0);
+  assert.ok((await validate(plainToInstance(CashJournalQueryDto, { ...dto, source: 'INVALID' }))).length);
+  const statements = [];
+  const service = new FinanceService({ $transaction: async work => work({ $queryRaw: async sql => { statements.push(sql); return sql.sql.includes('COUNT(*) AS count') ? [{ count: 0n }] : []; } }) });
+  await service.journal(dto);
+  for (const statement of statements) assert.match(statement.sql, /AND kind = 'INCOME' AND "membershipId" IS NOT NULL/);
+});
+
 test('expense and its audit commit together; audit failure rolls back, retries never create a second event', async () => {
   let committed = { expense: null, audit: null }, failAudit = true;
   const service = new FinanceService({ $transaction: async work => {

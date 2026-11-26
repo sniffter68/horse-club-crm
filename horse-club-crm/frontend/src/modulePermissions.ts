@@ -11,7 +11,7 @@ const resources: Record<string, SystemModule> = {
   lessons: 'SCHEDULE', schedule: 'SCHEDULE', 'lesson-history': 'SCHEDULE', bookings: 'SCHEDULE',
   stalls: 'STABLES', stable: 'STABLES', 'stall-map': 'STABLES', 'boarding-contracts': 'STABLES', boarding: 'STABLES',
   vet: 'VETERINARY', 'horse-health-logs': 'VETERINARY',
-  payments: 'CASHBOX', 'cash-desk': 'CASHBOX', 'financial-reports': 'CASHBOX',
+  payments: 'CASHBOX', 'cash-desk': 'CASHBOX', 'financial-reports': 'CASHBOX', finance: 'CASHBOX',
   staff: 'STAFF_PAYROLL', payroll: 'STAFF_PAYROLL',
 }
 export const moduleForResource = (resource?: string) => resource ? resources[resource] : undefined

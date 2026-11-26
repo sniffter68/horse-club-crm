@@ -3,6 +3,10 @@ export const shiftStatuses = { SCHEDULED: 'Запланирована', COMPLETE
 export type ShiftStatus = keyof typeof shiftStatuses
 export const shiftColors = { SCHEDULED: 'blue', COMPLETED: 'green', ABSENT: 'red', SICK: 'orange' }
 export type Shift = { id: string; staffId: string; date: string; startTime: string; endTime: string; status: ShiftStatus; notes?: string }
+export const plannedKind = (shift: Shift) => shift.status === 'ABSENT' ? shift.notes?.startsWith('[plan:OFF]') ? 'OFF' : shift.notes?.startsWith('[plan:VACATION]') ? 'VACATION' : undefined : undefined
+export const shiftLabel = (shift: Shift) => plannedKind(shift) === 'OFF' ? 'Выходной' : plannedKind(shift) === 'VACATION' ? 'Отпуск' : shiftStatuses[shift.status]
+export const shiftInterval = (shift: Shift) => plannedKind(shift) ? '—' : `${shift.startTime}–${shift.endTime}`
+export const shiftColor = (shift: Shift) => plannedKind(shift) ? 'default' : shiftColors[shift.status]
 export type Payroll = { id?: string; updatedAt?: string; staffId: string; fullName: string; roleTitle: string; shiftsCount: number; shiftsTotal: string; lessonsCount: number; lessonsTotal: string; bonuses: string; penalties: string; totalAmount: string; isPaid: boolean; blocked: boolean; paidAt?: string; expenseId?: string;
   lessonBreakdown?: Array<{ id: string; startTime: string; serviceName?: string; commissionPercent?: number; nominalPrice: number; clientPaid: string; trainerPayout: number }> }
 export type PageData<T> = { data: T[]; total: number }

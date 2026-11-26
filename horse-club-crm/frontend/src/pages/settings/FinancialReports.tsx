@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { PeriodClosingButton } from '../cash-desk/PeriodClosingModal'
 import { Alert, Button, Card, Col, Row, Select, Space, Statistic, Typography } from 'antd'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { financeJournalLink, type FinanceKpi } from './financeLinks'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { cashTime, currency, operationService, periodRange, type CashOperation, type CashSummary } from '../cash-desk/shared'
@@ -21,8 +22,8 @@ export function FinancialReportsPage() {
       if (controller.signal.aborted) return
       setLoading(true); setError(undefined)
       try {
-        const response = await httpClient.get<CashSummary>(`${API_URL}/payments/summary`, { signal: controller.signal,
-          params: { ...periodRange(period), page, pageSize: 20 } })
+        const response = await httpClient.get<CashSummary>(`${API_URL}/finance/summary`, { signal: controller.signal,
+          params: { ...periodRange(period), dateBasis: 'payment', page, pageSize: 20 } })
         if (!controller.signal.aborted) setData(response.data)
       } catch (cause) { if (!controller.signal.aborted) setError(toHttpError(cause).message) }
       finally { if (!controller.signal.aborted) setLoading(false) }
@@ -36,8 +37,10 @@ export function FinancialReportsPage() {
       options={[{ value: 'today', label: 'Сегодня' }, { value: 'yesterday', label: 'Вчера' }, { value: 'week', label: 'Неделя' }, { value: 'month', label: 'Месяц' }]} />
       <Button disabled={loading} onClick={() => setRevision(value => value + 1)}>Обновить отчёт</Button></Space>
     {error && <Alert role="alert" type="error" showIcon message={error} />}
-    <Row gutter={[16, 16]}>{[['Выручка', data?.totalRevenue], ['Наличные', data?.totalCash], ['Безналичные', data?.totalCard]].map(([title, value]) => <Col key={title} xs={24} md={8}>
-      <Card loading={loading}><Statistic title={title} value={currency(value)} /></Card>
+    <Row gutter={[16, 16]}>{([
+      ['income', 'Общие поступления', data?.totalRevenue], ['cash', 'Наличные', data?.totalCash], ['bank', 'Безналичные', data?.totalCard], ['memberships', 'Продажи абонементов', data?.totalMemberships], ['expenses', 'Расходы', data?.totalExpenses],
+    ] satisfies Array<[FinanceKpi, string, string | undefined]>).map(([key, title, value]) => <Col key={key} xs={24} md={8}>
+      <Link className="crm-card-link block h-full" aria-label={`${title}: открыть журнал`} to={financeJournalLink(key, periodRange(period))}><Card loading={loading}><Statistic title={title} value={error ? '—' : currency(value)} /><Typography.Text type="secondary">Открыть журнал →</Typography.Text></Card></Link>
     </Col>)}</Row>
     <ResponsiveTable<CashOperation> dataSource={data?.operations ?? []} loading={loading} rowKey="id" columns={[
       { title: 'Дата', key: 'date', render: (_, row) => cashTime(row.paidAt || row.createdAt) },

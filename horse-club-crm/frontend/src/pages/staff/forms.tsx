@@ -1,5 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Button, DatePicker, Form, Input, InputNumber, Select, Checkbox, Switch, TimePicker, Typography } from 'antd'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Alert, Button, DatePicker, Form, Input, InputNumber, Select, Checkbox, Switch, TimePicker, Typography, Space } from 'antd'
+import { DateTime } from 'luxon'
+import { intervalHours, type WeekDay } from './weekTemplates'
+import { WeekPreview } from './WeekPreview'
+import type { PageData } from './types'
+import { plannedKind, shiftLabel } from './types'
 import dayjs, { type Dayjs } from 'dayjs'
 import ruDatePicker from 'antd/es/date-picker/locale/ru_RU'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
@@ -101,6 +106,32 @@ export function ShiftModal({ variant = 'modal', leading, staff, shift, selectedD
   const force = Form.useWatch('force', form) === true && role === 'ADMIN'
   const [periodState, setPeriodState] = useState<{ staffId: string; periods: PaidPeriod[] }>()
   const [periodError, setPeriodError] = useState<string>()
+  const times = Form.useWatch('times', form) as [Dayjs, Dayjs] | undefined
+  const dates = Form.useWatch('dates', form) as Dayjs[] | undefined
+  const [preview, setPreview] = useState<WeekDay[]>()
+  const [previewError, setPreviewError] = useState<string>()
+  const [previewBusy, setPreviewBusy] = useState(false)
+  const previewController = useRef<AbortController | null>(null)
+  useEffect(() => () => previewController.current?.abort(), [])
+  const bulkInterval = async () => {
+    if (!shift || !times?.[0] || !times[1] || !isUuid(shift.staffId)) return
+    const startTime = times[0].format('HH:mm'), endTime = times[1].format('HH:mm')
+    if (startTime >= endTime) { setPreviewError('Окончание смены должно быть позже начала'); return }
+    setPreviewBusy(true); setPreviewError(undefined)
+    previewController.current?.abort()
+    const controller = new AbortController()
+    previewController.current = controller
+    try {
+      const monday = DateTime.fromISO(shift.date.slice(0, 10), { zone: 'Europe/Moscow' }).startOf('week')
+      const { data } = await httpClient.get<PageData<Shift>>(`${API_URL}/staff/shifts`, { params: { staffId: shift.staffId, from: monday.toISODate(), to: monday.plus({ days: 6 }).toISODate(), pageSize: 100 }, signal: controller.signal })
+      const current = form.getFieldValue('times') as [Dayjs, Dayjs] | undefined
+      if (!controller.signal.aborted && current?.[0]?.format('HH:mm') === startTime && current?.[1]?.format('HH:mm') === endTime) {
+        setPreview(data.data.filter(row => row.status === 'SCHEDULED').map(row => ({ date: row.date.slice(0, 10), kind: 'WORK', startTime, endTime })))
+        form.setFields([{ name: 'times', touched: true }])
+      }
+    } catch (cause) { if (!controller.signal.aborted) setPreviewError(toHttpError(cause).message) }
+    finally { if (!controller.signal.aborted) setPreviewBusy(false) }
+  }
   useEffect(() => {
     const controller = new AbortController()
     if (!staffId || !isUuid(staffId)) return
@@ -111,23 +142,41 @@ export function ShiftModal({ variant = 'modal', leading, staff, shift, selectedD
   }, [staffId])
   const periodsReady = periodState?.staffId === staffId && !periodError
   const isClosed = (date: string) => !!paidPeriodFor(periodState?.periods ?? [], staffId ?? '', date)
-  return <StableEntryModal variant={variant} title={shift ? 'Изменить смену' : 'Запланировать смену'} form={form} submitLabel={shift ? 'Сохранить смену' : 'Запланировать смену'} resources={['staff']} onClose={onClose} onSaved={onSaved}
+  return <StableEntryModal variant={variant} title={shift ? 'Изменить смену' : 'Запланировать смену'} form={form} submitDisabled={previewBusy} submitLabel={shift ? 'Сохранить смену' : 'Запланировать смену'} resources={['staff']} onClose={onClose} onSaved={onSaved}
     save={values => {
       if (!isUuid(shift?.id ?? values.staffId)) throw new Error('Некорректный идентификатор сотрудника или смены')
       if (!periodsReady) throw new Error('Не удалось проверить закрытые периоды. Закройте форму и повторите попытку')
+      if (preview) {
+        if (!preview.length) throw new Error('В этой неделе нет запланированных рабочих дней')
+        if (preview.some(day => isClosed(day.date))) throw new Error('План затрагивает оплаченный период')
+        return httpClient.post(`${API_URL}/staff/shifts`, { staffId, days: preview })
+      }
       if (!force && (shift ? isClosed(shift.date.slice(0, 10)) : values.dates.some(date => isClosed(date.format('YYYY-MM-DD'))))) throw new Error('Выберите даты вне оплаченных периодов или отмените оплату ведомости')
-      const payload = { startTime: values.times[0].format('HH:mm'), endTime: values.times[1].format('HH:mm'), notes: values.notes, ...(force ? { force: true } : {}) }
+      const kind = shift ? plannedKind(shift) : undefined
+      const payload = { startTime: values.times[0].format('HH:mm'), endTime: values.times[1].format('HH:mm'), notes: kind && values.status === 'ABSENT' ? `[plan:${kind}]${values.notes ? `\n${values.notes}` : ''}` : values.notes ?? (kind ? '' : undefined), ...(force ? { force: true } : {}) }
       if (payload.startTime >= payload.endTime) return Promise.reject(new Error('Окончание смены должно быть позже начала в тот же день'))
       return shift ? httpClient.patch(`${API_URL}/staff/shifts/${shift.id}`, { ...payload, status: values.status }) : httpClient.post(`${API_URL}/staff/shifts`, { ...payload, staffId: values.staffId, dates: values.dates.map(date => date.format('YYYY-MM-DD')) })
     }}>
     {leading}
+    {previewError && <Alert type="error" message={previewError} />}
+    <Space wrap style={{ marginBottom: 16 }}>{['09:00–18:00', '10:00–19:00', '10:00–21:00'].map(interval => <Button key={interval} onClick={() => { const [start, end] = interval.split('–'); form.setFieldValue('times', [dayjs(`2000-01-01T${start}`), dayjs(`2000-01-01T${end}`)]); setPreview(undefined) }}>{interval}</Button>)}
+      <Button onClick={() => {
+        const selected = shift ? [shift.date.slice(0, 10)] : (dates ?? []).map(date => date.format('YYYY-MM-DD'))
+        if (!selected.length || selected.length > 7) { setPreviewError('Для выходных выберите от 1 до 7 дат'); return }
+        setPreview(selected.map(date => ({ date, kind: 'OFF', startTime: shift?.startTime ?? '09:00', endTime: shift?.endTime ?? '18:00' })))
+        form.setFields([{ name: 'times', touched: true }])
+      }}>Выходной</Button>
+    </Space>
     {periodError && <Alert showIcon type="error" message="Не удалось загрузить закрытые периоды" description={periodError} />}
     {role === 'ADMIN' && <Form.Item name="force" valuePropName="checked"><Checkbox>Подтверждаю корректировку закрытых дат: отменить оплату затронутых ведомостей и связанные расходы, вернуть ведомости в черновик</Checkbox></Form.Item>}
     {!shift && <><Form.Item name="staffId" label="Сотрудник" initialValue={staff.find(row => row.isActive)?.id} rules={required}><Select aria-label="Сотрудник" options={staff.filter(row => row.isActive).map(row => ({ value: row.id, label: row.fullName }))} /></Form.Item>
       <Form.Item name="dates" label="Даты смен (до 31 даты)" initialValue={[dayjs(selectedDate)]} rules={[...required, { validator: (_, dates: Dayjs[]) => dates?.length > 31 ? Promise.reject(new Error('Выберите не более 31 даты')) : dates?.some(date => !force && isClosed(date.format('YYYY-MM-DD'))) ? Promise.reject(new Error('Выберите даты вне оплаченных периодов')) : Promise.resolve() }]}><DatePicker multiple locale={ruDatePicker} disabled={!periodsReady} disabledDate={date => !force && isClosed(date.format('YYYY-MM-DD'))} format="DD.MM.YYYY" style={{ width: '100%' }} /></Form.Item></>}
-    <Form.Item name="times" label="Время смены (Москва)" initialValue={[dayjs(`2000-01-01T${shift?.startTime ?? '08:00'}`), dayjs(`2000-01-01T${shift?.endTime ?? '20:00'}`)]} rules={required}><TimePicker.RangePicker aria-label="Время смены (Москва)" locale={ruDatePicker} placeholder={['Начало', 'Окончание']} format="HH:mm" /></Form.Item>
-    {shift && <Form.Item name="status" label="Статус смены" initialValue={shift.status} rules={required}><Select options={Object.entries(shiftStatuses).map(([value, label]) => ({ value, label }))} /></Form.Item>}
-    <Form.Item name="notes" label="Комментарий" initialValue={shift?.notes}><Input.TextArea rows={3} maxLength={2000} style={{ resize: 'none' }} /></Form.Item>
+    <Form.Item name="times" label="Время смены (Москва)" initialValue={[dayjs(`2000-01-01T${shift?.startTime ?? '08:00'}`), dayjs(`2000-01-01T${shift?.endTime ?? '20:00'}`)]} rules={required}><TimePicker.RangePicker onChange={() => setPreview(undefined)} aria-label="Время смены (Москва)" locale={ruDatePicker} placeholder={['Начало', 'Окончание']} format="HH:mm" /></Form.Item>
+    <Typography.Paragraph aria-live="polite">Продолжительность: {times?.[0] && times[1] ? intervalHours(times[0].format('HH:mm'), times[1].format('HH:mm')) : 0} ч</Typography.Paragraph>
+    {shift && <Button block style={{ height: 'auto', whiteSpace: 'normal' }} loading={previewBusy} onClick={() => void bulkInterval()}>Применить этот интервал ко всем рабочим дням недели</Button>}
+    {preview && <><WeekPreview days={preview} /><Button onClick={() => setPreview(undefined)}>Отменить применение</Button></>}
+    {shift && <Form.Item name="status" label="Статус смены" initialValue={shift.status} rules={required}><Select disabled={!!preview} options={Object.entries(shiftStatuses).map(([value, label]) => ({ value, label: value === 'ABSENT' && plannedKind(shift) ? shiftLabel(shift) : label }))} /></Form.Item>}
+    <Form.Item name="notes" label="Комментарий" initialValue={shift?.notes?.replace(/^\[plan:(OFF|VACATION)\]\n?/, '')}><Input.TextArea disabled={!!preview} rows={3} maxLength={2000} style={{ resize: 'none' }} /></Form.Item>
     {shift && onDelete && <Button danger disabled={!periodsReady || isClosed(shift.date.slice(0, 10))} onClick={() => onDelete(shift)}>Удалить смену</Button>}
   </StableEntryModal>
 }
