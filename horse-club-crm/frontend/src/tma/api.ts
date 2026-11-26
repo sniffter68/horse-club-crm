@@ -1,3 +1,5 @@
+import { getApiBaseUrl } from '../apiUrl'
+
 export type LessonStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
 export interface TrainerLesson {
   id: string
@@ -28,7 +30,7 @@ export class TmaApiError extends Error {
 }
 
 export async function tmaRequest<T>(path: string, token: string | null, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`/api/tma/${path}`, { ...options, credentials: 'omit', cache: 'no-store',
+  const response = await fetch(`${getApiBaseUrl()}/tma/${path}`, { ...options, credentials: 'omit', cache: 'no-store',
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) } })
   if (!response.ok) {
     let body: unknown

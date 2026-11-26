@@ -19,10 +19,10 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) response: Response): Promise<AccessTokenResponse> {
+  async login(@Body() dto: LoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response): Promise<AccessTokenResponse> {
     const result = await this.auth.login(dto);
-    response.cookie(sessionCookieName(), result.access_token, sessionCookieOptions());
-    response.cookie(refreshCookieName(), await this.auth.createRefreshToken(result.access_token), refreshCookieOptions());
+    response.cookie(sessionCookieName(), result.access_token, sessionCookieOptions(request.headers.origin));
+    response.cookie(refreshCookieName(), await this.auth.createRefreshToken(result.access_token), refreshCookieOptions(request.headers.origin));
     response.setHeader('Cache-Control', 'no-store');
     return { ...result, access_token: 'cookie-session' };
   }
@@ -31,8 +31,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response): Promise<AccessTokenResponse> {
     const result = await this.auth.refresh(refreshCookie(request));
-    response.cookie(sessionCookieName(), result.access_token, sessionCookieOptions());
-    response.cookie(refreshCookieName(), await this.auth.createRefreshToken(result.access_token), refreshCookieOptions());
+    response.cookie(sessionCookieName(), result.access_token, sessionCookieOptions(request.headers.origin));
+    response.cookie(refreshCookieName(), await this.auth.createRefreshToken(result.access_token), refreshCookieOptions(request.headers.origin));
     response.setHeader('Cache-Control', 'no-store');
     return { ...result, access_token: 'cookie-session' };
   }
@@ -54,10 +54,10 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
-  async logout(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) response: Response) {
+  async logout(@CurrentUser() user: AuthUser, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const result = await this.auth.logout(user);
-    response.clearCookie(sessionCookieName(), { ...sessionCookieOptions(), maxAge: undefined });
-    response.clearCookie(refreshCookieName(), { ...refreshCookieOptions(), maxAge: undefined });
+    response.clearCookie(sessionCookieName(), { ...sessionCookieOptions(request.headers.origin), maxAge: undefined });
+    response.clearCookie(refreshCookieName(), { ...refreshCookieOptions(request.headers.origin), maxAge: undefined });
     return result;
   }
 }

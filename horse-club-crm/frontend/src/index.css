@@ -621,3 +621,18 @@ html[data-theme='dark'] .dashboard-quick-actions .ant-btn-default { color: var(-
 .toggle-setting-row__children { padding: 10px 14px; border-top: 1px solid var(--crm-border); }
 .horse-service-settings { border: 0; padding: 0; margin: 0 0 1.5rem; min-width: 0; }
 .horse-service-settings legend { color: var(--crm-ink); font-weight: 600; margin-bottom: 1rem; }
+
+/* Capacitor edge-to-edge and standalone PWA: the shell owns system insets. */
+.crm-app-layout {
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+.crm-app-layout > .ant-layout { min-height: 0; }
+.crm-app-layout > .crm-sidebar { max-height: 100%; }
+.ant-drawer .ant-drawer-header { padding-top: max(16px, env(safe-area-inset-top, 0px)); }
+.ant-drawer .ant-drawer-footer { padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
+.ant-drawer .ant-drawer-body { padding-bottom: max(24px, env(safe-area-inset-bottom, 0px)); scroll-padding-bottom: env(safe-area-inset-bottom, 0px); }
+.mobile-navigation-drawer .ant-menu { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.ant-modal-wrap { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.profile-modal .ant-modal-content { max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+.loading-page { padding-top: max(24px, env(safe-area-inset-top, 0px)); padding-bottom: max(24px, env(safe-area-inset-bottom, 0px)); }
+main.login-page { padding-top: max(24px, env(safe-area-inset-top, 0px)); padding-bottom: max(24px, env(safe-area-inset-bottom, 0px)); }

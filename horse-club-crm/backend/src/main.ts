@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
 import { requestLimits } from './common/request-limits';
+import { corsOptions } from './common/trusted-origins';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { serveUploads } from './upload/upload.storage';
 import { validateVkConfig, vkGroupToken } from './vk-bot/vk-bot.config';
@@ -16,6 +17,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   // Backend is reachable only via Caddy on the private production network.
   app.getHttpAdapter().getInstance().set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : false);
+  app.enableCors(corsOptions);
   app.use(requestLimits());
   serveUploads(app);
 

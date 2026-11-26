@@ -15,6 +15,9 @@ dist
 dist-ssr
 *.local
 
+# Public build-time API endpoint for the native bundle.
+!.env.mobile
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

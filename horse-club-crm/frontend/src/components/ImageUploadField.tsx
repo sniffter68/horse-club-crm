@@ -4,13 +4,14 @@ import { UploadOutlined } from '@ant-design/icons'
 import { API_URL, httpClient, toHttpError } from '../httpClient'
 import { CatalogFormActivity } from '../pages/catalogs/CatalogFormActivity'
 import { optimizeCatalogImage } from '../imageOptimization'
+import { getMediaUrl } from '../apiUrl'
 
 const uploadedPath = /^\/uploads\/[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/
 const externalUrl = /^https?:\/\//i
 
 function imagePreviewUrl(value: string): string {
   if (!uploadedPath.test(value)) return externalUrl.test(value) ? value : ''
-  return /^https?:\/\//i.test(API_URL) ? new URL(value, API_URL).href : value
+  return getMediaUrl(value) ?? ''
 }
 
 export function ImageUploadField() {

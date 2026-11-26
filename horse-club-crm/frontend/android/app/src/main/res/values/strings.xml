@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Horse Club CRM</string>
+    <string name="title_activity_main">Horse Club CRM</string>
+    <string name="package_name">ru.horseclub68.staff</string>
+    <string name="custom_url_scheme">ru.horseclub68.staff</string>
+</resources>

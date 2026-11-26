@@ -1,8 +1,9 @@
 import axios from 'axios'
 import type { HttpError } from '@refinedev/core'
 import { getToken } from './authStorage'
+import { getApiBaseUrl } from './apiUrl'
 
-export const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '')
+export const API_URL = getApiBaseUrl()
 export const httpClient = axios.create({ timeout: 15_000, withCredentials: true })
 let refreshing: Promise<void> | undefined
 export function refreshSession(): Promise<void> {

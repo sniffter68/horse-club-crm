@@ -1,3 +1,4 @@
+import { getMediaUrl } from '../../apiUrl'
 import { horseServiceSettings } from './serviceAvailability'
 import { ProfileHeader, ProfileSection, ProfileFields } from '../cards/ProfileDetails'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -31,7 +32,7 @@ export function HorseList() {
   const [selectedId, setSelectedId] = useState<string | undefined>(linkedId && isUuid(linkedId) ? linkedId : undefined)
   return <>
     <CatalogList<Horse> resource="horses" onSearchSelect={setSelectedId} storageKey="horse_crm_horses_columns_v1" defaultHiddenColumns={['riderLevel', 'minRestMinutes', 'description']} title="Лошади" columns={[
-      { key: 'name', fixed: 'left', width: 180, title: 'Кличка / Фото', sorter: true, render: (_: unknown, row) => <Space size={8}><Avatar shape="square" size={32} src={row.imageUrl ? <img src={row.imageUrl} alt={row.name} /> : undefined}>{row.name.slice(0, 1)}</Avatar><CardLink onClick={() => setSelectedId(row.id)}>{row.name}</CardLink></Space> },
+      { key: 'name', fixed: 'left', width: 180, title: 'Кличка / Фото', sorter: true, render: (_: unknown, row) => <Space size={8}><Avatar shape="square" size={32} src={row.imageUrl ? <img src={getMediaUrl(row.imageUrl)} alt={row.name} /> : undefined}>{row.name.slice(0, 1)}</Avatar><CardLink onClick={() => setSelectedId(row.id)}>{row.name}</CardLink></Space> },
       { key: 'breed', align: 'center', width: 130, dataIndex: 'breed', title: 'Порода', sorter: true },
       { key: 'coat', align: 'center', width: 110, dataIndex: 'coat', title: 'Масть' },
       { key: 'description', width: 160, dataIndex: 'description', title: 'Особенности', render: (value: string | null) => <TableCellText>{value}</TableCellText> },

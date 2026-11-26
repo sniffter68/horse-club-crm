@@ -35,7 +35,7 @@ for (const resource of ['horses', 'trainers', 'services']) {
       localStorage.setItem('horsecrm.email', 'qa@example.com')
     })
     let saved: Record<string, unknown> = { id: '00000000-0000-4000-8000-000000000801', name: 'Фото', title: 'Фото', imageUrl: uploadedPhoto, baseRate: 0,
-      price: 100, durationMinutes: 60, maxCapacity: 1, cancellationWindowHours: 24, allowMembership: true,
+      price: 100, durationMinutes: 60, maxCapacity: 1, serviceDirection: 'allowIndividual', cancellationWindowHours: 24, allowMembership: true,
       maxRiderWeight: 85, maxDailyMinutes: 240, minRestMinutes: 15, maxDailyLoad: 480, maxParallelLessons: 4, isPublic: true, order: 0 }
     let failUpload = true
     let release: (() => void) | undefined
@@ -124,7 +124,7 @@ for (const resource of ['horses', 'trainers', 'services']) {
     })
     await page.goto(`/${resource}/new`)
     await expect(page.getByLabel('Отображать на сайте')).toBeChecked()
-    await page.getByLabel(resource === 'horses' ? 'Кличка' : resource === 'trainers' ? 'ФИО' : 'Название', { exact: true }).fill('Публичная карточка')
+    await page.getByRole('textbox', { name: resource === 'horses' ? 'Кличка' : resource === 'trainers' ? 'ФИО' : 'Название', exact: true }).fill('Публичная карточка')
     await page.getByLabel('Отображать на сайте').uncheck()
     await page.getByLabel('Ссылка на фото', { exact: true }).fill('javascript:bad')
     await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
