@@ -125,7 +125,7 @@ export function QuickPlacement({ context, onClose, variant = 'modal', onSaved }:
     <div className="quick-boarding-form">
       <Typography.Paragraph type="secondary">Постой без даты окончания. Часовой пояс: {CLUB_TIME_ZONE}.</Typography.Paragraph>
       <Form form={form} layout="vertical" noValidate disabled={busy || !ready} onFinish={submit}
-        initialValues={{ startsAt: initialStart, monthlyRate: 0, clientId: context.ownerClientId ?? undefined, ...(context.kind === 'HORSE' ? { horseId: context.id } : context.kind === 'STALL' ? { stallId: context.id } : {}) }}>
+        initialValues={{ startsAt: initialStart, clientId: context.ownerClientId ?? undefined, ...(context.kind === 'HORSE' ? { horseId: context.id } : context.kind === 'STALL' ? { stallId: context.id } : {}) }}>
         <FormField name="startsAt" label="Дата начала" rules={[{ required: true, message: 'Укажите дату начала' }, { validator: async (_rule, value: Dayjs | undefined) => {
           if (value) toInstant(value.format('YYYY-MM-DDTHH:mm'))
         } }]}>
@@ -161,8 +161,8 @@ export function QuickPlacement({ context, onClose, variant = 'modal', onSaved }:
         <FormField name="clientId" label="Владелец / клиент" rules={[{ required: true, message: 'Выберите владельца или клиента' }]}>
           <ClientSelectWithCreate aria-label="Владелец / клиент" getPopupContainer={popupContainer} showSearch filterOption={false} placeholder="Найдите клиента по имени или телефону" />
         </FormField>
-        <FormField name="monthlyRate" label="Стоимость в месяц, ₽" extra="0 ₽ — постой без начисления оплаты."
-          rules={[{ required: true, message: 'Укажите стоимость' }, { type: 'number', min: 0, max: 9999999999.99, message: 'Укажите неотрицательную стоимость' }]}>
+        <FormField name="monthlyRate" label="Стоимость в месяц, ₽" extra="Для частного постоя укажите стоимость больше 0 ₽."
+          rules={[{ required: true, message: 'Укажите стоимость' }, { type: 'number', min: 0.01, max: 9999999999.99, message: 'Укажите стоимость больше 0 ₽' }]}>
           <InputNumber aria-label="Стоимость в месяц, ₽" min={0} max={9999999999.99} precision={2} style={{ width: '100%' }} />
         </FormField>
         </>}

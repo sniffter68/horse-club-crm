@@ -8,6 +8,7 @@ import type { RefineQueryDto } from '../common/dto/refine-query.dto';
 import { rethrowCatalogMutation } from '../common/prisma-errors';
 import { parseRefineQuery, type PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
+import { billingMonth } from '../boarding/boarding.service';
 import type { CreateBoardingContractDto } from './dto/create-boarding-contract.dto';
 import type { UpdateBoardingContractDto } from './dto/update-boarding-contract.dto';
 
@@ -129,7 +130,7 @@ export class BoardingContractsService {
       return await this.runSerializable(async tx => {
         const data = this.createData(dto);
         await this.validate(tx, data);
-        return tx.boardingContract.create({
+        const contract = await tx.boardingContract.create({
           data: {
             ...data,
             ...(data.clientId && Number(data.monthlyRate) > 0 ? {
@@ -138,12 +139,15 @@ export class BoardingContractsService {
                 amount: data.monthlyRate,
                 method: PaymentMethod.UNSPECIFIED,
                 status: PaymentStatus.PENDING,
+                operationType: 'INCOME',
                 description: 'Начисление за первый месяц постоя',
               } },
             } : {}),
           },
           include: contractInclude.include,
         });
+        await this.chargeFirstMonth(tx, contract.id, data);
+        return contract;
       });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Договор постоя');
@@ -168,7 +172,16 @@ export class BoardingContractsService {
         };
         if (!data.clientId) data.monthlyRate = 0;
         await this.validate(tx, data, id);
-        return tx.boardingContract.update({ where: { id }, data, include: contractInclude.include });
+        const firstPayment = this.isCurrentFirstMonth(data)
+          && !await tx.payment.findFirst({ where: { boardingContractId: id }, select: { id: true } });
+        if (firstPayment) await this.chargeFirstMonth(tx, id, data);
+        return tx.boardingContract.update({ where: { id }, data: {
+          ...data,
+          ...(firstPayment && data.clientId ? { payments: { create: {
+            clientId: data.clientId, amount: data.monthlyRate, method: PaymentMethod.UNSPECIFIED,
+            status: PaymentStatus.PENDING, operationType: 'INCOME', description: 'Начисление за первый месяц постоя',
+          } } } : {}),
+        }, include: contractInclude.include });
       });
     } catch (error: unknown) {
       return rethrowCatalogMutation(error, 'Договор постоя');
@@ -228,6 +241,27 @@ export class BoardingContractsService {
     const date = new Date(value);
     if (!Number.isFinite(date.getTime())) throw new BadRequestException(message);
     return date;
+  }
+
+  private isCurrentFirstMonth(data: ContractData, now = new Date()): boolean {
+    return data.status === BoardingContractStatus.ACTIVE && Boolean(data.clientId) && Number(data.monthlyRate) > 0
+      && data.startsAt <= now && (!data.endsAt || data.endsAt > now)
+      && billingMonth(data.startsAt) === billingMonth(now);
+  }
+
+  private async chargeFirstMonth(tx: Prisma.TransactionClient, id: string, data: ContractData): Promise<void> {
+    if (!this.isCurrentFirstMonth(data) || !data.clientId) return;
+    const month = billingMonth(data.startsAt);
+    const existing = await tx.ledgerTransaction.findUnique({ where: {
+      boardingContractId_billingMonth: { boardingContractId: id, billingMonth: month },
+    } });
+    if (existing) return;
+    // The ledger trigger adjusts boardingBalance; never decrement it a second time here.
+    await tx.ledgerTransaction.create({ data: {
+      clientId: data.clientId, boardingContractId: id, billingMonth: month,
+      transactionType: 'boarding_charge', amount: new Prisma.Decimal(data.monthlyRate).negated(),
+      description: 'Начисление за первый месяц постоя',
+    } });
   }
 
   private async runSerializable<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {

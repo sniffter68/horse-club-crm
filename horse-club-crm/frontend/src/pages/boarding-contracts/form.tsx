@@ -53,7 +53,7 @@ export function BoardingContractForm({ action }: { action: 'create' | 'edit' }) 
     resource="boarding-contracts"
     action={action}
     title={action === 'create' ? 'Новый договор постоя' : 'Редактирование договора постоя'}
-    defaults={{ status: 'ACTIVE', startsAt: dayjs(), monthlyRate: 0 }}
+    defaults={{ status: 'ACTIVE', startsAt: dayjs() }}
     toPayload={toPayload}
   >
     <ContractField name="clubHorse" hidden valuePropName="checked"><Checkbox /></ContractField>
@@ -86,9 +86,9 @@ export function BoardingContractForm({ action }: { action: 'create' | 'edit' }) 
     <ContractField shouldUpdate>
       {({ getFieldValue }) => (getFieldValue('clubHorse') ?? !getFieldValue('clientId')) ? null : <ContractField name="monthlyRate" label="Стоимость в месяц, ₽" rules={[
       { required: true, message: 'Укажите стоимость' },
-      { type: 'number', min: 0, max: 9999999999.99, transform: (value: unknown) => value == null ? value : Number(value), message: 'Укажите корректную стоимость' },
+      { type: 'number', min: 0.01, max: 9999999999.99, transform: (value: unknown) => value == null ? value : Number(value), message: 'Укажите стоимость больше 0 ₽' },
     ]} getValueProps={(value: unknown) => ({ value: value == null ? undefined : Number(value) })}>
-      <InputNumber min={0} max={9999999999.99} precision={2} style={{ width: '100%' }} />
+      <InputNumber aria-label="Стоимость в месяц, ₽" min={0} max={9999999999.99} precision={2} style={{ width: '100%' }} />
     </ContractField>}
     </ContractField>
     <ContractField name="notes" label="Заметки" rules={[{ max: 2000, message: 'Не более 2000 символов' }]}>

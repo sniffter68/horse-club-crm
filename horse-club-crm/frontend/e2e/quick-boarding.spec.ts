@@ -20,7 +20,7 @@ async function setup(page: Page, { occupied = false, unavailable = false, role =
   }, role)
   const state = { occupied, posts: [] as Record<string, unknown>[], released: 0, horseReads: 0, stallReads: 0, feedingNotes: null as string | null }
   let boarding = contract as Omit<typeof contract, 'client'> & { client: typeof client | null }
-  const horseDetails = () => ({ ...horse, feedingNotes: state.feedingNotes, healthLogs: [], bookings: [], boardingContracts: state.occupied ? [boarding] : privateHorse ? [{ ...contract, status: 'TERMINATED' }] : [], currentBoardingContract: state.occupied ? boarding : null })
+  const horseDetails = () => ({ ...horse, owner: privateHorse ? client : null, feedingNotes: state.feedingNotes, healthLogs: [], bookings: [], boardingContracts: state.occupied ? [boarding] : privateHorse ? [{ ...contract, status: 'TERMINATED' }] : [], currentBoardingContract: state.occupied ? boarding : null })
   const stallDetails = () => ({ ...stall, isUnavailable: unavailable, contracts: state.occupied ? [boarding] : [] })
   await page.route('**/api/horses?*', route => route.fulfill({ json: [horse], headers: { 'x-total-count': '1' } }))
   await page.route('**/api/stalls?*', route => route.fulfill({ json: [stallDetails()], headers: { 'x-total-count': '1' } }))
@@ -109,9 +109,10 @@ test('stall preselection, search and keyboard cancellation preserve the underlyi
   await trigger.click()
   await select(page, modal, 'Лошадь', 'Валдай')
   await select(page, modal, 'Владелец / клиент', 'Анна Орлова')
+  await modal.getByRole('spinbutton', { name: 'Стоимость в месяц, ₽', exact: true }).fill('25000')
   await modal.getByRole('button', { name: 'Подтвердить', exact: true }).click()
   await expect(card.getByRole('button', { name: 'Освободить денник', exact: true })).toBeVisible()
-  expect(state.posts[0]).toMatchObject({ horseId: 'h2', stallId: '00000000-0000-4000-8000-000000000001', monthlyRate: 0 })
+  expect(state.posts[0]).toMatchObject({ horseId: 'h2', stallId: '00000000-0000-4000-8000-000000000001', monthlyRate: 25000 })
 })
 
 test('loading, API retry and empty availability keep placement disabled', async ({ page }) => {
@@ -231,7 +232,7 @@ test('private placement requires a client; switching to club drops hidden owner 
   expect(state.posts[0]).toMatchObject({ clientId: null, monthlyRate: 0 })
 })
 
-test('last private contract suggests the owner and defaults to private placement', async ({ page }) => {
+test('private horse suggests the owner and defaults to private placement', async ({ page }) => {
   await setup(page, { privateHorse: true })
   const card = await openCard(page, 'horse')
   await card.getByRole('button', { name: '+ Разместить в денник', exact: true }).click()
@@ -348,4 +349,46 @@ test('date changes refresh availability in club timezone and the mobile calendar
   await expect.poll(() => dates.at(-1)).toBe('2026-10-09T09:00:00.000Z')
   await expect(modal.getByText('Выбранная лошадь или денник уже заняты на этот период. Выберите другой вариант или дату.')).toBeVisible()
   await expect(modal.getByRole('button', { name: 'Заселить', exact: true })).toBeDisabled()
+})
+
+test('private placement requires an explicit positive monthly rate before sending a request', async ({ page }) => {
+  const state = await setup(page)
+  const card = await openCard(page, 'horse')
+  await card.getByRole('button', { name: '+ Разместить в денник', exact: true }).click()
+  const modal = page.getByRole('dialog', { name: `Быстрое заселение · ${horse.name}`, exact: true })
+  await select(page, modal, 'Денник', 'Денник №1')
+  await select(page, modal, 'Владелец / клиент', client.name)
+  const rate = modal.getByRole('spinbutton', { name: 'Стоимость в месяц, ₽', exact: true })
+  await expect(rate).toHaveValue('')
+  await modal.getByRole('button', { name: 'Заселить', exact: true }).click()
+  await expect(modal.getByText('Укажите стоимость', { exact: true })).toBeVisible()
+  expect(state.posts).toHaveLength(0)
+  await rate.fill('0')
+  await modal.getByRole('button', { name: 'Заселить', exact: true }).click()
+  await expect(modal.getByText('Укажите стоимость больше 0 ₽', { exact: true })).toBeVisible()
+  expect(state.posts).toHaveLength(0)
+  await rate.fill('25000')
+  await modal.getByRole('button', { name: 'Заселить', exact: true }).click()
+  await expect.poll(() => state.posts.length).toBe(1)
+  expect(state.posts[0]).toMatchObject({ monthlyRate: 25000 })
+})
+
+test('editing a private zero-rate contract requires a positive monthly rate', async ({ page }) => {
+  await setup(page)
+  const saved: Record<string, unknown>[] = []
+  const privateContract = { ...contract, clientId: 'c1', horseId: 'h1', stallId: stall.id, monthlyRate: '0.00' }
+  await page.route('**/api/boarding-contracts/bc1', route => {
+    if (route.request().method() === 'PATCH') saved.push(route.request().postDataJSON())
+    return route.fulfill({ json: privateContract })
+  })
+  await page.goto('/boarding-contracts/edit/bc1')
+  const rate = page.getByRole('spinbutton', { name: 'Стоимость в месяц, ₽', exact: true })
+  await expect(rate).toHaveValue('0.00')
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(page.getByText('Укажите стоимость больше 0 ₽', { exact: true })).toBeVisible()
+  expect(saved).toHaveLength(0)
+  await rate.fill('25000')
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect.poll(() => saved.length).toBe(1)
+  expect(saved[0]).toMatchObject({ monthlyRate: 25000 })
 })

@@ -111,6 +111,7 @@ test('active boarding contract is created in a serializable transaction', async 
     amount: activeContract.monthlyRate,
     method: 'UNSPECIFIED',
     status: 'PENDING',
+    operationType: 'INCOME',
     description: 'Начисление за первый месяц постоя',
   } });
   assert.equal(state.findFirstArgs.length, 2);
@@ -248,4 +249,82 @@ test('quick boarding HTTP endpoints validate dates and restrict changes to ADMIN
     await request(app.getHttpServer()).post(path).set('x-role', 'MANAGER').send({ refund: false }).expect(201);
     assert.deepEqual(calls, ['2026-10-08T09:00:00Z', activeContract.horseId]);
   } finally { await app.close(); }
+});
+
+function firstMonthPrisma(overrides = {}, { payment = null, charged = false } = {}) {
+  const { Prisma } = require('@prisma/client');
+  const contract = { ...activeContract, id: 'contract-1', startsAt: new Date('2026-11-01T00:00:00Z'), endsAt: null,
+    monthlyRate: new Prisma.Decimal(0), ...overrides };
+  const state = { payments: [], charges: [], balance: charged ? -25000 : 0 };
+  const tx = {
+    client: { findUnique: async () => ({ id: contract.clientId }) },
+    horse: { findUnique: async () => ({ id: contract.horseId }) },
+    stall: { findUnique: async () => ({ id: contract.stallId, isUnavailable: false }) },
+    payment: { findFirst: async ({ where }) => { assert.equal(where.boardingContractId, contract.id); return state.payments[0] ?? payment; } },
+    ledgerTransaction: {
+      findUnique: async ({ where }) => { assert.equal(where.boardingContractId_billingMonth.billingMonth, '2026-11'); return charged || state.charges.length ? { id: 'charge' } : null; },
+      create: async ({ data }) => { state.charges.push(data); state.balance += Number(data.amount); return data; },
+    },
+    boardingContract: {
+      findUnique: async () => contract,
+      findFirst: async () => null,
+      create: async ({ data }) => { Object.assign(contract, data); state.payments.push(data.payments.create); return contract; },
+      update: async ({ data }) => { Object.assign(contract, data); if (data.payments) state.payments.push(data.payments.create); return { ...contract, payments: state.payments }; },
+    },
+  };
+  return { state, service: new BoardingContractsService({ $transaction: async (fn, options) => {
+    assert.equal(options.isolationLevel, 'Serializable'); return fn(tx);
+  } }) };
+}
+
+test('raising zero boarding rate creates the first receivable and debits the ledger once', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-26T12:00:00Z') });
+  const { service, state } = firstMonthPrisma();
+  const result = await service.update('contract-1', { monthlyRate: 25000 });
+  assert.deepEqual(result.payments, [{ clientId: activeContract.clientId, amount: 25000, method: 'UNSPECIFIED',
+    status: 'PENDING', operationType: 'INCOME', description: 'Начисление за первый месяц постоя' }]);
+  assert.equal(state.charges.length, 1);
+  assert.equal(state.charges[0].transactionType, 'boarding_charge');
+  assert.equal(state.charges[0].boardingContractId, 'contract-1');
+  assert.equal(state.balance, -25000);
+  await service.update('contract-1', { monthlyRate: 25000 });
+  assert.equal(state.payments.length, 1);
+  assert.equal(state.charges.length, 1);
+  assert.equal(state.balance, -25000);
+});
+
+test('existing monthly charge permits a first invoice without a second balance debit', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-26T12:00:00Z') });
+  const { service, state } = firstMonthPrisma({}, { charged: true });
+  await service.update('contract-1', { monthlyRate: 25000 });
+  assert.equal(state.payments.length, 1);
+  assert.equal(state.charges.length, 0);
+  assert.equal(state.balance, -25000);
+});
+
+for (const [label, overrides, options] of [
+  ['prior payment of any status', {}, { payment: { id: 'cancelled-payment', status: 'CANCELLED' } }],
+  ['draft', { status: 'DRAFT' }], ['suspended', { status: 'SUSPENDED' }],
+  ['previous month', { startsAt: new Date('2026-10-31T20:59:59Z') }],
+  ['future start', { startsAt: new Date('2026-11-30T00:00:00Z') }],
+  ['ended', { endsAt: new Date('2026-11-25T00:00:00Z') }],
+  ['club placement', { clientId: null }],
+]) {
+  test(`first boarding invoice skips ${label}`, async t => {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-26T12:00:00Z') });
+    const { service, state } = firstMonthPrisma(overrides, options);
+    await service.update('contract-1', { monthlyRate: 25000 });
+    assert.equal(state.payments.length, 0);
+    assert.equal(state.charges.length, 0);
+    assert.equal(state.balance, 0);
+  });
+}
+
+test('first boarding month uses Moscow midnight and creation also debits the ledger', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-26T12:00:00Z') });
+  const { service, state } = firstMonthPrisma();
+  await service.create({ ...activeContract, startsAt: '2026-10-31T21:00:00Z', endsAt: null });
+  assert.equal(state.payments.length, 1);
+  assert.equal(state.charges[0].billingMonth, '2026-11');
+  assert.equal(state.balance, -25000);
 });
