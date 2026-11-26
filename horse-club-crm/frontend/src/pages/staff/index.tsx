@@ -1,3 +1,5 @@
+import { trainerRateLabel } from './trainerRate'
+import { trainerServiceSettings } from './specialization'
 import { TrainerStatements } from './TrainerStatements'
 import { CrmAccessToggle } from './CrmAccessToggle'
 import { EditOutlined, LockOutlined } from '@ant-design/icons'
@@ -39,6 +41,8 @@ export function StaffPage() {
   const rawTab = params.get('tab') ?? 'employees'
   const tab = ['employees', 'shifts', 'payroll', ...(canViewTrainers ? ['trainers'] : []), ...(canManage ? ['rates', 'statements'] : [])].includes(rawTab) ? rawTab : 'shifts'
   const roleFilter = params.get('role') || undefined
+  const staffGroup = params.get('group') === 'stable' ? 'stable' : undefined
+  const quickFilter = staffGroup ? 'stable' : roleFilter ?? ''
   const activity = params.get('activity') || undefined
   const duty = params.get('duty') || undefined
   const mobileDay = params.get('day') ? validDate(params.get('day'), month) : undefined
@@ -82,7 +86,7 @@ export function StaffPage() {
         setPayroll(response.data.data); setTotal(response.data.total)
         if (page > Math.max(1, Math.ceil(response.data.total / 10))) setParams(current => { const next = new URLSearchParams(current); next.set('page', '1'); return next })
       } else {
-        const response = await httpClient.get<PageData<Staff>>(`${API_URL}/staff`, { params: { page, pageSize: 10, ...(tab === 'employees' ? { role: roleFilter, activity, duty } : {}) }, signal: controller.signal })
+        const response = await httpClient.get<PageData<Staff>>(`${API_URL}/staff`, { params: { page, pageSize: 10, ...(tab === 'employees' ? { role: roleFilter, group: staffGroup, activity, duty } : {}) }, signal: controller.signal })
         if (controller.signal.aborted) return
         const people = response.data.data
         if (tab === 'shifts') {
@@ -107,7 +111,7 @@ export function StaffPage() {
       if (failure.statusCode === 401) authError(failure)
     }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [tab, roleFilter, activity, duty, page, from, to, month, version, roleLoading, role, authError, setParams])
+  }, [tab, roleFilter, staffGroup, activity, duty, page, from, to, month, version, roleLoading, role, authError, setParams])
 
   const changed = () => { setProfileModal(undefined); setShiftModal(undefined); setAdjustment(undefined); setPayout(undefined); refresh(value => value + 1) }
   const run = async (work: () => Promise<unknown>) => {
@@ -152,7 +156,10 @@ export function StaffPage() {
     {tab === 'trainers' ? <TrainerStatements /> : <Card>
       <Space wrap className="staff-toolbar">
         {tab === 'employees' && <>
-          <Select aria-label="Фильтр роли" placeholder="Все роли" allowClear value={roleFilter} style={{ minWidth: 160 }} options={Object.entries(staffRoles).map(([value, label]) => ({ value, label }))} onChange={value => update({ role: value ?? '', page: '1' })} />
+          <Space wrap role="group" aria-label="Быстрые фильтры персонала">{[
+            ['', 'Все'], ['TRAINER', 'Тренеры'], ['ADMIN', 'Администраторы'], ['stable', 'Персонал конюшни'],
+          ].map(([value, label]) => <Button key={value} aria-pressed={quickFilter === value} type={quickFilter === value ? 'primary' : 'default'} shape="round" onClick={() => update({ role: value === 'stable' ? '' : value, group: value === 'stable' ? 'stable' : '', page: '1' })}>{label}</Button>)}</Space>
+          <Select aria-label="Фильтр роли" placeholder="Все роли" allowClear value={roleFilter} style={{ minWidth: 160 }} options={Object.entries(staffRoles).map(([value, label]) => ({ value, label }))} onChange={value => update({ role: value ?? '', group: '', page: '1' })} />
           <Select aria-label="Статус сотрудника" placeholder="Все сотрудники" allowClear value={activity} style={{ minWidth: 170 }} options={[{ value: 'active', label: 'Активные' }, { value: 'archived', label: 'Архив' }]} onChange={value => update({ activity: value ?? '', page: '1' })} />
           <Select aria-label="Статус присутствия" placeholder="Все смены" allowClear value={duty} style={{ minWidth: 160 }} options={[{ value: 'on', label: 'На смене' }, { value: 'off', label: 'Выходной' }]} onChange={value => update({ duty: value ?? '', page: '1' })} />
         </>}
@@ -172,13 +179,15 @@ export function StaffPage() {
             const period = paidPeriodFor(paidPeriods, person.id, date.toISODate()!)
             return <td key={date.day} className={period ? 'staff-day-locked' : undefined}>
               {period && <Tooltip trigger={['hover', 'focus']} title={closedLabel(period)}><span tabIndex={0} aria-label={closedLabel(period)}><LockOutlined /> Закрыто</span></Tooltip>}{shift ? <div>{canManage ? <Button className="staff-shift-button" size="small" disabled={busy || !!period} onClick={() => setShiftModal(shift)}><Tag color={shiftColor(shift)}>{shiftLabel(shift)}<br />{shiftInterval(shift)}</Tag></Button> : <Tag color={shiftColor(shift)}>{shiftLabel(shift)}<br />{shiftInterval(shift)}</Tag>}
-              {canManage && shift.status === 'SCHEDULED' && date.toISODate()! <= now.toISODate()! && <Button size="small" disabled={busy || !!period} aria-label={`Отметить смену отработанной: ${person.fullName}, ${date.toFormat('dd.MM')}`} onClick={() => complete(shift)}>Отработана</Button>}</div> : <span aria-label="Нет смены">—</span>}</td>
+              {canManage && shift.status === 'SCHEDULED' && date.toISODate()! <= now.toISODate()! && <Button size="small" disabled={busy || !!period} aria-label={`Отметить смену отработанной: ${person.fullName}, ${date.toFormat('dd.MM')}`} onClick={() => complete(shift)}>Отработана</Button>}</div> : <span aria-label="Нет смены">?</span>}</td>
           })}</tr>)}</tbody></table></div> : <ResponsiveTable<Shift> rowKey="id" dataSource={mobileDay ? shifts.filter(shift => shift.date.slice(0, 10) === mobileDay) : shifts} pagination={{ pageSize: 10 }} locale={{ emptyText: 'В этом месяце смен нет' }} columns={[
             { title: 'Сотрудник', render: (_, row) => staff.find(person => person.id === row.staffId)?.fullName }, { title: 'Дата', render: (_, row) => <>{dayjs(row.date.slice(0, 10)).format('DD.MM.YYYY')}{closedPeriod(row) && <Typography.Paragraph><LockOutlined /> {closedLabel(closedPeriod(row)!)}</Typography.Paragraph>}</> }, { title: 'Время', render: (_, row) => shiftInterval(row) }, { title: 'Статус', render: (_, row) => <Tag color={shiftColor(row)}>{shiftLabel(row)}</Tag> }, ...(canManage ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Shift) => shiftActions(row) }] : []),
           ]} />)}
         {tab === 'employees' && <ConfigurableTable<Staff> storageKey="horse_crm_staff_columns_v1" defaultHiddenColumns={['vk', 'roleTitle']} rowKey="id" dataSource={staff} pagination={false} columns={[
           { key: 'fullName', width: 180, fixed: 'left' as const, title: 'ФИО', dataIndex: 'fullName' },
           { key: 'role', width: 120, align: 'center', title: 'Роль', render: (_, row) => <Tag>{staffRoles[row.user?.role ?? 'OTHER']}</Tag> },
+          { key: 'directions', width: 240, title: 'Направления', render: (_, row) => row.user?.role === 'TRAINER' ? <Space wrap>{trainerServiceSettings.filter(({ key }) => row.user?.trainer?.[key] !== false).map(({ key, title }) => <Tag color="blue" key={key}>{title}</Tag>)}</Space> : '—' },
+          { key: 'trainerRate', width: 170, title: 'Ставка тренера', render: (_, row) => trainerRateLabel(row) },
           { key: 'roleTitle', width: 140, title: 'Должность', dataIndex: 'roleTitle' },
           { key: 'phone', width: 140, fixed: 'left' as const, title: 'Телефон', render: (_, row) => row.phone || '—' },
           { key: 'vk', width: 70, align: 'center', title: 'VK', render: (_, row) => row.user?.vkId ? <a href={`https://vk.com/id${row.user.vkId}`} target="_blank" rel="noreferrer"><Tag color="blue">VK</Tag></a> : '—' },
@@ -202,7 +211,7 @@ export function StaffPage() {
             <strong>{DateTime.fromISO(lesson.startTime).setZone('Europe/Moscow').toFormat('dd.MM HH:mm')} · {lesson.serviceName}</strong>
             <div>Номинал по прайсу: {currency(lesson.nominalPrice)}</div>
             <div>Оплачено клиентом: {currency(lesson.clientPaid)}</div>
-            <div>Начислено тренеру {lesson.commissionPercent ?? 30}%: {currency(lesson.trainerPayout)}</div>
+            <div>Начислено тренеру {lesson.payScheme === 'FIXED' ? '(фикс)' : `${lesson.commissionPercent ?? 30}%`}: {currency(lesson.trainerPayout)}</div>
           </div>)}</Space> },
           ...(canManage ? [{ key: 'actions', width: 190, fixed: 'right' as const, title: 'Действия', render: (_: unknown, row: Payroll) => !row.isPaid && !row.blocked && <Space wrap><Button disabled={busy} onClick={() => setAdjustment(row)}>Премии / Штрафы</Button><Button type="primary" disabled={busy || Number(row.totalAmount) <= 0} onClick={() => preparePayout(row)}>Выплатить</Button></Space> }] : []),
         ]} />}
@@ -214,7 +223,7 @@ export function StaffPage() {
           { key: 'actions', width: 190, fixed: 'right' as const, title: 'Действия', render: (_, row) => <Space wrap><Button onClick={() => update({ tab: 'payroll', from: row.periodStart.slice(0, 10), to: row.periodEnd.slice(0, 10), page: '1' })}>Открыть расчет</Button>{role === 'ADMIN' && canManage && row.isPaid && <Button danger disabled={busy} onClick={() => reopen(row)}>Отменить оплату</Button>}</Space> },
         ]} />}
         {tab === 'rates' && <ConfigurableTable<Staff> storageKey="horse_crm_staff_rates_columns_v1" defaultHiddenColumns={['roleTitle', 'groupLessonRate']} rowKey="id" dataSource={staff} pagination={false} columns={[
-          { key: 'fullName', width: 180, fixed: 'left' as const, title: 'ФИО', dataIndex: 'fullName' }, { key: 'roleTitle', width: 130, title: 'Должность', dataIndex: 'roleTitle' }, { key: 'shiftRate', width: 110, align: 'right', title: 'За смену', render: (_, row) => currency(row.shiftRate ?? 0) }, { key: 'lessonRate', width: 125, align: 'right', title: 'Индивидуальное занятие', render: (_, row) => currency(row.lessonRate ?? 0) }, { key: 'groupLessonRate', width: 130, align: 'right', title: 'Групповое занятие', render: (_, row) => row.groupLessonRate == null ? 'По индивидуальной ставке' : currency(row.groupLessonRate) }, { key: 'lessonPercentage', width: 90, align: 'right', title: 'Процент', render: (_, row) => row.user?.trainer ? `${Number(row.user.trainer.commissionPercent)} %` : '—' }, { key: 'status', width: 120, align: 'center', title: 'Статус', render: (_, row) => row.isActive ? 'Активен' : 'Неактивен' }, { key: 'actions', width: 190, fixed: 'right' as const, title: 'Действия', render: (_, row) => <Button icon={<EditOutlined />} onClick={() => setProfileModal(row)}>Редактировать</Button> },
+          { key: 'fullName', width: 180, fixed: 'left' as const, title: 'ФИО', dataIndex: 'fullName' }, { key: 'roleTitle', width: 130, title: 'Должность', dataIndex: 'roleTitle' }, { key: 'shiftRate', width: 110, align: 'right', title: 'За смену', render: (_, row) => currency(row.shiftRate ?? 0) }, { key: 'lessonRate', width: 125, align: 'right', title: 'Индивидуальное занятие', render: (_, row) => currency(row.lessonRate ?? 0) }, { key: 'groupLessonRate', width: 130, align: 'right', title: 'Групповое занятие', render: (_, row) => row.groupLessonRate == null ? 'По индивидуальной ставке' : currency(row.groupLessonRate) }, { key: 'lessonPercentage', width: 90, align: 'right', title: 'Ставка тренера', render: (_, row) => trainerRateLabel(row) }, { key: 'status', width: 120, align: 'center', title: 'Статус', render: (_, row) => row.isActive ? 'Активен' : 'Неактивен' }, { key: 'actions', width: 190, fixed: 'right' as const, title: 'Действия', render: (_, row) => <Button icon={<EditOutlined />} onClick={() => setProfileModal(row)}>Редактировать</Button> },
         ]} />}
         <Pagination className="staff-pagination" current={page} pageSize={10} total={total} showSizeChanger={false} showTotal={count => `${tab === 'statements' ? 'Ведомостей' : 'Сотрудников'}: ${count}`} onChange={next => update({ page: String(next) })} />
       </>}

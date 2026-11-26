@@ -13,9 +13,6 @@ import { HorseList } from './pages/horses/list'
 import { VetCalendarPage } from './pages/stable/vet'
 import { HorseCreate } from './pages/horses/create'
 import { HorseEdit } from './pages/horses/edit'
-import { TrainerList } from './pages/trainers/list'
-import { TrainerCreate } from './pages/trainers/create'
-import { TrainerEdit } from './pages/trainers/edit'
 import { ServiceList } from './pages/services/list'
 import { ServiceCreate } from './pages/services/create'
 import { ServiceEdit } from './pages/services/edit'
@@ -62,7 +59,6 @@ import '@refinedev/antd/dist/reset.css'
 const catalogs = [
   { name: 'clients', ListPage: ClientList, CreatePage: ClientCreate, EditPage: ClientEdit, label: 'Клиенты' },
   { name: 'horses', ListPage: HorseList, CreatePage: HorseCreate, EditPage: HorseEdit, label: 'Лошади' },
-  { name: 'trainers', ListPage: TrainerList, CreatePage: TrainerCreate, EditPage: TrainerEdit, label: 'Тренеры' },
   { name: 'services', ListPage: ServiceList, CreatePage: ServiceCreate, EditPage: ServiceEdit, label: 'Услуги' },
   { name: 'arenas', ListPage: ArenaList, CreatePage: ArenaCreate, EditPage: ArenaEdit, label: 'Манежи' },
   { name: 'horse-health-logs', ListPage: HorseHealthLogList, CreatePage: HorseHealthLogCreate, EditPage: HorseHealthLogEdit, label: 'Журнал здоровья' },
@@ -206,6 +202,7 @@ export default function App() {
                 <Route path="users"><Route index element={<UserList />} /><Route path="new" element={<UserCreate />} /></Route>
                 <Route path="cash-desk" element={<CashDeskPage />} />
                 <Route path="staff" element={<StaffPage />} />
+                <Route path="trainers/*" element={<Navigate to="/staff?role=TRAINER" replace />} />
                 <Route path="payments" element={<PaymentList />} />
                 <Route path="financial-reports" element={<PermissionGate permission="financeRead"><FinancialReportsPage /></PermissionGate>} />
                 <Route path="finance" element={<PermissionGate permission="financeRead"><FinancialReportsPage /></PermissionGate>} />

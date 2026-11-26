@@ -23,13 +23,14 @@ const admin = { id: randomUUID(), role: 'ADMIN' };
 function store() {
   const state = { account: null, profile: null, trainer: null, shift: null, trainerCreates: 0, transactions: 0 };
   const tx = {
+    cashAuditLog: { create: async ({ data }) => { if (state.failAudit) throw new Error('audit unavailable'); state.audit = data; return data; } },
     user: { count: async args => { state.adminQuery = args; return state.remainingAdmins ?? 0; }, findUnique: async () => state.account, create: async ({ data }) => state.account = { id: randomUUID(), trainerId: null, ...data }, update: async ({ data }) => state.account = { ...state.account, ...data } },
     trainer: { findMany: async () => state.candidates ?? [], create: async ({ data }) => { state.trainerCreates++; return state.trainer = { id: randomUUID(), ...data }; }, update: async ({ data }) => state.trainer = { ...state.trainer, ...Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)) } },
     staffProfile: { findUnique: async ({ where }) => where.userId && where.userId !== state.account?.id ? null : state.profile, create: async ({ data }) => state.profile = { id: randomUUID(), isActive: true, ...data }, update: async ({ data }) => state.profile = { ...state.profile, ...data }, findMany: async args => { state.query = args; return []; }, count: async () => 0 },
     workShift: { findUnique: async () => state.shift, create: async ({ data }) => state.shift = { id: randomUUID(), status: 'SCHEDULED', endedAt: null, ...data }, update: async ({ data }) => state.shift = { ...state.shift, ...data }, updateMany: async args => { state.archiveShifts = args; return { count: 0 }; }, findMany: async args => { state.dutyQuery = args; return []; } },
     payrollCalculation: { findMany: async () => state.paid ? [{}] : [] },
   };
-  const prisma = { $transaction: async (work, options) => { state.transactions++; state.isolation = options?.isolationLevel; return work(tx); } };
+  const prisma = { $transaction: async (work, options) => { state.transactions++; state.isolation = options?.isolationLevel; const before = { ...state }; try { return await work(tx); } catch (error) { const adminQuery = state.adminQuery; for (const key of Object.keys(state)) delete state[key]; Object.assign(state, before); if (adminQuery) state.adminQuery = adminQuery; throw error; } } };
   const identity = { normalize: async input => ({ vkId: input.replace(/\D/g, '') }), applyStaff: async (_tx, id, vkId) => { state.vk = { id, vkId }; } };
   return { state, service: new StaffService(prisma, identity) };
 }
@@ -208,4 +209,49 @@ test('HTTP module permissions block READ_ONLY mutations and HIDDEN reads; full e
     await request(server).post('/api/staff').send({}).expect(403);
     assert.equal(starts, 1);
   } finally { await app.close(); }
+});
+
+
+test('unified staff request saves access, public profile, VK, directions and rate; patches never duplicate', async () => {
+  const { service, state } = store();
+  const row = await service.saveProfile({ fullName: 'Unified Trainer', role: 'TRAINER', hasCrmAccess: true,
+    email: 'unified@test.local', temporaryPassword: 'password-123', vkId: '12345',
+    isPublic: true, imageUrl: 'https://example.com/trainer.jpg', description: 'Dressage',
+    allowIndividual: true, allowGroup: false, allowWalk: false, allowSpecial: true,
+    payScheme: 'PERCENT', commissionPercent: 45 }, admin);
+  assert.equal(state.transactions, 1);
+  assert.equal(state.account.crmAccess, true);
+  assert.equal(state.trainer.payScheme, 'PERCENT'); assert.equal(state.trainer.commissionPercent, 45);
+  assert.equal(state.trainer.isPublic, true); assert.equal(state.trainer.description, 'Dressage');
+  assert.equal(state.trainer.vkId, 12345n); assert.equal(state.trainer.allowGroup, false);
+  assert.equal(state.profile.payScheme, undefined); assert.equal(state.profile.hasCrmAccess, undefined);
+  assert.equal(state.audit.action, 'STAFF_TRAINER_RATE_UPDATED');
+  await service.saveProfile({ payScheme: 'FIXED', fixedPay: 900, hasCrmAccess: false }, admin, row.id);
+  assert.equal(state.trainerCreates, 1); assert.equal(state.trainer.fixedPay, 900);
+  assert.equal(state.account.crmAccess, false);
+  await service.saveProfile({ role: 'GROOM' }, admin, row.id);
+  assert.equal(state.trainer.isPublic, false); assert.equal(state.trainer.isActive, false);
+  assert.equal(state.account.trainerId, state.trainer.id);
+});
+
+test('rate audit failure rolls account, profile and trainer back together', async () => {
+  const { service, state } = store(); state.failAudit = true;
+  await assert.rejects(service.saveProfile({ fullName: 'Trainer', role: 'TRAINER', payScheme: 'FIXED', fixedPay: 700 }, admin), /audit unavailable/);
+  assert.equal(state.account, null); assert.equal(state.profile, null); assert.equal(state.trainer, null);
+});
+
+test('unified DTO rejects invalid rate, public and image values; access alias preserves boolean validation', async () => {
+  for (const invalid of [{ hasCrmAccess: 'false' }, { isPublic: 'false' }, { payScheme: 'UNKNOWN' }, { commissionPercent: 101 }, { fixedPay: -1 }, { imageUrl: 'javascript:alert(1)' }]) {
+    assert.ok((await validate(plainToInstance(StaffProfileDto, { fullName: 'Trainer', ...invalid }, { enableImplicitConversion: true }))).length);
+  }
+  const { service } = store();
+  await assert.rejects(service.saveProfile({ fullName: 'Trainer', role: 'TRAINER', payScheme: 'FIXED' }, admin), e => e.status === 400);
+  await assert.rejects(service.saveProfile({ fullName: 'Trainer', role: 'OTHER', isPublic: true }, admin), e => e.status === 400);
+});
+
+
+test('stable team filter includes all stable personnel roles', async () => {
+ const { service, state } = store();
+ await service.profiles(admin, { group: 'stable' });
+ assert.deepEqual(state.query.where.user.role.in, ['STABLE_WORKER', 'GROOM', 'VET', 'OTHER']);
 });

@@ -287,7 +287,16 @@ model Service {
   updatedAt               DateTime      @updatedAt @db.Timestamptz(6)
 }
 
+enum TrainerPayScheme {
+  LEGACY
+  PERCENT
+  FIXED
+  CLUB
+}
+
 model Trainer {
+  payScheme TrainerPayScheme @default(LEGACY)
+  fixedPay Decimal @default(0) @db.Decimal(12, 2)
   allowIndividual Boolean @default(true)
   allowGroup Boolean @default(true)
   allowWalk Boolean @default(true)
@@ -1201,6 +1210,8 @@ enum TrainerPayoutStatus {
 }
 
 model TrainerPayout {
+  payScheme TrainerPayScheme @default(LEGACY)
+  fixedPay Decimal @default(0) @db.Decimal(12, 2)
   commissionPercent Decimal @default(30) @db.Decimal(5, 2)
   id String @id @default(uuid()) @db.Uuid
   // Nullable only for unresolved historical statements; new statements require a trainer.

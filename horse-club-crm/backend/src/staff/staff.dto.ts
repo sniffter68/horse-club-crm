@@ -1,8 +1,8 @@
 import { Transform, Type } from 'class-transformer';
-import { Role, WorkShiftStatus, ExpensePaymentMethod } from '@prisma/client';
+import { TrainerPayScheme, Role, WorkShiftStatus, ExpensePaymentMethod } from '@prisma/client';
 import { PartialType } from '@nestjs/swagger';
 import { PreserveInput } from '../auth/decorators/preserve-input.decorator';
-import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsEmail, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsEmail, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUrl, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 
 const empty = ({ value }: { value: unknown }) => value === '' ? undefined : value;
 const emptyNumber = ({ value, obj, key }: { value: unknown; obj: Record<string, unknown>; key: string }) => obj[key] === '' ? undefined : value;
@@ -10,6 +10,14 @@ const day = /^\d{4}-\d{2}-\d{2}$/;
 const clock = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export class StaffProfileDto {
+  @PreserveInput() @IsOptional() @IsBoolean() hasCrmAccess?: boolean;
+  @PreserveInput() @IsOptional() @IsBoolean() isPublic?: boolean;
+  @IsOptional() @IsString() @MaxLength(2000) description?: string | null;
+  @IsOptional() @IsString() @MaxLength(2000) @IsUrl({ protocols: ['http', 'https'], require_protocol: true }) imageUrl?: string | null;
+  @Transform(empty) @IsOptional() @IsEnum(TrainerPayScheme) payScheme?: TrainerPayScheme;
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(100) commissionPercent?: number;
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(9999999999.99) fixedPay?: number;
+
   @PreserveInput() @IsOptional() @IsBoolean() allowIndividual?: boolean;
   @PreserveInput() @IsOptional() @IsBoolean() allowGroup?: boolean;
   @PreserveInput() @IsOptional() @IsBoolean() allowWalk?: boolean;
@@ -88,6 +96,7 @@ export class PayoutDto {
 
 export class StaffQueryDto extends ShiftQueryDto {
   @Transform(empty) @IsOptional() @IsEnum(Role) role?: Role;
+  @Transform(empty) @IsOptional() @IsIn(['stable']) group?: 'stable';
   @Transform(empty) @IsOptional() @IsIn(['active', 'archived']) activity?: 'active' | 'archived';
   @Transform(empty) @IsOptional() @IsIn(['on', 'off']) duty?: 'on' | 'off';
 }

@@ -27,7 +27,7 @@ import { ModuleAccessGuard, RequireModule, RequireModuleForFields } from '../aut
 @UseGuards(JwtAuthGuard, ModuleAccessGuard, RolesGuard)
 @RequireModuleForFields('STAFF_PAYROLL', ['baseRate', 'commissionPercent'])
 @UseInterceptors(SanitizeRbacInterceptor)
-@SanitizeTrainerFields('baseRate', 'commissionPercent')
+@SanitizeTrainerFields('baseRate', 'commissionPercent', 'fixedPay', 'payScheme')
 @Controller('trainers')
 export class TrainersController {
   constructor(private readonly trainersService: TrainersService, private readonly identity: VkIdentityService) {}

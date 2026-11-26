@@ -9,7 +9,7 @@ import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { usePermissions } from '../../modulePermissions'
 
 type PayoutType = 'ADVANCE' | 'FINAL_SALARY'
-type Lesson = { commissionPercent?: number; id: string; startTime: string; serviceName: string; nominalPrice: string; trainerPayout: string }
+type Lesson = { payScheme?: string; fixedPay?: string; commissionPercent?: number; id: string; startTime: string; serviceName: string; nominalPrice: string; trainerPayout: string }
 type Statement = { commissionPercent?: number | string; id: string; type: PayoutType; status: 'DRAFT' | 'APPROVED' | 'PAID'; trainer?: { name: string; fullName: string } | null; staff?: { fullName: string } | null; periodStart: string; periodEnd: string;
   lessonsCount: number; nominalBase: string; accrued: string; advanceDeducted: string; totalAmount: string; lessonBreakdown: Lesson[] }
 const money = (value: string) => `${Number(value).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} руб.`
@@ -74,11 +74,11 @@ export function TrainerStatements() {
       <ResponsiveTable<Statement> rowKey="id" loading={loading} dataSource={rows.filter(row => row.type === type)} pagination={{ pageSize: 10 }}
         locale={{ emptyText: <Empty description="Ведомостей пока нет. Выберите период и сформируйте расчёт." /> }} columns={[
           { title: 'Тренер', render: (_, row) => <><strong>{trainerName(row)}</strong><div>{dayjs(row.periodStart.slice(0, 10)).format('DD.MM')}–{dayjs(row.periodEnd.slice(0, 10)).format('DD.MM.YYYY')}</div></> },
-          { title: 'Ставка', render: (_, row) => <Space wrap>{[...new Set(row.lessonBreakdown.length ? row.lessonBreakdown.map(lesson => Number(lesson.commissionPercent ?? row.commissionPercent ?? 30)) : [Number(row.commissionPercent ?? 30)])].map(rate => <Tag key={rate} color="processing">{rate}%</Tag>)}</Space> },
+          { title: 'Ставка', render: (_, row) => <Space wrap>{[...new Set(row.lessonBreakdown.length ? row.lessonBreakdown.map(lesson => lesson.payScheme === 'FIXED' ? `${money(lesson.fixedPay ?? lesson.trainerPayout)} / занятие` : `${Number(lesson.commissionPercent ?? row.commissionPercent ?? 30)}%`) : [`${Number(row.commissionPercent ?? 30)}%`])].map(rate => <Tag key={rate} color="processing">{rate}</Tag>)}</Space> },
           { title: 'Занятия, шт.', dataIndex: 'lessonsCount' },
           ...(['nominalBase', 'accrued', 'advanceDeducted', 'totalAmount'] as const).map((key, index) => ({ key, title: ['База по номиналу, руб.', 'Начислено, руб.', 'Удержано аванса, руб.', 'К выплате, руб.'][index], render: (_: unknown, row: Statement) => <span className="tabular-nums">{money(row[key])}</span> })),
           { title: 'Статус', render: (_, row) => <Tag color={row.status === 'PAID' ? 'success' : row.status === 'APPROVED' ? 'processing' : 'default'}>{statuses[row.status]}</Tag> },
-          { title: 'Занятия', render: (_, row) => <Collapse ghost size="small" items={[{ key: row.id, label: 'Детализация', children: <Space direction="vertical">{row.lessonBreakdown.map(lesson => <div key={lesson.id}>{DateTime.fromISO(lesson.startTime).setZone('Europe/Moscow').toFormat('dd.MM HH:mm')} · {lesson.serviceName}<br /><span className="tabular-nums">{money(lesson.nominalPrice)} × {Number(lesson.commissionPercent ?? row.commissionPercent ?? 30)}% → {money(lesson.trainerPayout)}</span></div>)}</Space> }]} /> },
+          { title: 'Занятия', render: (_, row) => <Collapse ghost size="small" items={[{ key: row.id, label: 'Детализация', children: <Space direction="vertical">{row.lessonBreakdown.map(lesson => <div key={lesson.id}>{DateTime.fromISO(lesson.startTime).setZone('Europe/Moscow').toFormat('dd.MM HH:mm')} · {lesson.serviceName}<br /><span className="tabular-nums">{lesson.payScheme === 'FIXED' ? 'Фикс за занятие' : `${money(lesson.nominalPrice)} × ${Number(lesson.commissionPercent ?? row.commissionPercent ?? 30)}%`} → {money(lesson.trainerPayout)}</span></div>)}</Space> }]} /> },
           { key: 'actions', title: 'Действия', render: (_, row) => writable && row.status !== 'PAID' && <Button disabled={busy || (row.status === 'APPROVED' && !modules.canWrite('CASHBOX'))} onClick={() => transition(row, row.status === 'APPROVED')}>{row.status === 'DRAFT' ? 'Утвердить' : 'Выплатить из основной кассы'}</Button> },
         ]} />
     </Space>

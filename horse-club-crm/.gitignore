@@ -10,6 +10,10 @@ caddy_config/
 *.dump
 .DS_Store
 *audit*.json
+!/docs/ui-audit-before.json
+!/docs/ui-audit-after.json
+!/docs/ui-audit-before-classified.json
+!/docs/ui-audit-classified.json
 project-*.txt
 test-results/
 

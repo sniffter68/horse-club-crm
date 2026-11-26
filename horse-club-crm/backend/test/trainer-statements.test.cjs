@@ -16,15 +16,16 @@ test('Moscow defaults: advance 1–15, final full month, invalid and cross-month
   assert.equal(closingRange({ type: 'SHIFT', date: '2026-10-01' }).end.toISO(), '2026-10-02T00:00:00.000+03:00');
 });
 
-function payrollFixture(initialRate = 30) {
+function payrollFixture(initialRate = 30, scheme = {}) {
   let row, expenses = [], audit = [], paid = [], failAudit = false;
   let commissionPercent = initialRate;
+  let extraLessons = [];
   const tx = {
     $queryRaw: async () => [],
-    trainer: { findMany: async query => { assert.equal(query.where.isActive, true); assert.equal(query.where.lessons.some.status, 'COMPLETED'); return [{ id: 'trainer', commissionPercent: d(commissionPercent) }]; } },
+    trainer: { findMany: async query => { assert.equal(query.where.isActive, true); assert.equal(query.where.lessons.some.status, 'COMPLETED'); return [{ id: 'trainer', commissionPercent: d(commissionPercent), ...scheme }]; } },
     payrollCalculation: { findFirst: async () => null },
     lesson: { findMany: async query => { assert.equal(query.where.status, 'COMPLETED'); assert.equal(query.where.trainerId, 'trainer'); assert.equal(query.where.deletedAt, null); assert.equal(query.where.bookings, undefined); return [
-      { id: 'lesson', startTime: new Date('2026-10-02T07:00Z'), service: { name: 'Урок', price: d('1000.50') }, costAmount: d(100) },
+      { id: 'lesson', startTime: new Date('2026-10-02T07:00Z'), service: { name: 'Урок', price: d('1000.50') }, costAmount: d(100) }, ...extraLessons,
     ]; } },
     trainerPayout: {
       findFirst: async () => null,
@@ -39,7 +40,7 @@ function payrollFixture(initialRate = 30) {
     assert.equal(options.isolationLevel, 'Serializable'); const before = { row, expenses: [...expenses], audit: [...audit], paid: [...paid] };
     try { return await work(tx); } catch (error) { ({ row, expenses, audit, paid } = before); throw error; }
   } });
-  return { service, state: () => ({ row, expenses, audit }), fail: () => { failAudit = true; }, setPaid: rows => { paid = rows; }, setRate: value => { commissionPercent = value; } };
+  return { service, state: () => ({ row, expenses, audit }), fail: () => { failAudit = true; }, setPaid: rows => { paid = rows; }, setRate: value => { commissionPercent = value; }, setExtraLessons: rows => { extraLessons = rows; } };
 }
 
 test('individual 0/30/100/fractional commissions use nominal price and freeze approved/paid snapshots', async () => {
@@ -141,4 +142,43 @@ test('closing reconciliation separates both cashboxes, freezes snapshot and reje
   assert.equal((await service.preview(dto)).isClosed, true);
   await assert.rejects(() => service.close(dto, actor), /уже закрыт/);
   await assert.rejects(() => service.close({ type: 'SHIFT', date: '2099-01-01' }, actor), /завершённый/);
+});
+
+
+test('fixed and club schemes calculate real statements and freeze their approval snapshots', async () => {
+  for (const [scheme, expected] of [[{ payScheme: 'FIXED', fixedPay: d(750) }, '750.00'], [{ payScheme: 'CLUB' }, '300.15']]) {
+    const f = payrollFixture(99, scheme);
+    const [row] = await f.service.generate({ type: 'ADVANCE', month: '2026-10' }, actor);
+    assert.equal(row.totalAmount.toFixed(2), expected);
+    assert.equal(row.lessonBreakdown[0].payScheme, scheme.payScheme);
+    await f.service.transition(row.id, false, actor);
+    f.setRate(1);
+    const paid = await f.service.transition(row.id, true, actor);
+    assert.equal(paid.totalAmount.toFixed(2), expected);
+  }
+});
+
+test('legacy payroll uses exclusive schemes without adding historical lesson bonuses', () => {
+  const { payrollAmounts } = require('../dist/staff/staff.service');
+  const profile = { shiftRate: d(100), lessonRate: d(500), groupLessonRate: d(900) };
+  const lesson = { service: { price: d(2000) }, bookings: [], trainer: { commissionPercent: d(40) } };
+  assert.equal(payrollAmounts(1, profile, [lesson]).totalAmount.toNumber(), 1400);
+  assert.equal(payrollAmounts(1, profile, [{ ...lesson, trainer: { ...lesson.trainer, payScheme: 'PERCENT' } }]).totalAmount.toNumber(), 900);
+  assert.equal(payrollAmounts(1, profile, [{ ...lesson, trainer: { ...lesson.trainer, payScheme: 'FIXED', fixedPay: d(700) } }]).totalAmount.toNumber(), 800);
+});
+
+
+test('final with a fixed paid advance and a new percentage rate approves using its own rate snapshot', async () => {
+  const scheme = { payScheme: 'FIXED', fixedPay: d(750) };
+  const f = payrollFixture(30, scheme);
+  const [advance] = await f.service.generate({ type: 'ADVANCE', month: '2026-10' }, actor);
+  await f.service.transition(advance.id, false, actor);
+  await f.service.transition(advance.id, true, actor);
+  scheme.payScheme = 'PERCENT'; f.setRate(20);
+  f.setExtraLessons([{ id: 'second', startTime: new Date('2026-10-20T07:00Z'), service: { name: 'Second', price: d('1000.50') } }]);
+  const [final] = await f.service.generate({ type: 'FINAL_SALARY', month: '2026-10' }, actor);
+  assert.equal(final.totalAmount.toFixed(2), '200.10');
+  assert.equal(final.lessonBreakdown[0].payScheme, 'FIXED');
+  assert.equal(final.lessonBreakdown[1].payScheme, 'PERCENT');
+  await f.service.transition(final.id, false, actor);
 });
