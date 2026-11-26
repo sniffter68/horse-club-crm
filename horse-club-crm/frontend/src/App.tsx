@@ -53,6 +53,7 @@ import { AppLayout } from './components/layout/AppLayout'
 import { LeadNotifications } from './components/LeadNotifications'
 import { CashboxHeaderWidget } from './components/CashboxHeaderWidget'
 import { AdminDashboardPage } from './pages/workspace/AdminDashboard'
+import { LeadsPage } from './pages/dashboard/LeadsPage'
 import { TrainerBoardPage } from './pages/workspace/TrainerBoard'
 import { LessonHistoryPage } from './pages/lesson-history'
 import type { Role } from './authStorage'
@@ -186,6 +187,9 @@ export default function App() {
               </Authenticated>}>
                 <Route index element={<DashboardRoute />} />
                 <Route path="dashboard" element={<DashboardRoute />} />
+                <Route path="leads" element={<LeadsPage />} />
+                <Route path="boarding" element={<Navigate to="/boarding-contracts" replace />} />
+                <Route path="shifts" element={<Navigate to="/staff?tab=shifts" replace />} />
                 <Route path="trainer" element={<TrainerBoardPage />} />
                 {catalogs.map(({ name, ListPage, CreatePage, EditPage }) => (
                   <Route key={name} path={name}>

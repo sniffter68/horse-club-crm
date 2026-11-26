@@ -6,13 +6,13 @@ export type AccessLevel = 'FULL' | 'READ_ONLY' | 'HIDDEN'
 export interface ModulePermission { module: SystemModule; isEnabled: boolean; accessLevel: AccessLevel }
 export interface Snapshot { role: Role; modules: ModulePermission[] }
 const resources: Record<string, SystemModule> = {
-  trainer: 'SCHEDULE', dashboard: 'SCHEDULE',
+  trainer: 'SCHEDULE', dashboard: 'SCHEDULE', leads: 'SCHEDULE',
   clients: 'SCHEDULE', memberships: 'SCHEDULE', 'client-memberships': 'SCHEDULE',
   lessons: 'SCHEDULE', schedule: 'SCHEDULE', 'lesson-history': 'SCHEDULE', bookings: 'SCHEDULE',
   stalls: 'STABLES', stable: 'STABLES', 'stall-map': 'STABLES', 'boarding-contracts': 'STABLES', boarding: 'STABLES',
   vet: 'VETERINARY', 'horse-health-logs': 'VETERINARY',
   payments: 'CASHBOX', 'cash-desk': 'CASHBOX', 'financial-reports': 'CASHBOX', finance: 'CASHBOX',
-  staff: 'STAFF_PAYROLL', payroll: 'STAFF_PAYROLL',
+  staff: 'STAFF_PAYROLL', payroll: 'STAFF_PAYROLL', shifts: 'STAFF_PAYROLL',
 }
 export const moduleForResource = (resource?: string) => resource ? resources[resource] : undefined
 export interface PermissionsState {

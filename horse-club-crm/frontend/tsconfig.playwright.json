@@ -12,5 +12,5 @@
     "noUnusedParameters": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["../scripts/classify-ui-audit.ts", "playwright.ui-audit.config.ts", "e2e/ui-audit-cleanup.spec.ts", "playwright.config.ts", "playwright.crm.config.ts", "playwright.tma.config.ts", "playwright.quick-booking.config.ts", "e2e/quick-trainer-booking.spec.ts", "e2e/landing.spec.ts", "e2e/trainer-tma.spec.ts", "e2e/cash-desk.spec.ts", "e2e/stall-map.spec.ts", "e2e/workspace.spec.ts", "e2e/role-access.spec.ts"]
+  "include": ["../scripts/classify-ui-audit.ts", "playwright.ui-audit.config.ts", "e2e/ui-audit-cleanup.spec.ts", "playwright.config.ts", "playwright.crm.config.ts", "playwright.tma.config.ts", "playwright.quick-booking.config.ts", "e2e/quick-trainer-booking.spec.ts", "e2e/landing.spec.ts", "e2e/trainer-tma.spec.ts", "e2e/cash-desk.spec.ts", "e2e/stall-map.spec.ts", "e2e/workspace.spec.ts", "e2e/role-access.spec.ts", "playwright.full-crm-audit.config.ts", "tests/e2e/**/*.ts"]
 }

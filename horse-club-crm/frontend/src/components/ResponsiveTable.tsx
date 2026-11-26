@@ -36,8 +36,17 @@ export function ResponsiveTable<T extends object>({ columns = [], ...tableProps 
         current: tableProps.pagination.current,
         pageSize: tableProps.pagination.pageSize,
         total: tableProps.pagination.total,
-        onChange: tableProps.pagination.onChange,
-        hideOnSinglePage: tableProps.pagination.hideOnSinglePage,
+        onChange: (current, pageSize) => {
+          if (tableProps.pagination && typeof tableProps.pagination === 'object') {
+            tableProps.pagination.onChange?.(current, pageSize)
+          }
+          // Ant Table normally forwards pagination to its top-level handler.
+          // Mobile List must do the same for Refine's server pagination.
+          tableProps.onChange?.({ current, pageSize }, {}, {}, {
+            action: 'paginate', currentDataSource: [...(tableProps.dataSource ?? [])],
+          })
+        },
+        hideOnSinglePage: tableProps.pagination.hideOnSinglePage ?? tableProps.pagination.total === 0,
         disabled: tableProps.pagination.disabled,
         simple: true,
         showSizeChanger: false,

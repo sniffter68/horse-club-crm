@@ -1,5 +1,26 @@
 # Playwright E2E
 
+Full CRM audit (isolated API fixtures; no backend/database required):
+
+```sh
+npm --prefix frontend run test:e2e:audit
+```
+
+Run that command from the repository root, or `npm run test:e2e:audit` from
+`frontend/`. The suite is `tests/e2e/full-crm-audit.spec.ts`; its config starts
+Vite and runs Edge at 1440×900 and 390×844 in both themes. It checks 15 routes,
+scroll geometry, populated client pagination, five business workflows and
+TRAINER restrictions. Unknown API endpoints fail rather than returning empty
+successes. `npm run typecheck` includes this suite under strict TypeScript.
+Screenshots and JSON results go to `docs/test-reports/`; traces on failure go
+to `frontend/test-results/full-crm-audit/`. Run legacy suites sequentially:
+their default output cleanup owns the parent `test-results/` directory.
+
+`npm ci` applies the pinned UI compatibility patches through `postinstall`.
+After applying them to an already running Vite server, restart it with `--force`
+to rebuild optimized dependencies. This suite verifies browser/API contracts;
+actual PostgreSQL persistence and production accounts require a separate live run.
+
 Run from `frontend/`:
 
 ```sh

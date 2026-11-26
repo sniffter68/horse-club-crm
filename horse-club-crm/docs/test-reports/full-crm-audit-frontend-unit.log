@@ -1,0 +1,13 @@
+
+> frontend@0.0.0 test
+> vitest run
+
+
+ RUN  v5.0.0 C:/Users/Валерий/Desktop/HorseCRM2026/horse-club-crm/frontend
+
+
+ Test Files  31 passed (31)
+      Tests  241 passed (241)
+   Start at  13:30:31
+   Duration  23.50s (import 81%, transform 16%, tests 2%, worker 2%)
+

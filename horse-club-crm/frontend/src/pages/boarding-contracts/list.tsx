@@ -43,7 +43,7 @@ export function BoardingContractList() {
           { key: 'status', label: 'Статус', children: <Tag color={statusColors[contract.status]}>{statusLabels[contract.status]}</Tag> },
           { key: 'period', label: 'Период', children: `${dateOnly(contract.startsAt)} — ${dateOnly(contract.endsAt)}` },
           { key: 'rate', label: 'Стоимость в месяц', children: money(contract.monthlyRate) },
-          { key: 'notes', label: 'Заметки', span: 2, children: contract.notes || '—' },
+          { key: 'notes', label: 'Заметки', span: 'filled', children: contract.notes || '—' },
         ]} />
         <section><Typography.Title level={5}>Начисления и оплаты</Typography.Title>
           <List dataSource={contract.payments} locale={{ emptyText: 'Начислений нет' }} renderItem={payment => <List.Item>

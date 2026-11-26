@@ -35,7 +35,7 @@ export function HorseForm({ action }: { action: 'create' | 'edit' }) {
     {action === 'edit' && id && <HorseIssues horseId={id} readOnly />}
     <fieldset className="horse-service-settings">
       <legend>Доступность для занятий</legend>
-      {horseServiceSettings.map(setting => <Form.Item key={setting.key} name={setting.key} valuePropName="checked" initialValue={true}>
+      {horseServiceSettings.map(setting => <Form.Item key={setting.key} name={setting.key} valuePropName="checked">
         <ToggleSettingRow title={setting.title} description={setting.description} data-testid={`horse-${setting.key}`} />
       </Form.Item>)}
     </fieldset>
