@@ -11,7 +11,7 @@ export interface LessonMoney {
 export interface Lesson extends LessonMoney {
   id: string; startTime: string; endTime: string; status: Status;
   trainer: Trainer; service: Service; arena: Arena | null;
-  bookings: { id: string; client: Client; horse: Horse | null; membership: MembershipSummary | null; costAmount?: number | string; payments?: { status: string; amount: number | string }[] }[];
+  bookings: { id: string; client: Client; horse: Horse | null; membership: MembershipSummary | null; isPaid?: boolean; costAmount?: number | string; payments?: { status: string; amount: number | string; archivedAt?: string | null }[] }[];
 }
 export interface MembershipSummary {
   deletedAt?: string | null; cancelledAt?: string | null;

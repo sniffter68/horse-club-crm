@@ -15,6 +15,8 @@ import { eventSummary } from './scheduleEventPresentation'
 import { BookingDateTimeInput } from '../../components/BookingDateTimePicker'
 import { EntryOverlay } from '../../components/EntryOverlay'
 import { LessonGroupBadge, LessonGroupSummary, CompleteLessonModal, LessonPaymentBadge } from './LessonPayments'
+import { LessonTrainerField } from './LessonTrainerField'
+import { isLessonTrainerLocked } from './trainerLock'
 import { LessonDeferredPayment } from './LessonDeferredPayment'
 import { ReplaceHorseAction } from './ReplaceHorseAction'
 import { HorseIssues } from './HorseIssues'
@@ -69,11 +71,13 @@ export function SchedulePage() {
   useEffect(() => {
     const refresh = () => setRevision(value => value + 1)
     window.addEventListener('cash-desk-paid', refresh)
+    window.addEventListener('lesson-trainer-changed', refresh)
     window.addEventListener('lesson-deleted', refresh)
     window.addEventListener('horse-assignment-changed', refresh)
     window.addEventListener('horse-status-changed', refresh)
     return () => {
       window.removeEventListener('cash-desk-paid', refresh)
+      window.removeEventListener('lesson-trainer-changed', refresh)
       window.removeEventListener('lesson-deleted', refresh)
       window.removeEventListener('horse-assignment-changed', refresh)
       window.removeEventListener('horse-status-changed', refresh)
@@ -96,6 +100,7 @@ export function SchedulePage() {
   const [lessonSeed, setLessonSeed] = useState<Partial<LessonDrawerProps>>()
   const [bookingOpen, setBookingOpen] = useState(false)
   const [editingLesson, setEditingLesson] = useState<Lesson>()
+  const [trainerBusy, setTrainerBusy] = useState(false)
   const calendarRef = useRef<FullCalendar>(null)
   const [workloadDate, setWorkloadDate] = useState(() => toLocalInput(new Date()).slice(0, 10))
   const [workloadRevision, setWorkloadRevision] = useState(0)
@@ -282,7 +287,7 @@ export function SchedulePage() {
   const failure = error ? <Alert type="error" showIcon message={error} /> : null
   const selectedHours = schedule ? clubHoursForDate(schedule, workloadDate) : undefined
   return <Space className="schedule-page" direction="vertical" size="middle" style={{ width: '100%' }}>
-    {completing && <CompleteLessonModal lesson={completing} onClose={() => { setDetail(completing); setCompleting(undefined) }} onSaved={updated => { setCompleting(undefined); setDetail(updated); setRevision(v => v + 1) }} />}
+    {completing && <CompleteLessonModal lesson={completing} onClose={updated => { setDetail(updated); setCompleting(undefined) }} onSaved={updated => { setCompleting(undefined); setDetail(updated); setRevision(v => v + 1) }} />}
     <Typography.Title level={2}>Расписание занятий</Typography.Title>
     <Typography.Text type="secondary">Часовой пояс клуба: {CLUB_TIME_ZONE}</Typography.Text>
     {failure}
@@ -368,7 +373,7 @@ export function SchedulePage() {
         {editingLesson && <><Typography.Paragraph type="secondary">Можно изменить время, длительность, тренера и манеж. Переносимое занятие исключено из текущей нагрузки.</Typography.Paragraph><LessonGroupSummary lesson={editingLesson} /></>}
         <Form.Item name="serviceId" label="Услуга" rules={[{ required: true, message: 'Выберите услугу' }]}><Select disabled={Boolean(editingLesson)} showSearch optionFilterProp="label" options={services.map(row => ({ value: row.id, label: row.title || row.name }))} /></Form.Item>
         <ScheduleConflictNotice entries={conflicts.entries} trainerId={selectedTrainer} horseIds={selectedHorseIds} error={conflicts.error} />
-        <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
+        <Form.Item name="trainerId" label="Тренер" rules={[{ required: true, message: 'Выберите тренера' }]}><Select aria-label="Тренер" disabled={Boolean(editingLesson && isLessonTrainerLocked(editingLesson))} showSearch optionFilterProp="label" options={trainerOptions} /></Form.Item>
         <Form.Item name="arenaId" label="Манеж" extra="Необязательно для выездного или теоретического занятия."><Select showSearch optionFilterProp="label" options={arenaOptions} /></Form.Item>
         <Form.Item name="startTime" label="Время начала" rules={[{ required: true }, { validator: (_, value: string) => { try { toInstant(value); return Promise.resolve() } catch (cause) { return Promise.reject(cause) } } }]}><BookingDateTimeInput /></Form.Item>
         <Form.Item name="durationMinutes" label="Длительность, мин" rules={[{ required: true }, { type: 'integer', min: 1 }]}><InputNumber min={1} precision={0} /></Form.Item>
@@ -379,11 +384,12 @@ export function SchedulePage() {
           loading={saving} disabled={!ready || workloadBlocked || horseBusy || conflicts.loading} style={{ marginTop: 16 }}>Сохранить перенос</Button>
       </Form>
     </EntryOverlay>
-    <Modal title="Карточка занятия" open={Boolean(detail)} keyboard={!saving} maskClosable={!saving} closable={!saving} onCancel={() => { if (!saving) setDetail(undefined) }} footer={null}>
+    <Modal title="Карточка занятия" open={Boolean(detail)} keyboard={!saving} maskClosable={!saving} closable={!saving} onCancel={() => { if (!saving && !trainerBusy) setDetail(undefined) }} footer={null}>
       {failure}
       {detail && <Space direction="vertical" style={{ width: '100%' }}>
         <LessonGroupBadge lesson={detail} /><LessonGroupSummary lesson={detail} /><LessonPaymentBadge lesson={detail} />
-        <LessonDeferredPayment key={detail.id} lesson={detail} onBusyChange={setPaymentBusy} onSaved={updated => { setDetail(updated); setRevision(v => v + 1) }} />
+        <LessonTrainerField lesson={detail} disabled={saving || trainerBusy} onBusyChange={setTrainerBusy} onSaved={updated => { setDetail(updated); setRevision(v => v + 1) }} />
+        <LessonDeferredPayment disabled={trainerBusy} key={detail.id} lesson={detail} onBusyChange={setPaymentBusy} onSaved={updated => { setDetail(updated); setRevision(v => v + 1) }} />
         <Tag className={`crm-tag crm-tag--${statuses[detail.status].badge}`} bordered={false}>{statuses[detail.status].label}</Tag>
         <Descriptions column={1} items={[
           { key: 'service', label: 'Услуга', children: detail.service.title || detail.service.name },
@@ -397,17 +403,17 @@ export function SchedulePage() {
             <HorseWorkloadBadge date={toLocalInput(new Date(detail.startTime)).slice(0, 10)} workload={dayWorkloads.byDate[toLocalInput(new Date(detail.startTime)).slice(0, 10)]?.find(row => row.horseId === booking.horse?.id)} />
             {detail.trainer && detail.status === 'SCHEDULED' && new Date(detail.startTime) > new Date() && <ReplaceHorseAction
               bookingId={booking.id} trainerId={detail.trainer.id} horseId={booking.horse?.id} startTime={detail.startTime} endTime={detail.endTime} horses={horses}
-              disabled={saving || !ready} report={report} onBusyChange={busy => { savingRef.current = busy; setSaving(busy) }}
+              disabled={saving || trainerBusy || !ready} report={report} onBusyChange={busy => { savingRef.current = busy; setSaving(busy) }}
               onSaved={() => { setDetail(undefined); setRevision(value => value + 1) }} />}
             {booking.membership && <Tag color="green">Абонемент: {booking.membership.remainedLessons} / {booking.membership.totalLessons}</Tag>}
           </Space>)}</Space> : 'Нет участников' },
         ]} />
         {canManage && <Space wrap>
-          <Button disabled={saving || !ready || detail.status !== 'SCHEDULED'} onClick={() => openReschedule(detail)}>Перенести занятие</Button>
-          <Button disabled={saving || detail.status === 'CANCELLED' || detail.status === 'COMPLETED'} onClick={() => { setCompleting(detail); setDetail(undefined) }}>Отметить присутствие</Button>
-          <Button disabled={saving || detail.status === 'CANCELLED' || detail.status === 'NO_SHOW'} onClick={() => void changeStatus('NO_SHOW')}>Неявка</Button>
-          <ServiceCancellationAction resource="lessons" id={detail.id} label="Отменить занятие" disabled={saving || detail.status === 'CANCELLED'} onChanged={() => setDetail(undefined)} />
-          <DeleteLessonAction key={detail.id} lesson={detail} disabled={saving} onBusyChange={busy => { savingRef.current = busy; setSaving(busy) }} onDeleted={() => setDetail(undefined)} />
+          <Button disabled={saving || trainerBusy || !ready || detail.status !== 'SCHEDULED'} onClick={() => openReschedule(detail)}>Перенести занятие</Button>
+          <Button disabled={saving || trainerBusy || detail.status === 'CANCELLED' || detail.status === 'COMPLETED'} onClick={() => { setCompleting(detail); setDetail(undefined) }}>Отметить присутствие</Button>
+          <Button disabled={saving || trainerBusy || detail.status === 'CANCELLED' || detail.status === 'NO_SHOW'} onClick={() => void changeStatus('NO_SHOW')}>Неявка</Button>
+          <ServiceCancellationAction resource="lessons" id={detail.id} label="Отменить занятие" disabled={saving || trainerBusy || detail.status === 'CANCELLED'} onChanged={() => setDetail(undefined)} />
+          <DeleteLessonAction key={detail.id} lesson={detail} disabled={saving || trainerBusy} onBusyChange={busy => { savingRef.current = busy; setSaving(busy) }} onDeleted={() => setDetail(undefined)} />
         </Space>}
       </Space>}
     </Modal>

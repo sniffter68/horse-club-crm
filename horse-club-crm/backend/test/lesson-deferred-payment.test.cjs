@@ -31,6 +31,8 @@ function harness({ status = 'SCHEDULED', membership = {}, lesson = {}, failReven
       const draft = structuredClone(state);
       const details = () => ({ ...draft.lesson, operations: draft.operations, bookings: draft.lesson.bookings.map(b => ({ ...b, membership: b.membershipId ? draft.membership : null })) });
       const tx = { cashAuditLog: { create: async ({ data }) => { draft.audit.push(data); return data; } },
+        user: { findMany: async () => [] },
+        clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] }) },
         membershipMember: { findUnique: async () => shared ? { client: { deletedAt: null } } : null },
         $queryRaw: async (sql, ...values) => {
           const query = sql.join('');
@@ -42,8 +44,10 @@ function harness({ status = 'SCHEDULED', membership = {}, lesson = {}, failReven
           }
           return [];
         },
-        lesson: { findUnique: async () => details(), findUniqueOrThrow: async () => details(), update: async ({ data }) => { Object.assign(draft.lesson, data); return details(); } },
-        booking: { update: async ({ data }) => Object.assign(draft.lesson.bookings[0], data) },
+        lesson: { findMany: async () => [], findUnique: async () => details(), findUniqueOrThrow: async () => details(), update: async ({ data }) => { Object.assign(draft.lesson, data); return details(); } },
+        booking: { count: async () => draft.lesson.bookings.filter(b => b.isPaid).length,
+          updateMany: async ({ data }) => { draft.lesson.bookings.forEach(b => Object.assign(b, data)); return { count: 1 }; },
+          update: async ({ data }) => Object.assign(draft.lesson.bookings[0], data) },
         membership: { findUnique: async ({ where }) => [draft.membership, ...draft.additionalMemberships].find(row => row.id === where.id),
           updateMany: async ({ where }) => {
             const row = [draft.membership, ...draft.additionalMemberships].find(row => row.id === where.id);
@@ -63,8 +67,27 @@ function harness({ status = 'SCHEDULED', membership = {}, lesson = {}, failReven
     });
     serial = result.catch(() => {}); return result;
   } };
-  return { service: new LessonsService(prisma, new MembershipLedgerService(prisma)), state: () => state };
+  return { service: new LessonsService(prisma, new MembershipLedgerService(prisma), { validate: async () => {} }), state: () => state };
 }
+
+test('replacement before membership debit uses current trainer and locks replacement after debit', async () => {
+  const h = harness();
+  await h.service.changeTrainer(id(2), id(9), actor);
+  const paid = await h.service.payWithMembership(id(2), id(7), actor);
+  assert.equal(paid.trainerId, id(9));
+  assert.equal(paid.bookings[0].trainerId, id(9));
+  assert.equal(h.state().operations.length, 1);
+  assert.equal(h.state().audit.at(-1).action, 'LESSON_PAID_BY_MEMBERSHIP');
+  await assert.rejects(h.service.changeTrainer(id(2), id(5), actor), error => error.getStatus() === 400);
+});
+
+test('a reserved membership with zero lesson cost does not lock trainer before debit', async () => {
+  const h = harness({ lesson: { paymentStatus: 'PAID', cost: '0' } });
+  h.state().lesson.bookings[0].membershipId = id(7);
+  const moved = await h.service.changeTrainer(id(2), id(9), actor);
+  assert.equal(moved.trainerId, id(9));
+  assert.equal(h.state().operations.length, 0);
+});
 
 for (const shared of [false, true]) test(`yesterday's completed debt accepts today's ${shared ? 'family' : 'owned'} membership`, async () => {
   const now = Date.now();

@@ -19,6 +19,7 @@ function harness({ enabled = true, failLedger = false, role = 'ADMIN', cost = 15
       const draft = { ...state, lesson: state.lesson && { ...state.lesson, bookings: state.lesson.bookings.map(b => ({ ...b })) }, payments: [...state.payments], ledger: [...state.ledger] };
       const details = () => ({ ...draft.lesson, bookings: draft.lesson.bookings.map(b => ({ ...b, payments: draft.payments.filter(p => p.bookingId === b.id && p.status === 'PAID') })) });
       const tx = { cashAuditLog: { create: async ({ data }) => data },
+        user: { findMany: async () => [] },
         service: { findUnique: async () => ({ id: 'service', isPerPerson, durationMinutes: 60, price: cost, maxCapacity: 1, allowMembership: true, name: 'Тренировка' }) },
         clubSchedule: { findUnique: async () => ({ openTime: '09:00', closeTime: '21:00', daysOfWeekOff: [] }) },
         clubModuleSettings: { findUnique: async () => ({ isEnabled: enabled }) },
@@ -35,7 +36,11 @@ function harness({ enabled = true, failLedger = false, role = 'ADMIN', cost = 15
           },
           update: async ({ data }) => { Object.assign(draft.lesson, data); return details(); },
         },
-        booking: { update: async ({ where, data }) => Object.assign(draft.lesson.bookings.find(b => b.id === where.id), data) },
+        booking: {
+          count: async () => draft.lesson.bookings.filter(b => b.isPaid || decimal(b.prepaymentAmount).gt(0) || decimal(b.finalPaymentAmount).gt(0)).length,
+          updateMany: async ({ data }) => { draft.lesson.bookings.forEach(b => Object.assign(b, data)); return { count: draft.lesson.bookings.length }; },
+          update: async ({ where, data }) => Object.assign(draft.lesson.bookings.find(b => b.id === where.id), data),
+        },
         payment: { create: async ({ data }) => { const row = { ...data, id: `receipt-${draft.payments.length}` }; draft.payments.push(row); return row; }, updateMany: async () => ({ count: 1 }) },
         ledgerTransaction: { create: async ({ data }) => { if (failLedger) throw new Error('ledger failed'); draft.ledger.push(data); return data; } },
       };
@@ -47,8 +52,37 @@ function harness({ enabled = true, failLedger = false, role = 'ADMIN', cost = 15
   const create = (prepaymentAmount = 500, extra = {}) => service.createLesson({ trainerId: 'trainer', serviceId: 'service', clientId: 'client',
     startTime: '2026-10-20T10:00:00Z', cost, prepaymentAmount, prepaymentMethod: 'CASH', ...extra }, undefined, { ...actor, role });
   const complete = (payment = { payRemaining: true, paymentMethod: 'CARD' }) => service.updateLessonStatus('lesson', 'COMPLETED', payment, { ...actor, role });
-  return { create, complete, state: () => state };
+  return { create, complete, service, state: () => state };
 }
+
+for (const paymentMethod of ['CASH', 'CARD']) test(`replacement before ${paymentMethod} payment accrues to current trainer and locks replacements`, async () => {
+  const h = harness();
+  await h.create(0);
+  const moved = await h.service.changeTrainer('lesson', 'replacement', actor);
+  assert.equal(moved.trainerId, 'replacement');
+  assert.equal(moved.bookings[0].trainerId, 'replacement');
+  await h.complete({ payRemaining: true, paymentMethod });
+  assert.equal(h.state().payments[0].method, paymentMethod);
+  assert.equal(h.state().payments[0].bookingId, moved.bookings[0].id);
+  const { TrainerPayoutService } = require('../dist/staff/trainer-payout.service');
+  const tx = {
+    payrollCalculation: { findFirst: async () => null }, trainerPayout: { findMany: async () => [] },
+    lesson: { findMany: async ({ where }) => {
+      return where.trainerId === h.state().lesson.trainerId ? [{ ...h.state().lesson, service: { name: 'Урок', price: decimal(1500) } }] : [];
+    } },
+  };
+  const amounts = await new TrainerPayoutService({}).compute(tx, 'replacement', { month: '2026-10', type: 'FINAL_SALARY' }, 40);
+  assert.equal(amounts.accrued.toString(), '600');
+  const oldTrainer = await new TrainerPayoutService({}).compute(tx, 'trainer', { month: '2026-10', type: 'FINAL_SALARY' }, 30);
+  assert.equal(oldTrainer.accrued.toString(), '0');
+  await assert.rejects(h.service.changeTrainer('lesson', 'old-trainer', actor), error => error.getStatus() === 400 && /Тренер зафиксирован/.test(error.message));
+  assert.equal(h.state().lesson.trainerId, 'replacement');
+});
+
+test('even partial prepayment locks the existing reschedule API', async () => {
+  const h = harness(); await h.create(100);
+  await assert.rejects(h.service.rescheduleLesson('lesson', '2026-10-20T10:00:00Z', 60, 'replacement', undefined, actor), error => error.getStatus() === 400);
+});
 
 test('prepayment and final payment create two audited receipts and ledger entries', async () => {
   const h = harness();

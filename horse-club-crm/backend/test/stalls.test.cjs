@@ -20,7 +20,7 @@ test('stall list supports Refine pagination, search and sorting', async () => {
     },
     $transaction: async operations => Promise.all(operations),
   };
-  const result = await new StallsService(prisma).findAll({
+  const result = await new StallsService(Object.assign(prisma, { clubSchedule: { findUnique: async () => ({ stallRiskAdjacent: true, stallRiskOpposite: true }) } })).findAll({
     _start: 10,
     _end: 20,
     _sort: 'isUnavailable',
@@ -45,7 +45,7 @@ test('stall list supports Refine pagination, search and sorting', async () => {
 test('stall creation normalizes its name and description', async () => {
   let data;
   const prisma = { stall: { create: async args => { data = args.data; return { id: 'stall-1', ...args.data }; } } };
-  await new StallsService(prisma).create({
+  await new StallsService(Object.assign(prisma, { clubSchedule: { findUnique: async () => ({ stallRiskAdjacent: true, stallRiskOpposite: true }) } })).create({
     number: '1',
     name: '  Денник   1 ',
     description: '  Первый корпус  ',

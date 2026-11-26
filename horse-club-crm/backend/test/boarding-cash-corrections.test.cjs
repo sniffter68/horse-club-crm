@@ -70,7 +70,7 @@ test('active boarding payment options retain unavailable/rest horses', async () 
 });
 test('stall map restores a private rest horse from its active contract when snapshot is missing', async () => {
   const horse = { id: 'horse', name: 'Шанель', ownerType: 'private', status: 'rest', isUnavailable: true, sex: 'MARE' };
-  const service = new StallsService({ stall: { findMany: async args => {
+  const service = new StallsService({ clubSchedule: { findUnique: async () => null }, stall: { findMany: async args => {
     assert.equal(args.include.contracts.where.horse.deletedAt, null);
     assert.equal(args.include.contracts.where.horse.isUnavailable, undefined);
     return [{ id: 'stall', horseId: null, horse: null, status: 'AVAILABLE', zone: 'MAIN', position: 9, side: 'LEFT', contracts: [{ status: 'ACTIVE', horse }] }];

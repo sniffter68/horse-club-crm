@@ -199,6 +199,66 @@ const client = { id: id(1), name: 'Анна Орлова', firstName: 'Анна'
 const trainer = { id: id(2), name: 'Мария' }
 const service = { id: id(3), title: 'Разовая тренировка', name: 'Разовая тренировка', price: '1500', durationMinutes: 60, maxCapacity: 1, allowMembership: false }
 
+test('trainer can be replaced inside cash payment before receipt is posted', async ({ page }) => {
+  const state = await setup(page, 0)
+  const replacement = { ...trainer, id: id(99), name: 'Ольга' }
+  await page.route('**/api/trainers?*', route => route.fulfill({ json: [trainer, replacement] }))
+  await page.route(`**/api/lessons/${id(4)}`, route => route.fulfill({ json: state.lesson }))
+  await page.route(`**/api/lessons/${id(4)}/trainer`, async route => {
+    state.lesson = { ...state.lesson!, trainer: replacement }
+    await route.fulfill({ json: state.lesson })
+  })
+  await page.route(`**/api/payments/cash-desk/options/${client.id}`, route => route.fulfill({ json: { memberships: [], bookings: [
+    { id: id(5), startTime: state.lesson!.startTime, remainingAmount: 1500, lesson: { id: id(4), service } },
+  ] } }))
+  await page.route('**/api/payments/cash-desk', async route => {
+    expect(state.lesson?.trainer.id).toBe(replacement.id)
+    expect(route.request().postDataJSON()).toMatchObject({ bookingId: id(5), method: 'TRANSFER' })
+    state.lesson = { ...state.lesson!, paymentStatus: 'PAID', finalPaymentAmount: 1500 }
+    await route.fulfill({ status: 201, json: { id: id(45), method: 'TRANSFER' } })
+  })
+  await page.goto('/schedule'); await page.locator('.fc-event').first().click()
+  const detail = page.getByRole('dialog', { name: 'Карточка занятия', exact: true })
+  await detail.getByRole('button', { name: 'Принять оплату в кассу' }).click()
+  const cash = page.getByRole('dialog', { name: 'Принять оплату / Касса' })
+  await choose(page, cash, 'Тренер', 'Ольга')
+  await expect(cash.getByText('Начисление получит: Ольга.', { exact: false })).toBeVisible()
+  await expect(detail.getByText('Начисление получит: Ольга.', { exact: false })).toHaveCount(1)
+  await cash.getByText('Безнал', { exact: true }).click()
+  await choose(page, cash, 'Вид безналичной оплаты', 'Перевод')
+  await cash.getByRole('button', { name: 'Провести платёж', exact: true }).click()
+  await expect(cash).not.toBeVisible()
+  await expect(detail.getByText('Тренер зафиксирован после оплаты', { exact: true })).toBeVisible()
+})
+
+for (const width of [1440, 390]) test(`trainer settlement replacement and payment lock at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 1000 })
+  const state = await setup(page, 0)
+  const replacement = { ...trainer, id: id(99), name: 'Ольга', allowIndividual: false }
+  await page.route('**/api/trainers?*', route => route.fulfill({ json: [trainer, replacement] }))
+  await page.route(`**/api/lessons/${id(4)}/trainer`, async route => {
+    expect(route.request().postDataJSON()).toEqual({ trainerId: replacement.id })
+    state.lesson = { ...state.lesson!, trainer: replacement }
+    await route.fulfill({ json: state.lesson })
+  })
+  await page.goto('/schedule'); await page.locator('.fc-event').first().click()
+  const detail = page.getByRole('dialog', { name: 'Карточка занятия', exact: true })
+  await choose(page, detail, 'Тренер', 'Ольга')
+  await expect(detail.getByText('Начисление получит: Ольга.', { exact: false })).toBeVisible()
+  await expect(detail.getByText('не входит в специализацию', { exact: false })).toBeVisible()
+  await detail.screenshot({ path: `test-results/trainer-replacement-${width}.png`, animations: 'disabled' })
+  await detail.getByRole('button', { name: 'Отметить присутствие' }).click()
+  const completion = page.getByRole('dialog', { name: 'Занятие состоялось', exact: true })
+  await expect(completion.getByRole('combobox', { name: 'Тренер', exact: true })).toBeEnabled()
+  await completion.getByRole('radio', { name: 'Оплачено наличными' }).check()
+  await completion.getByRole('button', { name: 'Завершить занятие', exact: true }).click()
+  await expect(detail.getByText('Тренер зафиксирован после оплаты', { exact: true })).toBeVisible()
+  await expect(detail.getByRole('combobox', { name: 'Тренер', exact: true })).toHaveCount(0)
+  expect(state.lesson?.trainer.id).toBe(replacement.id)
+  expect(state.receipts).toHaveLength(1)
+  await detail.screenshot({ path: `test-results/trainer-settlement-${width}.png`, animations: 'disabled' })
+})
+
 test('client preferred trainer remains editable and manual trainer reaches lesson payload', async ({ page }) => {
   const state = await setup(page)
   const other = { id: id(22), name: 'Другой тренер', isActive: true }

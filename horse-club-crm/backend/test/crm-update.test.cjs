@@ -57,7 +57,7 @@ test('stall and pony require numbers, service requires name, null name persists 
     findUnique: async () => current, findMany: async () => [],
     update: async ({ data }) => { current = { ...current, ...data }; return current; },
   }, cashAuditLog: { create: async ({ data }) => data }, $transaction: work => work(prisma) };
-  const service = new StallsService(prisma);
+  const service = new StallsService(Object.assign(prisma, { clubSchedule: { findUnique: async () => ({ stallRiskAdjacent: true, stallRiskOpposite: true }) } }));
   for (const type of ['STALL', 'PONY_PEN']) {
     await assert.rejects(service.create({ type, name: 'Имя без номера' }), e => e.status === 400);
     assert.equal((await service.create({ type, number: '7', name: '' })).name, null);

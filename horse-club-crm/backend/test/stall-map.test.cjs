@@ -10,7 +10,8 @@ const { StallsController } = require('../dist/stalls/stalls.controller');
 const { JwtAuthGuard } = require('../dist/auth/guards/jwt-auth.guard');
 const { RolesGuard } = require('../dist/auth/guards/roles.guard');
 const { RoleAccessGuard } = require('../dist/auth/role-access.guard');
-const { neighborhoodWarnings, stallRowPosition } = require('../dist/stalls/neighborhood');
+const { neighborhoodWarnings: calculateWarnings, stallRowPosition } = require('../dist/stalls/neighborhood');
+const neighborhoodWarnings = (stall, all) => calculateWarnings(stall, all, { stallRiskAdjacent: true, stallRiskOpposite: true });
 const sid = '00000000-0000-4000-8000-000000000001';
 const hid = '00000000-0000-4000-8000-000000000002';
 function fixture() {
@@ -39,7 +40,7 @@ function fixture() {
       catch (error) { stalls.splice(0, stalls.length, ...snapshot.stalls); horses.splice(0, horses.length, ...snapshot.horses); audit.splice(0, audit.length, ...snapshot.audit); throw error; }
     },
   };
-  return { stalls, horses, prisma, audit, service: new StallsService(prisma) };
+  return { stalls, horses, prisma, audit, service: new StallsService(Object.assign(prisma, { clubSchedule: { findUnique: async () => ({ stallRiskAdjacent: true, stallRiskOpposite: true }) } })) };
 }
 test('numbered rows warn both adjacent stallions and preserve opposite pairs', () => {
   const make = (n, sex = 'STALLION') => ({ id: `s${n}`, number: String(n), name: String(n), zone: 'MAIN',

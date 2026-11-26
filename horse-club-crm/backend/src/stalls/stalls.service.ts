@@ -8,7 +8,7 @@ import { parseRefineQuery, type PaginatedResult } from '../common/refine';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateStallDto } from './dto/create-stall.dto';
 import type { UpdateStallDto } from './dto/update-stall.dto';
-import { neighborhoodWarnings, stallRowPosition } from './neighborhood';
+import { neighborhoodWarnings, stallRowPosition, defaultStallRisk } from './neighborhood';
 import type { TransferStallDto } from './dto/transfer-stall.dto';
 import { randomUUID } from 'node:crypto';
 import type { AuthUser } from '../auth/auth.types';
@@ -35,6 +35,11 @@ export type StallWithContracts = Prisma.StallGetPayload<typeof stallInclude> & {
 @Injectable()
 export class StallsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async riskSettings() {
+    return await this.prisma.clubSchedule.findUnique({ where: { id: 1 },
+      select: { stallRiskAdjacent: true, stallRiskOpposite: true } }) ?? defaultStallRisk;
+  }
 
   async findAll(query: StallQueryDto): Promise<PaginatedResult<StallWithContracts>> {
     const options = parseRefineQuery(
@@ -64,7 +69,8 @@ export class StallsService {
       }),
     ]);
     const neighbors = await this.prisma.stall.findMany({ include: stallInclude.include });
-    return { total, data: data.map(stall => ({ ...stall, warnings: neighborhoodWarnings(stall, neighbors) })) };
+    const risk = await this.riskSettings();
+    return { total, data: data.map(stall => ({ ...stall, warnings: neighborhoodWarnings(stall, neighbors, risk) })) };
   }
 
   async map() {
@@ -81,7 +87,8 @@ export class StallsService {
       return { ...stall, horse, horseId: horse?.id ?? null,
         status: horse && stall.status === 'AVAILABLE' ? 'OCCUPIED' as const : stall.status };
     });
-    return placed.map(stall => ({ ...stall, rowPosition: stallRowPosition(stall, placed), warnings: neighborhoodWarnings(stall, placed) }));
+    const risk = await this.riskSettings();
+    return placed.map(stall => ({ ...stall, rowPosition: stallRowPosition(stall, placed), warnings: neighborhoodWarnings(stall, placed, risk) }));
   }
 
   assignmentHorses() {
@@ -110,8 +117,9 @@ export class StallsService {
     const destination = stalls.find(stall => stall.id === target.id)!;
     const projected = stalls.map(stall => stall.id === source.id ? { ...stall, horse: destination.horse }
       : stall.id === target.id ? { ...stall, horse: source.horse } : stall);
+    const risk = await this.riskSettings();
     return projected.filter(stall => [source.id, target.id].includes(stall.id)).map(stall => ({
-      stallId: stall.id, number: stall.number ?? stall.name, warnings: neighborhoodWarnings(stall, projected),
+      stallId: stall.id, number: stall.number ?? stall.name, warnings: neighborhoodWarnings(stall, projected, risk),
     }));
   }
 
@@ -175,7 +183,8 @@ export class StallsService {
     const stall = await this.prisma.stall.findUnique({ where: { id }, include: stallInclude.include });
     if (!stall) throw new NotFoundException('Денник не найден');
     const neighbors = await this.prisma.stall.findMany({ include: stallInclude.include });
-    return { ...stall, warnings: neighborhoodWarnings(stall, neighbors) };
+    const risk = await this.riskSettings();
+    return { ...stall, warnings: neighborhoodWarnings(stall, neighbors, risk) };
   }
 
   async create(dto: CreateStallDto): Promise<StallWithContracts> {

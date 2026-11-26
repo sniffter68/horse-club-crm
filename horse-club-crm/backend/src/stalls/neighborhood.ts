@@ -11,7 +11,10 @@ export function stallRowPosition(stall: NeighborStall, all: NeighborStall[]) {
     !building.some(left => building.some(right => left.side !== right.side && left.position === right.position));
   return numbered ? Math.ceil(stall.position / 2) : stall.position;
 }
-export function neighborhoodWarnings(stall: NeighborStall, all: NeighborStall[]) {
+export interface StallRiskSettings { stallRiskAdjacent: boolean; stallRiskOpposite: boolean }
+export const defaultStallRisk: StallRiskSettings = { stallRiskAdjacent: true, stallRiskOpposite: false };
+
+export function neighborhoodWarnings(stall: NeighborStall, all: NeighborStall[], settings: StallRiskSettings = defaultStallRisk) {
   if (!stall.horse) return [];
   if (stall.buildingId && stall.row && stall.col) {
     const rowEnd = stall.row + (stall.rowSpan ?? 1);
@@ -25,10 +28,10 @@ export function neighborhoodWarnings(stall: NeighborStall, all: NeighborStall[])
       const adjacent = (sharedRows && (colEnd === other.col || otherColEnd === stall.col)) ||
         (sharedCols && (rowEnd === other.row || otherRowEnd === stall.row));
       // Horses facing one another across an empty aisle are also a risk.
-      const facing = sharedRows && !all.some(block => block.id !== stall.id && block.id !== other.id && block.buildingId === stall.buildingId &&
+      const facing = !adjacent && sharedRows && !all.some(block => block.id !== stall.id && block.id !== other.id && block.buildingId === stall.buildingId &&
         block.row! < Math.min(rowEnd, otherRowEnd) && block.row! + (block.rowSpan ?? 1) > Math.max(stall.row!, other.row!) &&
         block.col! < Math.max(stall.col!, other.col!) && block.col! + (block.colSpan ?? 1) > Math.min(colEnd, otherColEnd));
-      return (adjacent || facing) && ((stall.horse!.sex === 'STALLION' && ['MARE', 'STALLION'].includes(other.horse.sex ?? '')) ||
+      return ((settings.stallRiskAdjacent && adjacent) || (settings.stallRiskOpposite && facing)) && ((stall.horse!.sex === 'STALLION' && ['MARE', 'STALLION'].includes(other.horse.sex ?? '')) ||
         (stall.horse!.sex === 'MARE' && other.horse.sex === 'STALLION'));
     }).map(other => ({ neighborId: other.id, neighborNumber: other.number || other.name || 'Без номера',
       message: `Нежелательное соседство: ${stall.horse!.name} и ${other.horse!.name}` }));
@@ -42,7 +45,7 @@ export function neighborhoodWarnings(stall: NeighborStall, all: NeighborStall[])
   const adjacentIds = [row[index - 1]?.id, row[index + 1]?.id];
   // Legacy coordinates use shared row positions; numbered coordinates use 1/3/5 and 2/4/6.
   return all.filter(other => other.id !== stall.id && other.zone === stall.zone && other.horse && other.position !== null &&
-    (other.side === stall.side ? adjacentIds.includes(other.id) : stallRowPosition(other, building) === stallRowPosition(stall, building)) &&
+    (other.side === stall.side ? settings.stallRiskAdjacent && adjacentIds.includes(other.id) : settings.stallRiskOpposite && stallRowPosition(other, building) === stallRowPosition(stall, building)) &&
     ((stall.horse!.sex === 'STALLION' && ['MARE', 'STALLION'].includes(other.horse.sex ?? '')) ||
       (stall.horse!.sex === 'MARE' && other.horse.sex === 'STALLION')))
     .map(other => ({ neighborId: other.id, neighborNumber: other.number ?? other.name ?? 'Без номера',

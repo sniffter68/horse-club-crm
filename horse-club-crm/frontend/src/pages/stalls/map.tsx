@@ -13,6 +13,7 @@ import { sexes, statuses, type MapHorse, type MapStall } from './mapTypes'
 import { BuildingMap } from './buildings'
 import type { StableBuilding } from './gridLayout'
 import './map.css'
+import { StallRiskSettings } from './StallRiskSettings'
 import { StallCard } from './card'
 
 const colors = { AVAILABLE: 'green', OCCUPIED: 'default', MAINTENANCE: 'orange', QUARANTINE: 'red' }
@@ -79,6 +80,7 @@ export function StallMap() {
     <Space wrap className="stall-map-toolbar"><Typography.Title level={2}>Карта денников</Typography.Title>
       <Link to="/stalls">Список денников</Link><Button onClick={() => void refresh()} disabled={loading || constructing}>Обновить</Button>
     </Space>
+    <StallRiskSettings canManage={canManage} onSaved={refresh} />
     {error && <Alert type="error" showIcon message="Не удалось загрузить карту" description={error} action={<Button onClick={() => void refresh()}>Повторить</Button>} />}
     {loading && !loaded ? <div className="stable-loading"><Spin aria-label="Загрузка карты денников" /></div> : !error && <>
       <div className="stall-stats">

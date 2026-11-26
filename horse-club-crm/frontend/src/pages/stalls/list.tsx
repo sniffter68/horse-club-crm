@@ -1,3 +1,5 @@
+import { StallRiskSettings } from './StallRiskSettings'
+import { useCatalogPermissions } from '../catalogs/permissions'
 import { useState } from 'react'
 import { Empty, List, Space, Tag } from 'antd'
 import { money } from '../catalogs/format'
@@ -12,8 +14,10 @@ import { StallForm } from './form'
 import { StallDetailsCard } from './card'
 
 export function StallList() {
+  const { canManage } = useCatalogPermissions('stalls')
   const [selectedId, setSelectedId] = useState<string>()
   return <>
+    <StallRiskSettings canManage={canManage} />
     <CatalogList<Stall> resource="stalls" title="Денники" editAction={stall => <CatalogEditAction resource="stalls" id={stall.id}><StallForm action="edit" /></CatalogEditAction>} extraActions={stall => <StallDeleteAction id={stall.id} />} columns={[
       { key: 'name', title: 'Название', sorter: true, render: (_: unknown, row) => <CardLink onClick={() => setSelectedId(row.id)}>{row.name || `Денник ${row.number ?? 'без номера'}`}</CardLink> },
       { key: 'number', title: 'Номер', render: (_: unknown, row) => row.type === 'SERVICE' ? null : row.number },

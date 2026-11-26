@@ -9,7 +9,7 @@ import { MembershipCreate } from '../memberships/create'
 import type { ClientWithMemberships, Lesson, MembershipSummary } from './types'
 import { lessonBalance } from './lessonPaymentSummary'
 
-export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesson: Lesson; onSaved: (lesson: Lesson) => void; onBusyChange: (busy: boolean) => void }) {
+export function LessonDeferredPayment({ lesson, onSaved, onBusyChange, disabled = false }: { lesson: Lesson; disabled?: boolean; onSaved: (lesson: Lesson) => void; onBusyChange: (busy: boolean) => void }) {
   const access = usePermissions()
   const { message } = App.useApp()
   const [cashOpen, setCashOpen] = useState(false)
@@ -41,7 +41,7 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
     } catch (cause) { setError(toHttpError(cause).message) }
   }
   async function chooseMembership() {
-    if (pending.current) return
+    if (pending.current || disabled) return
     pending.current = true; setBusy(true); setError(undefined); setChoosing(true)
     try {
       if (!isUuid(booking.client.id)) throw new Error('Некорректный идентификатор клиента')
@@ -59,7 +59,7 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
     finally { pending.current = false; setBusy(false) }
   }
   async function attach(membershipId: string, sold = false) {
-    if (pending.current) return
+    if (pending.current || disabled) return
     pending.current = true; setBusy(true); setError(undefined); setSelected(membershipId)
     try {
       if (!isUuid(lesson.id) || !isUuid(membershipId)) throw new Error('Выберите корректный абонемент')
@@ -73,7 +73,7 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
   return <Space direction="vertical" style={{ width: '100%' }}>
     <Alert type="warning" showIcon message="Занятие не оплачено" description="Примите оплату или спишите занятие с абонемента." />
     {error && <Alert role="alert" type="error" showIcon message={error} />}
-    <Select aria-label="Режим оплаты занятия" style={{ width: '100%' }} value={cashOpen ? 'ONE_OFF' : choosing ? 'MEMBERSHIP' : 'FUTURE'} disabled={busy}
+    <Select aria-label="Режим оплаты занятия" style={{ width: '100%' }} value={cashOpen ? 'ONE_OFF' : choosing ? 'MEMBERSHIP' : 'FUTURE'} disabled={busy || disabled}
       options={[
         { value: 'FUTURE', label: 'В счет будущего абонемента / оплатить позже' },
         { value: 'ONE_OFF', label: 'Разовое занятие', disabled: !access.canWrite('CASHBOX') },
@@ -84,18 +84,18 @@ export function LessonDeferredPayment({ lesson, onSaved, onBusyChange }: { lesso
         else setChoosing(false)
       }} />
     <Space wrap>
-      {access.canWrite('CASHBOX') && <Button disabled={busy} onClick={() => setCashOpen(true)}>Принять оплату в кассу</Button>}
-      {eligible && <Button loading={busy} onClick={() => void chooseMembership()}>Списать с абонемента</Button>}
-      {eligible && canSell && <Button disabled={busy} onClick={() => setSaleOpen(true)}>Продать абонемент и привязать</Button>}
+      {access.canWrite('CASHBOX') && <Button disabled={busy || disabled} onClick={() => setCashOpen(true)}>Принять оплату в кассу</Button>}
+      {eligible && <Button loading={busy} disabled={disabled} onClick={() => void chooseMembership()}>Списать с абонемента</Button>}
+      {eligible && canSell && <Button disabled={busy || disabled} onClick={() => setSaleOpen(true)}>Продать абонемент и привязать</Button>}
     </Space>
     {choosing && <Space direction="vertical" style={{ width: '100%' }}>
       {!busy && !memberships.length && !error && <Typography.Text type="secondary">У клиента нет активных абонементов с доступными занятиями.</Typography.Text>}
-      <Select aria-label="Абонемент для оплаты" style={{ width: '100%' }} loading={busy} disabled={busy} value={selected} placeholder="Выберите абонемент"
+      <Select aria-label="Абонемент для оплаты" style={{ width: '100%' }} loading={busy} disabled={busy || disabled} value={selected} placeholder="Выберите абонемент"
         options={memberships.map(m => ({ value: m.id, label: `${m.title || m.pricingPlan?.name || 'Абонемент'}${m.isShared ? ` · Семейный: ${m.ownerName || 'Общий доступ'}` : ''} · Осталось: ${m.remainedLessons}` }))} onChange={setSelected} />
       {lateMembership && <Alert type="info" showIcon message="Отложенная оплата: абонемент оформлен после даты занятия" />}
-      <Button type="primary" loading={busy} disabled={!selected} onClick={() => { if (selected) void attach(selected) }}>Списать занятие</Button>
+      <Button type="primary" loading={busy} disabled={!selected || disabled} onClick={() => { if (selected) void attach(selected) }}>Списать занятие</Button>
     </Space>}
-    {cashOpen && <CashDeskPaymentModal oneOffPrice={oneOffPrice} initialClientId={booking.client.id} initialBookingId={booking.id} onClose={() => setCashOpen(false)} onPaid={() => void refresh()} />}
+    {cashOpen && <CashDeskPaymentModal oneOffPrice={oneOffPrice} initialClientId={booking.client.id} initialBookingId={booking.id} onClose={() => setCashOpen(false)} onLessonSaved={onSaved} onPaid={() => void refresh()} />}
     {saleOpen && <MembershipCreate initialClientId={booking.client.id} initialServiceId={lesson.service.id} onClose={() => setSaleOpen(false)} onSold={membership => {
       setSaleOpen(false); setChoosing(true)
       setMemberships([membership])

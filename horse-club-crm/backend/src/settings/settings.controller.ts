@@ -1,4 +1,4 @@
-import { RequireModule } from '../auth/module-access.guard';
+import { ModuleAccessGuard, RequireModule } from '../auth/module-access.guard';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 import { ModuleAccessService } from './module-access.service';
 import { ToggleModuleDto, UpdateModulePermissionsDto } from './dto/module-settings.dto';
@@ -14,6 +14,7 @@ import { RoleAccessService } from '../auth/role-access.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
 import { UpdateRoleAccessDto } from './dto/update-role-access.dto';
+import { UpdateStallRiskDto } from './dto/update-stall-risk.dto';
 
 @ApiTags('Settings')
 @ApiBearerAuth()
@@ -21,6 +22,17 @@ import { UpdateRoleAccessDto } from './dto/update-role-access.dto';
 @Controller('settings')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService, private readonly access: RoleAccessService, private readonly modules: ModuleAccessService) {}
+
+  @Get('stall-risk')
+  @UseGuards(ModuleAccessGuard)
+  @RequireModule('STABLES')
+  getStallRisk() { return this.settingsService.getStallRisk(); }
+
+  @Patch('stall-risk')
+  @UseGuards(ModuleAccessGuard)
+  @RequireModule('STABLES')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  updateStallRisk(@Body() dto: UpdateStallRiskDto) { return this.settingsService.updateStallRisk(dto); }
 
   @Get('modules')
   @Roles(Role.ADMIN, Role.MANAGER)

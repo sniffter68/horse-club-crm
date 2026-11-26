@@ -1,0 +1,21 @@
+npm.cmd : npm notice run frontend@0.0.0 test
+строка:2 знак:115
++ ...  run build; npm.cmd --prefix frontend test > docs/reports/trainer-sta ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm notice run frontend@0.0.0 test:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm notice run vitest run
+
+ RUN  v5.0.0 C:/Users/Валерий/Desktop/HorseCRM2026/horse-club-crm/frontend
+
+
+ Test Files  32 passed (32)
+      Tests  248 passed (248)
+   Start at  14:29:49
+   Duration  5.29s (import 63%, transform 28%, tests 5%, worker 3%)
+
+  Transform  transforming modules took 3.25s · 28% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

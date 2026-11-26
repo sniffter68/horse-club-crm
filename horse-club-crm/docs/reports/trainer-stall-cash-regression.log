@@ -1,0 +1,51 @@
+npx.cmd : npm notice run frontend@0.0.0 npx
+строка:2 знак:1
++ npx.cmd playwright test cash-desk.spec.ts --config playwright.crm.con ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm notice run frontend@0.0.0 npx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm notice run playwright test cash-desk.spec.ts --config playwright.crm.config.ts --project=mock
+
+Running 36 tests using 1 worker
+
+(node:27052) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [mock] › e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 1440px (3.6s)
+  ok  2 [mock] › e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 1280px (2.9s)
+  ok  3 [mock] › e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 1024px (2.8s)
+  ok  4 [mock] › e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 390px (2.5s)
+  ok  5 [mock] › e2e\cash-desk.spec.ts:41:34 › journal filters, empty state, retry and read only at 1440px (4.8s)
+  ok  6 [mock] › e2e\cash-desk.spec.ts:41:34 › journal filters, empty state, retry and read only at 390px (3.8s)
+  ok  7 [mock] › e2e\cash-desk.spec.ts:83:1 › invalid journal shift UUID is never sent and can be cleared (1.8s)
+  ok  8 [mock] › e2e\cash-desk.spec.ts:95:48 › payment list settles lesson through cash drawer rather than generic status update (3.1s)
+  ok  9 [mock] › e2e\cash-desk.spec.ts:95:48 › payment list settles membership through cash drawer rather than generic status update (3.1s)
+  ok 10 [mock] › e2e\cash-desk.spec.ts:121:1 › cash audit overview capture (1.6s)
+  ok 11 [mock] › e2e\cash-desk.spec.ts:129:34 › turnover date basis changes receipts and preserves balances at 1440px (4.9s)
+  ok 12 [mock] › e2e\cash-desk.spec.ts:129:34 › turnover date basis changes receipts and preserves balances at 390px (3.6s)
+  ok 13 [mock] › e2e\cash-desk.spec.ts:223:34 › monthly accrual closing preserves summary and recovers from failure at 1440px (3.1s)
+  ok 14 [mock] › e2e\cash-desk.spec.ts:223:34 › monthly accrual closing preserves summary and recovers from failure at 390px (2.7s)
+  ok 15 [mock] › e2e\cash-desk.spec.ts:275:1 › monthly preview failure can retry; empty balances close once and show zero incoming balance (2.6s)
+  ok 16 [mock] › e2e\cash-desk.spec.ts:312:1 › manager with FULL access can preview and close month (1.5s)
+  ok 17 [mock] › e2e\cash-desk.spec.ts:319:34 › owner reset requires exact word, preserves failure and refreshes book at 1440px (2.0s)
+  ok 18 [mock] › e2e\cash-desk.spec.ts:319:34 › owner reset requires exact word, preserves failure and refreshes book at 390px (1.9s)
+  ok 19 [mock] › e2e\cash-desk.spec.ts:364:1 › owner withdrawal retries same operation after uncertain failure and permits correcting insufficient amount (2.2s)
+  ok 20 [mock] › e2e\cash-desk.spec.ts:389:1 › manager cannot see owner reset or withdrawal controls (1.9s)
+  ok 21 [mock] › e2e\cash-desk.spec.ts:395:34 › expense 1500 reduces cash balance, filters and admin cancellation at 1440px (6.1s)
+  ok 22 [mock] › e2e\cash-desk.spec.ts:395:34 › expense 1500 reduces cash balance, filters and admin cancellation at 390px (5.4s)
+  ok 23 [mock] › e2e\cash-desk.spec.ts:438:1 › expense failure preserves payload for retry; manager cannot delete (2.9s)
+  ok 24 [mock] › e2e\cash-desk.spec.ts:460:34 › cash payment and book refresh at 1440px (2.8s)
+  ok 25 [mock] › e2e\cash-desk.spec.ts:460:34 › cash payment and book refresh at 390px (2.7s)
+  ok 26 [mock] › e2e\cash-desk.spec.ts:481:1 › uncertain response preserves payload and operation key on retry (2.8s)
+  ok 27 [mock] › e2e\cash-desk.spec.ts:496:1 › noncash SBP skips cash input and trainer cannot access cash desk (3.9s)
+  ok 28 [mock] › e2e\cash-desk.spec.ts:514:1 › custom date picker uses Russian calendar and Moscow date boundaries (2.1s)
+  ok 29 [mock] › e2e\cash-desk.spec.ts:529:34 › quick client creation preserves payment and selects new client at 1440px (5.0s)
+  ok 30 [mock] › e2e\cash-desk.spec.ts:529:34 › quick client creation preserves payment and selects new client at 390px (4.6s)
+  ok 31 [mock] › e2e\cash-desk.spec.ts:583:1 › quick client phone prefill, validation, failure and cancel retain noncash payment (3.1s)
+  ok 32 [mock] › e2e\cash-desk.spec.ts:613:75 › current month preview and early close for ADMIN at 1440px (3.8s)
+  ok 33 [mock] › e2e\cash-desk.spec.ts:613:75 › current month preview and early close for ADMIN at 390px (3.1s)
+  ok 34 [mock] › e2e\cash-desk.spec.ts:613:75 › current month preview and early close for MANAGER at 1440px (3.8s)
+  ok 35 [mock] › e2e\cash-desk.spec.ts:613:75 › current month preview and early close for MANAGER at 390px (3.1s)
+  ok 36 [mock] › e2e\cash-desk.spec.ts:652:1 › READ_ONLY manager cannot close open month (1.3s)
+
+  36 passed (1.9m)

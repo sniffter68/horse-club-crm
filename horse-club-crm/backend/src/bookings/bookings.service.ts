@@ -1,4 +1,5 @@
 import { assertScheduleInterval } from '../settings/club-schedule';
+import { assertTrainerUnlocked } from '../lessons/trainer-lock';
 import { resolveServiceDirection } from '../services/service-direction';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { canUseMembership } from '../memberships/membership-access';
@@ -163,6 +164,9 @@ export class BookingsService {
       try {
         return await this.prisma.$transaction(async tx => {
           const current = id ? await tx.booking.findUnique({ where: { id } }) : null;
+          if (current && patch.trainerId && patch.trainerId !== current.trainerId) {
+            await assertTrainerUnlocked(tx, [current.id], current.status !== 'scheduled');
+          }
           if (id && (!current || current.lessonId !== null || current.status !== 'scheduled')) throw new BookingValidationError('BOOKING_NOT_EDITABLE', 'Редактировать можно только запланированное бронирование тройного ресурса');
           const defined = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
           const dto = { ...(current ? { ...current, startTime: current.startTime?.toISOString(), endTime: current.endTime?.toISOString(), costAmount: Number(current.costAmount) } : {}), ...defined } as CreateBookingDto;

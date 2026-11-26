@@ -1,0 +1,404 @@
+npx.cmd : npm notice run frontend@0.0.0 npx
+строка:2 знак:1
++ npx.cmd --prefix frontend playwright test lesson-payments.spec.ts sta ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm notice run frontend@0.0.0 npx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm notice run playwright test lesson-payments.spec.ts stall-map.spec.ts cash-desk.spec.ts --config frontend/playwright
+.crm.config.ts --project=mock
+
+Running 100 tests using 1 worker
+
+(node:26940) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x    1 [mock] › frontend\e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 1440px (4.0s)
+(node:4616) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x    2 [mock] › frontend\e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 1280px (4.0s)
+(node:37060) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x    3 [mock] › frontend\e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 1024px (3.7s)
+(node:40704) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x    4 [mock] › frontend\e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 390px (3.5s)
+(node:36532) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok   5 [mock] › frontend\e2e\cash-desk.spec.ts:41:34 › journal filters, empty state, retry and read only at 1440px (4.2s)
+  ok   6 [mock] › frontend\e2e\cash-desk.spec.ts:41:34 › journal filters, empty state, retry and read only at 390px (3.7s)
+  ok   7 [mock] › frontend\e2e\cash-desk.spec.ts:83:1 › invalid journal shift UUID is never sent and can be cleared (1.8s)
+  ok   8 [mock] › frontend\e2e\cash-desk.spec.ts:95:48 › payment list settles lesson through cash drawer rather than generic status update (3.2s)
+  ok   9 [mock] › frontend\e2e\cash-desk.spec.ts:95:48 › payment list settles membership through cash drawer rather than generic status update (3.6s)
+  x   10 [mock] › frontend\e2e\cash-desk.spec.ts:121:1 › cash audit overview capture (1.5s)
+(node:51600) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   11 [mock] › frontend\e2e\cash-desk.spec.ts:129:34 › turnover date basis changes receipts and preserves balances at 1440px (4.9s)
+(node:43424) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   12 [mock] › frontend\e2e\cash-desk.spec.ts:129:34 › turnover date basis changes receipts and preserves balances at 390px (3.6s)
+(node:9468) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   13 [mock] › frontend\e2e\cash-desk.spec.ts:223:34 › monthly accrual closing preserves summary and recovers from failure at 1440px (4.2s)
+(node:47472) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   14 [mock] › frontend\e2e\cash-desk.spec.ts:223:34 › monthly accrual closing preserves summary and recovers from failure at 390px (2.8s)
+(node:27380) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  15 [mock] › frontend\e2e\cash-desk.spec.ts:275:1 › monthly preview failure can retry; empty balances close once and show zero incoming balance (3.5s)
+  ok  16 [mock] › frontend\e2e\cash-desk.spec.ts:312:1 › manager with FULL access can preview and close month (1.4s)
+  ok  17 [mock] › frontend\e2e\cash-desk.spec.ts:319:34 › owner reset requires exact word, preserves failure and refreshes book at 1440px (2.0s)
+  ok  18 [mock] › frontend\e2e\cash-desk.spec.ts:319:34 › owner reset requires exact word, preserves failure and refreshes book at 390px (1.8s)
+  ok  19 [mock] › frontend\e2e\cash-desk.spec.ts:364:1 › owner withdrawal retries same operation after uncertain failure and permits correcting insufficient amount (2.8s)
+  ok  20 [mock] › frontend\e2e\cash-desk.spec.ts:389:1 › manager cannot see owner reset or withdrawal controls (2.1s)
+  ok  21 [mock] › frontend\e2e\cash-desk.spec.ts:395:34 › expense 1500 reduces cash balance, filters and admin cancellation at 1440px (6.2s)
+  ok  22 [mock] › frontend\e2e\cash-desk.spec.ts:395:34 › expense 1500 reduces cash balance, filters and admin cancellation at 390px (6.2s)
+  ok  23 [mock] › frontend\e2e\cash-desk.spec.ts:438:1 › expense failure preserves payload for retry; manager cannot delete (3.0s)
+  ok  24 [mock] › frontend\e2e\cash-desk.spec.ts:460:34 › cash payment and book refresh at 1440px (3.1s)
+  ok  25 [mock] › frontend\e2e\cash-desk.spec.ts:460:34 › cash payment and book refresh at 390px (2.7s)
+  ok  26 [mock] › frontend\e2e\cash-desk.spec.ts:481:1 › uncertain response preserves payload and operation key on retry (2.5s)
+  ok  27 [mock] › frontend\e2e\cash-desk.spec.ts:496:1 › noncash SBP skips cash input and trainer cannot access cash desk (3.7s)
+  ok  28 [mock] › frontend\e2e\cash-desk.spec.ts:514:1 › custom date picker uses Russian calendar and Moscow date boundaries (1.9s)
+  ok  29 [mock] › frontend\e2e\cash-desk.spec.ts:529:34 › quick client creation preserves payment and selects new client at 1440px (4.9s)
+  ok  30 [mock] › frontend\e2e\cash-desk.spec.ts:529:34 › quick client creation preserves payment and selects new client at 390px (4.3s)
+  ok  31 [mock] › frontend\e2e\cash-desk.spec.ts:583:1 › quick client phone prefill, validation, failure and cancel retain noncash payment (2.7s)
+  x   32 [mock] › frontend\e2e\cash-desk.spec.ts:613:75 › current month preview and early close for ADMIN at 1440px (2.4s)
+(node:52856) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   33 [mock] › frontend\e2e\cash-desk.spec.ts:613:75 › current month preview and early close for ADMIN at 390px (2.5s)
+(node:51508) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   34 [mock] › frontend\e2e\cash-desk.spec.ts:613:75 › current month preview and early close for MANAGER at 1440px (2.7s)
+(node:34740) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   35 [mock] › frontend\e2e\cash-desk.spec.ts:613:75 › current month preview and early close for MANAGER at 390px (2.4s)
+(node:27492) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  36 [mock] › frontend\e2e\cash-desk.spec.ts:652:1 › READ_ONLY manager cannot close open month (1.7s)
+  ok  37 [mock] › frontend\e2e\lesson-payments.spec.ts:4:1 › lesson horse warnings follow explicit service direction before name and capacity (4.5s)
+  ok  38 [mock] › frontend\e2e\lesson-payments.spec.ts:31:34 › optional horse creates an unpaid individual lesson at 1440px (5.0s)
+  ok  39 [mock] › frontend\e2e\lesson-payments.spec.ts:31:34 › optional horse creates an unpaid individual lesson at 390px (5.2s)
+  ok  40 [mock] › frontend\e2e\lesson-payments.spec.ts:62:1 › completed debt opens cash desk with the current client and lesson selected (2.4s)
+  ok  41 [mock] › frontend\e2e\lesson-payments.spec.ts:85:34 › completed zero-cost debt converts to one-off transfer at 1440px (4.5s)
+  ok  42 [mock] › frontend\e2e\lesson-payments.spec.ts:85:34 › completed zero-cost debt converts to one-off transfer at 390px (6.1s)
+  ok  43 [mock] › frontend\e2e\lesson-payments.spec.ts:112:35 › completed unpaid lesson uses existing membership with retry (5.7s)
+  ok  44 [mock] › frontend\e2e\lesson-payments.spec.ts:112:35 › completed unpaid lesson uses newly sold membership with retry (6.4s)
+  ok  45 [mock] › frontend\e2e\lesson-payments.spec.ts:158:57 › past COMPLETED debt allows manual family membership selection and filters service (4.7s)
+  ok  46 [mock] › frontend\e2e\lesson-payments.spec.ts:158:57 › past NO_SHOW debt allows manual family membership selection and filters service (4.8s)
+  ok  47 [mock] › frontend\e2e\lesson-payments.spec.ts:202:34 › trainer settlement replacement and payment lock at 1440px (5.9s)
+  ok  48 [mock] › frontend\e2e\lesson-payments.spec.ts:202:34 › trainer settlement replacement and payment lock at 390px (4.1s)
+  ok  49 [mock] › frontend\e2e\lesson-payments.spec.ts:230:1 › client preferred trainer remains editable and manual trainer reaches lesson payload (4.5s)
+  ok  50 [mock] › frontend\e2e\lesson-payments.spec.ts:247:62 › independent lessons split into 2 lanes at 1440px (7.3s)
+  ok  51 [mock] › frontend\e2e\lesson-payments.spec.ts:247:62 › independent lessons split into 3 lanes at 1440px (7.4s)
+  ok  52 [mock] › frontend\e2e\lesson-payments.spec.ts:247:62 › independent lessons split into 2 lanes at 390px (4.3s)
+  ok  53 [mock] › frontend\e2e\lesson-payments.spec.ts:247:62 › independent lessons split into 3 lanes at 390px (5.6s)
+  ok  54 [mock] › frontend\e2e\lesson-payments.spec.ts:355:34 › excursion for 20 guests calculates total and posts prepayment at 1440px (9.0s)
+  ok  55 [mock] › frontend\e2e\lesson-payments.spec.ts:355:34 › excursion for 20 guests calculates total and posts prepayment at 390px (7.4s)
+  ok  56 [mock] › frontend\e2e\lesson-payments.spec.ts:390:34 › cash prepayment and card completion appear in cashbox at 1440px (10.4s)
+  ok  57 [mock] › frontend\e2e\lesson-payments.spec.ts:390:34 › cash prepayment and card completion appear in cashbox at 390px (10.5s)
+  ok  58 [mock] › frontend\e2e\lesson-payments.spec.ts:426:1 › completion retains payment choice on error and fully prepaid lessons need no collection (5.3s)
+  ok  59 [mock] › frontend\e2e\lesson-payments.spec.ts:448:40 › calendar cards show rider horse and payment at 1440px (2.0s)
+  ok  60 [mock] › frontend\e2e\lesson-payments.spec.ts:448:40 › calendar cards show rider horse and payment at 1024px (2.0s)
+  ok  61 [mock] › frontend\e2e\lesson-payments.spec.ts:448:40 › calendar cards show rider horse and payment at 768px (2.0s)
+  ok  62 [mock] › frontend\e2e\lesson-payments.spec.ts:482:1 › calendar shows a compact excursion label or a fallback for a missing trainer (3.5s)
+  ok  63 [mock] › frontend\e2e\lesson-payments.spec.ts:494:34 › lesson deletion confirms client, membership and cash history at 1440px (5.1s)
+  ok  64 [mock] › frontend\e2e\lesson-payments.spec.ts:494:34 › lesson deletion confirms client, membership and cash history at 390px (4.5s)
+  ok  65 [mock] › frontend\e2e\lesson-payments.spec.ts:531:1 › lesson deletion preserves the dialog on error and blocks duplicate requests while busy (3.3s)
+  ok  66 [mock] › frontend\e2e\lesson-payments.spec.ts:558:46 › lesson deletion is hidden for TRAINER (1.3s)
+  ok  67 [mock] › frontend\e2e\lesson-payments.spec.ts:558:46 › lesson deletion is hidden for READ_ONLY (2.0s)
+  ok  68 [mock] › frontend\e2e\lesson-payments.spec.ts:574:37 › paid cancellation sends financial choice refund=true (3.0s)
+  ok  69 [mock] › frontend\e2e\lesson-payments.spec.ts:574:37 › paid cancellation sends financial choice refund=false (3.0s)
+  ok  70 [mock] › frontend\e2e\lesson-payments.spec.ts:606:1 › refund requires cashbox FULL and retaining funds remains available (2.4s)
+  ok  71 [mock] › frontend\e2e\stall-map.spec.ts:65:34 › stall risk toggles persist and recalculate across aisle at 1440px (2.9s)
+  ok  72 [mock] › frontend\e2e\stall-map.spec.ts:65:34 › stall risk toggles persist and recalculate across aisle at 390px (2.8s)
+  ok  73 [mock] › frontend\e2e\stall-map.spec.ts:94:1 › constructor moves a pen into the aisle, rejects collisions, retains failed draft and saves spans (3.2s)
+  ok  74 [mock] › frontend\e2e\stall-map.spec.ts:127:1 › rename and delete a stall, retaining failed drafts and refreshing the map (7.2s)
+  ok  75 [mock] › frontend\e2e\stall-map.spec.ts:183:1 › list edits labels in a drawer using PATCH and deletes without leaving the list (5.3s)
+  ok  76 [mock] › frontend\e2e\stall-map.spec.ts:224:3 › stall card edits details in place and persists after reload: list, occupied=false (6.2s)
+  ok  77 [mock] › frontend\e2e\stall-map.spec.ts:224:3 › stall card edits details in place and persists after reload: list, occupied=true (5.8s)
+  ok  78 [mock] › frontend\e2e\stall-map.spec.ts:224:3 › stall card edits details in place and persists after reload: map, occupied=false (6.0s)
+  ok  79 [mock] › frontend\e2e\stall-map.spec.ts:224:3 › stall card edits details in place and persists after reload: map, occupied=true (5.6s)
+  ok  80 [mock] › frontend\e2e\stall-map.spec.ts:290:1 › stall card hides mutations for READ_ONLY and deletion for a boarding contract without a horse (4.4s)
+  ok  81 [mock] › frontend\e2e\stall-map.spec.ts:305:1 › stall card changes room type and building, validates and locks a pending save (6.4s)
+  ok  82 [mock] › frontend\e2e\stall-map.spec.ts:353:1 › building settings create, rename and delete an empty building with recoverable errors (6.3s)
+  ok  83 [mock] › frontend\e2e\stall-map.spec.ts:389:1 › service card is neutral and read-only access hides constructor and building mutations (2.3s)
+  ok  84 [mock] › frontend\e2e\stall-map.spec.ts:400:1 › empty aisle slot creates a service room without a number (3.4s)
+  ok  85 [mock] › frontend\e2e\stall-map.spec.ts:419:1 › drag moves into an aisle and cancelling a dirty layout requires confirmation (4.6s)
+  ok  86 [mock] › frontend\e2e\stall-map.spec.ts:434:1 › map shows both rows, warnings, sign and isolated print layout (3.9s)
+  ok  87 [mock] › frontend\e2e\stall-map.spec.ts:454:1 › risk tooltip explains opposite stallions and quarantine on keyboard focus (2.7s)
+  ok  88 [mock] › frontend\e2e\stall-map.spec.ts:466:1 › manager relocates a horse and the previous stall becomes free (3.9s)
+  ok  89 [mock] › frontend\e2e\stall-map.spec.ts:476:1 › read-only manager can read rations and print but cannot mutate (1.9s)
+  ok  90 [mock] › frontend\e2e\stall-map.spec.ts:488:1 › failed assignment retains selection and shows a recoverable error (2.8s)
+  ok  91 [mock] › frontend\e2e\stall-map.spec.ts:500:1 › narrow layout, building filter, keyboard selection and focus restoration (1.9s)
+  ok  92 [mock] › frontend\e2e\stall-map.spec.ts:517:1 › status and notes save, and unavailable stalls cannot be populated (3.8s)
+  ok  93 [mock] › frontend\e2e\stall-map.spec.ts:530:1 › empty map and fetch error offer clear feedback and retry (1.5s)
+  ok  94 [mock] › frontend\e2e\stall-map.spec.ts:542:3 › quick transfer moves into empty stall with preview and recoverable failure (3.2s)
+  ok  95 [mock] › frontend\e2e\stall-map.spec.ts:542:3 › quick transfer swaps occupants with preview and recoverable failure (2.8s)
+  ok  96 [mock] › frontend\e2e\stall-map.spec.ts:571:1 › preview failure can be retried and Escape restores transfer opener focus (3.4s)
+  ok  97 [mock] › frontend\e2e\stall-map.spec.ts:594:1 › manager with READ_ONLY stables cannot transfer (1.6s)
+  ok  98 [mock] › frontend\e2e\stall-map.spec.ts:607:3 › constructor edits room parameters and persists after reload (immediate) (4.6s)
+  ok  99 [mock] › frontend\e2e\stall-map.spec.ts:607:3 › constructor edits room parameters and persists after reload (layout) (4.7s)
+  ok 100 [mock] › frontend\e2e\stall-map.spec.ts:607:3 › constructor edits room parameters and persists after reload (stall) (4.3s)
+
+
+  1) [mock] › frontend\e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 1440px 
+
+    Error: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\docs\reports\cash-metrics-1440.png'
+
+      36 |   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      37 |   await cards.first().scrollIntoViewIfNeeded()
+    > 38 |   await page.screenshot({ path: `../docs/reports/cash-metrics-${width}.png`, animations: 'disabled' })
+         |   ^
+      39 | })
+      40 |
+      41 | for (const width of [1440, 390]) test(`journal filters, empty state, retry and read only at ${width}px`, async ({ page }) => {
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:38:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-balances-and-turnover-contain-long-money-at-1440px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-balances-and-turnover-contain-long-money-at-1440px-mock\error-context.md
+
+  2) [mock] › frontend\e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 1280px 
+
+    Error: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\docs\reports\cash-metrics-1280.png'
+
+      36 |   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      37 |   await cards.first().scrollIntoViewIfNeeded()
+    > 38 |   await page.screenshot({ path: `../docs/reports/cash-metrics-${width}.png`, animations: 'disabled' })
+         |   ^
+      39 | })
+      40 |
+      41 | for (const width of [1440, 390]) test(`journal filters, empty state, retry and read only at ${width}px`, async ({ page }) => {
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:38:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-balances-and-turnover-contain-long-money-at-1280px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-balances-and-turnover-contain-long-money-at-1280px-mock\error-context.md
+
+  3) [mock] › frontend\e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 1024px 
+
+    Error: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\docs\reports\cash-metrics-1024.png'
+
+      36 |   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      37 |   await cards.first().scrollIntoViewIfNeeded()
+    > 38 |   await page.screenshot({ path: `../docs/reports/cash-metrics-${width}.png`, animations: 'disabled' })
+         |   ^
+      39 | })
+      40 |
+      41 | for (const width of [1440, 390]) test(`journal filters, empty state, retry and read only at ${width}px`, async ({ page }) => {
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:38:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-balances-and-turnover-contain-long-money-at-1024px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-balances-and-turnover-contain-long-money-at-1024px-mock\error-context.md
+
+  4) [mock] › frontend\e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 390px 
+
+    Error: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\docs\reports\cash-metrics-390.png'
+
+      36 |   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      37 |   await cards.first().scrollIntoViewIfNeeded()
+    > 38 |   await page.screenshot({ path: `../docs/reports/cash-metrics-${width}.png`, animations: 'disabled' })
+         |   ^
+      39 | })
+      40 |
+      41 | for (const width of [1440, 390]) test(`journal filters, empty state, retry and read only at ${width}px`, async ({ page }) => {
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:38:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-balances-and-turnover-contain-long-money-at-390px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-balances-and-turnover-contain-long-money-at-390px-mock\error-context.md
+
+  5) [mock] › frontend\e2e\cash-desk.spec.ts:121:1 › cash audit overview capture ───────────────────
+
+    Error: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\docs\reports\cash-audit-after.png'
+
+      124 |   await expect(page.getByText('Остаток в кассе (наличные)', { exact: true })).toBeVisible()
+      125 |   await expect(page.locator('.cash-desk-page .ant-spin-spinning')).toHaveCount(0)
+    > 126 |   await page.screenshot({ path: '../docs/reports/cash-audit-after.png', fullPage: true, animations: 'disabled' })
+          |   ^
+      127 | })
+      128 |
+      129 | for (const width of [1440, 390]) test(`turnover date basis changes receipts and preserves balances at ${width}px`, async ({ page }) => {
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:126:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-cash-audit-overview-capture-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-cash-audit-overview-capture-mock\error-context.md
+
+  6) [mock] › frontend\e2e\cash-desk.spec.ts:129:34 › turnover date basis changes receipts and preserves balances at 1440px 
+
+    Error: locator.screenshot: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\docs\reports\date-basis-1440.png'
+
+      159 |   await expect(current).toHaveText(before, { useInnerText: true })
+      160 |   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    > 161 |   await turnover.screenshot({ path: `../docs/reports/date-basis-${width}.png`, animations: 'disabled' })
+          |                  ^
+      162 | })
+      163 |
+      164 | async function setup(page: Page, role = 'ADMIN') {
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:161:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-turnover-date-ba-ca4f2-reserves-balances-at-1440px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-turnover-date-ba-ca4f2-reserves-balances-at-1440px-mock\error-context.md
+
+  7) [mock] › frontend\e2e\cash-desk.spec.ts:129:34 › turnover date basis changes receipts and preserves balances at 390px 
+
+    Error: locator.screenshot: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\docs\reports\date-basis-390.png'
+
+      159 |   await expect(current).toHaveText(before, { useInnerText: true })
+      160 |   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    > 161 |   await turnover.screenshot({ path: `../docs/reports/date-basis-${width}.png`, animations: 'disabled' })
+          |                  ^
+      162 | })
+      163 |
+      164 | async function setup(page: Page, role = 'ADMIN') {
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:161:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-turnover-date-ba-4552c-preserves-balances-at-390px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-turnover-date-ba-4552c-preserves-balances-at-390px-mock\error-context.md
+
+  8) [mock] › frontend\e2e\cash-desk.spec.ts:223:34 › monthly accrual closing preserves summary and recovers from failure at 1440px 
+
+    Error: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\test-results\monthly-closing-dialog-1440.png'
+
+      263 |   const confirmBounds = await confirm.boundingBox()
+      264 |   expect(confirmBounds!.y + confirmBounds!.height).toBeLessThanOrEqual(900)
+    > 265 |   await page.screenshot({ path: `../test-results/monthly-closing-dialog-${width}.png`, fullPage: true })
+          |   ^
+      266 |   await confirm.click()
+      267 |   await expect(dialog).not.toBeVisible()
+      268 |   await expect(panel.getByText('Месяц закрыт', { exact: true })).toBeVisible()
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:265:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-monthly-accrual--37fe1-vers-from-failure-at-1440px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-monthly-accrual--37fe1-vers-from-failure-at-1440px-mock\error-context.md
+
+  9) [mock] › frontend\e2e\cash-desk.spec.ts:223:34 › monthly accrual closing preserves summary and recovers from failure at 390px 
+
+    Error: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\test-results\monthly-closing-dialog-390.png'
+
+      263 |   const confirmBounds = await confirm.boundingBox()
+      264 |   expect(confirmBounds!.y + confirmBounds!.height).toBeLessThanOrEqual(900)
+    > 265 |   await page.screenshot({ path: `../test-results/monthly-closing-dialog-${width}.png`, fullPage: true })
+          |   ^
+      266 |   await confirm.click()
+      267 |   await expect(dialog).not.toBeVisible()
+      268 |   await expect(panel.getByText('Месяц закрыт', { exact: true })).toBeVisible()
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:265:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-monthly-accrual--0d345-overs-from-failure-at-390px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-monthly-accrual--0d345-overs-from-failure-at-390px-mock\error-context.md
+
+  10) [mock] › frontend\e2e\cash-desk.spec.ts:613:75 › current month preview and early close for ADMIN at 1440px 
+
+    Error: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\test-results\current-month-ADMIN-1440.png'
+
+      633 |   await expect(dialog).toContainText('Фактическая признанная выручка')
+      634 |   await expect(dialog).not.toHaveClass(/ant-zoom/)
+    > 635 |   await page.screenshot({ path: `../test-results/current-month-${role}-${width}.png`, fullPage: true, animations: 'disabled' })
+          |   ^
+      636 |   await dialog.getByLabel('Комментарий к закрытию (необязательно)').fill('Досрочно')
+      637 |   await dialog.getByRole('button', { name: /Подтвердить и перенести остатки в ноябрь 2026/ }).click()
+      638 |   await expect(dialog).not.toBeVisible()
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:635:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-current-month-pr-abd47-y-close-for-ADMIN-at-1440px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-current-month-pr-abd47-y-close-for-ADMIN-at-1440px-mock\error-context.md
+
+  11) [mock] › frontend\e2e\cash-desk.spec.ts:613:75 › current month preview and early close for ADMIN at 390px 
+
+    Error: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\test-results\current-month-ADMIN-390.png'
+
+      633 |   await expect(dialog).toContainText('Фактическая признанная выручка')
+      634 |   await expect(dialog).not.toHaveClass(/ant-zoom/)
+    > 635 |   await page.screenshot({ path: `../test-results/current-month-${role}-${width}.png`, fullPage: true, animations: 'disabled' })
+          |   ^
+      636 |   await dialog.getByLabel('Комментарий к закрытию (необязательно)').fill('Досрочно')
+      637 |   await dialog.getByRole('button', { name: /Подтвердить и перенести остатки в ноябрь 2026/ }).click()
+      638 |   await expect(dialog).not.toBeVisible()
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:635:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-current-month-pr-f6f77-ly-close-for-ADMIN-at-390px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-current-month-pr-f6f77-ly-close-for-ADMIN-at-390px-mock\error-context.md
+
+  12) [mock] › frontend\e2e\cash-desk.spec.ts:613:75 › current month preview and early close for MANAGER at 1440px 
+
+    Error: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\test-results\current-month-MANAGER-1440.png'
+
+      633 |   await expect(dialog).toContainText('Фактическая признанная выручка')
+      634 |   await expect(dialog).not.toHaveClass(/ant-zoom/)
+    > 635 |   await page.screenshot({ path: `../test-results/current-month-${role}-${width}.png`, fullPage: true, animations: 'disabled' })
+          |   ^
+      636 |   await dialog.getByLabel('Комментарий к закрытию (необязательно)').fill('Досрочно')
+      637 |   await dialog.getByRole('button', { name: /Подтвердить и перенести остатки в ноябрь 2026/ }).click()
+      638 |   await expect(dialog).not.toBeVisible()
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:635:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-current-month-pr-364cc-close-for-MANAGER-at-1440px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-current-month-pr-364cc-close-for-MANAGER-at-1440px-mock\error-context.md
+
+  13) [mock] › frontend\e2e\cash-desk.spec.ts:613:75 › current month preview and early close for MANAGER at 390px 
+
+    Error: ENOENT: no such file or directory, open 'C:\Users\Валерий\Desktop\HorseCRM2026\test-results\current-month-MANAGER-390.png'
+
+      633 |   await expect(dialog).toContainText('Фактическая признанная выручка')
+      634 |   await expect(dialog).not.toHaveClass(/ant-zoom/)
+    > 635 |   await page.screenshot({ path: `../test-results/current-month-${role}-${width}.png`, fullPage: true, animations: 'disabled' })
+          |   ^
+      636 |   await dialog.getByLabel('Комментарий к закрытию (необязательно)').fill('Досрочно')
+      637 |   await dialog.getByRole('button', { name: /Подтвердить и перенести остатки в ноябрь 2026/ }).click()
+      638 |   await expect(dialog).not.toBeVisible()
+        at C:\Users\Валерий\Desktop\HorseCRM2026\horse-club-crm\frontend\e2e\cash-desk.spec.ts:635:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    frontend\test-results\cash-desk-current-month-pr-3d46b--close-for-MANAGER-at-390px-mock\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: frontend\test-results\cash-desk-current-month-pr-3d46b--close-for-MANAGER-at-390px-mock\error-context.md
+
+  13 failed
+    [mock] › frontend\e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 1440px 
+    [mock] › frontend\e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 1280px 
+    [mock] › frontend\e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 1024px 
+    [mock] › frontend\e2e\cash-desk.spec.ts:3:46 › balances and turnover contain long money at 390px 
+    [mock] › frontend\e2e\cash-desk.spec.ts:121:1 › cash audit overview capture ────────────────────
+    [mock] › frontend\e2e\cash-desk.spec.ts:129:34 › turnover date basis changes receipts and preserves balances at 1440px 
+    [mock] › frontend\e2e\cash-desk.spec.ts:129:34 › turnover date basis changes receipts and preserves balances at 390px 
+    [mock] › frontend\e2e\cash-desk.spec.ts:223:34 › monthly accrual closing preserves summary and recovers from failure at 1440px 
+    [mock] › frontend\e2e\cash-desk.spec.ts:223:34 › monthly accrual closing preserves summary and recovers from failure at 390px 
+    [mock] › frontend\e2e\cash-desk.spec.ts:613:75 › current month preview and early close for ADMIN at 1440px 
+    [mock] › frontend\e2e\cash-desk.spec.ts:613:75 › current month preview and early close for ADMIN at 390px 
+    [mock] › frontend\e2e\cash-desk.spec.ts:613:75 › current month preview and early close for MANAGER at 1440px 
+    [mock] › frontend\e2e\cash-desk.spec.ts:613:75 › current month preview and early close for MANAGER at 390px 
+  87 passed (6.9m)

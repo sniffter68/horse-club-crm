@@ -1,4 +1,5 @@
 import { scheduleForDay } from '../settings/club-schedule';
+import { assertTrainerUnlocked } from './trainer-lock';
 import { telegramCancellation } from '../modules/telegram-bot/telegram-cancellation';
 import { DateTime } from 'luxon';
 import type { TrainerTmaRescheduleDto, TrainerTmaRescheduleQuery } from '../modules/telegram-bot/trainer-tma.dto';
@@ -310,6 +311,14 @@ export class LessonsService {
         await this.assertLessonManagement(actor, lesson.trainerId, tx);
         if (trainerId) await this.assertLessonManagement(actor, trainerId, tx);
       }
+      if (trainerId && trainerId !== lesson.trainerId) {
+        // A membership selected at booking time has cost=0 / PAID before any
+        // visit is debited. It must remain editable until actual settlement.
+        await assertTrainerUnlocked(tx, lesson.bookings.map(booking => booking.id), lesson.status !== 'SCHEDULED'
+          || lesson.paymentStatus === 'PAID_BY_MEMBERSHIP'
+          || lesson.paymentStatus === 'PARTIALLY_PAID'
+          || lesson.paymentStatus === 'PAID' && Number(lesson.cost) > 0);
+      }
       if (lesson.status !== LessonStatus.SCHEDULED) throw new ConflictException('Переносить можно только запланированные занятия');
       if (!arenaId && lesson.arena?.isUnavailable) throw new ConflictException('Манеж недоступен на новое время занятия');
       await this.validateLessonMove(tx, lesson, start, end, trainerId, arenaId, options?.horseId);
@@ -329,7 +338,8 @@ export class LessonsService {
         const format = (date: Date) => DateTime.fromJSDate(date, { zone: 'Europe/Moscow' }).toFormat('dd.MM.yyyy HH:mm');
         await queueTelegramAdmins(tx, `admin:reschedule:${eventId}`, `Тренировка перенесена: ${format(lesson.startTime)} → ${format(start)} (Москва)\n${options?.reason ?? ''}`);
         if (actor) await tx.cashAuditLog.create({ data: { requestId: eventId, action: 'LESSON_RESCHEDULED', actorId: actor.id, actorName: actor.email,
-          details: { lessonId, startTime, previousStart: lesson.startTime.toISOString(), horseId: options?.horseId ?? null, reason: options?.reason ?? null } } });
+          details: { lessonId, startTime, previousStart: lesson.startTime.toISOString(), previousTrainerId: lesson.trainerId,
+            trainerId: updated.trainerId, horseId: options?.horseId ?? null, reason: options?.reason ?? null } } });
       }
       return updated;
     };
@@ -591,6 +601,15 @@ export class LessonsService {
       throw new NotFoundException('Занятие не найдено');
     }
     return lesson;
+  }
+
+  changeTrainer(id: string, trainerId: string, actor: AuthUser) {
+    return this.runSerializable(async tx => {
+      const lesson = await tx.lesson.findUnique({ where: { id }, ...lessonDetails });
+      if (!lesson) throw new NotFoundException('Занятие не найдено');
+      return this.rescheduleLesson(id, lesson.startTime.toISOString(),
+        (lesson.endTime.getTime() - lesson.startTime.getTime()) / MILLISECONDS_PER_MINUTE, trainerId, undefined, actor, { tx });
+    });
   }
 
   async deleteLesson(lessonId: string, actor: AuthUser, dto?: CancelServiceDto) {

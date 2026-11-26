@@ -16,6 +16,7 @@ const initial = [
 ].map(s => ({ ...s, buildingId: s.zone === 'SUMMER' ? summerBuilding : mainBuilding, row: 1, col: s.side === 'RIGHT' ? 4 : 1, rowSpan: 1, colSpan: 1, type: 'STALL' }))
 type FixtureStall = Omit<(typeof initial)[number], 'horse' | 'horseId' | 'notes'> & { horse: typeof horse | null; horseId: string | null; notes: string | null; description?: string; contracts?: Array<{ status: string }> }
 async function setup(page: Page, role = 'ADMIN', empty = false, readOnly = false) {
+  await page.route('**/api/settings/stall-risk', route => route.fulfill({ json: { stallRiskAdjacent: true, stallRiskOpposite: false } }))
   await page.addInitScript(role => {
     localStorage.setItem('horsecrm.access_token', 'cookie-session'); localStorage.setItem('horsecrm.role', role); localStorage.setItem('horsecrm.email', 'qa@example.com')
     Object.defineProperty(window, 'print', { value: () => { document.body.dataset.printed = 'true' } })
@@ -60,6 +61,35 @@ async function setup(page: Page, role = 'ADMIN', empty = false, readOnly = false
   await page.goto('/stable')
   return state
 }
+
+for (const width of [1440, 390]) test(`stall risk toggles persist and recalculate across aisle at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 1000 })
+  const state = await setup(page)
+  let flags = { stallRiskAdjacent: true, stallRiskOpposite: false }
+  let fail = false
+  await page.route('**/api/settings/stall-risk', async route => {
+    if (route.request().method() === 'PATCH') {
+      if (fail) return route.fulfill({ status: 503, json: { message: 'Не удалось сохранить правила' } })
+      flags = { ...flags, ...route.request().postDataJSON() }
+    }
+    await route.fulfill({ json: flags })
+  })
+  await page.route('**/api/stalls/map', route => route.fulfill({ json: state.stalls.map((stall, index) => ({ ...stall,
+    warnings: flags.stallRiskOpposite && index === 0 ? initial[0].warnings : [] })) }))
+  await page.reload()
+  const adjacent = page.getByRole('switch', { name: 'Риск соседства рядом (смежные денники)', exact: true })
+  const opposite = page.getByRole('switch', { name: 'Риск соседства напротив (через проход)', exact: true })
+  await expect(adjacent).toBeChecked(); await expect(opposite).not.toBeChecked()
+  await expect(page.locator('.stall-warning')).toHaveCount(0)
+  await opposite.click()
+  await expect(opposite).toBeChecked(); await expect(page.locator('.stall-warning')).toHaveCount(1)
+  await page.reload(); await expect(opposite).toBeChecked()
+  await opposite.click(); await expect(page.locator('.stall-warning')).toHaveCount(0)
+  fail = true; await adjacent.click()
+  await expect(page.getByText('Не удалось сохранить правила', { exact: true })).toBeVisible()
+  await expect(adjacent).toBeChecked()
+  await page.screenshot({ path: `test-results/stall-risk-${width}.png`, animations: 'disabled' })
+})
 
 test('constructor moves a pen into the aisle, rejects collisions, retains failed draft and saves spans', async ({ page }) => {
   const state = await setup(page)

@@ -216,6 +216,7 @@ test('partial reschedule merges current resources and preserves pricing inside t
   const { tx, input } = fixture();
   const current = { id: 'b', lessonId: null, status: 'scheduled', clientId: 'client', horseId: 'horse', trainerId: 'trainer', arenaId: 'arena', membershipId: null, startTime: at('08:00'), endTime: at('08:30'), serviceType: 'dressage', costAmount: new Prisma.Decimal('1234.56') };
   tx.booking.findUnique = async () => current;
+  tx.booking.count = async () => 0;
   let saved, validated;
   tx.booking.update = async ({ data }) => { saved = data; return { ...current, ...data }; };
   const service = new BookingsService({ $transaction: async (work, options) => {

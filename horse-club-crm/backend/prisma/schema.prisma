@@ -1022,6 +1022,8 @@ model MembershipMember {
 
 model ClubSchedule {
   id            Int      @id @default(1)
+  stallRiskAdjacent Boolean @default(true)
+  stallRiskOpposite Boolean @default(false)
   openTime      String   @default("09:00")
   closeTime     String   @default("21:00")
   daysOfWeekOff Int[]    @default([1])

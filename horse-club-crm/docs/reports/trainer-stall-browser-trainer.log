@@ -1,0 +1,19 @@
+npx.cmd : npm notice run frontend@0.0.0 npx
+строка:2 знак:1
++ npx.cmd --prefix frontend playwright test --config frontend/playwrigh ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm notice run frontend@0.0.0 npx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm notice run playwright test --config frontend/playwright.crm.config.ts --project=mock --grep trainer can be replaced
+|trainer settlement
+
+Running 3 tests using 1 worker
+
+(node:25440) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [mock] › frontend\e2e\lesson-payments.spec.ts:202:1 › trainer can be replaced inside cash payment before receipt is posted (4.2s)
+  ok 2 [mock] › frontend\e2e\lesson-payments.spec.ts:233:34 › trainer settlement replacement and payment lock at 1440px (4.7s)
+  ok 3 [mock] › frontend\e2e\lesson-payments.spec.ts:233:34 › trainer settlement replacement and payment lock at 390px (4.0s)
+
+  3 passed (14.8s)

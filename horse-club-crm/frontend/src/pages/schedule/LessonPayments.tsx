@@ -1,3 +1,4 @@
+import { LessonTrainerField } from './LessonTrainerField'
 import { isUuid } from '../../uuid'
 import { useRef, useState } from 'react'
 import { Alert, App, Button, Descriptions, Form, InputNumber, Modal, Radio, Space, Tag, Typography } from 'antd'
@@ -70,9 +71,11 @@ export function LessonPriceFields({ price, perPerson = false }: { price?: number
   </>
 }
 
-export function CompleteLessonModal({ lesson, onClose, onSaved }: { lesson: Lesson; onClose: () => void; onSaved: (lesson: Lesson) => void }) {
+export function CompleteLessonModal({ lesson, onClose, onSaved }: { lesson: Lesson; onClose: (lesson: Lesson) => void; onSaved: (lesson: Lesson) => void }) {
   const modules = usePermissions()
   const { message } = App.useApp()
+  const [currentLesson, setCurrentLesson] = useState(lesson)
+  const [trainerBusy, setTrainerBusy] = useState(false)
   const [method, setMethod] = useState<'CASH' | 'CARD' | 'DEBT'>('DEBT')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -81,7 +84,7 @@ export function CompleteLessonModal({ lesson, onClose, onSaved }: { lesson: Less
   const oneOff = lesson.bookings.some(b => !b.membership)
   const canPay = !modules.isEnabled('CASHBOX') || modules.canWrite('CASHBOX')
   async function save() {
-    if (busyRef.current || !modules.canWrite('SCHEDULE')) return
+    if (busyRef.current || trainerBusy || !modules.canWrite('SCHEDULE')) return
     if (!isUuid(lesson.id)) { setError('Некорректный идентификатор занятия'); return }
     busyRef.current = true; setBusy(true); setError(undefined)
     try {
@@ -96,9 +99,10 @@ export function CompleteLessonModal({ lesson, onClose, onSaved }: { lesson: Less
     finally { busyRef.current = false; setBusy(false) }
   }
   return <Modal open title="Занятие состоялось" okText="Завершить занятие" cancelText="Отмена" confirmLoading={busy}
-    okButtonProps={{ disabled: !modules.canWrite('SCHEDULE') }} cancelButtonProps={{ disabled: busy }} closable={!busy} maskClosable={!busy} keyboard={!busy}
-    onCancel={() => { if (!busy) onClose() }} onOk={() => void save()}>
+    okButtonProps={{ disabled: trainerBusy || !modules.canWrite('SCHEDULE') }} cancelButtonProps={{ disabled: busy || trainerBusy }} closable={!busy && !trainerBusy} maskClosable={!busy && !trainerBusy} keyboard={!busy && !trainerBusy}
+    onCancel={() => { if (!busy && !trainerBusy) onClose(currentLesson) }} onOk={() => void save()}>
     {error && <Alert type="error" showIcon message={error} />}
+    <LessonTrainerField lesson={currentLesson} disabled={busy} onSaved={setCurrentLesson} onBusyChange={setTrainerBusy} />
     {oneOff ? <>
       <LessonGroupSummary lesson={lesson} />
       <Descriptions column={1} items={[

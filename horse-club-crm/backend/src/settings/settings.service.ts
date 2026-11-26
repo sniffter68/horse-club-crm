@@ -3,12 +3,23 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { UpdateClubScheduleDto } from './dto/update-club-schedule.dto';
 import { scheduleWeekDays } from './club-schedule';
 import type { UpdateNotificationsDto } from './dto/update-notifications.dto';
+import type { UpdateStallRiskDto } from './dto/update-stall-risk.dto';
 
 const SCHEDULE_ID = 1;
 
 @Injectable()
 export class SettingsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  getStallRisk() {
+    return this.prisma.clubSchedule.upsert({ where: { id: 1 }, create: { id: 1 }, update: {},
+      select: { stallRiskAdjacent: true, stallRiskOpposite: true } });
+  }
+
+  updateStallRisk(dto: UpdateStallRiskDto) {
+    return this.prisma.clubSchedule.upsert({ where: { id: 1 }, create: { id: 1, ...dto }, update: dto,
+      select: { stallRiskAdjacent: true, stallRiskOpposite: true } });
+  }
 
   async getSchedule() {
     const schedule = await this.prisma.clubSchedule.upsert({

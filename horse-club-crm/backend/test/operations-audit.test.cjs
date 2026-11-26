@@ -82,7 +82,7 @@ test('assignment releases previous stall before occupying a new one in Serializa
         assert.equal(stalls.filter(s => s.horseId === data.horseId).length, 0);
         Object.assign(stalls.find(s => s.id === where.id), data);
       } } };
-  const service = new StallsService({ $transaction: async (work, options) => { assert.equal(options.isolationLevel, 'Serializable'); return work(tx); },
+  const service = new StallsService({ clubSchedule: { findUnique: async () => null }, $transaction: async (work, options) => { assert.equal(options.isolationLevel, 'Serializable'); return work(tx); },
     stall: { findUnique: async () => stalls[1], findMany: async () => stalls } });
   await service.assign('s2', 'h');
   assert.equal(stalls.filter(s => s.horseId === 'h').length, 1);

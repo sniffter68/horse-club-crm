@@ -34,7 +34,7 @@ function fixture(extra = {}, contracts = []) {
       try { return await fn(db); } catch (error) { Object.assign(state, before); throw error; }
     },
   };
-  return { db, state, service: new StallsService(db) };
+  return { db, state, service: new StallsService(Object.assign(db, { clubSchedule: { findUnique: async () => ({ stallRiskAdjacent: true, stallRiskOpposite: true }) } })) };
 }
 test('rename ignores unchanged legacy grid, normalizes labels, synchronizes occupied horse and audits', async () => {
   const { service, state } = fixture({ horseId: id, status: 'OCCUPIED' });

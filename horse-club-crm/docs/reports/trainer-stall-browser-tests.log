@@ -1,0 +1,21 @@
+npx.cmd : npm notice run frontend@0.0.0 npx
+строка:2 знак:1
++ npx.cmd playwright test --config playwright.crm.config.ts --project=m ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm notice run frontend@0.0.0 npx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm notice run playwright test --config playwright.crm.config.ts --project=mock --grep trainer can be replaced|trainer 
+settlement|stall risk toggles
+
+Running 5 tests using 1 worker
+
+(node:50120) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [mock] › e2e\lesson-payments.spec.ts:202:1 › trainer can be replaced inside cash payment before receipt is posted (4.5s)
+  ok 2 [mock] › e2e\lesson-payments.spec.ts:234:34 › trainer settlement replacement and payment lock at 1440px (3.1s)
+  ok 3 [mock] › e2e\lesson-payments.spec.ts:234:34 › trainer settlement replacement and payment lock at 390px (4.8s)
+  ok 4 [mock] › e2e\stall-map.spec.ts:65:34 › stall risk toggles persist and recalculate across aisle at 1440px (2.9s)
+  ok 5 [mock] › e2e\stall-map.spec.ts:65:34 › stall risk toggles persist and recalculate across aisle at 390px (2.8s)
+
+  5 passed (20.0s)

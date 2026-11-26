@@ -61,7 +61,7 @@ test('buildings CRUD, service-free counts, occupied deletion and shrink protecti
 });
 test('batch layout validates final state, swaps coordinates and never partly saves invalid changes', async () => {
   const db = database([block('a', 1, 1), block('b', 1, 4), block('untouched', 3, 1)]);
-  const service = new StallsService(db);
+  const service = new StallsService(Object.assign(db, { clubSchedule: { findUnique: async () => ({ stallRiskAdjacent: true, stallRiskOpposite: true }) } }));
   await service.saveLayout([block('a', 1, 4), block('b', 1, 1)], { id: 'actor', email: 'qa@test' });
   assert.equal(db.state.stalls[0].col, 4);
   const before = structuredClone(db.state.stalls);
@@ -73,7 +73,7 @@ test('batch layout validates final state, swaps coordinates and never partly sav
 });
 test('individual stall create and update validate bounds and collisions inside transactions', async () => {
   const db = database([block('a', 1, 1, { type: 'STALL', number: '1', status: 'AVAILABLE', horseId: null })]);
-  const service = new StallsService(db);
+  const service = new StallsService(Object.assign(db, { clubSchedule: { findUnique: async () => ({ stallRiskAdjacent: true, stallRiskOpposite: true }) } }));
   await assert.rejects(service.create({ number: '2', ...block('ignored', 1, 1) }), /пересекается/);
   await assert.rejects(service.update('a', { col: 4, colSpan: 2 }), /границы/);
   await service.create({ number: '2', buildingId: 'b1', row: 1, col: 2 });
@@ -107,7 +107,7 @@ test('building and layout HTTP APIs enforce UUID/DTO validation and FULL, READ_O
   const db = database([block(sid, 1, 1, { buildingId: id })]); db.state.buildings[0].id = id;
   const module = await Test.createTestingModule({ controllers: [StableBuildingsController, StallsController], providers: [
     RolesGuard, { provide: StableBuildingsService, useValue: new StableBuildingsService(db) },
-    { provide: StallsService, useValue: new StallsService(db) },
+    { provide: StallsService, useValue: new StallsService(Object.assign(db, { clubSchedule: { findUnique: async () => ({ stallRiskAdjacent: true, stallRiskOpposite: true }) } })) },
     { provide: ModuleAccessService, useValue: { forRole: async role => [{ module: 'STABLES', isEnabled: true, accessLevel: role === 'MANAGER' ? 'READ_ONLY' : role === 'STABLE_WORKER' ? 'HIDDEN' : 'FULL' }] } },
   ] }).overrideGuard(JwtAuthGuard).useValue({ canActivate(context) { const req = context.switchToHttp().getRequest(); req.user = { id: sid, role: req.headers['x-role'] }; return true; } })
     .overrideGuard(RoleAccessGuard).useValue({ canActivate: () => true }).compile();

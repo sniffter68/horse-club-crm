@@ -1,4 +1,5 @@
 import { CancelServiceDto } from '../payments/dto/cancel-service.dto';
+import { ChangeTrainerDto } from './dto/change-trainer.dto';
 import { TrainerTmaRescheduleDto, TrainerTmaRescheduleQuery, TrainerTmaStatusDto } from '../modules/telegram-bot/trainer-tma.dto';
 import { TrainerStatusDto } from '../workspace/workspace.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -168,6 +169,12 @@ export class LessonsController {
   @Roles(Role.ADMIN, Role.MANAGER)
   reschedule(@Param('id', new ParseUUIDPipe()) lessonId: string, @Body() dto: RescheduleLessonDto, @CurrentUser() actor: AuthUser): Promise<LessonDetails> {
     return this.lessonsService.rescheduleLesson(lessonId, dto.startTime, dto.durationMinutes, dto.trainerId, dto.arenaId, actor);
+  }
+
+  @Patch(':id/trainer')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  changeTrainer(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: ChangeTrainerDto, @CurrentUser() actor: AuthUser) {
+    return this.lessonsService.changeTrainer(id, dto.trainerId, actor);
   }
 
   @Get(':id')
