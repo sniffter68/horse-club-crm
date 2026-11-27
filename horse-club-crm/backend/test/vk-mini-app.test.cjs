@@ -248,3 +248,57 @@ test('VK HTTP role routing, scoped Bearer sessions, CORS, RBAC and live revocati
     } finally { await app.close(); }
   }
 });
+
+const { requestLimits } = require('../dist/common/request-limits');
+
+test('VK bootstrap limiter resets after one minute and keeps other auth limits isolated', () => {
+  const originalNow = Date.now;
+  let now = 1_000_000;
+  Date.now = () => now;
+  try {
+    const run = requestLimits();
+    const req = { path: '/api/auth/vk-mini-app', method: 'POST', ip: '127.0.0.1', socket: {}, headers: {} };
+    function hit(path = req.path) {
+      let status = 200;
+      const headers = {};
+      const res = { setHeader(k, v) { headers[k] = v; }, status(code) { status = code; return this; }, json() {} };
+      run({ ...req, path }, res, () => {});
+      return { status, headers };
+    }
+    for (let i = 0; i < 30; i++) assert.equal(hit().status, 200);
+    assert.equal(hit().status, 429);
+    assert.equal(hit().headers['Retry-After'], '60');
+    for (let i = 0; i < 10; i++) assert.equal(hit('/api/auth/login').status, 200);
+    assert.equal(hit('/api/auth/login').status, 429);
+    assert.equal(hit('/api/auth/vk-mini-app/link-by-vk').status, 429);
+    assert.equal(hit('/api/demo/login').status, 429);
+    now += 59_999;
+    assert.equal(hit().status, 429);
+    now += 1;
+    assert.equal(hit().status, 200);
+    assert.equal(hit('/api/auth/login').status, 429);
+  } finally { Date.now = originalNow; }
+});
+
+test('HTTP VK bootstrap permits 30 requests and rejects the 31st with 429', async () => {
+  process.env.VK_MINI_APP_SECRET = secret;
+  process.env.VK_MINI_APP_ID = '54927434';
+  const service = new VkMiniAppService({ user: { findFirst: async () => null }, client: { findFirst: async () => null } }, {}, {});
+  const module = await Test.createTestingModule({ controllers: [VkMiniAppController], providers: [{ provide: VkMiniAppService, useValue: service }] }).compile();
+  const app = module.createNestApplication();
+  app.setGlobalPrefix('api');
+  app.use(requestLimits());
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
+  await app.init();
+  try {
+    const api = request(app.getHttpServer());
+    const body = { launchParams: launch() };
+    for (let i = 0; i < 30; i++) {
+      await api.post('/api/auth/vk-mini-app').send(body).expect(200, { status: 'UNLINKED', vkUserId: '123' });
+    }
+    const blocked = await api.post('/api/auth/vk-mini-app').send(body).expect(429);
+    assert.equal(blocked.body.statusCode, 429);
+    assert.ok(Number(blocked.headers['retry-after']) > 0);
+    assert.ok(Number(blocked.headers['retry-after']) <= 60);
+  } finally { await app.close(); }
+});

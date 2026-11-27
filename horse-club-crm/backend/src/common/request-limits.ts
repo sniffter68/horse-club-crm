@@ -22,11 +22,12 @@ export function requestLimits() {
       sweepAt = now + 60_000;
     }
     const path = req.path.replace(/\/+$/, '').toLowerCase();
+    const vkBootstrap = path === '/api/auth/vk-mini-app' && req.method === 'POST';
     const login = path === '/api/auth/login' || path.startsWith('/api/auth/vk-mini-app') || path === '/api/demo/login';
     const lead = path === '/api/leads' && req.method === 'POST';
-    const limit = login ? 10 : lead ? 5 : 300;
-    const duration = login || lead ? 15 * 60_000 : 60_000;
-    const key = `${login ? 'login' : lead ? 'lead' : 'api'}:${req.ip ?? req.socket.remoteAddress}`;
+    const limit = vkBootstrap ? 30 : login ? 10 : lead ? 5 : 300;
+    const duration = vkBootstrap ? 60_000 : login || lead ? 15 * 60_000 : 60_000;
+    const key = `${vkBootstrap ? 'vk-bootstrap' : login ? 'login' : lead ? 'lead' : 'api'}:${req.ip ?? req.socket.remoteAddress}`;
     const bucket = buckets.get(key);
     if ((!bucket && buckets.size >= 10_000) || (bucket && bucket.until > now && bucket.count >= limit)) {
       res.setHeader('Retry-After', String(Math.max(1, Math.ceil(((bucket?.until ?? now + duration) - now) / 1000))));
