@@ -2,7 +2,13 @@
 
 URL запуска: https://horseclub68.ru/vk-app/
 
-На сервере задайте VK_MINI_APP_ID=6781503 и VK_MINI_APP_SECRET (защищённый ключ приложения VK). Пересоберите backend и tma, перезапустите backend и Caddy. docker-compose.prod.yml передаёт обе переменные. Миграция Prisma не нужна.
+На сервере задайте VK_MINI_APP_ID=6781503 и VK_MINI_APP_SECRET (защищённый ключ приложения VK). Пересоберите backend, frontend и tma (именно в этом порядке), перезапустите backend и Caddy. `frontend build` также собирает кабинет персонала в `frontend/dist/vk-app/staff/`; `tma build` сохраняет его, обновляя только `dist/tma/`. docker-compose.prod.yml передаёт обе переменные. Миграция Prisma не нужна.
+
+После входа и после `link-by-vk` клиент сразу видит кабинет всадника, тренер — своё расписание с отметкой посещаемости, администратор/менеджер — расписание клуба. Используется тот же `TrainerScheduleView`, что и в Telegram. VK остаётся на `horseclub68.ru/vk-app/` (персонал — `/vk-app/staff/`): переходов на внешний сайт, кнопки «Открыть CRM» и заглушки нет. Caddy обслуживает отдельную сборку персонала с VK CSP на этом же origin.
+
+Ответ LINKED сохраняет `role` и `access_token` для совместимости. `token` — токен сессии Mini App; сотрудникам также возвращаются `miniAppRole` (`ADMIN`, `TRAINER`, `STAFF`), `trainerId`, `user: { id, name, ... }`, `accessLevel`. Адаптер приводит роль VK к общему BootstrapResponse; MANAGER и другие сотрудники используют STAFF и существующие настройки SCHEDULE. Роль TRAINER требует активной карточки тренера. Для сотрудников `token` имеет audience=trainer-tma, tokenType=trainer-tma, vkUserId и authVersion. CRM `access_token` сохраняется отдельно и не принимается на scoped TMA endpoints. Каждый запрос проверяет актуальную VK-привязку, crmAccess, активность и tokenVersion, затем RBAC. Клиент получает token=access_token с audience=client-tma.
+
+Клиентский и рабочий API-транспорт на horseclub68.ru обращаются к https://crm.horseclub68.ru/api с `Authorization: Bearer <token>`. Вход и клиентский транспорт также используют `credentials: include`; рабочий транспорт использует Bearer с `credentials: omit`. Авторизация работает при отсутствии cookies. CORS разрешает origin horseclub68.ru и заголовок Authorization. При загрузке отдельного рабочего bundle повторно проверяются исходные launchParams; JWT не попадает в URL или browser storage. Ошибка входа остаётся inline с повтором; истёкшая рабочая сессия предлагает повторить вход через VK.
 
 POST /api/auth/vk-mini-app принимает launchParams (исходную строку query). Проверяются HMAC-SHA256/base64url, уникальность параметров, App ID, числовой user ID и vk_ts (24 часа, затем требуется повторный запуск). Параметры launch не сохраняются. JWT клиента ограничен audience client-tma; каждая операция проверяет актуальную привязку и отсутствие архива. JWT сотрудников использует существующий tokenVersion и CRM RBAC. Сотрудникам выдаётся cookie CRM при запросе на crm.horseclub68.ru.
 

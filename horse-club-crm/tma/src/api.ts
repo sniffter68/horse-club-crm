@@ -13,9 +13,11 @@ export interface MyBookingsResponse { bookings: Booking[]; hasMore: boolean; mem
 export interface ClientOverview { client: { id: string; name: string; firstName: string; lastName: string; phone: string | null }; membership: Membership | null; bookings: Booking[] }
 let sessionToken: string | null = null;
 export function setClientSession(token: string | null): void { sessionToken = token; }
+export const apiOrigin = (): string => window.location.hostname === 'horseclub68.ru' ? 'https://crm.horseclub68.ru' : '';
 export interface ClientDashboard { client?: ClientOverview['client']; bookings?: Booking[]; isEstablished: boolean; membership: Membership | null; nextBooking: Booking | null }
 export type BootstrapResponse = { role: 'CLIENT'; token: string | null; clientId: string | null; clientName: string | null;
-  activeMembership: Membership | null; nextLesson: Booking | null } | { role: 'UNLINKED_CLIENT'; needsPhoneLink: true; vkUserId?: string } | { role: 'ADMIN' | 'TRAINER' | 'STAFF' };
+  activeMembership: Membership | null; nextLesson: Booking | null } | { role: 'UNLINKED_CLIENT'; needsPhoneLink: true; vkUserId?: string }
+  | { role: 'ADMIN' | 'TRAINER' | 'STAFF'; token: string; trainerId: string | null; accessLevel: 'FULL' | 'READ_ONLY'; user: { id: string; name: string } };
 export interface Booking {
   id: string; canCancel?: boolean; canConfirm?: boolean; canReschedule?: boolean; horse?: { name: string } | null; startTime: string; endTime: string; status: string; clientConfirmed: boolean;
   clientCancellationRequested: boolean; costAmount: string; trainer?: { name?: string } | null;
@@ -33,7 +35,7 @@ let renewal: Promise<BootstrapResponse> | undefined;
 async function request<T>(path: string, options: RequestInit, retry: boolean): Promise<T> {
   const initData = telegram()?.initData;
   if (!initData && !sessionToken) throw telegramRequiredError();
-  const response = await fetch(`/api/tma/${path}`, { ...options, credentials: 'omit', cache: 'no-store',
+  const response = await fetch(`${apiOrigin()}/api/tma/${path}`, { ...options, credentials: 'include', cache: 'no-store',
     signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
     headers: { 'Content-Type': 'application/json', ...options.headers, Authorization: sessionToken && path !== 'bootstrap' ? `Bearer ${sessionToken}` : `tma ${initData}`, ...(initData ? { 'X-Telegram-Init-Data': initData } : {}) } });
   if (response.status === 401 && initData && path !== 'bootstrap' && retry) {

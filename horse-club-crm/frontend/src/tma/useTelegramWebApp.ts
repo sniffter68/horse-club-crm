@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { tmaRequest, type TmaBootstrapResponse, type TrainerSession } from './api'
+import { isVkMiniApp, vkStaffBootstrap } from './vkSession'
 
 export interface TelegramWebApp {
   safeAreaInset?: { top: number; bottom: number; left: number; right: number }
@@ -42,6 +43,13 @@ export function useTelegramWebApp() {
     let disposeTheme: (() => void) | undefined
     void (async () => {
       try {
+        if (isVkMiniApp()) {
+          const result = await vkStaffBootstrap(controller.signal)
+          if (controller.signal.aborted || result.role === 'CLIENT' || result.role === 'UNLINKED_CLIENT') return
+          setState({ kind: 'ready', session: { authenticated: true, role: result.role, access_token: result.token,
+            accessLevel: result.accessLevel, trainer: { trainerId: result.trainerId ?? '', name: result.user.name } } })
+          return
+        }
         await loadTelegramSdk()
         if (controller.signal.aborted) return
         const app = window.Telegram?.WebApp
@@ -107,6 +115,6 @@ export function useTelegramWebApp() {
     return () => { controller.abort(); disposeTheme?.() }
   }, [attempt])
   const retry = useCallback(() => { setState({ kind: 'loading' }); setAttempt(value => value + 1) }, [])
-  const expire = useCallback(() => setState({ kind: 'error', message: 'Сессия истекла. Откройте приложение заново через бота' }), [])
+  const expire = useCallback(() => setState({ kind: 'error', message: isVkMiniApp() ? 'Сессия истекла. Повторите вход через VK' : 'Сессия истекла. Откройте приложение заново через бота' }), [])
   return { state, dark, retry, expire }
 }

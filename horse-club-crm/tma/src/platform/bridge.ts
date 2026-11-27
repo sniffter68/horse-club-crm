@@ -1,6 +1,6 @@
 import vkBridge from '@vkontakte/vk-bridge';
 import { waitForTelegram, telegramRequiredError } from '../telegram';
-import type { BootstrapResponse } from '../api';
+import { apiOrigin, type BootstrapResponse } from '../api';
 
 export const isVk = (): boolean => {
   const params = new URLSearchParams(window.location.search);
@@ -24,7 +24,7 @@ export async function initPlatform(): Promise<void> {
     setTimeout(() => reject(new Error('Откройте приложение через VK')), 10000);
   })]);
 }
-type VkResult = { status: 'UNLINKED'; vkUserId: string } | { status: 'LINKED'; role: 'CLIENT' | 'ADMIN' | 'TRAINER' | 'MANAGER' | 'STABLE_WORKER' | 'GROOM' | 'VET' | 'OTHER'; access_token: string; clientId?: string };
+type VkResult = { status: 'UNLINKED'; vkUserId: string } | { status: 'LINKED'; role: 'CLIENT' | 'ADMIN' | 'TRAINER' | 'MANAGER' | 'STABLE_WORKER' | 'GROOM' | 'VET' | 'OTHER'; access_token: string; token: string; clientId?: string; trainerId: string | null; accessLevel: 'FULL' | 'READ_ONLY'; user: { id: string; name: string } };
 export async function copyVkId(vkUserId: string): Promise<void> {
   await vkBridge.send('VKWebAppCopyText', { text: vkUserId });
 }
@@ -37,7 +37,7 @@ export async function linkVkPhone(): Promise<BootstrapResponse> {
 }
 
 export async function vkAuthenticate(contact?: { phone: string; phoneToken: string }): Promise<BootstrapResponse> {
-  const origin = window.location.hostname === 'horseclub68.ru' ? 'https://crm.horseclub68.ru' : '';
+  const origin = apiOrigin();
   const response = await fetch(`${origin}/api/auth/vk-mini-app${contact ? '/link-by-vk' : ''}`, {
     method: 'POST', credentials: 'include', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ launchParams: window.location.search, ...contact }),
@@ -51,9 +51,10 @@ export async function vkAuthenticate(contact?: { phone: string; phoneToken: stri
   const result = await response.json() as VkResult;
   if (result.status === 'UNLINKED') return { role: 'UNLINKED_CLIENT', needsPhoneLink: true, vkUserId: result.vkUserId };
   if (result.role !== 'CLIENT') {
-    return { role: result.role === 'ADMIN' || result.role === 'TRAINER' ? result.role : 'STAFF' };
+    return { role: result.role === 'ADMIN' || result.role === 'TRAINER' ? result.role : 'STAFF',
+      token: result.token, trainerId: result.trainerId, accessLevel: result.accessLevel, user: result.user };
   }
-  return { role: 'CLIENT', token: result.access_token, clientId: result.clientId ?? null, clientName: null, activeMembership: null, nextLesson: null };
+  return { role: 'CLIENT', token: result.token ?? result.access_token, clientId: result.clientId ?? null, clientName: null, activeMembership: null, nextLesson: null };
 }
 export async function bootstrapPlatform(signal: AbortSignal, telegramBootstrap: (initData: string) => Promise<BootstrapResponse>): Promise<BootstrapResponse> {
   if (isVk()) { await initPlatform(); signal.throwIfAborted(); return vkAuthenticate(); }

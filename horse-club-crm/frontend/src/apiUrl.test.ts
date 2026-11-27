@@ -1,9 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getApiBaseUrl, getMediaUrl } from './apiUrl'
 
-afterEach(() => vi.unstubAllEnvs())
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
 
 describe('API URLs', () => {
+  it('uses the CRM origin for VK staff and keeps the web proxy elsewhere', () => {
+    vi.stubEnv('VITE_API_URL', '')
+    vi.stubGlobal('window', { location: { hostname: 'horseclub68.ru', pathname: '/vk-app/staff/' } })
+    expect(getApiBaseUrl()).toBe('https://crm.horseclub68.ru/api')
+    vi.stubGlobal('window', { location: { hostname: 'crm.horseclub68.ru', pathname: '/tma/trainer' } })
+    expect(getApiBaseUrl()).toBe('/api')
+  })
   it.each([undefined, '', '   '])('uses the web proxy for %s', value => {
     vi.stubEnv('VITE_API_URL', value)
     expect(getApiBaseUrl()).toBe('/api')

@@ -8,6 +8,7 @@ import { isUuid } from '../uuid'
 import { TmaApiError, tmaRequest, type LessonStatus, type TmaHorse, type TrainerLesson, type TrainerSession } from './api'
 import { tmaDay, tmaTime, tmaWeek } from './dates'
 import { useTelegramWebApp } from './useTelegramWebApp'
+import { isVkMiniApp } from './vkSession'
 import './trainer.css'
 import { TrainerBoardView } from '../pages/workspace/TrainerBoard'
 
@@ -35,7 +36,7 @@ export function TrainerScheduleView() {
         <img src="/horse-crm.svg" alt="КСК «СЛКС»" width={64} height={64} />
         <p className="trainer-eyebrow">HORSE CLUB · КСК «СЛКС»</p>
         <h1>Кабинет клуба</h1>
-        {state.kind === 'loading' ? <div role="status"><Spin aria-label="Вход через Telegram" /><p>Проверяем доступ…</p></div> : <>
+        {state.kind === 'loading' ? <div role="status"><Spin aria-label={isVkMiniApp() ? 'Вход через VK' : 'Вход через Telegram'} /><p>Проверяем доступ…</p></div> : <>
           <Alert showIcon type={state.kind === 'error' ? 'error' : 'info'} message={state.kind === 'not-linked'
             ? 'Telegram пока не привязан' : state.kind === 'outside' ? 'Откройте приложение в Telegram' : 'Не удалось войти'}
           description={state.kind === 'not-linked' ? 'Попросите администратора привязать ваш Telegram к учётной записи сотрудника и карточке тренера.'

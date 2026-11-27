@@ -49,7 +49,7 @@ async function advance(page: Page) {
 }
 
 for (const role of ['ADMIN', 'TRAINER', 'STAFF'] as const) {
-  test(`${role} redirects to staff Mini App with Telegram launch parameters`, async ({ page }) => {
+  test(`${role} redirects to staff Mini App with Telegram launch parameters`, async ({ page, baseURL }) => {
     await setup(page);
     await page.route('**/api/tma/bootstrap', route => route.fulfill({ json: { role } }));
     await page.route('**/tma/trainer?**', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: '<h1>Кабинет персонала</h1>' }));
@@ -59,7 +59,7 @@ for (const role of ['ADMIN', 'TRAINER', 'STAFF'] as const) {
     });
     const launch = '?tgWebAppStartParam=schedule#tgWebAppData=signed-data-test&tgWebAppVersion=8.0';
     await page.goto(`/tma/${launch}`);
-    await expect(page).toHaveURL(`http://127.0.0.1:5175/tma/trainer${launch}`);
+    await expect(page).toHaveURL(new URL(`/tma/trainer${launch}`, baseURL).href);
     await expect(page.getByRole('heading', { name: 'Кабинет персонала' })).toBeVisible();
     expect(clientRequests).toEqual([]);
   });

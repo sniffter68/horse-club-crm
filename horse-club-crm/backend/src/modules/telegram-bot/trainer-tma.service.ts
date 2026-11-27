@@ -24,7 +24,7 @@ export type TmaBootstrapResponse =
   | { role: TmaRole.ADMIN | TmaRole.STAFF; token: string; trainerId: string | null; user: { id: string; name: string }; accessLevel: 'FULL' | 'READ_ONLY' };
 
 export const TRAINER_TMA_AUDIENCE = 'trainer-tma';
-export interface TrainerTmaActor extends AuthUser { telegramUserId: string; trainerId: string | null }
+export interface TrainerTmaActor extends AuthUser { telegramUserId?: string; vkUserId?: string; trainerId: string | null }
 
 @Injectable()
 export class TrainerTmaService {
@@ -88,6 +88,17 @@ export class TrainerTmaService {
     let payload: unknown;
     try { payload = await this.jwt.verifyAsync<object>(token, { audience: TRAINER_TMA_AUDIENCE, algorithms: ['HS256'] }); }
     catch { throw new UnauthorizedException('Сессия истекла. Откройте приложение заново'); }
+    // VK uses the same scoped Mini App endpoints, with its own live identity binding.
+    if (payload && typeof payload === 'object' && 'tokenType' in payload && payload.tokenType === 'trainer-tma'
+      && 'vkUserId' in payload && typeof payload.vkUserId === 'string' && /^[1-9]\d{0,15}$/.test(payload.vkUserId)
+      && 'sub' in payload && 'authVersion' in payload) {
+      const vkUserId = payload.vkUserId;
+      const user = await this.prisma.user.findFirst({ where: { OR: [{ vkUserId: BigInt(vkUserId) }, { vkId: vkUserId }, { trainer: { vkId: BigInt(vkUserId) } }] }, include: { trainer: true, staffProfile: true } });
+      if (!user || user.id !== payload.sub || !user.crmAccess || String(user.tokenVersion) !== payload.authVersion
+        || user.staffProfile?.isActive === false || user.trainer?.isActive === false
+        || (user.role === Role.TRAINER && (!user.trainerId || !user.trainer?.isActive))) throw new UnauthorizedException('Сессия отозвана');
+      return { id: user.id, email: user.email, role: user.role, trainerId: user.trainer?.isActive ? user.trainerId : null, vkUserId };
+    }
     if (!payload || typeof payload !== 'object' || !('tokenType' in payload) || payload.tokenType !== 'trainer-tma'
       || !('telegramUserId' in payload) || typeof payload.telegramUserId !== 'string'
       || !('sub' in payload) || !('authVersion' in payload)) throw new UnauthorizedException('Недействительная сессия');

@@ -5,6 +5,7 @@ require('reflect-metadata');
 const { verifyVkLaunchParams, VkMiniAppService } = require('../dist/auth/vk-mini-app.service');
 const { VkMiniAppController } = require('../dist/auth/vk-mini-app.controller');
 const secret = 'test-mini-app-secret';
+const access = { forRole: async () => [{ module: 'SCHEDULE', isEnabled: true, accessLevel: 'FULL' }] };
 function launch(extra = {}) {
   const params = new URLSearchParams({ vk_user_id: '123', vk_ts: String(Math.floor(Date.now()/1000)), vk_app_id: '6781503', ...extra });
   const sorted = new URLSearchParams([...params.entries()].sort(([a], [b]) => a < b ? -1 : 1));
@@ -45,7 +46,8 @@ function phoneToken(phone, userId = '123') {
   return crypto.createHash('sha256').update(`6781503${secret}${userId}phone_number${phone}`).digest('base64url');
 }
 
-function linkingFixture({ matches = [{ kind: 'CLIENT', id: 'client' }], clientOverrides = {}, userOverrides = {}, occupied = false } = {}) {
+function linkingFixture({ matches = [{ kind: 'CLIENT', id: 'client' }], clientOverrides = {}, userOverrides = {}, occupied = false,
+  jwt = { signAsync: async () => 'token' }, permissions = access } = {}) {
   process.env.VK_MINI_APP_SECRET = secret;
   process.env.VK_MINI_APP_ID = '6781503';
   const client = { id: 'client', phone: '+79991234567', deletedAt: null, vkId: null, vkUserId: null, ...clientOverrides };
@@ -65,8 +67,8 @@ function linkingFixture({ matches = [{ kind: 'CLIENT', id: 'client' }], clientOv
     assert.equal(options.isolationLevel, 'Serializable'); return work(tx);
   }, client: { ...tx.client, findFirst: async () => client.vkUserId === 123n ? client : null },
   user: { ...tx.user, findFirst: async () => user.vkUserId === 123n ? user : null } };
-  const service = new VkMiniAppService(prisma, { signAsync: async () => 'token' });
-  return { service, get writes() { return writes; }, get query() { return query; }, client, user };
+  const service = new VkMiniAppService(prisma, jwt, permissions);
+  return { service, prisma, get writes() { return writes; }, get query() { return query; }, client, user };
 }
 
 test('native signed phone links a client without a code, normalizes RU variants and preserves bot fields', async () => {
@@ -129,7 +131,7 @@ test('login finds legacy bot and CRM identities using both normalized VK fields'
         return staff ? { id: 'staff', role: 'MANAGER', crmAccess: true, tokenVersion: 1 } : null;
       } },
       client: { findFirst: async ({ where }) => { assert.deepEqual(where.OR, [{ vkUserId: 123n }, { vkId: '123' }]); return { id: 'client' }; } },
-    }, { signAsync: async () => 'token' });
+    }, { signAsync: async () => 'token' }, access);
     assert.equal((await service.login(launch())).status, 'LINKED');
   }
 });
@@ -170,4 +172,79 @@ test('HTTP native phone link returns an immediate session without a code', async
     assert.equal(result.body.role, 'CLIENT');
     assert.equal(result.headers['cache-control'], 'no-store');
   } finally { await app.close(); }
+});
+
+test('VK HTTP role routing, scoped Bearer sessions, CORS, RBAC and live revocation', async () => {
+  const { JwtService } = require('@nestjs/jwt');
+  const { TrainerTmaService } = require('../dist/modules/telegram-bot/trainer-tma.service');
+  const { TrainerTmaController, TrainerTmaGuard } = require('../dist/modules/telegram-bot/trainer-tma.controller');
+  const { ModuleAccessGuard } = require('../dist/auth/module-access.guard');
+  const { ModuleAccessService } = require('../dist/settings/module-access.service');
+  const { corsOptions } = require('../dist/common/trusted-origins');
+  const jwt = new JwtService({ secret: 'vk-test-secret-at-least-32-characters', signOptions: { algorithm: 'HS256' } });
+  for (const role of ['CLIENT', 'TRAINER', 'ADMIN', 'MANAGER']) {
+    let level = 'FULL', enabled = true;
+    const permissions = { forRole: async () => [{ module: 'SCHEDULE', isEnabled: enabled, accessLevel: level }] };
+    const fixture = linkingFixture({ matches: [{ kind: role === 'CLIENT' ? 'CLIENT' : 'STAFF', id: role === 'CLIENT' ? 'client' : 'user' }],
+      userOverrides: { role, trainerId: role === 'TRAINER' ? 'trainer' : null,
+        trainer: role === 'TRAINER' ? { isActive: true, vkId: null } : null }, jwt, permissions });
+    fixture.prisma.lesson = { findMany: async () => [], findUnique: async () => ({ id: 'lesson', trainerId: 'trainer', deletedAt: null }) };
+    let updates = 0;
+    const tma = new TrainerTmaService(fixture.prisma, jwt, permissions, { updateLessonStatus: async (...args) => {
+      assert.equal(args[3].vkUserId, '123'); assert.equal(args[5], undefined); updates++;
+    } }, {}, {});
+    const module = await Test.createTestingModule({ controllers: [VkMiniAppController, TrainerTmaController], providers: [
+      { provide: VkMiniAppService, useValue: fixture.service }, { provide: TrainerTmaService, useValue: tma },
+      { provide: ModuleAccessService, useValue: permissions }, TrainerTmaGuard, ModuleAccessGuard,
+    ] }).compile();
+    const app = module.createNestApplication({ logger: false });
+    app.setGlobalPrefix('api'); app.enableCors(corsOptions);
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    await app.init();
+    const api = request(app.getHttpServer());
+    try {
+      const linked = await api.post('/api/auth/vk-mini-app/link-by-vk').send({ launchParams: launch(), phone: '+79991234567', phoneToken: phoneToken('+79991234567') }).expect(200);
+      const login = await api.post('/api/auth/vk-mini-app').send({ launchParams: launch() }).expect(200);
+      for (const result of [linked, login]) {
+        assert.equal(result.body.role, role);
+        assert.ok(result.body.token);
+        const payload = jwt.decode(result.body.token);
+        assert.equal(payload.aud, role === 'CLIENT' ? 'client-tma' : 'trainer-tma');
+        assert.equal(payload.vkUserId, '123');
+        if (role !== 'CLIENT') {
+          assert.equal(result.body.miniAppRole, role === 'MANAGER' ? 'STAFF' : role);
+          assert.equal(result.body.accessLevel, 'FULL');
+          assert.ok(result.body.user.name);
+          assert.equal(result.body.trainerId, role === 'TRAINER' ? 'trainer' : null);
+        }
+      }
+      await api.options('/api/tma/schedule').set('Origin', 'https://horseclub68.ru')
+        .set('Access-Control-Request-Method', 'GET').set('Access-Control-Request-Headers', 'authorization,content-type')
+        .expect('Access-Control-Allow-Origin', 'https://horseclub68.ru').expect('Access-Control-Allow-Credentials', 'true').expect(204);
+      const token = login.body.token;
+      const schedule = role === 'TRAINER' ? 'schedule' : 'admin/schedule';
+      const read = () => api.get(`/api/tma/${schedule}?date=2026-11-27`).auth(token, { type: 'bearer' });
+      if (role === 'CLIENT') { await read().expect(401); continue; }
+      await read().expect(200, []);
+      // A CRM JWT is deliberately not accepted at the scoped Mini App endpoints.
+      await api.get(`/api/tma/${schedule}?date=2026-11-27`).auth(login.body.access_token, { type: 'bearer' }).expect(401);
+      const mutate = () => api.patch('/api/tma/lessons/11111111-1111-4111-8111-111111111111/status')
+        .auth(token, { type: 'bearer' }).send({ status: 'COMPLETED' });
+      if (role === 'TRAINER') {
+        await api.get('/api/tma/admin/schedule?date=2026-11-27').auth(token, { type: 'bearer' }).expect(403);
+        await mutate().expect(200); assert.equal(updates, 1);
+      }
+      if (role !== 'ADMIN') {
+        level = 'READ_ONLY'; await read().expect(200); await mutate().expect(403);
+        level = 'HIDDEN'; await read().expect(403);
+        await api.post('/api/auth/vk-mini-app').send({ launchParams: launch() }).expect(403);
+        level = 'FULL';
+      }
+      enabled = false; await read().expect(403); enabled = true;
+      fixture.user.tokenVersion++; await read().expect(401); fixture.user.tokenVersion--;
+      fixture.user.crmAccess = false; await read().expect(401); fixture.user.crmAccess = true;
+      fixture.user.staffProfile.isActive = false; await read().expect(401); fixture.user.staffProfile.isActive = true;
+      fixture.user.vkUserId = null; fixture.user.vkId = null; await read().expect(401);
+    } finally { await app.close(); }
+  }
 });

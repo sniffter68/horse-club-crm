@@ -19,6 +19,7 @@ function bridgeFixture({ denied = false, status = 200, result = { status: 'LINKE
         return { phone_number: '79991234567', sign: 'signed-phone' };
       } } };
       if (name === '../telegram') return {};
+      if (name === '../api') return { apiOrigin: () => 'https://crm.horseclub68.ru' };
       throw new Error(`Unexpected import: ${name}`);
     },
     window: { location: { hostname: 'horseclub68.ru', search: '?vk_user_id=123&sign=launch', pathname: '/vk-app/' } },
@@ -60,3 +61,18 @@ test('CRM error is shown and staff roles enter staff flow', async () => {
   assert.equal(staff.calls[1].method, 'VKWebAppCopyText');
   assert.equal(staff.calls[1].params.text, '123');
 });
+
+for (const role of ['CLIENT', 'TRAINER', 'ADMIN', 'MANAGER']) {
+  test(`VK ${role} login and native linking preserve the Mini App session`, async () => {
+    const fixture = bridgeFixture({ result: { status: 'LINKED', role, access_token: 'legacy-token', token: 'scoped-token',
+      clientId: 'client', trainerId: role === 'TRAINER' ? 'trainer' : null, accessLevel: 'READ_ONLY', user: { id: 'user', name: 'Имя' } } });
+    for (const result of [await fixture.bridge.vkAuthenticate(), await fixture.bridge.linkVkPhone()]) {
+      assert.equal(result.role, role === 'MANAGER' ? 'STAFF' : role);
+      assert.equal(result.token, 'scoped-token');
+      if (role !== 'CLIENT') {
+        assert.equal(result.accessLevel, 'READ_ONLY');
+        assert.equal(result.user.name, 'Имя');
+      }
+    }
+  });
+}

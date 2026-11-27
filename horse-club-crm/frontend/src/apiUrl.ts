@@ -1,7 +1,8 @@
 /** API root shared by REST, authentication, uploads and event streams. */
 export function getApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_URL?.trim()
-  if (!configured) return '/api'
+  if (!configured) return typeof window !== 'undefined' && window.location.hostname === 'horseclub68.ru' && window.location.pathname.startsWith('/vk-app/')
+    ? 'https://crm.horseclub68.ru/api' : '/api'
   const base = configured.replace(/\/+$/, '')
   if (base.startsWith('/') && !base.startsWith('//')) return base
   const url = new URL(base)

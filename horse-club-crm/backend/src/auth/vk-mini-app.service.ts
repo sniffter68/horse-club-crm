@@ -1,10 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { normalizePhone } from '../vk-bot/vk-link.service';
 import { VkIdentityService } from '../vk-bot/vk-identity.service';
+import { ModuleAccessService } from '../settings/module-access.service';
 
 export function verifyVkLaunchParams(input: string, secret: string, appId?: string): string {
   if (!secret) throw new ServiceUnavailableException('VK Mini App не настроено');
@@ -24,7 +25,8 @@ export function verifyVkLaunchParams(input: string, secret: string, appId?: stri
 
 @Injectable()
 export class VkMiniAppService {
-  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService) {}
+  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService,
+    private readonly access: ModuleAccessService) {}
 
   verify(launchParams: string): string {
     return verifyVkLaunchParams(launchParams, process.env.VK_MINI_APP_SECRET ?? '', process.env.VK_MINI_APP_ID);
@@ -35,14 +37,25 @@ export class VkMiniAppService {
     const user = await this.prisma.user.findFirst({ where: { OR: [{ vkUserId: BigInt(vkUserId) }, { vkId: vkUserId }, { trainer: { vkId: BigInt(vkUserId) } }] }, include: { staffProfile: true, trainer: true } });
     if (user) {
       if (!user.crmAccess || user.staffProfile?.isActive === false || user.trainer?.isActive === false) throw new UnauthorizedException('Доступ отключён');
-      return { status: 'LINKED' as const, role: user.role, user: { id: user.id, email: user.email, role: user.role },
+      if (user.role === 'TRAINER' && (!user.trainerId || !user.trainer?.isActive)) throw new ForbiddenException('Карточка тренера не привязана');
+      const permission = (await this.access.forRole(user.role)).find(row => row.module === 'SCHEDULE');
+      if (!permission?.isEnabled || permission.accessLevel === 'HIDDEN') throw new ForbiddenException('Расписание недоступно для вашей роли');
+      const token = await this.jwt.signAsync({ sub: user.id, tokenType: 'trainer-tma', vkUserId,
+        authVersion: String(user.tokenVersion) }, { audience: 'trainer-tma', expiresIn: '1h' });
+      return { status: 'LINKED' as const, role: user.role,
+        miniAppRole: user.role === 'ADMIN' ? 'ADMIN' as const : user.role === 'TRAINER' ? 'TRAINER' as const : 'STAFF' as const,
+        token, trainerId: user.trainer?.isActive ? user.trainerId : null,
+        accessLevel: user.role === 'ADMIN' ? 'FULL' as const : permission.accessLevel,
+        user: { id: user.id, email: user.email, role: user.role, name: user.staffProfile?.fullName || user.trainer?.name || user.trainer?.fullName || user.email },
         access_token: await this.jwt.signAsync({ sub: user.id, email: user.email, role: user.role, authVersion: String(user.tokenVersion) }) };
     }
     const client = await this.prisma.client.findFirst({ where: { OR: [{ vkUserId: BigInt(vkUserId) }, { vkId: vkUserId }] } });
     if (!client) return { status: 'UNLINKED' as const, vkUserId };
     if (client.deletedAt) throw new UnauthorizedException('Профиль в архиве');
-    return { status: 'LINKED' as const, role: 'CLIENT' as const, clientId: client.id,
-      user: { id: client.id, role: 'CLIENT' as const }, access_token: await this.jwt.signAsync({ sub: client.id, vkUserId, tokenType: 'vk-client-tma' }, { audience: 'client-tma', expiresIn: '1h' }) };
+    const token = await this.jwt.signAsync({ sub: client.id, vkUserId, tokenType: 'vk-client-tma' }, { audience: 'client-tma', expiresIn: '1h' });
+    return { status: 'LINKED' as const, role: 'CLIENT' as const, clientId: client.id, clientName: client.name,
+      token, activeMembership: null, nextLesson: null,
+      user: { id: client.id, role: 'CLIENT' as const }, access_token: token };
   }
 
   async linkByVk(launchParams: string, phone?: string, phoneToken?: string) {

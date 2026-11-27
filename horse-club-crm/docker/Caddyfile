@@ -84,10 +84,18 @@
 		header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors https://vk.com https://*.vk.com https://m.vk.com https://vk.ru https://*.vk.ru https://*.vk-apps.com; form-action 'self'; script-src 'self' https://telegram.org https://unpkg.com https://*.vk.com https://*.vk.ru; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://crm.horseclub68.ru"
 		redir /vk-app /vk-app/ 308
 		root * /var/www/crm-dist
-		uri strip_prefix /vk-app
-		try_files /tma{path} /tma/index.html
 		header Cache-Control "no-store"
-		file_server
+		@vkStaff path /vk-app/staff /vk-app/staff/*
+		handle @vkStaff {
+			redir /vk-app/staff /vk-app/staff/ 308
+			try_files {path} /vk-app/staff/index.html
+			file_server
+		}
+		handle {
+			uri strip_prefix /vk-app
+			try_files /tma{path} /tma/index.html
+			file_server
+		}
 	}
 	handle {
 		# Shares the common CSP and upload proxy with CRM/API.

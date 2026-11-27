@@ -15,6 +15,8 @@ const titles: Record<Screen, string> = { loading: 'Кабинет клуба', l
 const errorText = (error: unknown): string => error instanceof Error ? error.message : 'Не удалось загрузить. Повторите попытку';
 const serviceTitle = (service: Service): string => service.title || service.name;
 const bookingTitle = (booking: Booking): string => booking.lesson?.service?.title || booking.lesson?.service?.name || 'Занятие в клубе';
+// Revalidate signed launch data in the staff bundle; never transfer JWTs via URL/storage.
+const openStaff = () => window.location.replace(`${isVk() ? '/vk-app/staff/' : '/tma/trainer'}${window.location.search}${window.location.hash}`);
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('loading');
@@ -39,7 +41,6 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [staffUrl, setStaffUrl] = useState('');
   const [retry, setRetry] = useState(0);
   const submitting = useRef(false);
   const requestId = useRef('');
@@ -94,11 +95,7 @@ export function App() {
           return undefined;
         }
         if (bootstrap && bootstrap.role !== 'CLIENT') {
-          if (isVk()) { setStaffUrl('https://crm.horseclub68.ru'); return undefined; }
-          // Telegram's SDK reads the signed launch parameters again in the separate staff bundle.
-          const target = `/tma/trainer${window.location.search}${window.location.hash}`;
-          setStaffUrl(target);
-          window.location.replace(target);
+          openStaff();
           return undefined;
         }
         if (bootstrap) { setClientSession(bootstrap.token); setLinked(Boolean(bootstrap.clientId)); }
@@ -189,13 +186,11 @@ export function App() {
     finally { submitting.current = false; setBusy(false); }
   }
 
-  if (screen === 'loading' && !staffUrl) return <main className="mx-auto max-w-xl px-5" aria-busy={!error}>
+  if (screen === 'loading') return <main className="mx-auto max-w-xl px-5" aria-busy={!error}>
     {error ? <div role="alert"><h1>Не удалось открыть кабинет</h1><p>{error}</p>
-      {staffUrl ? <a className="primary mt-4" href={staffUrl}>Открыть кабинет персонала</a>
-        : <button className="primary mt-4" onClick={refresh}>Повторить</button>}</div>
+      <button className="primary mt-4" onClick={refresh}>Повторить</button></div>
       : <p role="status">Загружаем личный кабинет…</p>}
   </main>;
-  if (isVk() && staffUrl) return <main className="mx-auto max-w-xl px-5"><h1>Кабинет сотрудника</h1><p>Вход выполнен.</p><a href={staffUrl}>Открыть CRM</a></main>;
   if (isVk() && screen === 'link') return <main className="mx-auto max-w-xl px-5">
     <h1>Привязка кабинета</h1>
     <p>Разрешите VK передать номер телефона, чтобы найти ваш профиль в клубе.</p>
@@ -206,7 +201,7 @@ export function App() {
         const result = await linkVkPhone();
         if (result.role === 'UNLINKED_CLIENT') throw new Error('Передайте VK ID администратору клуба');
         if (result.role === 'CLIENT') { setClientSession(result.token); setLinked(true); setScreen('dashboard'); }
-        else setStaffUrl('https://crm.horseclub68.ru');
+        else openStaff();
       } catch (failure: unknown) { reportError(failure); }
       finally { submitting.current = false; setBusy(false); }
     }}>{busy ? 'Привязываем…' : 'Привязать по номеру ВК'}</button>

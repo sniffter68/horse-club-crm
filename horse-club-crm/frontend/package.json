@@ -13,7 +13,7 @@
     "test:e2e:mock": "playwright test --config=playwright.crm.config.ts --project=mock",
     "test": "vitest run",
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && vite build --config vite.vk.config.ts",
     "typecheck": "tsc -b --pretty false && tsc -p tsconfig.playwright.json",
     "lint": "oxlint",
     "preview": "vite preview",
