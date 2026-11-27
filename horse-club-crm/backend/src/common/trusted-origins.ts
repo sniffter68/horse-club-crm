@@ -1,6 +1,7 @@
 // Shared by CORS and mutation/CSRF validation. Never use a wildcard with cookies.
 export const trustedOrigins = [
   'https://crm.horseclub68.ru',
+  'https://demo.horseclub68.ru',
   'https://localhost',
   'http://localhost',
   'capacitor://localhost',
