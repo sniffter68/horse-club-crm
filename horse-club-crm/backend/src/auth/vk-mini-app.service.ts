@@ -1,8 +1,10 @@
-import { Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
-import { VkLinkService } from '../vk-bot/vk-link.service';
+import { normalizePhone } from '../vk-bot/vk-link.service';
+import { VkIdentityService } from '../vk-bot/vk-identity.service';
 
 export function verifyVkLaunchParams(input: string, secret: string, appId?: string): string {
   if (!secret) throw new ServiceUnavailableException('VK Mini App не настроено');
@@ -22,7 +24,7 @@ export function verifyVkLaunchParams(input: string, secret: string, appId?: stri
 
 @Injectable()
 export class VkMiniAppService {
-  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService, private readonly links: VkLinkService) {}
+  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService) {}
 
   verify(launchParams: string): string {
     return verifyVkLaunchParams(launchParams, process.env.VK_MINI_APP_SECRET ?? '', process.env.VK_MINI_APP_ID);
@@ -32,7 +34,7 @@ export class VkMiniAppService {
     const vkUserId = this.verify(launchParams);
     const user = await this.prisma.user.findFirst({ where: { OR: [{ vkUserId: BigInt(vkUserId) }, { vkId: vkUserId }, { trainer: { vkId: BigInt(vkUserId) } }] }, include: { staffProfile: true, trainer: true } });
     if (user) {
-      if (!user.crmAccess || user.staffProfile?.isActive === false || user.trainer?.isActive === false || !['ADMIN', 'TRAINER'].includes(user.role)) throw new UnauthorizedException('Доступ отключён');
+      if (!user.crmAccess || user.staffProfile?.isActive === false || user.trainer?.isActive === false) throw new UnauthorizedException('Доступ отключён');
       return { status: 'LINKED' as const, role: user.role, user: { id: user.id, email: user.email, role: user.role },
         access_token: await this.jwt.signAsync({ sub: user.id, email: user.email, role: user.role, authVersion: String(user.tokenVersion) }) };
     }
@@ -43,9 +45,55 @@ export class VkMiniAppService {
       user: { id: client.id, role: 'CLIENT' as const }, access_token: await this.jwt.signAsync({ sub: client.id, vkUserId, tokenType: 'vk-client-tma' }, { audience: 'client-tma', expiresIn: '1h' }) };
   }
 
-  async link(launchParams: string, phone: string, code: string) {
+  async linkByVk(launchParams: string, phone?: string, phoneToken?: string) {
     const vkUserId = this.verify(launchParams);
-    await this.links.bind(Number(vkUserId), phone, code);
+    if (!phone || !phoneToken) throw new BadRequestException('Разрешите VK передать номер телефона');
+    const appId = process.env.VK_MINI_APP_ID;
+    const secret = process.env.VK_MINI_APP_SECRET;
+    if (!appId || !secret) throw new ServiceUnavailableException('VK Mini App не настроено');
+    // VK signs the original field value, before any phone normalization.
+    const expected = createHash('sha256').update(`${appId}${secret}${vkUserId}phone_number${phone}`).digest('base64url');
+    if (!/^[A-Za-z0-9_-]{43}$/.test(phoneToken) || !timingSafeEqual(Buffer.from(expected), Buffer.from(phoneToken))) {
+      throw new UnauthorizedException('Не удалось проверить номер VK. Повторите запрос номера');
+    }
+    const normalized = normalizePhone(phone);
+    const digits = normalized.replace(/^\+/, '');
+    const variants = digits.startsWith('7') ? [digits, `8${digits.slice(1)}`] : [digits];
+    const identity = new VkIdentityService(this.prisma);
+    await identity.atomic(async tx => {
+      // Normalize legacy formatted phones in SQL, without loading the phone book into memory.
+      const matches = await tx.$queryRaw<Array<{ kind: 'CLIENT' | 'STAFF'; id: string }>>(Prisma.sql`
+        SELECT 'CLIENT' AS kind, id FROM "Client"
+        WHERE "deletedAt" IS NULL AND regexp_replace(phone, '[^0-9]', '', 'g') IN (${Prisma.join(variants)})
+        UNION
+        SELECT 'STAFF' AS kind, u.id FROM "User" u
+        LEFT JOIN "StaffProfile" s ON s."userId" = u.id
+        LEFT JOIN "Trainer" t ON t.id = u."trainerId"
+        WHERE (regexp_replace(s.phone, '[^0-9]', '', 'g') IN (${Prisma.join(variants)})
+          OR regexp_replace(t.phone, '[^0-9]', '', 'g') IN (${Prisma.join(variants)}))
+          AND (s.id IS NULL OR s."isActive") AND (t.id IS NULL OR t."isActive")
+      `);
+      if (!matches.length) throw new BadRequestException('Номер VK не найден в CRM. Передайте VK ID администратору клуба');
+      if (matches.length !== 1) throw new ConflictException('Номер указан в нескольких профилях. Обратитесь к администратору');
+      const target = matches[0];
+      const peer = BigInt(vkUserId);
+      if (target.kind === 'CLIENT') {
+        const client = await tx.client.findUnique({ where: { id: target.id } });
+        if (!client || client.deletedAt) throw new ConflictException('Профиль недоступен');
+        if ((client.vkUserId !== null && client.vkUserId !== peer) || (client.vkId !== null && client.vkId !== vkUserId)) {
+          throw new ConflictException('Профиль уже связан с другим VK аккаунтом');
+        }
+        await identity.assertAvailable(tx, vkUserId, 'CLIENT', client.id);
+        await tx.client.update({ where: { id: client.id }, data: { vkUserId: peer, vkId: vkUserId } });
+      } else {
+        const user = await tx.user.findUnique({ where: { id: target.id }, include: { staffProfile: true, trainer: true } });
+        if (!user || !user.crmAccess || user.staffProfile?.isActive === false || user.trainer?.isActive === false) throw new UnauthorizedException('Доступ отключён');
+        if ((user.vkUserId !== null && user.vkUserId !== peer) || (user.vkId !== null && user.vkId !== vkUserId)
+          || (user.trainer?.vkId != null && user.trainer.vkId !== peer)) throw new ConflictException('Профиль уже связан с другим VK аккаунтом');
+        await identity.applyStaff(tx, user.id, vkUserId);
+        if (user.trainerId) await tx.trainer.update({ where: { id: user.trainerId }, data: { vkId: peer } });
+      }
+    });
     return this.login(launchParams);
   }
 }

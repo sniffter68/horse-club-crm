@@ -1,8 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const port = Number(process.env.TMA_E2E_PORT ?? '5175');
+const baseURL = `http://127.0.0.1:${port}/tma/`;
+
 export default defineConfig({
   testDir: './e2e', fullyParallel: true, reporter: 'list',
-  use: { baseURL: 'http://127.0.0.1:5175/tma/', screenshot: 'only-on-failure' },
+  use: { baseURL, screenshot: 'only-on-failure' },
   projects: [{ name: 'mobile', use: { ...devices['iPhone SE'], viewport: { width: 390, height: 844 }, defaultBrowserType: 'chromium', channel: 'msedge' } }],
-  webServer: { command: 'node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5175', url: 'http://127.0.0.1:5175/tma/', reuseExistingServer: !process.env.CI },
+  webServer: { command: `node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port ${port} --strictPort --outDir ../frontend/dist`, url: baseURL, reuseExistingServer: !process.env.CI },
 });

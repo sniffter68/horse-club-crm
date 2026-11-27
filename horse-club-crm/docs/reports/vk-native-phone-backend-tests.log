@@ -1,0 +1,9 @@
+﻿✔ HTTP workspace enforces role, FULL mutations, UUID and status/note validation (220.9874ms)
+ℹ tests 1031
+ℹ suites 0
+ℹ pass 1003
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 28
+ℹ todo 0
+ℹ duration_ms 25253.4723

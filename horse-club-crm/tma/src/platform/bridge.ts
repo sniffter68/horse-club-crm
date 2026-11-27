@@ -24,18 +24,34 @@ export async function initPlatform(): Promise<void> {
     setTimeout(() => reject(new Error('Откройте приложение через VK')), 10000);
   })]);
 }
-type VkResult = { status: 'UNLINKED'; vkUserId: string } | { status: 'LINKED'; role: 'CLIENT' | 'ADMIN' | 'TRAINER'; access_token: string; clientId?: string };
-export async function vkAuthenticate(phone?: string, code?: string): Promise<BootstrapResponse> {
+type VkResult = { status: 'UNLINKED'; vkUserId: string } | { status: 'LINKED'; role: 'CLIENT' | 'ADMIN' | 'TRAINER' | 'MANAGER' | 'STABLE_WORKER' | 'GROOM' | 'VET' | 'OTHER'; access_token: string; clientId?: string };
+export async function copyVkId(vkUserId: string): Promise<void> {
+  await vkBridge.send('VKWebAppCopyText', { text: vkUserId });
+}
+
+export async function linkVkPhone(): Promise<BootstrapResponse> {
+  let contact: { phone_number: string; sign: string };
+  try { contact = await vkBridge.send('VKWebAppGetPhoneNumber'); }
+  catch { throw new Error('VK не передал номер. Разрешите доступ к номеру или передайте VK ID администратору.'); }
+  return vkAuthenticate({ phone: contact.phone_number, phoneToken: contact.sign });
+}
+
+export async function vkAuthenticate(contact?: { phone: string; phoneToken: string }): Promise<BootstrapResponse> {
   const origin = window.location.hostname === 'horseclub68.ru' ? 'https://crm.horseclub68.ru' : '';
-  const response = await fetch(`${origin}/api/auth/vk-mini-app${phone ? '/link' : ''}`, {
+  const response = await fetch(`${origin}/api/auth/vk-mini-app${contact ? '/link-by-vk' : ''}`, {
     method: 'POST', credentials: 'include', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ launchParams: window.location.search, ...(phone ? { phone, code } : {}) }),
+    body: JSON.stringify({ launchParams: window.location.search, ...contact }),
+    signal: AbortSignal.timeout(15000),
   });
-  if (!response.ok) throw new Error('Не удалось войти. Проверьте код или откройте приложение заново через VK.');
+  if (!response.ok) {
+    const failure: unknown = await response.json().catch(() => null);
+    const message = failure && typeof failure === 'object' && 'message' in failure && typeof failure.message === 'string' ? failure.message : '';
+    throw new Error(message || 'Не удалось войти. Повторите вход через VK или обратитесь к администратору.');
+  }
   const result = await response.json() as VkResult;
-  if (result.status === 'UNLINKED') return { role: 'UNLINKED_CLIENT', needsPhoneLink: true };
+  if (result.status === 'UNLINKED') return { role: 'UNLINKED_CLIENT', needsPhoneLink: true, vkUserId: result.vkUserId };
   if (result.role !== 'CLIENT') {
-    return { role: result.role };
+    return { role: result.role === 'ADMIN' || result.role === 'TRAINER' ? result.role : 'STAFF' };
   }
   return { role: 'CLIENT', token: result.access_token, clientId: result.clientId ?? null, clientName: null, activeMembership: null, nextLesson: null };
 }

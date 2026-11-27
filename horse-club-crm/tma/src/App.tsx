@@ -1,4 +1,4 @@
-import { bootstrapPlatform, isVk, vkAuthenticate } from './platform/bridge';
+import { bootstrapPlatform, copyVkId, isVk, linkVkPhone } from './platform/bridge';
 import React, { useEffect, useRef, useState } from 'react';
 import { api, setClientSession, dateTime, money, moscowDate, requireUuid, time, upcoming, type Booking, type MyBookingsResponse, type Service, type Slot } from './api';
 import { ClientDashboardView } from './ClientDashboardView';
@@ -30,7 +30,7 @@ export function App() {
   const [slot, setSlot] = useState<Slot>();
   const [trainerId, setTrainerId] = useState('');
   const [phone, setPhone] = useState('');
-  const [linkCode, setLinkCode] = useState('');
+  const [vkUserId, setVkUserId] = useState('');
   const [contactPending, setContactPending] = useState(false);
   const [contactNotice, setContactNotice] = useState('');
   const contactRequest = useRef(false);
@@ -89,6 +89,7 @@ export function App() {
           method: 'POST', body: JSON.stringify({ initData }), signal: controller.signal,
         })) : undefined;
         if (bootstrap?.role === 'UNLINKED_CLIENT') {
+          setVkUserId(bootstrap.vkUserId ?? '');
           setClientSession(null); setLinked(false); setScreen('link');
           return undefined;
         }
@@ -196,17 +197,31 @@ export function App() {
   </main>;
   if (isVk() && staffUrl) return <main className="mx-auto max-w-xl px-5"><h1>Кабинет сотрудника</h1><p>Вход выполнен.</p><a href={staffUrl}>Открыть CRM</a></main>;
   if (isVk() && screen === 'link') return <main className="mx-auto max-w-xl px-5">
-    <h1>Привязка кабинета</h1><p>Укажите телефон и код из карточки клиента. Получите код у администратора клуба.</p>
-    <form noValidate onSubmit={event => { event.preventDefault(); if (busy || !validPhone || !/^\d{4}$/.test(linkCode)) return; setBusy(true); setError('');
-      void vkAuthenticate(phone, linkCode).then(result => {
-        if (result.role !== 'CLIENT') throw new Error('Обратитесь к администратору');
-        setClientSession(result.token); setLinked(true); setScreen('dashboard');
-      }).catch(reportError).finally(() => setBusy(false)); }}>
-      <label className="field">Телефон<input type="tel" autoComplete="tel" required value={phone} onChange={event => setPhone(event.target.value)} /></label>
-      <label className="field">Код привязки<input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{4}" required value={linkCode} onChange={event => setLinkCode(event.target.value)} /></label>
-      <button type="submit" disabled={busy || !validPhone || !/^\d{4}$/.test(linkCode)}>{busy ? 'Привязываем…' : 'Привязать кабинет'}</button>
-      {error && <p role="alert">{error}</p>}
-    </form>
+    <h1>Привязка кабинета</h1>
+    <p>Разрешите VK передать номер телефона, чтобы найти ваш профиль в клубе.</p>
+    <button className="primary mt-4 w-full" disabled={busy} onClick={async () => {
+      if (submitting.current) return;
+      submitting.current = true; setBusy(true); setError(''); setContactNotice('');
+      try {
+        const result = await linkVkPhone();
+        if (result.role === 'UNLINKED_CLIENT') throw new Error('Передайте VK ID администратору клуба');
+        if (result.role === 'CLIENT') { setClientSession(result.token); setLinked(true); setScreen('dashboard'); }
+        else setStaffUrl('https://crm.horseclub68.ru');
+      } catch (failure: unknown) { reportError(failure); }
+      finally { submitting.current = false; setBusy(false); }
+    }}>{busy ? 'Привязываем…' : 'Привязать по номеру ВК'}</button>
+    <section className="summary mt-4" aria-label="Привязка администратором">
+      <p>Или передайте этот ID администратору клуба для привязки в CRM.</p>
+      <p className="text-2xl font-semibold break-all">VK ID: {vkUserId}</p>
+      <button className="quiet mt-4" disabled={busy || !vkUserId} onClick={async () => {
+        setError('');
+        try { await copyVkId(vkUserId); setContactNotice('VK ID скопирован'); }
+        catch { setError('Не удалось скопировать. Передайте VK ID администратору вручную.'); }
+      }}>Скопировать ID</button>
+    </section>
+    <p role="status">{busy ? 'Ожидаем разрешение VK и проверяем профиль…' : contactNotice}</p>
+    {error && <p role="alert">{error}</p>}
+    <button className="quiet mt-4" disabled={busy} onClick={() => { setError(''); setContactNotice(''); setScreen('loading'); }}>Повторить вход</button>
   </main>;
   if (screen === 'link') return <main className="mx-auto max-w-xl px-5">
     <h1>{titles.link}</h1><p>Поделитесь телефоном +7… в чате бота.</p>
