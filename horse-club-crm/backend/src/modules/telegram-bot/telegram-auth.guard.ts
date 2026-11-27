@@ -21,6 +21,18 @@ export class TelegramAuthGuard implements CanActivate {
     const authorization = request.get('Authorization');
     const initData = telegramInitData(request);
     const bearer = /^Bearer (\S+)$/i.exec(authorization ?? '')?.[1];
+    if (bearer) {
+      const payload = await this.jwt.verifyAsync<{ sub?: string; vkUserId?: string; tokenType?: string }>(bearer, { audience: 'client-tma', algorithms: ['HS256'] }).catch(() => null);
+      if (payload?.tokenType === 'vk-client-tma') {
+        if (!payload.sub || !payload.vkUserId || !/^[1-9]\d{0,15}$/.test(payload.vkUserId)) throw new UnauthorizedException('Invalid VK session');
+        const client = await this.prisma.client.findFirst({ where: { id: payload.sub, deletedAt: null, OR: [{ vkUserId: BigInt(payload.vkUserId) }, { vkId: payload.vkUserId }] } });
+        if (!client) throw new UnauthorizedException('VK link revoked');
+        const settings = await this.prisma.clubModuleSettings.findUnique({ where: { module: 'SCHEDULE' } });
+        if (settings && !settings.isEnabled) throw new ForbiddenException('Запись отключена');
+        request.telegram = { telegramUserId: `vk:${payload.vkUserId}`, firstName: client.firstName, lastName: client.lastName, clientId: client.id };
+        return true;
+      }
+    }
     let identity: TelegramIdentity;
     let sessionClientId: string | undefined;
     if (bearer) {

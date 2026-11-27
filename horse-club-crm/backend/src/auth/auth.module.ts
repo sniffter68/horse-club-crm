@@ -1,3 +1,6 @@
+import { VkMiniAppService } from './vk-mini-app.service';
+import { VkMiniAppController } from './vk-mini-app.controller';
+import { VkLinkService } from '../vk-bot/vk-link.service';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import type { JwtModuleOptions } from '@nestjs/jwt';
@@ -28,8 +31,8 @@ import { ACCESS_TOKEN_SECONDS } from './session-cookie';
       }),
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
+  controllers: [AuthController, VkMiniAppController],
+  providers: [VkMiniAppService, VkLinkService, AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
   exports: [AuthService, JwtAuthGuard, RolesGuard, PassportModule, RoleAccessModule],
 })
 export class AuthModule {}

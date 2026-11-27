@@ -1,9 +1,10 @@
+import { bootstrapPlatform, isVk, vkAuthenticate } from './platform/bridge';
 import React, { useEffect, useRef, useState } from 'react';
 import { api, setClientSession, dateTime, money, moscowDate, requireUuid, time, upcoming, type Booking, type MyBookingsResponse, type Service, type Slot } from './api';
 import { ClientDashboardView } from './ClientDashboardView';
 import { ClientBookingCatalog } from './ClientBookingCatalog';
 import type { BootstrapResponse, ClientDashboard, ClientOverview } from './api';
-import { applyTheme, waitForTelegram, canRequestContact, haptic, telegram, telegramRequiredError, withTelegram } from './telegram';
+import { applyTheme, canRequestContact, haptic, telegram, withTelegram } from './telegram';
 import { useTelegramNavigation } from './useTelegramNavigation';
 
 const _h = React.createElement;
@@ -29,6 +30,7 @@ export function App() {
   const [slot, setSlot] = useState<Slot>();
   const [trainerId, setTrainerId] = useState('');
   const [phone, setPhone] = useState('');
+  const [linkCode, setLinkCode] = useState('');
   const [contactPending, setContactPending] = useState(false);
   const [contactNotice, setContactNotice] = useState('');
   const contactRequest = useRef(false);
@@ -83,17 +85,15 @@ export function App() {
     setLoading(true); setError('');
     if (screen === 'loading' || screen === 'dashboard') {
       const loadDashboard = async () => {
-        const app = await waitForTelegram(controller.signal);
-        controller.signal.throwIfAborted();
-        if (!app?.initData) throw telegramRequiredError();
-        const bootstrap = screen === 'loading' ? await api<BootstrapResponse>('bootstrap', {
-          method: 'POST', body: JSON.stringify({ initData: app.initData }), signal: controller.signal,
-        }) : undefined;
+        const bootstrap = screen === 'loading' ? await bootstrapPlatform(controller.signal, initData => api<BootstrapResponse>('bootstrap', {
+          method: 'POST', body: JSON.stringify({ initData }), signal: controller.signal,
+        })) : undefined;
         if (bootstrap?.role === 'UNLINKED_CLIENT') {
           setClientSession(null); setLinked(false); setScreen('link');
           return undefined;
         }
         if (bootstrap && bootstrap.role !== 'CLIENT') {
+          if (isVk()) { setStaffUrl('https://crm.horseclub68.ru'); return undefined; }
           // Telegram's SDK reads the signed launch parameters again in the separate staff bundle.
           const target = `/tma/trainer${window.location.search}${window.location.hash}`;
           setStaffUrl(target);
@@ -188,11 +188,25 @@ export function App() {
     finally { submitting.current = false; setBusy(false); }
   }
 
-  if (screen === 'loading') return <main className="mx-auto max-w-xl px-5" aria-busy={!error}>
+  if (screen === 'loading' && !staffUrl) return <main className="mx-auto max-w-xl px-5" aria-busy={!error}>
     {error ? <div role="alert"><h1>Не удалось открыть кабинет</h1><p>{error}</p>
       {staffUrl ? <a className="primary mt-4" href={staffUrl}>Открыть кабинет персонала</a>
         : <button className="primary mt-4" onClick={refresh}>Повторить</button>}</div>
       : <p role="status">Загружаем личный кабинет…</p>}
+  </main>;
+  if (isVk() && staffUrl) return <main className="mx-auto max-w-xl px-5"><h1>Кабинет сотрудника</h1><p>Вход выполнен.</p><a href={staffUrl}>Открыть CRM</a></main>;
+  if (isVk() && screen === 'link') return <main className="mx-auto max-w-xl px-5">
+    <h1>Привязка кабинета</h1><p>Укажите телефон и код из карточки клиента. Получите код у администратора клуба.</p>
+    <form noValidate onSubmit={event => { event.preventDefault(); if (busy || !validPhone || !/^\d{4}$/.test(linkCode)) return; setBusy(true); setError('');
+      void vkAuthenticate(phone, linkCode).then(result => {
+        if (result.role !== 'CLIENT') throw new Error('Обратитесь к администратору');
+        setClientSession(result.token); setLinked(true); setScreen('dashboard');
+      }).catch(reportError).finally(() => setBusy(false)); }}>
+      <label className="field">Телефон<input type="tel" autoComplete="tel" required value={phone} onChange={event => setPhone(event.target.value)} /></label>
+      <label className="field">Код привязки<input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{4}" required value={linkCode} onChange={event => setLinkCode(event.target.value)} /></label>
+      <button type="submit" disabled={busy || !validPhone || !/^\d{4}$/.test(linkCode)}>{busy ? 'Привязываем…' : 'Привязать кабинет'}</button>
+      {error && <p role="alert">{error}</p>}
+    </form>
   </main>;
   if (screen === 'link') return <main className="mx-auto max-w-xl px-5">
     <h1>{titles.link}</h1><p>Поделитесь телефоном +7… в чате бота.</p>

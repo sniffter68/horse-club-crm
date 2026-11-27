@@ -11,5 +11,5 @@ for (const name of assets) {
   if (/refinedev|antd/.test(bytes.toString())) throw new Error('CRM dependencies found in TMA');
 }
 console.log(`TMA JS + CSS: ${raw} bytes raw; ${gzip} bytes gzip (Telegram SDK excluded)`);
-// The authenticated dashboard adds membership progress and the next lesson.
-if (raw >= 160_000) throw new Error('TMA exceeds the 160 KB uncompressed JS + CSS budget');
+// Includes the official VK Bridge SDK alongside the authenticated dashboard.
+if (raw >= 176_000) throw new Error('TMA exceeds the 176 KB uncompressed JS + CSS budget');
