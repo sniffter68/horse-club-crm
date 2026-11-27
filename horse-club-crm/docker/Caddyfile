@@ -81,8 +81,8 @@
 	@vkApp path /vk-app /vk-app/*
 	handle @vkApp {
 		header -X-Frame-Options
-		header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors https://vk.com https://*.vk.com https://m.vk.com https://vk.ru https://*.vk.ru https://*.vk-apps.com; form-action 'self'; script-src 'self' https://telegram.org https://unpkg.com https://*.vk.com https://*.vk.ru; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://crm.horseclub68.ru"
-		redir /vk-app /vk-app/ 308
+		header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors https://vk.com https://*.vk.com https://m.vk.com https://vk.ru https://*.vk.ru https://m.vk.ru https://*.vk-apps.com; form-action 'self'; script-src 'self' https://telegram.org https://unpkg.com https://*.vk.com https://*.vk.ru; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://crm.horseclub68.ru"
+		rewrite /vk-app /vk-app/index.html
 		root * /var/www/crm-dist
 		header Cache-Control "no-store"
 		try_files {path} /vk-app/index.html

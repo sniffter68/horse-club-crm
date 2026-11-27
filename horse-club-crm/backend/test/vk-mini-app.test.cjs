@@ -7,7 +7,7 @@ const { VkMiniAppController } = require('../dist/auth/vk-mini-app.controller');
 const secret = 'test-mini-app-secret';
 const access = { forRole: async () => [{ module: 'SCHEDULE', isEnabled: true, accessLevel: 'FULL' }] };
 function launch(extra = {}) {
-  const params = new URLSearchParams({ vk_user_id: '123', vk_ts: String(Math.floor(Date.now()/1000)), vk_app_id: '6781503', ...extra });
+  const params = new URLSearchParams({ vk_user_id: '123', vk_ts: String(Math.floor(Date.now()/1000)), vk_app_id: '54927434', ...extra });
   const sorted = new URLSearchParams([...params.entries()].sort(([a], [b]) => a < b ? -1 : 1));
   params.set('sign', crypto.createHmac('sha256', secret).update(sorted.toString()).digest('base64url'));
   return params.toString();
@@ -17,7 +17,7 @@ test('VK signature sorts keys, encodes values, ignores unsigned values and compa
   let calls = 0;
   crypto.timingSafeEqual = (...args) => { calls++; return original(...args); };
   try {
-    assert.equal(verifyVkLaunchParams(launch({ vk_extra: 'a b+/=' }) + '&ref=ignored', secret, '6781503'), '123');
+    assert.equal(verifyVkLaunchParams(launch({ vk_extra: 'a b+/=' }) + '&ref=ignored', secret, '54927434'), '123');
     assert.equal(calls, 1);
     assert.throws(() => verifyVkLaunchParams(launch().replace('vk_user_id=123', 'vk_user_id=124'), secret));
     assert.equal(calls, 2);
@@ -31,7 +31,7 @@ test('VK rejects malformed signatures, duplicates, wrong app and stale launches'
 });
 test('POST vk-mini-app returns unlinked or client JWT and re-verifies link', async () => {
   process.env.VK_MINI_APP_SECRET = secret;
-  process.env.VK_MINI_APP_ID = '6781503';
+  process.env.VK_MINI_APP_ID = '54927434';
   let client = null;
   const service = new VkMiniAppService({ user: { findFirst: async () => null }, client: { findFirst: async () => client } },
     { signAsync: async (payload, options) => { assert.equal(payload.tokenType, 'vk-client-tma'); assert.equal(options.audience, 'client-tma'); return 'token'; } });
@@ -43,13 +43,13 @@ test('POST vk-mini-app returns unlinked or client JWT and re-verifies link', asy
 });
 
 function phoneToken(phone, userId = '123') {
-  return crypto.createHash('sha256').update(`6781503${secret}${userId}phone_number${phone}`).digest('base64url');
+  return crypto.createHash('sha256').update(`54927434${secret}${userId}phone_number${phone}`).digest('base64url');
 }
 
 function linkingFixture({ matches = [{ kind: 'CLIENT', id: 'client' }], clientOverrides = {}, userOverrides = {}, occupied = false,
   jwt = { signAsync: async () => 'token' }, permissions = access } = {}) {
   process.env.VK_MINI_APP_SECRET = secret;
-  process.env.VK_MINI_APP_ID = '6781503';
+  process.env.VK_MINI_APP_ID = '54927434';
   const client = { id: 'client', phone: '+79991234567', deletedAt: null, vkId: null, vkUserId: null, ...clientOverrides };
   const user = { id: 'user', email: 'staff@test.local', role: 'MANAGER', crmAccess: true, tokenVersion: 2,
     staffProfile: { isActive: true }, trainer: null, trainerId: null, vkId: null, vkUserId: null, ...userOverrides };
@@ -140,7 +140,7 @@ const { ValidationPipe } = require('@nestjs/common');
 const request = require('supertest');
 test('HTTP POST /api/auth/vk-mini-app validates DTO and rejects tampered signatures', async () => {
   process.env.VK_MINI_APP_SECRET = secret;
-  process.env.VK_MINI_APP_ID = '6781503';
+  process.env.VK_MINI_APP_ID = '54927434';
   const service = new VkMiniAppService({ user: { findFirst: async () => null }, client: { findFirst: async () => null } }, {}, {});
   const module = await Test.createTestingModule({ controllers: [VkMiniAppController], providers: [{ provide: VkMiniAppService, useValue: service }] }).compile();
   const app = module.createNestApplication();

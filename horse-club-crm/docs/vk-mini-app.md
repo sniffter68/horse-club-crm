@@ -1,6 +1,6 @@
 ﻿# VK Mini App
 
-Вход: https://horseclub68.ru/vk-app/ — приложение https://vk.ru/app6781503.
+Вход: https://horseclub68.ru/vk-app/ — приложение https://vk.ru/app54927434.
 
 Единственный шлюз `frontend/src/tma/VkMiniApp.tsx` проверяет наличие vk_app_id,
 vk_user_id и sign, инициализирует VK Bridge и один раз вызывает POST /api/auth/vk-mini-app.
@@ -24,7 +24,7 @@ Bridge ограничен 10 секундами, авторизация/согл
 
 ## Сборка и развёртывание
 
-Нужны VK_MINI_APP_ID=6781503 и VK_MINI_APP_SECRET. deploy.sh и deploy-native.cjs
+Нужны VK_MINI_APP_ID=54927434 и VK_MINI_APP_SECRET. deploy.sh и deploy-native.cjs
 устанавливают зависимости frontend и tma до сборки frontend: VK entry переиспользует
 исходники клиента, VK Bridge и Tailwind plugin из tma. Vite использует один React 19
 runtime для VK; лёгкий Telegram bundle сохраняет React 17.

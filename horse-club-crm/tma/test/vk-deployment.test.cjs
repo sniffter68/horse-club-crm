@@ -9,7 +9,10 @@ test('Caddy serves one VK entry with VK framing scoped to Mini App only', () => 
   assert.match(config, /X-Frame-Options DENY/);
   const vk = config.slice(config.indexOf('handle @vkApp'), config.indexOf('root * /var/www/landing-dist'));
   assert.match(vk, /header -X-Frame-Options/);
-  for (const domain of ['https://vk.com', 'https://*.vk.com', 'https://m.vk.com', 'https://vk.ru', 'https://*.vk.ru', 'https://*.vk-apps.com']) assert.ok(vk.includes(domain));
+  const frameAncestors = vk.match(/frame-ancestors ([^;]+);/)[1].split(' ');
+  for (const domain of ['https://vk.com', 'https://*.vk.com', 'https://m.vk.com', 'https://vk.ru', 'https://*.vk.ru', 'https://m.vk.ru', 'https://*.vk-apps.com']) assert.ok(frameAncestors.includes(domain));
+  assert.match(vk, /rewrite \/vk-app \/vk-app\/index.html/);
+  assert.doesNotMatch(vk, /\bredir\b/);
   assert.match(vk, /try_files \{path\} \/vk-app\/index.html/);
   assert.doesNotMatch(vk, /staff|strip_prefix|\/tma/);
 });

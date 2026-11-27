@@ -50,7 +50,7 @@ export function VkMiniApp() {
       .catch((error: unknown) => { if (!controller.signal.aborted) setState({ kind: 'error', message: error instanceof Error ? error.message : 'Проверьте соединение и повторите попытку' }) })
     return () => controller.abort()
   }, [outside, attempt])
-  if (outside) return <main className="mx-auto max-w-xl px-5"><h1>Откройте приложение через VK</h1><a href="https://vk.ru/app6781503" target="_blank" rel="noreferrer">Открыть в VK</a></main>
+  if (outside) return <main className="mx-auto max-w-xl px-5"><h1>Откройте приложение через VK</h1><a href="https://vk.ru/app54927434" target="_blank" rel="noreferrer">Открыть в VK</a></main>
   if (state.kind === 'loading') return <main className="mx-auto max-w-xl px-5"><p role="status">Загружаем личный кабинет…</p></main>
   if (state.kind === 'error') return <Failure message={state.message} retry={retry} />
   const result = state.result

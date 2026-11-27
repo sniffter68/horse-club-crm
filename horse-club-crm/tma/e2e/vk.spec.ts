@@ -38,7 +38,7 @@ for (const role of ['UNLINKED', 'CLIENT', 'TRAINER', 'ADMIN', 'MANAGER']) {
       expect(route.request().headers().authorization).toBe(`Bearer ${role === 'CLIENT' ? 'vk-token' : 'scoped-staff-token'}`);
       return route.fulfill({ json: role === 'CLIENT' ? { client: { id: linked.clientId, name: 'Анна', phone: null }, membership: null, bookings: [] } : [] });
     });
-    await page.route('**/vk-test-host', route => route.fulfill({ contentType: 'text/html', body: '<iframe title="VK" src="/vk-app/?vk_app_id=6781503&vk_user_id=123&sign=test"></iframe>' }));
+    await page.route('**/vk-test-host', route => route.fulfill({ contentType: 'text/html', body: '<iframe title="VK" src="/vk-app/?vk_app_id=54927434&vk_user_id=123&sign=test"></iframe>' }));
     await page.goto('/vk-test-host');
     const frame = page.frameLocator('iframe');
     await expect(frame.getByRole('heading', { name: role === 'UNLINKED' ? 'Привязка кабинета' : role === 'CLIENT' ? 'Кабинет всадника' : role === 'TRAINER' ? 'Моё расписание' : 'Расписание клуба', exact: true })).toBeVisible();
@@ -60,7 +60,7 @@ test('outside VK is immediate both directly and inside iframe, without Bridge or
 });
 
 test('Bridge timeout ends loading and retry initializes Bridge again', async ({ page }) => {
-  await page.goto('/vk-app/?vk_app_id=6781503&vk_user_id=123&sign=test');
+  await page.goto('/vk-app/?vk_app_id=54927434&vk_user_id=123&sign=test');
   await expect(page.getByRole('alert')).toContainText('Сервис не ответил вовремя', { timeout: 13000 });
   await mockBridge(page);
   await page.route('**/api/auth/vk-mini-app', route => route.fulfill({ json: linked }));
@@ -75,7 +75,7 @@ test('Bridge timeout ends loading and retry initializes Bridge again', async ({ 
 test('render failure shows boundary and repeat recovers', async ({ page }) => {
   await mockBridge(page);
   await page.route('**/api/auth/vk-mini-app', route => route.fulfill({ json: { status: 'LINKED', role: 'ADMIN' } }));
-  await page.goto('/vk-app/?vk_app_id=6781503&vk_user_id=123&sign=test');
+  await page.goto('/vk-app/?vk_app_id=54927434&vk_user_id=123&sign=test');
   await expect(page.getByRole('alert')).toContainText('Не удалось показать кабинет');
   await page.route('**/api/auth/vk-mini-app', route => route.fulfill({ json: staff('ADMIN') }));
   await mockSchedule(page);
@@ -90,7 +90,7 @@ test('expired VK client session returns to gateway and explicitly authenticates 
   await page.route('**/api/tma/**', route => route.fulfill(expired
     ? { status: 401, json: { message: 'Истекла сессия' } }
     : { json: { client: { id: linked.clientId, name: 'Анна' }, membership: null, bookings: [] } }));
-  await page.goto('/vk-app/?vk_app_id=6781503&vk_user_id=123&sign=test');
+  await page.goto('/vk-app/?vk_app_id=54927434&vk_user_id=123&sign=test');
   await expect(page.getByRole('alert')).toContainText('Сессия истекла');
   expired = false;
   await page.getByRole('button', { name: 'Повторить', exact: true }).click();
@@ -102,13 +102,13 @@ test('VK native phone links without input and opens the dashboard', async ({ pag
   await mockBridge(page);
   await page.route('**/api/auth/vk-mini-app', route => route.fulfill({ json: { status: 'UNLINKED', vkUserId: '123' } }));
   await page.route('**/api/auth/vk-mini-app/link-by-vk', async route => {
-    expect(route.request().postDataJSON()).toEqual({ launchParams: '?vk_app_id=6781503&vk_user_id=123&sign=test', phone: '79991234567', phoneToken: 'native-proof' });
+    expect(route.request().postDataJSON()).toEqual({ launchParams: '?vk_app_id=54927434&vk_user_id=123&sign=test', phone: '79991234567', phoneToken: 'native-proof' });
     await route.fulfill({ json: linked });
   });
   await page.route('**/api/tma/client/overview', route => route.fulfill({ json: {
     client: { id: '11111111-1111-4111-8111-111111111111', name: 'Анна', firstName: 'Анна', lastName: '', phone: '+79991234567' }, membership: null, bookings: [],
   } }));
-  await page.goto('/vk-app/?vk_app_id=6781503&vk_user_id=123&sign=test');
+  await page.goto('/vk-app/?vk_app_id=54927434&vk_user_id=123&sign=test');
   await expect(page.getByRole('heading', { name: 'Привязка кабинета' })).toBeVisible();
   await expect(page.getByText('VK ID: 123', { exact: true })).toBeVisible();
   await expect(page.getByRole('textbox')).toHaveCount(0);
@@ -125,7 +125,7 @@ test('VK consent refusal keeps ID and allows repeated login', async ({ page }) =
   let calls = 0;
   await page.route('**/api/auth/vk-mini-app', route => { calls++; return route.fulfill({ json: calls === 1 ? { status: 'UNLINKED', vkUserId: '123' } : staff() }); });
   await page.route('**/api/auth/vk-mini-app/link-by-vk', () => { throw new Error('No phone consent'); });
-  await page.goto('/vk-app/?vk_app_id=6781503&vk_user_id=123&sign=test');
+  await page.goto('/vk-app/?vk_app_id=54927434&vk_user_id=123&sign=test');
   await page.getByRole('button', { name: 'Привязать по номеру ВК' }).click();
   await expect(page.getByRole('alert')).toContainText('VK не передал номер');
   await expect(page.getByText('VK ID: 123', { exact: true })).toBeVisible();
@@ -142,7 +142,7 @@ test('VK displays CRM errors, pending state and keyboard recovery', async ({ pag
     await new Promise(resolve => setTimeout(resolve, 300));
     await route.fulfill({ status: 409, json: { message: 'Номер указан в нескольких профилях. Обратитесь к администратору' } });
   });
-  await page.goto('/vk-app/?vk_app_id=6781503&vk_user_id=123&sign=test');
+  await page.goto('/vk-app/?vk_app_id=54927434&vk_user_id=123&sign=test');
   await page.getByRole('button', { name: 'Привязать по номеру ВК' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Привязываем…' })).toBeDisabled();
@@ -170,7 +170,7 @@ for (const role of ['CLIENT', 'TRAINER', 'ADMIN', 'MANAGER']) {
         expect(route.request().headers().authorization).toBe('Bearer vk-token');
         return route.fulfill({ json: { client: { id: linked.clientId, name: 'Анна', firstName: 'Анна', lastName: '', phone: null }, membership: null, bookings: [] } });
       });
-      await page.goto('/vk-app/?vk_app_id=6781503&vk_user_id=123&sign=test');
+      await page.goto('/vk-app/?vk_app_id=54927434&vk_user_id=123&sign=test');
       if (link) await page.getByRole('button', { name: 'Привязать по номеру ВК' }).click();
       await expect(page.getByRole('heading', { name: role === 'CLIENT' ? 'Кабинет всадника' : role === 'TRAINER' ? 'Моё расписание' : 'Расписание клуба', exact: true })).toBeVisible();
       if (role !== 'CLIENT') await expect(page.getByText('На этот день занятий нет')).toBeVisible();
@@ -197,7 +197,7 @@ test('VK read-only staff hides mutations and recovers from expired session', asy
     expect(route.request().headers().authorization).toBe('Bearer scoped-staff-token');
     return route.fulfill(expired ? { status: 401, json: { message: 'Сессия истекла' } } : { json: [] });
   });
-  await page.goto('/vk-app/?vk_app_id=6781503&vk_user_id=123&sign=test');
+  await page.goto('/vk-app/?vk_app_id=54927434&vk_user_id=123&sign=test');
   await expect(page.getByText('Сессия истекла. Повторите вход через VK')).toBeVisible();
   expired = false;
   await page.getByRole('button', { name: 'Повторить вход' }).click();
@@ -228,7 +228,7 @@ for (const role of ['CLIENT', 'TRAINER', 'ADMIN']) {
       return route.fulfill({ headers: cors, json: role === 'CLIENT'
         ? { client: { id: linked.clientId, name: 'Анна', phone: null }, membership: null, bookings: [] } : [] });
     });
-    await page.goto('https://horseclub68.ru/vk-app/?vk_app_id=6781503&vk_user_id=123&sign=test');
+    await page.goto('https://horseclub68.ru/vk-app/?vk_app_id=54927434&vk_user_id=123&sign=test');
     await expect(page.getByRole('heading', { name: role === 'CLIENT' ? 'Кабинет всадника' : role === 'TRAINER' ? 'Моё расписание' : 'Расписание клуба', exact: true })).toBeVisible();
     await expect.poll(() => reads).toBeGreaterThan(0);
     expect(await context.cookies()).toHaveLength(0);
@@ -251,7 +251,7 @@ test('VK trainer marks attendance with the scoped Bearer session', async ({ page
       status: completed ? 'COMPLETED' : 'SCHEDULED', serviceName: 'Индивидуальное занятие', clientName: 'Анна Всадник',
       horseId: null, horseName: null, notes: null, participants: [] }] });
   });
-  await page.goto('/vk-app/?vk_app_id=6781503&vk_user_id=123&sign=test');
+  await page.goto('/vk-app/?vk_app_id=54927434&vk_user_id=123&sign=test');
   await page.getByRole('button', { name: 'Проведено', exact: true }).click();
   await expect.poll(() => completed).toBe(true);
   await expect(page.getByRole('button', { name: 'Проведено', exact: true })).toHaveCount(0);
