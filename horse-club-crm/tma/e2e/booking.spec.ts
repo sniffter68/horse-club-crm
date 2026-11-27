@@ -150,7 +150,7 @@ test('membership appears above bookings with Moscow date and expiry warning, inc
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/tma-membership-dark.png', fullPage: true });
   await page.evaluate(() => {
-    const app = window.Telegram!.WebApp;
+    const app = window.Telegram!.WebApp!;
     Object.assign(app.themeParams, { bg_color: '#f7f4f0', text_color: '#3a2f2b', button_color: '#234d3c', button_text_color: '#ffffff', hint_color: '#6c655f', secondary_bg_color: '#ffffff' });
     window.__tmaTest.theme();
   });

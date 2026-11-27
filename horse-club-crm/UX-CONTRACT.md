@@ -425,3 +425,17 @@ TMA gateway: `/tma` определяет роль через подписанн�
 ## Android и standalone PWA (2026-11-26)
 
 Источник — задача владельца; инструкция: `docs/android-build.md`. Владелец системной кнопки Back — `mobile/NativeApp` и `mobile/backButton`: Escape существующему Ant Design оверлею, затем история BrowserRouter; корень не закрывает приложение. Проверки незавершённого ввода остаются у формы. Shell и общие Drawer/Modal владеют safe-area; кабинет тренера сохраняет существующие inset-отступы. Единый API root — `apiUrl.ts`; media разрешаются от backend origin. Backend CORS и проверка origin мутаций используют общий allowlist; cookie обычного веба сохраняют Strict. Проверки: `mobile-shell.spec.ts`, `apiUrl.test.ts`, `mobile-origins.test.cjs`.
+
+## Единый VK Mini App (27.11.2026)
+
+Источник — задача владельца и docs/vk-mini-app.md. VkMiniApp владеет входом /vk-app/:
+один подписанный bootstrap, затем клиентский App или TrainerScheduleView по state/props,
+без смены документа и повторной авторизации. Сессия только в памяти; CRM storage не меняется.
+Вне VK сразу показывается инструкция открытия. MiniAppBoundary защищает оба кабинета;
+ошибка рендера/загрузки модуля даёт «Повторить» с перезагрузкой того же URL. Сетевые ошибки
+и 401 требуют явного повтора входа, без бесконечных автоматических запросов.
+Клиент сохраняет канонические компоненты tma и нативные контролы; персонал — Ant Design,
+TrainerScheduleView, trainer.css, syncTrainerTheme и существующие --crm-* токены.
+Проверки: tma/e2e/vk.spec.ts, tma/test/deadline.test.cjs, tma/test/vk-deployment.test.cjs,
+backend/test/vk-archive-rebinding.test.cjs. Архивирование освобождает VK ID; восстановление
+из архива требует новой привязки, старый VK автоматически не возвращается.

@@ -2,6 +2,9 @@ import '@ant-design/v5-patch-for-react-19'
 import { createRoot } from 'react-dom/client'
 import '../index.css'
 import '../ui-polish.css'
-import { TrainerScheduleView } from './TrainerScheduleView'
+import '../../../tma/src/styles.css'
+import './vk.css'
+import { VkMiniApp, MiniAppBoundary } from './VkMiniApp'
 
-createRoot(document.getElementById('root')!).render(<TrainerScheduleView />)
+document.body.classList.add('vk-mini-app')
+createRoot(document.getElementById('root')!).render(<MiniAppBoundary retry={() => window.location.reload()}><VkMiniApp /></MiniAppBoundary>)

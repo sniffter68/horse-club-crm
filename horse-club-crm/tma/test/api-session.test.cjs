@@ -11,7 +11,15 @@ test('VK cross-origin reads and mutations use the CRM API and Bearer without Tel
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   vm.runInNewContext(compiled, {
-    exports, require: () => ({ telegram: () => undefined, telegramRequiredError: () => new Error('No Telegram') }),
+    exports, require: name => {
+      if (name === './deadline') {
+        const child = {};
+        const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/deadline.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+        vm.runInNewContext(code, { exports: child, AbortController, setTimeout, clearTimeout, Error, Promise });
+        return child;
+      }
+      return { telegram: () => undefined, telegramRequiredError: () => new Error('No Telegram') };
+    },
     window: { location: { hostname: 'horseclub68.ru' } }, AbortSignal,
     fetch: async (url, options) => { requests.push({ url, options }); return { ok: true, json: async () => ({ ok: true }) }; },
   });

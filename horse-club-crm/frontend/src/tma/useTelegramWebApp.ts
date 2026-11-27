@@ -1,19 +1,14 @@
+export type { TelegramWebApp } from '../../../tma/src/telegram'
+import '../../../tma/src/telegram'
 import { useCallback, useEffect, useState } from 'react'
 import { tmaRequest, type TmaBootstrapResponse, type TrainerSession } from './api'
-import { isVkMiniApp, vkStaffBootstrap } from './vkSession'
+import { isVkMiniApp } from './vkSession'
 
-export interface TelegramWebApp {
-  safeAreaInset?: { top: number; bottom: number; left: number; right: number }
-  contentSafeAreaInset?: { top: number; bottom: number; left: number; right: number }
-  initData: string
-  colorScheme: 'light' | 'dark'
-  themeParams: { bg_color?: string; text_color?: string; secondary_bg_color?: string; hint_color?: string; button_color?: string; button_text_color?: string }
-  ready(): void
-  expand(): void
-  onEvent(event: 'themeChanged' | 'safeAreaChanged' | 'contentSafeAreaChanged', callback: () => void): void
-  offEvent(event: 'themeChanged' | 'safeAreaChanged' | 'contentSafeAreaChanged', callback: () => void): void
+const trainerColors = { bg: '#1c2420', text: '#edf2ed', surface: '#28332c', hint: '#b3bdb6', button: '#a4d5b8', 'button-text': '#163326' }
+function syncTrainerTheme() {
+  document.documentElement.dataset.theme = 'dark'
+  for (const [key, value] of Object.entries(trainerColors)) document.documentElement.style.setProperty(`--trainer-${key}`, value)
 }
-declare global { interface Window { Telegram?: { WebApp?: TelegramWebApp } } }
 
 let sdkPromise: Promise<void> | undefined
 function loadTelegramSdk(): Promise<void> {
@@ -33,7 +28,7 @@ function loadTelegramSdk(): Promise<void> {
 type AuthState = { kind: 'loading' } | { kind: 'ready'; session: TrainerSession }
   | { kind: 'not-linked' } | { kind: 'outside' } | { kind: 'error'; message: string }
 
-export function useTelegramWebApp() {
+export function useTelegramWebApp(suppliedSession?: TrainerSession) {
   const [state, setState] = useState<AuthState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const [dark, setDark] = useState(true)
@@ -43,12 +38,15 @@ export function useTelegramWebApp() {
     let disposeTheme: (() => void) | undefined
     void (async () => {
       try {
-        if (isVkMiniApp()) {
-          const result = await vkStaffBootstrap(controller.signal)
-          if (controller.signal.aborted || result.role === 'CLIENT' || result.role === 'UNLINKED_CLIENT') return
-          setState({ kind: 'ready', session: { authenticated: true, role: result.role, access_token: result.token,
-            accessLevel: result.accessLevel, trainer: { trainerId: result.trainerId ?? '', name: result.user.name } } })
-          return
+        if (suppliedSession) {
+          const previousTheme = document.documentElement.dataset.theme
+          syncTrainerTheme()
+          disposeTheme = () => {
+            if (previousTheme) document.documentElement.dataset.theme = previousTheme
+            else delete document.documentElement.dataset.theme
+            for (const key of Object.keys(trainerColors)) document.documentElement.style.removeProperty(`--trainer-${key}`)
+          }
+          setState({ kind: 'ready', session: suppliedSession }); return
         }
         await loadTelegramSdk()
         if (controller.signal.aborted) return
@@ -76,12 +74,7 @@ export function useTelegramWebApp() {
         }
         const syncTheme = () => {
           setDark(true)
-          root.dataset.theme = 'dark'
-          const values = { bg: '#1c2420', text: '#edf2ed', surface: '#28332c', hint: '#b3bdb6', button: '#a4d5b8', 'button-text': '#163326' }
-          for (const [key, value] of Object.entries(values)) {
-            if (value && /^#[0-9a-f]{6}$/i.test(value)) root.style.setProperty(`--trainer-${key}`, value)
-            else root.style.removeProperty(`--trainer-${key}`)
-          }
+          syncTrainerTheme()
         }
         syncTheme()
         syncSafeArea()
@@ -113,7 +106,7 @@ export function useTelegramWebApp() {
       }
     })()
     return () => { controller.abort(); disposeTheme?.() }
-  }, [attempt])
+  }, [attempt, suppliedSession])
   const retry = useCallback(() => { setState({ kind: 'loading' }); setAttempt(value => value + 1) }, [])
   const expire = useCallback(() => setState({ kind: 'error', message: isVkMiniApp() ? 'Сессия истекла. Повторите вход через VK' : 'Сессия истекла. Откройте приложение заново через бота' }), [])
   return { state, dark, retry, expire }

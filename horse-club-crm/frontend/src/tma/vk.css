@@ -1,0 +1,9 @@
+/* CRM primitives keep their tokens; the VK document inherits the Mini App theme. */
+html body.vk-mini-app {
+  color: var(--tma-text);
+  background: var(--tma-bg);
+  min-height: 100dvh;
+}
+body.vk-mini-app #root {
+  background: var(--tma-bg);
+}

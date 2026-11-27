@@ -1,3 +1,4 @@
+import { withDeadline } from './deadline';
 import { telegram, telegramRequiredError } from './telegram';
 
 const ZONE = 'Europe/Moscow';
@@ -35,27 +36,34 @@ let renewal: Promise<BootstrapResponse> | undefined;
 async function request<T>(path: string, options: RequestInit, retry: boolean): Promise<T> {
   const initData = telegram()?.initData;
   if (!initData && !sessionToken) throw telegramRequiredError();
-  const response = await fetch(`${apiOrigin()}/api/tma/${path}`, { ...options, credentials: 'include', cache: 'no-store',
-    signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
-    headers: { 'Content-Type': 'application/json', ...options.headers, Authorization: sessionToken && path !== 'bootstrap' ? `Bearer ${sessionToken}` : `tma ${initData}`, ...(initData ? { 'X-Telegram-Init-Data': initData } : {}) } });
-  if (response.status === 401 && initData && path !== 'bootstrap' && retry) {
-    renewal ??= request<BootstrapResponse>('bootstrap', { method: 'POST', body: JSON.stringify({ initData }) }, false)
-      .finally(() => { renewal = undefined; });
-    const result = await renewal;
-    setClientSession(result.role === 'CLIENT' ? result.token : null);
-    if (result.role === 'UNLINKED_CLIENT') {
-      window.dispatchEvent(new Event('tma:phone-link-required'));
-      throw new Error('Подтвердите телефон для привязки кабинета');
+  return withDeadline(async signal => {
+    const response = await fetch(`${apiOrigin()}/api/tma/${path}`, { ...options, credentials: 'include', cache: 'no-store',
+      signal,
+      headers: { 'Content-Type': 'application/json', ...options.headers, Authorization: sessionToken && path !== 'bootstrap' ? `Bearer ${sessionToken}` : `tma ${initData}`, ...(initData ? { 'X-Telegram-Init-Data': initData } : {}) } });
+    if (response.status === 401 && initData && path !== 'bootstrap' && retry) {
+      renewal ??= request<BootstrapResponse>('bootstrap', { method: 'POST', body: JSON.stringify({ initData }) }, false)
+        .finally(() => { renewal = undefined; });
+      const result = await renewal;
+      setClientSession(result.role === 'CLIENT' ? result.token : null);
+      if (result.role === 'UNLINKED_CLIENT') {
+        window.dispatchEvent(new Event('tma:phone-link-required'));
+        throw new Error('Подтвердите телефон для привязки кабинета');
+      }
+      if (result.role !== 'CLIENT') throw new Error('Откройте кабинет персонала: /tma/trainer');
+      return request<T>(path, options, false);
     }
-    if (result.role !== 'CLIENT') throw new Error('Откройте кабинет персонала: /tma/trainer');
-    return request<T>(path, options, false);
-  }
-  if (!response.ok) {
-    const body: unknown = await response.json().catch(() => null);
-    const message = body && typeof body === 'object' && 'message' in body ? body.message : undefined;
-    throw new Error(`${typeof message === 'string' ? message : 'Проверьте соединение и повторите запрос'} (HTTP ${response.status})`);
-  }
-  return response.json() as Promise<T>;
+    if (response.status === 401 && !initData && sessionToken) {
+      setClientSession(null);
+      window.dispatchEvent(new Event('vk:session-expired'));
+      throw new Error('Сессия истекла. Повторите вход через VK');
+    }
+    if (!response.ok) {
+      const body: unknown = await response.json().catch(() => null);
+      const message = body && typeof body === 'object' && 'message' in body ? body.message : undefined;
+      throw new Error(`${typeof message === 'string' ? message : 'Проверьте соединение и повторите запрос'} (HTTP ${response.status})`);
+    }
+    return response.json() as Promise<T>;
+  }, options.signal ?? undefined);
 }
 export const money = (value: string): string => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(Number(value));
 export const dateTime = (value?: string, dateOnly = false): string => {

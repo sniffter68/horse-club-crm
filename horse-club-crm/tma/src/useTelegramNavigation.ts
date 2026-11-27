@@ -8,9 +8,9 @@ export function useTelegramNavigation(text: string | undefined, enabled: boolean
     if (!app?.initData) return;
     const click = () => { if (enabled && !busy) { haptic(); action(); } };
     withTelegram(() => {
-      app.MainButton.setParams({ text: text ?? '', is_active: enabled && !busy, is_visible: Boolean(text) });
-      if (busy) app.MainButton.showProgress(); else app.MainButton.hideProgress();
-      app.MainButton.onClick(click);
+      app.MainButton?.setParams({ text: text ?? '', is_active: enabled && !busy, is_visible: Boolean(text) });
+      if (busy) app.MainButton?.showProgress(); else app.MainButton?.hideProgress();
+      app.MainButton?.onClick(click);
     });
     withTelegram(() => {
       if (app.BackButton) {
@@ -19,7 +19,7 @@ export function useTelegramNavigation(text: string | undefined, enabled: boolean
     });
     return () => {
       withTelegram(() => {
-        app.MainButton.offClick(click); app.MainButton.hide(); app.MainButton.hideProgress();
+        app.MainButton?.offClick(click); app.MainButton?.hide(); app.MainButton?.hideProgress();
       });
       withTelegram(() => {
         if (app.BackButton) {

@@ -1,5 +1,5 @@
 import { bootstrapPlatform, copyVkId, isVk, linkVkPhone } from './platform/bridge';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, setClientSession, dateTime, money, moscowDate, requireUuid, time, upcoming, type Booking, type MyBookingsResponse, type Service, type Slot } from './api';
 import { ClientDashboardView } from './ClientDashboardView';
 import { ClientBookingCatalog } from './ClientBookingCatalog';
@@ -7,7 +7,6 @@ import type { BootstrapResponse, ClientDashboard, ClientOverview } from './api';
 import { applyTheme, canRequestContact, haptic, telegram, withTelegram } from './telegram';
 import { useTelegramNavigation } from './useTelegramNavigation';
 
-const _h = React.createElement;
 
 const ADDRESS = 'Тамбов, ул. Бастионная, 22АС2';
 type Screen = 'loading' | 'link' | 'dashboard' | 'catalog' | 'slots' | 'checkout' | 'success' | 'my-bookings';
@@ -15,10 +14,10 @@ const titles: Record<Screen, string> = { loading: 'Кабинет клуба', l
 const errorText = (error: unknown): string => error instanceof Error ? error.message : 'Не удалось загрузить. Повторите попытку';
 const serviceTitle = (service: Service): string => service.title || service.name;
 const bookingTitle = (booking: Booking): string => booking.lesson?.service?.title || booking.lesson?.service?.name || 'Занятие в клубе';
-// Revalidate signed launch data in the staff bundle; never transfer JWTs via URL/storage.
-const openStaff = () => window.location.replace(`${isVk() ? '/vk-app/staff/' : '/tma/trainer'}${window.location.search}${window.location.hash}`);
+// Telegram keeps its separate entry; VK hands the session to its gateway in memory.
+const openTelegramStaff = () => window.location.replace(`/tma/trainer${window.location.search}${window.location.hash}`);
 
-export function App() {
+export function App({ bootstrap: suppliedBootstrap, onBootstrap }: { bootstrap?: BootstrapResponse; onBootstrap?: (result: BootstrapResponse) => void } = {}) {
   const [screen, setScreen] = useState<Screen>('loading');
   const [dashboard, setDashboard] = useState<ClientDashboard>();
   const [linked, setLinked] = useState(false);
@@ -73,7 +72,7 @@ export function App() {
 
   useEffect(() => {
     withTelegram(app => {
-      if (screen === 'checkout') app.enableClosingConfirmation(); else app.disableClosingConfirmation();
+      if (screen === 'checkout') app.enableClosingConfirmation?.(); else app.disableClosingConfirmation?.();
     });
     document.title = titles[screen];
     heading.current?.focus();
@@ -86,7 +85,7 @@ export function App() {
     setLoading(true); setError('');
     if (screen === 'loading' || screen === 'dashboard') {
       const loadDashboard = async () => {
-        const bootstrap = screen === 'loading' ? await bootstrapPlatform(controller.signal, initData => api<BootstrapResponse>('bootstrap', {
+        const bootstrap = screen === 'loading' ? suppliedBootstrap ?? await bootstrapPlatform(controller.signal, initData => api<BootstrapResponse>('bootstrap', {
           method: 'POST', body: JSON.stringify({ initData }), signal: controller.signal,
         })) : undefined;
         if (bootstrap?.role === 'UNLINKED_CLIENT') {
@@ -95,7 +94,7 @@ export function App() {
           return undefined;
         }
         if (bootstrap && bootstrap.role !== 'CLIENT') {
-          openStaff();
+          if (onBootstrap) onBootstrap(bootstrap); else openTelegramStaff();
           return undefined;
         }
         if (bootstrap) { setClientSession(bootstrap.token); setLinked(Boolean(bootstrap.clientId)); }
@@ -201,7 +200,7 @@ export function App() {
         const result = await linkVkPhone();
         if (result.role === 'UNLINKED_CLIENT') throw new Error('Передайте VK ID администратору клуба');
         if (result.role === 'CLIENT') { setClientSession(result.token); setLinked(true); setScreen('dashboard'); }
-        else openStaff();
+        else if (onBootstrap) onBootstrap(result); else openTelegramStaff();
       } catch (failure: unknown) { reportError(failure); }
       finally { submitting.current = false; setBusy(false); }
     }}>{busy ? 'Привязываем…' : 'Привязать по номеру ВК'}</button>
@@ -216,7 +215,7 @@ export function App() {
     </section>
     <p role="status">{busy ? 'Ожидаем разрешение VK и проверяем профиль…' : contactNotice}</p>
     {error && <p role="alert">{error}</p>}
-    <button className="quiet mt-4" disabled={busy} onClick={() => { setError(''); setContactNotice(''); setScreen('loading'); }}>Повторить вход</button>
+    <button className="quiet mt-4" disabled={busy} onClick={() => { setError(''); setContactNotice(''); if (onBootstrap) onBootstrap({ role: 'UNLINKED_CLIENT', needsPhoneLink: true }); else setScreen('loading'); }}>Повторить вход</button>
   </main>;
   if (screen === 'link') return <main className="mx-auto max-w-xl px-5">
     <h1>{titles.link}</h1><p>Поделитесь телефоном +7… в чате бота.</p>

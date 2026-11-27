@@ -85,17 +85,8 @@
 		redir /vk-app /vk-app/ 308
 		root * /var/www/crm-dist
 		header Cache-Control "no-store"
-		@vkStaff path /vk-app/staff /vk-app/staff/*
-		handle @vkStaff {
-			redir /vk-app/staff /vk-app/staff/ 308
-			try_files {path} /vk-app/staff/index.html
-			file_server
-		}
-		handle {
-			uri strip_prefix /vk-app
-			try_files /tma{path} /tma/index.html
-			file_server
-		}
+		try_files {path} /vk-app/index.html
+		file_server
 	}
 	handle {
 		# Shares the common CSP and upload proxy with CRM/API.

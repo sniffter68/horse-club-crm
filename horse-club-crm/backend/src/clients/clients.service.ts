@@ -289,13 +289,14 @@ export class ClientsService {
     try {
       return await archiveTransaction(this.prisma, async tx => {
         const client = await tx.client.findUnique({ where: { id }, select: {
-          id: true, deletedAt: true, boardingBalance: true,
+          id: true, deletedAt: true, boardingBalance: true, vkUserId: true,
           _count: { select: { sharedMemberships: true, bookings: true, memberships: true, payments: true, transactions: true,
             boardingContracts: true, boardingDailyLogs: true, ownedHorses: true, leadRequests: true } },
         } });
         if (!client) throw new NotFoundException('Клиент не найден');
         const softDeleted = Boolean(client.deletedAt) || !client.boardingBalance.isZero() || Object.values(client._count).some(count => count > 0);
-        if (softDeleted) await tx.client.update({ where: { id }, data: { deletedAt: client.deletedAt ?? new Date() } });
+        if (softDeleted && client.vkUserId) await tx.vkNotification.deleteMany({ where: { peerId: client.vkUserId, sentAt: null } });
+        if (softDeleted) await tx.client.update({ where: { id }, data: { deletedAt: client.deletedAt ?? new Date(), vkId: null, vkUserId: null, vkScreenName: null } });
         else await tx.client.delete({ where: { id } });
         return { id, softDeleted, message: softDeleted ? 'Клиент перенесен в архив. История сохранена' : 'Клиент удален безвозвратно' };
       });

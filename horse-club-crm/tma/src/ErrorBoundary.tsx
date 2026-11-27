@@ -1,6 +1,5 @@
 import React from 'react';
 
-const _h = React.createElement;
 
 export class ErrorBoundary extends React.Component<React.PropsWithChildren<{}>, { error: Error | null }> {
   // Explicit initialization avoids class-field compatibility helpers in the WebView bundle.

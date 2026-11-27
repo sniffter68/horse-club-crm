@@ -129,9 +129,10 @@ export class StaffService {
       if (trainerId) await tx.trainer.update({ where: { id: trainerId }, data: { ...trainerFields, ...(!active || nextRole !== Role.TRAINER ? { isPublic: false } : {}), fullName, name: fullName, ...(dto.phone !== undefined ? { phone: dto.phone || null } : {}), ...(dto.scheduleColor !== undefined ? { scheduleColor: dto.scheduleColor } : {}), isActive: active && nextRole === Role.TRAINER } });
       const accessChanged = createCrmAccess !== undefined && createCrmAccess !== account.crmAccess;
       await tx.user.update({ where: { id: account.id }, data: { role: nextRole, trainerId, ...(email !== undefined ? { email: email.trim().toLowerCase() } : {}), ...(passwordHash ? { passwordHash } : {}), ...(!active ? { crmAccess: false } : createCrmAccess !== undefined ? { crmAccess: createCrmAccess } : {}), ...(nextRole !== account.role || !active || accessChanged || passwordHash ? { tokenVersion: { increment: 1 } } : {}) } });
-      if (normalized) await this.identity.applyStaff(tx, account.id, normalized.vkId);
+      if (!active) await this.identity.applyStaff(tx, account.id, null);
+      else if (normalized) await this.identity.applyStaff(tx, account.id, normalized.vkId);
       // VK notifications resolve trainers directly; keep both identities in this transaction.
-      if (trainerId && (normalized || account.vkId)) await tx.trainer.update({ where: { id: trainerId }, data: { vkId: (normalized ? normalized.vkId : account.vkId) ? BigInt((normalized ? normalized.vkId : account.vkId)!) : null } });
+      if (trainerId && (!active || normalized || account.vkId)) await tx.trainer.update({ where: { id: trainerId }, data: { vkId: active && (normalized ? normalized.vkId : account.vkId) ? BigInt((normalized ? normalized.vkId : account.vkId)!) : null } });
       if (trainerId && (payScheme !== undefined || commissionPercent !== undefined || fixedPay !== undefined)) await tx.cashAuditLog.create({ data: {
         requestId: randomUUID(), action: 'STAFF_TRAINER_RATE_UPDATED', actorId: user.id, actorName: user.email,
         details: { trainerId, payScheme, commissionPercent, fixedPay },

@@ -7,5 +7,5 @@ export default defineConfig({
   testDir: './e2e', fullyParallel: true, reporter: 'list',
   use: { baseURL, screenshot: 'only-on-failure' },
   projects: [{ name: 'mobile', use: { ...devices['iPhone SE'], viewport: { width: 390, height: 844 }, defaultBrowserType: 'chromium', channel: 'msedge' } }],
-  webServer: { command: `node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port ${port} --strictPort --outDir ../frontend/dist`, url: baseURL, reuseExistingServer: !process.env.CI },
+  webServer: process.env.TMA_E2E_EXTERNAL_SERVER ? undefined : { command: `node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port ${port} --strictPort --outDir ../frontend/dist`, url: baseURL, reuseExistingServer: false },
 });

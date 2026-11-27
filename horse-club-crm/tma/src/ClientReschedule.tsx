@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, moscowDate, requireUuid } from './api';
 
-const _h = React.createElement;
 interface Slot { startTime: string; available: boolean }
 
 export function ClientReschedule({ bookingId, onClose, onSaved }: { bookingId: string; onClose: () => void; onSaved: () => void }) {

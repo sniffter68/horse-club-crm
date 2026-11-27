@@ -34,8 +34,8 @@ fi
 
 echo "===> 2. Building frontend dist..."
 npm --prefix frontend ci
-npm --prefix frontend run build
 npm --prefix tma ci
+npm --prefix frontend run build
 npm --prefix tma run build
 
 echo "===> 2.1. Building landing dist..."

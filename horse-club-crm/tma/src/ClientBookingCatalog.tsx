@@ -1,8 +1,6 @@
-import React from 'react';
 import { money, type Service } from './api';
 import { haptic } from './telegram';
 
-const _h = React.createElement;
 const serviceTitle = (service: Service): string => service.title || service.name;
 const FORMATS = [
   { label: 'Первое знакомство', pattern: /знаком|перв|начал|нович/i },

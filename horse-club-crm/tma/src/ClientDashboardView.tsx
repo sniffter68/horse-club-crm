@@ -1,9 +1,8 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { api, dateTime, requireUuid, upcoming, type ClientDashboard, type Booking } from './api';
 import { MembershipCard } from './MembershipCard';
 import { ClientReschedule } from './ClientReschedule';
 
-const _h = React.createElement;
 
 export function ClientDashboardView({ data, onBook, onRefresh, history = false }: { data: ClientDashboard; onBook: () => void; onRefresh: () => void; history?: boolean }) {
   const [busy, setBusy] = useState('');

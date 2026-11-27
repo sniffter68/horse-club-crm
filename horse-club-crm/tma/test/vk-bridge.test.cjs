@@ -18,6 +18,12 @@ function bridgeFixture({ denied = false, status = 200, result = { status: 'LINKE
         if (denied) throw new Error('Denied');
         return { phone_number: '79991234567', sign: 'signed-phone' };
       } } };
+      if (name === '../deadline') {
+        const child = { exports: {} };
+        const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/deadline.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+        vm.runInNewContext(code, { exports: child.exports, AbortController, setTimeout, clearTimeout, Error, Promise });
+        return child.exports;
+      }
       if (name === '../telegram') return {};
       if (name === '../api') return { apiOrigin: () => 'https://crm.horseclub68.ru' };
       throw new Error(`Unexpected import: ${name}`);

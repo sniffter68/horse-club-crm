@@ -1,3 +1,4 @@
+import { withDeadline } from '../../../tma/src/deadline'
 import { getApiBaseUrl } from '../apiUrl'
 
 export type LessonStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
@@ -30,16 +31,19 @@ export class TmaApiError extends Error {
 }
 
 export async function tmaRequest<T>(path: string, token: string | null, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${getApiBaseUrl()}/tma/${path}`, { ...options, credentials: 'omit', cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) } })
-  if (!response.ok) {
-    let body: unknown
-    try { body = await response.json() } catch { /* Proxy failures can return HTML. */ }
-    const message = body && typeof body === 'object' && 'message' in body ? body.message : undefined
-    throw new TmaApiError(typeof message === 'string' ? message : Array.isArray(message) && message.every(item => typeof item === 'string')
-      ? message.join('. ') : 'Не удалось выполнить запрос. Проверьте соединение и повторите', response.status)
-  }
-  return response.json() as Promise<T>
+  return withDeadline(async signal => {
+    const response = await fetch(`${getApiBaseUrl()}/tma/${path}`, { ...options, credentials: 'omit', cache: 'no-store',
+      signal,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) } })
+    if (!response.ok) {
+      let body: unknown
+      try { body = await response.json() } catch { /* Proxy failures can return HTML. */ }
+      const message = body && typeof body === 'object' && 'message' in body ? body.message : undefined
+      throw new TmaApiError(typeof message === 'string' ? message : Array.isArray(message) && message.every(item => typeof item === 'string')
+        ? message.join('. ') : 'Не удалось выполнить запрос. Проверьте соединение и повторите', response.status)
+    }
+    return response.json() as Promise<T>
+  }, options.signal ?? undefined);
 }
 
 export type TmaBootstrapResponse =

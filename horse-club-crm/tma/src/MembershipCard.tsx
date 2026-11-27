@@ -1,7 +1,5 @@
-import React from 'react';
 import { dateTime, type Membership } from './api';
 
-const _h = React.createElement;
 
 export function MembershipCard({ membership, progress = false }: { membership: Membership | null; progress?: boolean }) {
   const remaining = membership?.remainingLessons ?? membership?.remainedLessons ?? 0;

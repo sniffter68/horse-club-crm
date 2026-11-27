@@ -9,19 +9,20 @@ export interface TelegramWebApp {
   safeAreaInset?: { top: number; bottom: number; left: number; right: number };
   contentSafeAreaInset?: { top: number; bottom: number; left: number; right: number };
   initData: string;
-  initDataUnsafe: { user?: TelegramUser };
+  colorScheme?: 'light' | 'dark';
+  initDataUnsafe?: { user?: TelegramUser };
   themeParams: { bg_color?: string; text_color?: string; button_color?: string; button_text_color?: string; hint_color?: string; secondary_bg_color?: string };
-  MainButton: TelegramButton & { setParams(params: { text: string; is_active: boolean; is_visible: boolean }): void; showProgress(): void; hideProgress(): void };
+  MainButton?: TelegramButton & { setParams(params: { text: string; is_active: boolean; is_visible: boolean }): void; showProgress(): void; hideProgress(): void };
   BackButton?: TelegramButton;
   HapticFeedback?: { impactOccurred(style: 'light'): void };
   isVersionAtLeast?(version: string): boolean;
   requestContact?(callback: (ok: boolean, response?: TelegramContactResponse) => void): void;
   ready(): void; expand(): void;
-  enableClosingConfirmation(): void; disableClosingConfirmation(): void;
+  enableClosingConfirmation?(): void; disableClosingConfirmation?(): void;
   onEvent(event: 'themeChanged' | 'safeAreaChanged' | 'contentSafeAreaChanged', callback: () => void): void;
   offEvent(event: 'themeChanged' | 'safeAreaChanged' | 'contentSafeAreaChanged', callback: () => void): void;
 }
-declare global { interface Window { Telegram?: { WebApp: TelegramWebApp } } }
+declare global { interface Window { Telegram?: { WebApp?: TelegramWebApp } } }
 export const telegram = (): TelegramWebApp | undefined => typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
 export const telegramRequiredError = (): Error => new Error('Откройте запись через Telegram-бота');
 

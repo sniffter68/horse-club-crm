@@ -1,25 +1,69 @@
-# VK Mini App 6781503
+﻿# VK Mini App
 
-URL запуска: https://horseclub68.ru/vk-app/
+Вход: https://horseclub68.ru/vk-app/ — приложение https://vk.ru/app6781503.
 
-На сервере задайте VK_MINI_APP_ID=6781503 и VK_MINI_APP_SECRET (защищённый ключ приложения VK). Пересоберите backend, frontend и tma (именно в этом порядке), перезапустите backend и Caddy. `frontend build` также собирает кабинет персонала в `frontend/dist/vk-app/staff/`; `tma build` сохраняет его, обновляя только `dist/tma/`. docker-compose.prod.yml передаёт обе переменные. Миграция Prisma не нужна.
+Единственный шлюз `frontend/src/tma/VkMiniApp.tsx` проверяет наличие vk_app_id,
+vk_user_id и sign, инициализирует VK Bridge и один раз вызывает POST /api/auth/vk-mini-app.
+Подпись и права проверяет backend; наличие параметров само по себе не даёт доступа.
 
-После входа и после `link-by-vk` клиент сразу видит кабинет всадника, тренер — своё расписание с отметкой посещаемости, администратор/менеджер — расписание клуба. Используется тот же `TrainerScheduleView`, что и в Telegram. VK остаётся на `horseclub68.ru/vk-app/` (персонал — `/vk-app/staff/`): переходов на внешний сайт, кнопки «Открыть CRM» и заглушки нет. Caddy обслуживает отдельную сборку персонала с VK CSP на этом же origin.
+CLIENT/UNLINKED используют существующий tma/src/App.tsx, TRAINER — своё расписание,
+ADMIN/STAFF — расписание клуба из TrainerScheduleView. Готовая сессия передаётся
+через props, без повторной авторизации, редиректа и переноса JWT через URL/storage.
+Bearer хранится в памяти. CRM-сессия не используется; API на публичном домене
+использует существующий CRM API origin и CORS.
 
-Ответ LINKED сохраняет `role` и `access_token` для совместимости. `token` — токен сессии Mini App; сотрудникам также возвращаются `miniAppRole` (`ADMIN`, `TRAINER`, `STAFF`), `trainerId`, `user: { id, name, ... }`, `accessLevel`. Адаптер приводит роль VK к общему BootstrapResponse; MANAGER и другие сотрудники используют STAFF и существующие настройки SCHEDULE. Роль TRAINER требует активной карточки тренера. Для сотрудников `token` имеет audience=trainer-tma, tokenType=trainer-tma, vkUserId и authVersion. CRM `access_token` сохраняется отдельно и не принимается на scoped TMA endpoints. Каждый запрос проверяет актуальную VK-привязку, crmAccess, активность и tokenVersion, затем RBAC. Клиент получает token=access_token с audience=client-tma.
+Привязка телефона: VKWebAppGetPhoneNumber и POST /api/auth/vk-mini-app/link-by-vk.
+Backend проверяет подпись телефона; результат переключает кабинет в том же документе.
+Повторная авторизация нужна только по явной команде пользователя, например после 401.
 
-Клиентский и рабочий API-транспорт на horseclub68.ru обращаются к https://crm.horseclub68.ru/api с `Authorization: Bearer <token>`. Вход и клиентский транспорт также используют `credentials: include`; рабочий транспорт использует Bearer с `credentials: omit`. Авторизация работает при отсутствии cookies. CORS разрешает origin horseclub68.ru и заголовок Authorization. При загрузке отдельного рабочего bundle повторно проверяются исходные launchParams; JWT не попадает в URL или browser storage. Ошибка входа остаётся inline с повтором; истёкшая рабочая сессия предлагает повторить вход через VK.
+Вне VK сразу появляется «Откройте приложение через VK», без Bridge/API.
+Bridge ограничен 10 секундами, авторизация/согласие — 15, чтения/мутации — 20.
+Загрузка модуля расписания ограничена 15 секундами. ErrorBoundary перехватывает
+ошибки рендера и загрузки модуля; «Повторить» перезагружает тот же URL.
+Сетевые ошибки и истечение сессии имеют явный повтор входа.
 
-POST /api/auth/vk-mini-app принимает launchParams (исходную строку query). Проверяются HMAC-SHA256/base64url, уникальность параметров, App ID, числовой user ID и vk_ts (24 часа, затем требуется повторный запуск). Параметры launch не сохраняются. JWT клиента ограничен audience client-tma; каждая операция проверяет актуальную привязку и отсутствие архива. JWT сотрудников использует существующий tokenVersion и CRM RBAC. Сотрудникам выдаётся cookie CRM при запросе на crm.horseclub68.ru.
+## Сборка и развёртывание
 
-UNLINKED возвращает проверенный vkUserId. Экран показывает VK ID, «Скопировать ID», «Повторить вход» и «Привязать по номеру ВК». Полей ручного ввода телефона и кода нет. Администратор может указать VK ID в карточке клиента или сотрудника; следующий вход сразу открывает кабинет.
+Нужны VK_MINI_APP_ID=6781503 и VK_MINI_APP_SECRET. deploy.sh и deploy-native.cjs
+устанавливают зависимости frontend и tma до сборки frontend: VK entry переиспользует
+исходники клиента, VK Bridge и Tailwind plugin из tma. Vite использует один React 19
+runtime для VK; лёгкий Telegram bundle сохраняет React 17.
 
-POST /api/auth/vk-mini-app/link-by-vk принимает `{ launchParams, phone, phoneToken }`: `phone` — исходный `phone_number`, `phoneToken` — `sign` из `VKWebAppGetPhoneNumber`. Backend проверяет HMAC launch-параметров, затем SHA256/base64url от конкатенации App ID, защищённого ключа, проверенного User ID, `phone_number` и исходного номера. Формат подписи описан в [официальном VK Mini Apps API](https://github.com/VKCOM/vk-mini-apps-api/blob/master/src/index.ts). Номер без подписи не принимается, код из карточки не нужен. Старый Mini App endpoint `/link` удалён; привязка через чат VK-бота сохраняет собственный сценарий.
+```sh
+npm --prefix frontend ci
+npm --prefix tma ci
+npm --prefix frontend run build
+npm --prefix tma run build
+```
 
-Телефон нормализуется через libphonenumber-js; SQL сопоставляет цифры существующих номеров, включая форматирование и префиксы 7/8. Поиск охватывает неархивных Client и активных StaffProfile/Trainer, связанных с User. При нескольких профилях с одним номером привязка отклоняется. Изменения выполняются в Serializable-транзакции через общий VkIdentityService: проверка конфликтов между моделями, синхронизация vkId/vkUserId, для тренера также Trainer.vkId. Недоступным сотрудникам с crmAccess=false сессия не выдаётся. Поддерживаются все CRM-роли с существующим RBAC. Клиент получает JWT, сотрудник — JWT и cookie CRM.
+Результат: frontend/dist/vk-app/index.html и assets для всех ролей VK;
+frontend/dist/tma/ — самостоятельный Telegram-клиент. Сборки с базой
+/vk-app/staff/ больше нет. npm run build:frontends также собирает tma.
+Backend собирается штатным Dockerfile; Caddy монтирует тот же frontend/dist.
 
-Telegram SDK и его авторизация сохранены. Общий bundle использует относительные пути для /tma/ и /vk-app/. CSP и разрешение iframe VK ограничены /vk-app/. Официальный VK Bridge: https://github.com/VKCOM/vk-bridge . После добавления SDK лимит JS+CSS увеличен со 160 до 176 КБ; фактический размер около 165 КБ.
+Caddy разрешает iframe от vk.com, *.vk.com, m.vk.com, vk.ru, *.vk.ru и *.vk-apps.com
+только на /vk-app/*. Здесь отсутствует X-Frame-Options; остальные обычные страницы
+сохраняют DENY. Старые подпути обслуживаются тем же SPA. CSP и маршрут защищены тестом.
 
-Проверки 27.11.2026: backend lint/typecheck/build, 1003 теста passed, 28 skipped (включая 10 профильных unit/HTTP-тестов VK). Frontend lint/typecheck/build, 261 тест passed. TMA lint/typecheck/build, 5 unit-тестов passed; JS+CSS 166615 байт raw при лимите 176000. Статический аудит TMA — без замечаний. Backend lint сохраняет 3 существующих предупреждения в тестах, ошибок нет.
+При архивировании Client очищаются vkId/vkUserId/vkScreenName; архивирование сотрудника
+(StaffProfile.isActive=false) очищает User и связанную Trainer VK-привязку. Новое назначение
+освобождает старые архивные привязки в той же Serializable-транзакции: UNIQUE-индексы
+больше не мешают перепривязке. Активные дубликаты дают 409. Восстановление из архива
+не возвращает прежний VK автоматически. Схема Prisma не меняется.
 
-Playwright: `TMA_E2E_PORT=5177 npm --prefix tma run test:e2e -- vk.spec.ts` (в PowerShell переменная задаётся через `$env:TMA_E2E_PORT='5177'`) — 4 passed в Edge, мобильный viewport 390×844. Проверены подписанный номер из mock VK Bridge, отсутствие полей ввода, копирование ID, отказ VK, ошибка CRM, pending, повтор и вход сотрудника. Preview обслуживает общий frontend/dist для корректных путей /tma/assets; порт по умолчанию 5175, альтернативный задаётся при занятом локальном порте. Скриншот: `docs/reports/vk-native-phone-mobile.png`. Реальный запрос согласия внутри VK и SQL на серверной PostgreSQL требуют проверки при развёртывании; тесты используют mocks. Миграция Prisma не нужна.
+## Проверки
+
+npm test в backend/frontend/tma; Playwright в tma проверяет Telegram и VK, включая
+iframe для всех ролей, один bootstrap, phone-link, READ_ONLY, истечение сессии,
+отсутствие launch params, ошибки, Bridge timeout и повтор.
+
+```powershell
+$env:TMA_E2E_PORT='5193'
+npm --prefix tma run test:e2e -- --workers=3
+```
+
+Preview создаётся заново, чтобы не подхватить старые правила маршрутизации.
+Для заранее запущенного проверенного preview есть TMA_E2E_EXTERNAL_SERVER=1.
+Подробности: [отчёт](reports/vk-mini-app-architecture-cleanup-2026-11-27.md).
+Реальный вход/согласие VK и HTTP-заголовки production проверяются после выкладки;
+локальные тесты используют mock VK Bridge/API/Prisma.

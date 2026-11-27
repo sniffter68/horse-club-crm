@@ -45,13 +45,33 @@ export class VkIdentityService {
     return { vkId: String(user.id), vkScreenName: parsed.vkScreenName! };
   }
 
-  async assertAvailable(tx: Prisma.TransactionClient, vkId: string | null, kind: 'CLIENT' | 'STAFF' | 'TRAINER', id?: string, trainerId?: string | null) {
+  async assertAvailable(tx: Prisma.TransactionClient, vkId: string | null, kind: 'CLIENT' | 'STAFF' | 'TRAINER', id?: string, trainerId?: string | null): Promise<void> {
     if (!vkId) return;
     const [client, user, trainer] = await Promise.all([
-      tx.client.findFirst({ where: { OR: [{ vkId }, { vkUserId: BigInt(vkId) }] }, select: { id: true } }),
-      tx.user.findFirst({ where: { OR: [{ vkId }, { vkUserId: BigInt(vkId) }] }, select: { id: true, trainerId: true } }),
-      tx.trainer.findUnique({ where: { vkId: BigInt(vkId) }, select: { id: true } }),
+      tx.client.findFirst({ where: { OR: [{ vkId }, { vkUserId: BigInt(vkId) }] }, select: { id: true, deletedAt: true } }),
+      tx.user.findFirst({ where: { OR: [{ vkId }, { vkUserId: BigInt(vkId) }] }, select: { id: true, trainerId: true, staffProfile: { select: { isActive: true } } } }),
+      tx.trainer.findUnique({ where: { vkId: BigInt(vkId) }, select: { id: true, deletedAt: true } }),
     ]);
+    // Release legacy archived bindings inside the same serializable transaction.
+    // Filtering them out alone still leaves PostgreSQL's unique constraints occupied.
+    let released = false;
+    if (client?.deletedAt) {
+      await tx.client.update({ where: { id: client.id }, data: { vkId: null, vkUserId: null, vkScreenName: null } });
+      released = true;
+    }
+    if (user?.staffProfile?.isActive === false) {
+      await tx.user.update({ where: { id: user.id }, data: { vkId: null, vkUserId: null } });
+      if (user.trainerId) await tx.trainer.updateMany({ where: { id: user.trainerId, vkId: BigInt(vkId) }, data: { vkId: null } });
+      released = true;
+    }
+    if (trainer?.deletedAt) {
+      await tx.trainer.update({ where: { id: trainer.id }, data: { vkId: null } });
+      released = true;
+    }
+    if (released) {
+      await tx.vkNotification.deleteMany({ where: { peerId: BigInt(vkId), sentAt: null } });
+      return this.assertAvailable(tx, vkId, kind, id, trainerId);
+    }
     const ownsClient = kind === 'CLIENT' && client?.id === id;
     const ownsUser = kind === 'STAFF' && user?.id === id || kind === 'TRAINER' && id !== undefined && user?.trainerId === id;
     const ownsTrainer = kind === 'TRAINER' && trainer?.id === id || kind === 'STAFF' && trainer?.id === trainerId;

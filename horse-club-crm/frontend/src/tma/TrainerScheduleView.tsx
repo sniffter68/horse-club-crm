@@ -19,8 +19,8 @@ const statuses: Record<LessonStatus, { label: string; color: string }> = {
 type Sheet = { kind: 'status' | 'horse'; lesson: TrainerLesson } | null
 type DayResult = { lessons: TrainerLesson[]; error?: string }
 
-export function TrainerScheduleView() {
-  const { state, dark, retry, expire } = useTelegramWebApp()
+export function TrainerScheduleView({ session, onRetry }: { session?: TrainerSession; onRetry?: () => void } = {}) {
+  const { state, dark, retry, expire } = useTelegramWebApp(session)
   const [board, setBoard] = useState(false)
   const [date, setDate] = useState(tmaDay)
   return <ConfigProvider locale={ruRU} theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm,
@@ -41,7 +41,7 @@ export function TrainerScheduleView() {
             ? 'Telegram пока не привязан' : state.kind === 'outside' ? 'Откройте приложение в Telegram' : 'Не удалось войти'}
           description={state.kind === 'not-linked' ? 'Попросите администратора привязать ваш Telegram к учётной записи сотрудника и карточке тренера.'
             : state.kind === 'outside' ? 'Перейдите в бот клуба и откройте расписание тренера.' : state.kind === 'error' ? state.message : undefined} />
-          <Button onClick={retry}>Повторить вход</Button>
+          <Button onClick={onRetry ?? retry}>Повторить вход</Button>
         </>}
       </section>}
     </main></App>

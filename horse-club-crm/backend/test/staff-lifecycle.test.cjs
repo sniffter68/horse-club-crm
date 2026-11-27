@@ -111,7 +111,12 @@ test('employee without CRM access remains a linked trainer; archiving disables a
   const row = await service.saveProfile({ fullName: 'Тренер', role: 'TRAINER' }, admin);
   assert.equal(state.account.crmAccess, false); assert.ok(state.account.email.endsWith('@staff.invalid'));
   const trainerId = state.trainer.id;
+  state.account.vkId = '42';
+  state.account.vkUserId = 42n;
+  state.trainer.vkId = 42n;
   await service.archive(row.id, admin);
+  assert.deepEqual(state.vk, { id: state.account.id, vkId: null });
+  assert.equal(state.trainer.vkId, null);
   assert.equal(state.profile.isActive, false); assert.equal(state.trainer.isActive, false);
   assert.equal(state.account.trainerId, trainerId); assert.equal(state.account.crmAccess, false);
   assert.equal(state.archiveShifts.where.staffId, row.id);
