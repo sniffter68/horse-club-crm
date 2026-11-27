@@ -1,11 +1,11 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Descriptions, List, Space, Tag, Typography } from 'antd'
 import { money } from '../catalogs/format'
 import { CatalogList } from '../catalogs/shared'
 import { dateOnly, dateTime, personName } from '../cards/format'
 import { CardLink, DetailsModal } from '../cards/shared'
 import type { BoardingContract, BoardingContractStatus } from './types'
-import { BoardingCash } from '../cash-desk/BoardingCash'
 import { usePermissions } from '../../modulePermissions'
 
 const statusLabels: Record<BoardingContractStatus, string> = {
@@ -19,8 +19,9 @@ export function BoardingContractList() {
   const { canRead } = usePermissions()
   const [selectedId, setSelectedId] = useState<string>()
   return <>
-    {canRead('CASHBOX') && <BoardingCash />}
-    <CatalogList<BoardingContract> resource="boarding-contracts" storageKey="horse_crm_boarding_contracts_columns_v1" defaultHiddenColumns={['startsAt', 'endsAt', 'payments']} title="Договоры постоя" columns={[
+    <CatalogList<BoardingContract> resource="boarding-contracts" storageKey="horse_crm_boarding_contracts_columns_v1" defaultHiddenColumns={['startsAt', 'endsAt', 'payments']}
+      toolbar={canRead('CASHBOX') && <Link className="crm-toolbar-link" to="/payments?cashboxType=BOARDING">Касса постоя</Link>}
+      title="Договоры постоя" columns={[
       { key: 'client', fixed: 'left', width: 180, title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{record.client ? personName(record.client) : 'Лошадь клуба'}</CardLink> },
       { key: 'horse', width: 125, dataIndex: ['horse', 'name'], title: 'Лошадь' },
       { key: 'stall', align: 'center', width: 100, title: 'Денник', render: (_: unknown, record) => record.stall?.name || record.stall?.number || '—' },

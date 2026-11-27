@@ -118,7 +118,7 @@ export function ClientList() {
     { key: 'phone', dataIndex: 'phone', title: 'Телефон', width: 150, fixed: 'left', align: 'left', sorter: true, render: (value: string | null) => <span className="data-mono">{value || '—'}</span> },
     { key: 'clientType', title: 'Тип', width: 120, align: 'center', render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : row.clientType === 'ONE_TIME' ? <OneTimeBadge /> : 'Постоянный' },
     { key: 'vk', title: 'VK', hidden: !canManage, width: 180, align: 'left', render: (_: unknown, row) => <VkProfileLink id={row.id} name={row.name || row.firstName} kind="CLIENT" vkId={row.vkId} vkUserId={row.vkUserId} /> },
-    { key: 'membership', title: 'Абонемент', hidden: !canManage, width: 260, align: 'right', render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : <MembershipBalance membership={row.membership} clientId={row.id} /> },
+    { key: 'membership', title: 'Абонемент', hidden: !canManage, width: 260, align: 'right', render: (_: unknown, row) => row.deletedAt ? <Tag>В архиве</Tag> : <MembershipBalance compact membership={row.membership} clientId={row.id} /> },
     { key: 'roles', title: 'Роли', width: 160, align: 'center', render: (_: unknown, row) => <Space wrap size={4} className="client-roles">{row.isRider && <Tag className="crm-tag crm-tag--accent">Всадник</Tag>}{row.isPayer && <Tag className="crm-tag crm-tag--success">Плательщик</Tag>}</Space> },
     { key: 'preferences', dataIndex: 'preferences', title: 'Заметки', width: 180, align: 'left', render: (value: string | null) => <ClientNotes value={value} /> },
     { key: 'createdAt', dataIndex: 'createdAt', title: 'Дата создания', width: 150, align: 'left', sorter: true, render: (value: string) => dateFormatter.format(new Date(value)) },

@@ -62,18 +62,18 @@ export function PaymentList() {
       {cashboxType === 'BOARDING' && <BoardingCash />}
       <Alert type="info" showIcon message="Простой внутренний учёт"
         description="Начисления создаются автоматически. Нажмите «Оплачено», когда деньги получены. Кассовые чеки и бухгалтерия ведутся отдельно."
-        style={{ marginBottom: 20 }} />
-      <Form noValidate {...searchFormProps} layout="inline" style={{ marginBottom: 20 }}>
+        style={{ marginBottom: 12 }} />
+      <Form noValidate {...searchFormProps} layout="inline" className="crm-list-toolbar">
         <Form.Item name="q" style={{ width: 320, maxWidth: '100%' }}><LiveSearch loading={tableQuery.isFetching} suggestions={(tableProps.dataSource ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })} placeholder="Клиент, лошадь или комментарий" onSearch={() => searchFormProps.form?.submit()} /></Form.Item>
         <Button htmlType="submit">Найти</Button>
       </Form>
       {tableQuery.error && <Alert type="error" showIcon message="Не удалось загрузить оплаты" description={tableQuery.error.message} />}
-      <ResponsiveTable<Payment> {...tableProps} className="crm-entity-table" tableLayout="fixed" size="small" rowKey="id" pagination={{
+      <ResponsiveTable<Payment> {...tableProps} compact className="crm-entity-table" tableLayout="fixed" size="small" rowKey="id" pagination={{
         ...tableProps.pagination, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showTotal: total => `Всего: ${total}`,
       }} columns={[
         { key: 'client', title: 'Клиент', render: (_: unknown, record) => <CardLink onClick={() => setSelectedId(record.id)}>{personName(record.client)}</CardLink> },
         { key: 'source', title: 'Основание', render: (_: unknown, record) => source(record) },
-        { key: 'amount', dataIndex: 'amount', title: 'Сумма', sorter: true, render: money },
+        { key: 'amount', dataIndex: 'amount', title: 'Сумма', align: 'right', sorter: true, render: money },
         { key: 'method', title: 'Способ оплаты', render: (_: unknown, row) => <Tag color={row.method === 'CASH' ? 'green' : 'blue'}>{paymentMethods.find(item => item.value === row.method)?.label || 'Не указан'}</Tag> },
         { key: 'status', dataIndex: 'status', title: 'Оплата', sorter: true, render: (_: PaymentStatus, record) => <Space>
           <Tag color={colors[record.status]}>{statuses[record.status]}</Tag>

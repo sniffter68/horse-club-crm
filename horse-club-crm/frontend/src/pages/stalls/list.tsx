@@ -1,7 +1,7 @@
 import { StallRiskSettings } from './StallRiskSettings'
 import { useCatalogPermissions } from '../catalogs/permissions'
 import { useState } from 'react'
-import { Empty, List, Space, Tag } from 'antd'
+import { Button, Empty, List, Popover, Space, Tag } from 'antd'
 import { money } from '../catalogs/format'
 import { CatalogList } from '../catalogs/shared'
 import type { Stall } from '../catalogs/types'
@@ -16,11 +16,14 @@ import { StallDetailsCard } from './card'
 export function StallList() {
   const { canManage } = useCatalogPermissions('stalls')
   const [selectedId, setSelectedId] = useState<string>()
+  const [riskOpen, setRiskOpen] = useState(false)
   return <>
-    <StallRiskSettings canManage={canManage} />
-    <CatalogList<Stall> resource="stalls" title="Денники" editAction={stall => <CatalogEditAction resource="stalls" id={stall.id}><StallForm action="edit" /></CatalogEditAction>} extraActions={stall => <StallDeleteAction id={stall.id} />} columns={[
+    <CatalogList<Stall> resource="stalls" title="Денники" toolbar={<Popover trigger="click" open={riskOpen} onOpenChange={setRiskOpen}
+      title="Проверка соседства" content={<div className="stall-risk-popover"><StallRiskSettings canManage={canManage} /></div>}>
+      <Button aria-expanded={riskOpen} onClick={() => setRiskOpen(!riskOpen)}>Проверка соседства</Button>
+    </Popover>} editAction={stall => <CatalogEditAction resource="stalls" id={stall.id}><StallForm action="edit" /></CatalogEditAction>} extraActions={stall => <StallDeleteAction id={stall.id} />} columns={[
       { key: 'name', title: 'Название', sorter: true, render: (_: unknown, row) => <CardLink onClick={() => setSelectedId(row.id)}>{row.name || `Денник ${row.number ?? 'без номера'}`}</CardLink> },
-      { key: 'number', title: 'Номер', render: (_: unknown, row) => row.type === 'SERVICE' ? null : row.number },
+      { key: 'number', title: 'Номер', align: 'right', render: (_: unknown, row) => row.type === 'SERVICE' ? null : row.number },
       { key: 'description', dataIndex: 'description', title: 'Описание', width: 420, ellipsis: true, render: (value: string | null) => value || '—' },
       { key: 'contracts', title: 'Постой', width: 360, render: (_: unknown, record) => {
         const contracts = record.contracts ?? []

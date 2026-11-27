@@ -26,8 +26,8 @@ rounded:
   pill: "999px"
 spacing:
   control-height: "2.5rem"
-  page-gutter: "1.5rem"
-  section-gap: "1.5rem"
+  page-gutter: "1rem"
+  section-gap: "0.75rem"
 components:
   button:
     radius: "0.75rem"
@@ -241,3 +241,6 @@ Telegram в контактах клиента, пользователях и ш�
 Персонал (25.11.2026): специализация тренера и «Доступ в CRM» переиспользуют `ToggleSettingRow` в существующей правой шторке. Компактный доступ в таблице — Ant Design Switch, подтверждение отключения — App Modal с начальным фокусом на отмене. Предупреждения специализации в обеих формах расписания — мягкий Alert; сохранение разрешено. Существующие `--crm-*`, типографика и тема сохраняются. Контракт: `docs/staff-toggles.md`.
 
 Android/PWA (26.11.2026): манифест использует существующие background #F7F4F0 и primary #241E1C; PNG повторяют знак H с цветом #E4DAD0. Общий shell, Ant Design Drawer/Modal и login учитывают safe-area. NativeApp адаптирует статус-бар к текущей теме; Back переиспользует Escape существующего оверлея и историю BrowserRouter. Инструкция: `docs/android-build.md`; проверки: `frontend/e2e/mobile-shell.spec.ts`.
+
+
+Compact UI (27.11.2026): page gutter 16px, section gap 12px, card padding 16px, table rows 44px minimum (multiline values may expand). Runtime owners: --crm-page-gutter, --crm-section-gap, --crm-card-padding, --crm-row-height in frontend/src/index.css. Shared components: AppLayout/Sidebar, CatalogList, ConfigurableTable and ResponsiveTable. Palette and typography retained. Laptop tables use proportional column budgets; TableCellText exposes truncated text. Search, filters, create and column settings share a toolbar.

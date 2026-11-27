@@ -16,6 +16,7 @@ import type { AuthOptions } from './auth.config';
 import type { AccessTokenResponse, AuthUser, JwtPayload } from './auth.types';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
+import { demoAccounts, requireDemo, type DemoRole } from '../demo/demo.config';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -51,6 +52,18 @@ export class AuthService implements OnModuleInit {
     const { authVersion, ...user } = await this.validateUser(dto.email, dto.password);
     const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role, authVersion };
     return { access_token: await this.jwt.signAsync(payload), user };
+  }
+
+  async loginDemo(role: DemoRole): Promise<AccessTokenResponse> {
+    requireDemo();
+    const account = demoAccounts[role];
+    const user = await this.prisma.user.findUnique({ where: { id: account.id },
+      select: { id: true, email: true, role: true, crmAccess: true, tokenVersion: true } });
+    if (!user || !user.crmAccess || user.email !== account.email || user.role !== account.role) {
+      throw new UnauthorizedException('Демо-аккаунт недоступен');
+    }
+    return { access_token: await this.jwt.signAsync({ sub: user.id, email: user.email, role: user.role,
+      authVersion: String(user.tokenVersion) }), user: { id: user.id, email: user.email, role: user.role } };
   }
 
   async logout(user: AuthUser): Promise<{ success: true }> {

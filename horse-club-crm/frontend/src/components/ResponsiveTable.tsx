@@ -2,6 +2,7 @@ import { isValidElement, type Key, type ReactNode } from 'react'
 import { Card, Grid, List, Table, Typography, type TableProps } from 'antd'
 import type { ColumnType } from 'antd/es/table'
 import type { PaginationConfig } from 'antd/es/pagination'
+import { RowActions } from './RowActions'
 
 type DataIndex = string | number | readonly (string | number)[]
 
@@ -27,9 +28,21 @@ function columnLabel<T extends object>(column: ColumnType<T>): ReactNode {
   return typeof column.key === 'string' || typeof column.key === 'number' ? String(column.key) : ''
 }
 
-export function ResponsiveTable<T extends object>({ columns = [], ...tableProps }: TableProps<T>) {
+export function ResponsiveTable<T extends object>({ columns = [], compact = false, ...tableProps }: TableProps<T> & { compact?: boolean }) {
   const screens = Grid.useBreakpoint()
-  if (screens.md) return <Table<T> {...tableProps} columns={columns} />
+  if (screens.md) {
+    // Fit the laptop workspace using proportional column budgets instead of a fixed pixel minimum.
+    const totalWidth = columns.reduce((sum, column) => sum + (typeof column.width === 'number' ? column.width : 150), 0)
+    const fitted = screens.lg && compact ? columns.map(column => ({ ...column,
+      width: `${(typeof column.width === 'number' ? column.width : 150) / totalWidth * 100}%`,
+      ...(column.key === 'actions' && column.render ? { render: (value: unknown, record: T, index: number) => {
+        const actions = column.render?.(value, record, index) as ReactNode
+        return actions ? <RowActions>{actions}</RowActions> : null
+      } } : {}),
+    })) : columns
+    return <Table<T> {...tableProps} tableLayout="fixed" columns={fitted}
+      scroll={screens.lg && compact ? { ...tableProps.scroll, x: undefined } : tableProps.scroll} />
+  }
 
   const pagination: false | PaginationConfig | undefined = tableProps.pagination && typeof tableProps.pagination === 'object'
     ? {

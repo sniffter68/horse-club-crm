@@ -9,10 +9,10 @@ function LeadNotificationControls() {
   const alerts = useLeadNotifications()
   const [open, setOpen] = useState(false)
   return <Space wrap>
-    {alerts.permission === 'default' && <Button size="small" loading={alerts.requesting} onClick={() => void alerts.enable()}>
-      Включить звуковые пуши о заявках
-    </Button>}
     <Popover trigger="click" open={open} onOpenChange={setOpen} title="Уведомления о заявках" content={<Space direction="vertical" style={{ maxWidth: 280 }}>
+      {alerts.permission === 'default' && <Button size="small" loading={alerts.requesting} onClick={() => void alerts.enable()}>
+        Включить звуковые пуши о заявках
+      </Button>}
       <Typography.Text role="status">{alerts.connected ? 'Ожидаем новые заявки с сайта' : 'Восстанавливаем связь с сервером…'}</Typography.Text>
       <Space><Switch aria-label="Звук новых заявок" checked={alerts.soundEnabled} onChange={alerts.toggleSound} /><span>Звук новых заявок</span></Space>
       {alerts.permission === 'granted' && <Typography.Text type="secondary">Системные уведомления включены</Typography.Text>}

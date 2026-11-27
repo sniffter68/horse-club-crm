@@ -5,6 +5,7 @@
     "seed": "node prisma/seed.cjs"
   },
   "scripts": {
+    "demo-seed": "npm run build && node --env-file=.env dist/demo/seed-cli.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "node ../frontend/node_modules/oxlint/bin/oxlint src test",

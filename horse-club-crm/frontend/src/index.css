@@ -1,4 +1,8 @@
 :root {
+  --crm-page-gutter: 16px;
+  --crm-section-gap: 12px;
+  --crm-card-padding: 16px;
+  --crm-row-height: 44px;
   --crm-alabaster: #f7f4f0;
   --crm-paper: #ffffff;
   --crm-chocolate: #241e1c;
@@ -579,7 +583,7 @@ html[data-theme='dark'] .dashboard-quick-actions .ant-btn-default { color: var(-
 /* Navigation and content have independent viewport-bounded scroll owners. */
 .crm-app-layout { height: 100vh; height: 100dvh; overflow: hidden; }
 .crm-workspace { min-width: 0; min-height: 0; }
-.crm-main { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: 24px; scrollbar-gutter: stable; }
+.crm-main { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: var(--crm-page-gutter); scrollbar-gutter: stable; }
 .crm-sidebar .ant-layout-sider-children { height: 100%; min-height: 0; }
 .sidebar-title-row--desktop { flex-shrink: 0; }
 .crm-sidebar .ant-menu { min-height: 0; }
@@ -635,4 +639,53 @@ html[data-theme='dark'] .dashboard-quick-actions .ant-btn-default { color: var(-
 .ant-modal-wrap { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 .profile-modal .ant-modal-content { max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
 .loading-page { padding-top: max(24px, env(safe-area-inset-top, 0px)); padding-bottom: max(24px, env(safe-area-inset-bottom, 0px)); }
+/* Compact B2B density, shared across catalogues and finance. */
+.crm-main .ant-card .ant-card-body { padding: var(--crm-card-padding); }
+.crm-main .ant-page-header { padding: 0 0 var(--crm-section-gap); }
+.crm-main .ant-page-header-heading { align-items: center; gap: var(--crm-section-gap); }
+.crm-main .ant-page-header-heading-title { font-size: 22px; line-height: 32px; }
+.crm-main .ant-page-header-heading-left, .crm-main .ant-page-header-heading-extra { margin-block: 0; }
+.crm-main > .ant-space-vertical, .cash-desk-page.ant-space { gap: var(--crm-section-gap) !important; }
+.crm-main .ant-table-cell { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.crm-main .ant-table-tbody > tr > td { height: var(--crm-row-height); padding: 8px 12px; vertical-align: middle; }
+.crm-main .ant-table-thead > tr > th { padding: 8px 12px; }
+.crm-main .ant-table-cell .ant-space { max-width: 100%; flex-wrap: wrap; gap: 4px !important; }
+.catalog-table-toolbar { align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.crm-list-toolbar { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.catalog-table-toolbar .crm-list-toolbar { margin-bottom: 0; }
+.catalog-table-toolbar > .staff-toolbar { display: contents; }
+.crm-toolbar-link { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 12px; border: 1px solid var(--crm-border); border-radius: 12px; color: var(--crm-text-accent); white-space: nowrap; }
+.crm-toolbar-link:hover, .crm-toolbar-link:focus-visible { border-color: var(--crm-text-accent); color: var(--crm-ink); }
+.crm-list-toolbar .ant-form-item { margin: 0; min-width: 0; max-width: 100%; }
+.crm-list-toolbar .ant-form-item:first-child { flex: 1 1 220px; }
+.crm-list-toolbar .ant-form-item:first-child .ant-select { width: 100%; }
+.cash-desk-header { flex: none; min-height: 44px; padding: 4px var(--crm-page-gutter); gap: 8px; }
+.cashbox-header-widget { min-width: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+.cashbox-header-link { padding: 3px 8px; gap: 4px 8px; border-radius: 8px; }
+.cashbox-header-link strong { text-align: right; }
+.cash-summary-section, .cash-metrics { gap: var(--crm-section-gap); }
+.cash-journal-filters { gap: var(--crm-section-gap); }
+.demo-banner { display: flex; flex: none; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; min-height: 36px; padding: 4px 16px; border-bottom: 1px solid var(--crm-border); background: var(--crm-paper); font-size: 12px; }
+.demo-login { display: grid; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--crm-border); }
+.demo-login h5 { margin: 0; }
+.row-actions-menu { max-width: min(320px, calc(100vw - 48px)); }
+.stall-risk-popover { width: min(440px, calc(100vw - 48px)); }
+.row-actions-menu .ant-space { display: flex; flex-direction: column; align-items: stretch; gap: 8px !important; }
+.membership-summary-button.ant-btn { max-width: 100%; height: 26px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.crm-main .ant-table-tbody .ant-tag { padding-block: 0; line-height: 22px; }
+.crm-main .ant-table-tbody .ant-btn { min-height: 24px; height: 26px; line-height: 22px; padding-block: 0; max-width: 100%; }
+.crm-main .ant-table-tbody .ant-avatar { width: 26px !important; height: 26px !important; line-height: 26px; font-size: 13px; }
+.clients-table .ant-btn.client-name { font-size: 14px; line-height: 24px; }
+@media (min-width: 1024px) {
+  .cash-desk-header { height: 44px; flex-wrap: nowrap; }
+  .cashbox-header-widget.ant-space { display: flex; flex: 1; gap: 8px !important; flex-wrap: nowrap; }
+  .cashbox-header-link { white-space: nowrap; }
+  .cashbox-header-funds { font-size: 11px; }
+  .staff-page > h2.ant-typography { display: inline-block; font-size: 22px; margin: 0 12px 8px 0; }
+  .staff-page > .ant-typography + .ant-typography { display: inline-block; margin-bottom: 8px; }
+}
+@media (max-width: 767px) {
+  .cash-desk-header { padding-top: 76px; }
+  .demo-banner { padding-inline-start: 88px; }
+}
 main.login-page { padding-top: max(24px, env(safe-area-inset-top, 0px)); padding-bottom: max(24px, env(safe-area-inset-bottom, 0px)); }

@@ -11,8 +11,8 @@ export function TableCellText({ children }: { children: string | null | undefine
   </Tooltip>
 }
 
-export function ConfigurableTable<T extends object>({ columns, storageKey, defaultHiddenColumns = [], className, ...props }: Omit<TableProps<T>, 'columns'> & {
-  columns: ConfigurableColumn<T>[]; storageKey: string; defaultHiddenColumns?: readonly string[]
+export function ConfigurableTable<T extends object>({ columns, storageKey, defaultHiddenColumns = [], className, toolbar, ...props }: Omit<TableProps<T>, 'columns'> & {
+  columns: ConfigurableColumn<T>[]; storageKey: string; defaultHiddenColumns?: readonly string[]; toolbar?: ReactNode
 }) {
   const table = useTableColumns(columns.map(column => ({ ...column, defaultVisible: column.defaultVisible ?? !defaultHiddenColumns.includes(String(column.key)) })), storageKey)
   const visible = table.columns.map(column => ({
@@ -25,8 +25,8 @@ export function ConfigurableTable<T extends object>({ columns, storageKey, defau
   }))
   const width = visible.reduce((total, column) => total + (typeof column.width === 'number' ? column.width : 120), 0)
   return <>
-    <div className="catalog-table-toolbar"><TableColumnSettings settings={table.settings} definitions={table.available} /></div>
-    <ResponsiveTable<T> {...props} size="small" tableLayout="fixed" columns={visible}
+    <div className="catalog-table-toolbar">{toolbar}<TableColumnSettings settings={table.settings} definitions={table.available} /></div>
+    <ResponsiveTable<T> {...props} compact size="small" tableLayout="fixed" columns={visible}
       className={['crm-entity-table', className].filter(Boolean).join(' ')} scroll={{ ...props.scroll, x: width }} />
   </>
 }

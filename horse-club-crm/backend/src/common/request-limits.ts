@@ -22,7 +22,7 @@ export function requestLimits() {
       sweepAt = now + 60_000;
     }
     const path = req.path.replace(/\/+$/, '').toLowerCase();
-    const login = path === '/api/auth/login';
+    const login = path === '/api/auth/login' || path === '/api/demo/login';
     const lead = path === '/api/leads' && req.method === 'POST';
     const limit = login ? 10 : lead ? 5 : 300;
     const duration = login || lead ? 15 * 60_000 : 60_000;

@@ -2,8 +2,10 @@ import { useLogin } from '@refinedev/core'
 import { Alert, Button, Card, Form, Input, Typography } from 'antd'
 import type { LoginCredentials } from '../../authProvider'
 import { EquestrianMotif } from '../../components/EquestrianMotif'
+import { useDemoStatus, type DemoRole } from '../../useDemoStatus'
 
 export function LoginPage() {
+  const isDemo = useDemoStatus()
   const { mutate: login, isPending, data, error } = useLogin<LoginCredentials>()
   const message = error?.message ?? (data?.success === false ? data.error?.message : undefined)
   return (
@@ -21,6 +23,11 @@ export function LoginPage() {
           </Form.Item>
           <Button type="primary" htmlType="submit" size="large" loading={isPending} block>Войти</Button>
         </Form>
+        {isDemo && <section className="demo-login" aria-label="Быстрый вход на демо-стенд">
+          <Typography.Title level={5}>Демо-стенд · вход в один клик</Typography.Title>
+          {([['OWNER', 'Владелец клуба'], ['ADMIN', 'Администратор'], ['TRAINER', 'Тренер']] satisfies [DemoRole, string][])
+            .map(([role, label]) => <Button key={role} block disabled={isPending} onClick={() => login({ demoRole: role })}>{label}</Button>)}
+        </section>}
       </Card>
     </main>
   )

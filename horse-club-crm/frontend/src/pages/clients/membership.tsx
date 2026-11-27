@@ -1,6 +1,6 @@
 import { useTable } from '@refinedev/antd'
 import type { HttpError } from '@refinedev/core'
-import { Alert, Button, Empty, Tag, Typography } from 'antd'
+import { Alert, Button, Empty, Popover, Tag, Typography } from 'antd'
 import { Link } from 'react-router-dom'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { useCatalogPermissions } from '../catalogs/permissions'
@@ -28,8 +28,16 @@ export type ActiveMembership = {
   validUntil: string; status: 'ACTIVE' | 'EXPIRING';
 }
 
-export function MembershipBalance({ membership, clientId }: { membership: ActiveMembership | null; clientId: string }) {
+export function MembershipBalance({ membership, clientId, compact = false }: { membership: ActiveMembership | null; clientId: string; compact?: boolean }) {
   const { canManage } = useCatalogPermissions()
+  const [summaryOpen, setSummaryOpen] = useState(false)
+  if (compact) return <Popover trigger="click" open={summaryOpen} onOpenChange={setSummaryOpen} title={membership?.planName ?? 'Абонемент'}
+    content={<MembershipBalance membership={membership} clientId={clientId} />}>
+    <Button type="link" size="small" className="membership-summary-button" aria-expanded={summaryOpen}
+      onClick={() => setSummaryOpen(!summaryOpen)} onKeyDown={event => { if (event.key === 'Escape') setSummaryOpen(false) }}>
+      {membership ? `${membership.remainingUnits} / ${membership.totalUnits} занятий · до ${dateOnly(membership.validUntil)}` : 'Нет абонемента · выдать'}
+    </Button>
+  </Popover>
   return <section className="client-membership" aria-label="Активный абонемент">
     {membership ? <>
       <div className="client-membership-summary">

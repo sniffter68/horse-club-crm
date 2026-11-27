@@ -14,7 +14,7 @@ import { DateTime } from 'luxon'
 import { getIdentity, type Role } from '../../authStorage'
 import { API_URL, httpClient, toHttpError } from '../../httpClient'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
-import { ConfigurableTable } from '../../components/ConfigurableTable'
+import { ConfigurableTable, TableCellText } from '../../components/ConfigurableTable'
 import { currency } from '../cash-desk/shared'
 import { AdjustmentModal, PayoutModal, ProfileModal, ShiftModal } from './forms'
 import { paidPeriodFor, staffRoles, type PaidPeriod, type PayrollStatement, type PageData, type Payroll, type Shift, type Staff } from './types'
@@ -148,28 +148,29 @@ export function StaffPage() {
     update({ from: start.toISODate()!, to: start.endOf('month').toISODate()!, page: '1' })
   }
   const dates = Array.from({ length: DateTime.fromISO(month).daysInMonth ?? 31 }, (_, index) => DateTime.fromISO(month).plus({ days: index }))
+  const toolbar = <Space wrap className="staff-toolbar">
+    {tab === 'employees' && <>
+      <Space wrap role="group" aria-label="Быстрые фильтры персонала">{[
+        ['', 'Все'], ['TRAINER', 'Тренеры'], ['ADMIN', 'Администраторы'], ['stable', 'Персонал конюшни'],
+      ].map(([value, label]) => <Button key={value} aria-pressed={quickFilter === value} type={quickFilter === value ? 'primary' : 'default'} shape="round" onClick={() => update({ role: value === 'stable' ? '' : value, group: value === 'stable' ? 'stable' : '', page: '1' })}>{label}</Button>)}</Space>
+      <Select aria-label="Фильтр роли" placeholder="Все роли" allowClear value={roleFilter} style={{ minWidth: 160 }} options={Object.entries(staffRoles).map(([value, label]) => ({ value, label }))} onChange={value => update({ role: value ?? '', group: '', page: '1' })} />
+      <Select aria-label="Статус сотрудника" placeholder="Все сотрудники" allowClear value={activity} style={{ minWidth: 170 }} options={[{ value: 'active', label: 'Активные' }, { value: 'archived', label: 'Архив' }]} onChange={value => update({ activity: value ?? '', page: '1' })} />
+      <Select aria-label="Статус присутствия" placeholder="Все смены" allowClear value={duty} style={{ minWidth: 160 }} options={[{ value: 'on', label: 'На смене' }, { value: 'off', label: 'Выходной' }]} onChange={value => update({ duty: value ?? '', page: '1' })} />
+    </>}
+    {tab === 'shifts' && <><Typography.Text>Месяц</Typography.Text><DatePicker aria-label="Месяц графика" picker="month" locale={ruDatePicker} allowClear={false} value={dayjs(month)} onChange={value => value && update({ month: value.format('YYYY-MM'), page: '1' })} />
+      {canManage && <><Button type="primary" disabled={!staff.some(person => person.isActive) || loading || busy} onClick={() => setShiftModal('new')}>Запланировать смену</Button><Button disabled={!staff.some(person => person.isActive) || loading || busy} onClick={() => setTemplateOpen(true)}>Применить шаблон</Button></>}</>}
+    {tab === 'payroll' && <><DatePicker.RangePicker aria-label="Период расчета" locale={ruDatePicker} format="DD.MM.YYYY" allowClear={false} value={[dayjs(from), dayjs(to)]} onChange={values => values?.[0] && values[1] && update({ from: values[0].format('YYYY-MM-DD'), to: values[1].format('YYYY-MM-DD'), page: '1' })} />
+      <Button onClick={() => periodPreset(0)}>Текущий месяц</Button><Button onClick={() => periodPreset(-1)}>Прошлый месяц</Button></>}
+    {canManage && <Button type="primary" onClick={() => setProfileModal('new')}>+ Добавить сотрудника</Button>}
+    <Button disabled={loading || busy} onClick={() => refresh(value => value + 1)}>{error ? 'Повторить' : 'Обновить'}</Button>
+  </Space>
   if (roleLoading) return <div className="loading-page"><Spin aria-label="Загрузка прав" /></div>
   return <div className="staff-page">
     <Typography.Title level={2}>Персонал</Typography.Title>
     <Typography.Paragraph type="secondary">График работы, табель и зарплата · время Москвы</Typography.Paragraph>
     <Tabs activeKey={tab} onChange={key => update({ tab: key, page: '1' })} items={[{ key: 'employees', label: 'Сотрудники' }, { key: 'shifts', label: 'График смен' }, { key: 'payroll', label: 'Табель и расчет зарплаты' }, ...(canViewTrainers ? [{ key: 'trainers', label: 'Выплаты тренерам' }] : []), ...(canManage ? [{ key: 'rates', label: 'Настройки ставок' }, { key: 'statements', label: 'Сформированные ведомости' }] : [])]} />
     {tab === 'trainers' ? <TrainerStatements /> : <Card>
-      <Space wrap className="staff-toolbar">
-        {tab === 'employees' && <>
-          <Space wrap role="group" aria-label="Быстрые фильтры персонала">{[
-            ['', 'Все'], ['TRAINER', 'Тренеры'], ['ADMIN', 'Администраторы'], ['stable', 'Персонал конюшни'],
-          ].map(([value, label]) => <Button key={value} aria-pressed={quickFilter === value} type={quickFilter === value ? 'primary' : 'default'} shape="round" onClick={() => update({ role: value === 'stable' ? '' : value, group: value === 'stable' ? 'stable' : '', page: '1' })}>{label}</Button>)}</Space>
-          <Select aria-label="Фильтр роли" placeholder="Все роли" allowClear value={roleFilter} style={{ minWidth: 160 }} options={Object.entries(staffRoles).map(([value, label]) => ({ value, label }))} onChange={value => update({ role: value ?? '', group: '', page: '1' })} />
-          <Select aria-label="Статус сотрудника" placeholder="Все сотрудники" allowClear value={activity} style={{ minWidth: 170 }} options={[{ value: 'active', label: 'Активные' }, { value: 'archived', label: 'Архив' }]} onChange={value => update({ activity: value ?? '', page: '1' })} />
-          <Select aria-label="Статус присутствия" placeholder="Все смены" allowClear value={duty} style={{ minWidth: 160 }} options={[{ value: 'on', label: 'На смене' }, { value: 'off', label: 'Выходной' }]} onChange={value => update({ duty: value ?? '', page: '1' })} />
-        </>}
-        {tab === 'shifts' && <><Typography.Text>Месяц</Typography.Text><DatePicker aria-label="Месяц графика" picker="month" locale={ruDatePicker} allowClear={false} value={dayjs(month)} onChange={value => value && update({ month: value.format('YYYY-MM'), page: '1' })} />
-          {canManage && <><Button type="primary" disabled={!staff.some(person => person.isActive) || loading || busy} onClick={() => setShiftModal('new')}>Запланировать смену</Button><Button disabled={!staff.some(person => person.isActive) || loading || busy} onClick={() => setTemplateOpen(true)}>Применить шаблон</Button></>}</>}
-        {tab === 'payroll' && <><DatePicker.RangePicker aria-label="Период расчета" locale={ruDatePicker} format="DD.MM.YYYY" allowClear={false} value={[dayjs(from), dayjs(to)]} onChange={values => values?.[0] && values[1] && update({ from: values[0].format('YYYY-MM-DD'), to: values[1].format('YYYY-MM-DD'), page: '1' })} />
-          <Button onClick={() => periodPreset(0)}>Текущий месяц</Button><Button onClick={() => periodPreset(-1)}>Прошлый месяц</Button></>}
-        {canManage && <Button type="primary" onClick={() => setProfileModal('new')}>+ Добавить сотрудника</Button>}
-        <Button disabled={loading || busy} onClick={() => refresh(value => value + 1)}>{error ? 'Повторить' : 'Обновить'}</Button>
-      </Space>
+      {tab !== 'employees' && toolbar}
       {error && <Alert className="staff-feedback" showIcon type="error" message="Не удалось выполнить операцию" description={error} />}
       {tab === 'shifts' && !screens.md && <Space wrap className="staff-toolbar"><Typography.Text>Компактный график</Typography.Text><DatePicker aria-label="День графика" placeholder="Все дни месяца" locale={ruDatePicker} format="DD.MM.YYYY" value={mobileDay ? dayjs(mobileDay) : null} disabledDate={date => date.format('YYYY-MM') !== month.slice(0, 7)} onChange={date => update({ day: date?.format('YYYY-MM-DD') ?? '' })} /></Space>}
       {loading ? <div className="stable-loading"><Spin aria-label="Загрузка персонала" /></div> : !total ? <Empty description={tab === 'statements' ? 'Сформированных ведомостей пока нет' : canManage ? 'Сотрудников пока нет. Нажмите «+ Добавить сотрудника».' : 'Профиль сотрудника пока не создан. Обратитесь к администратору.'} /> : <>
@@ -183,10 +184,10 @@ export function StaffPage() {
           })}</tr>)}</tbody></table></div> : <ResponsiveTable<Shift> rowKey="id" dataSource={mobileDay ? shifts.filter(shift => shift.date.slice(0, 10) === mobileDay) : shifts} pagination={{ pageSize: 10 }} locale={{ emptyText: 'В этом месяце смен нет' }} columns={[
             { title: 'Сотрудник', render: (_, row) => staff.find(person => person.id === row.staffId)?.fullName }, { title: 'Дата', render: (_, row) => <>{dayjs(row.date.slice(0, 10)).format('DD.MM.YYYY')}{closedPeriod(row) && <Typography.Paragraph><LockOutlined /> {closedLabel(closedPeriod(row)!)}</Typography.Paragraph>}</> }, { title: 'Время', render: (_, row) => shiftInterval(row) }, { title: 'Статус', render: (_, row) => <Tag color={shiftColor(row)}>{shiftLabel(row)}</Tag> }, ...(canManage ? [{ key: 'actions', title: 'Действия', render: (_: unknown, row: Shift) => shiftActions(row) }] : []),
           ]} />)}
-        {tab === 'employees' && <ConfigurableTable<Staff> storageKey="horse_crm_staff_columns_v1" defaultHiddenColumns={['vk', 'roleTitle']} rowKey="id" dataSource={staff} pagination={false} columns={[
+        {tab === 'employees' && <ConfigurableTable<Staff> toolbar={toolbar} storageKey="horse_crm_staff_columns_v1" defaultHiddenColumns={['vk', 'roleTitle']} rowKey="id" dataSource={staff} pagination={false} columns={[
           { key: 'fullName', width: 180, fixed: 'left' as const, title: 'ФИО', dataIndex: 'fullName' },
           { key: 'role', width: 120, align: 'center', title: 'Роль', render: (_, row) => <Tag>{staffRoles[row.user?.role ?? 'OTHER']}</Tag> },
-          { key: 'directions', width: 240, title: 'Направления', render: (_, row) => row.user?.role === 'TRAINER' ? <Space wrap>{trainerServiceSettings.filter(({ key }) => row.user?.trainer?.[key] !== false).map(({ key, title }) => <Tag color="blue" key={key}>{title}</Tag>)}</Space> : '—' },
+          { key: 'directions', width: 240, title: 'Направления', render: (_, row) => row.user?.role === 'TRAINER' ? <TableCellText>{trainerServiceSettings.filter(({ key }) => row.user?.trainer?.[key] !== false).map(({ title }) => title).join(', ')}</TableCellText> : '—' },
           { key: 'trainerRate', width: 170, title: 'Ставка тренера', render: (_, row) => trainerRateLabel(row) },
           { key: 'roleTitle', width: 140, title: 'Должность', dataIndex: 'roleTitle' },
           { key: 'phone', width: 140, fixed: 'left' as const, title: 'Телефон', render: (_, row) => row.phone || '—' },

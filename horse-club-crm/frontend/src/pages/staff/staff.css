@@ -1,5 +1,5 @@
 .staff-page { min-width: 0; }
-.staff-toolbar { margin-bottom: 20px; }
+.staff-toolbar { margin-bottom: var(--crm-section-gap); gap: 8px !important; }
 .staff-feedback { margin-bottom: 16px; }
 .staff-pagination { margin-top: 20px; }
 .staff-grid-scroll { overflow: auto; max-width: 100%; scrollbar-gutter: stable; }

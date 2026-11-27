@@ -58,7 +58,13 @@ function toCategorizedMenuItems(resources: TreeMenuItem[]): NonNullable<MenuProp
 }
 
 export function Sidebar({ darkMode, onToggleTheme }: { darkMode: boolean; onToggleTheme: () => void }) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('horsecrm.sidebar-collapsed') === 'true' } catch { return false }
+  })
+  const changeCollapsed = (value: boolean) => {
+    setCollapsed(value)
+    try { localStorage.setItem('horsecrm.sidebar-collapsed', String(value)) } catch { /* Storage may be disabled. */ }
+  }
   const [mobileOpen, setMobileOpen] = useState(false)
   const screens = Grid.useBreakpoint()
   const { menuItems, selectedKey, defaultOpenKeys } = useMenu()
@@ -127,8 +133,8 @@ export function Sidebar({ darkMode, onToggleTheme }: { darkMode: boolean; onTogg
   }
 
   return (
-    <Layout.Sider className="crm-sidebar" theme="dark" collapsible collapsed={collapsed} onCollapse={setCollapsed}
-      breakpoint="lg" collapsedWidth={80} style={{ height: '100dvh', position: 'sticky', top: 0, flexShrink: 0 }}>
+    <Layout.Sider className="crm-sidebar" theme="dark" collapsible collapsed={collapsed} onCollapse={changeCollapsed}
+      collapsedWidth={80} style={{ height: '100dvh', position: 'sticky', top: 0, flexShrink: 0 }}>
       <div className="sidebar-title-row sidebar-title-row--desktop">
         <BrandMark collapsed={collapsed} />
         <Button type="text" shape="circle" icon={darkMode ? <BulbOutlined /> : <MoonOutlined />}

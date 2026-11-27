@@ -2,12 +2,15 @@ import type { AuthProvider } from '@refinedev/core'
 import axios from 'axios'
 import { clearSession, getIdentity, getToken, isRole, saveSession } from './authStorage'
 import { API_URL, httpClient, toHttpError } from './httpClient'
+import type { DemoRole } from './useDemoStatus'
 
-export interface LoginCredentials { email: string; password: string }
+export type LoginCredentials = { email: string; password: string } | { demoRole: DemoRole }
 export const authProvider = {
-  login: async ({ email, password }: LoginCredentials) => {
+  login: async (credentials: LoginCredentials) => {
     try {
-      const { data } = await axios.post<unknown>(`${API_URL}/auth/login`, { email, password }, { timeout: 15_000, withCredentials: true })
+      const demo = 'demoRole' in credentials
+      const { data } = await axios.post<unknown>(`${API_URL}/${demo ? 'demo/login' : 'auth/login'}`,
+        demo ? { role: credentials.demoRole } : credentials, { timeout: 15_000, withCredentials: true })
       if (!data || typeof data !== 'object' || !('access_token' in data) ||
         typeof data.access_token !== 'string' || !data.access_token.trim() || !('user' in data) ||
         !data.user || typeof data.user !== 'object' || !('email' in data.user) ||

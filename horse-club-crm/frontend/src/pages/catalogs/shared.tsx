@@ -8,8 +8,8 @@ import { CatalogDrawerForm } from './EditDrawer'
 import { CatalogEditContext } from './editContext'
 import { CatalogFormActivity } from './CatalogFormActivity'
 import { type BaseRecord, type HttpError } from '@refinedev/core'
-import { Create, Edit, List, EditButton, DeleteButton, useForm, useTable } from '@refinedev/antd'
-import { Alert, Button, Checkbox, Form, Input, InputNumber, Result, Select, Space, Spin, type TableColumnsType } from 'antd'
+import { Create, CreateButton, Edit, List, EditButton, DeleteButton, useForm, useTable } from '@refinedev/antd'
+import { Alert, Button, Checkbox, Form, Input, InputNumber, Result, Select, Space, Spin, Tag, type TableColumnsType } from 'antd'
 import { useCatalogPermissions } from './permissions'
 import { ResponsiveTable } from '../../components/ResponsiveTable'
 import { ConfigurableTable } from '../../components/ConfigurableTable'
@@ -50,8 +50,7 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
         confirmTitle={resource === 'horses' ? 'Удалить лошадь из клуба? Если по лошади есть история занятий или постоя, она будет перенесена в архив с сохранением всех отчётов' : 'Удалить запись?'} confirmOkText="Удалить" confirmCancelText="Отмена">Удалить</DeleteButton>}
     </Space>,
   }] : []
-  return <List title={title} canCreate={canManage} createButtonProps={{ children: 'Создать' }}>
-    <Form noValidate {...searchFormProps} initialValues={{ ...searchFormProps.initialValues, clientType: filters.find(filter => 'field' in filter && filter.field === 'clientType')?.value }} layout="inline" style={{ marginBottom: 20 }}>
+  const controls = <Form noValidate {...searchFormProps} initialValues={{ ...searchFormProps.initialValues, clientType: filters.find(filter => 'field' in filter && filter.field === 'clientType')?.value }} layout="inline" className="crm-list-toolbar">
       <Form.Item name="q" style={{ width: 320, maxWidth: '100%' }}>
         <LiveSearch onSearch={() => searchFormProps.form?.submit()} loading={tableQuery.isFetching}
           suggestions={(tableQuery.data?.data ?? []).flatMap(row => { const item = recordSuggestion(row); return item ? [item] : [] })}
@@ -67,13 +66,16 @@ export function CatalogList<T extends BaseRecord>({ resource, title, columns, ex
         initialValue={filters.some(f => 'field' in f && f.field === 'includeArchived' && f.value === 'true')}>
         <Checkbox onChange={() => searchFormProps.form?.submit()}>Показать архивных</Checkbox>
       </Form.Item>}
-      <Button type="primary" htmlType="submit">Найти</Button>
+      <Button htmlType="submit">Найти</Button>
+      {toolbar}
+      {canManage && <CreateButton resource={resource}>Создать</CreateButton>}
     </Form>
-    {toolbar && <div className="catalog-table-toolbar">{toolbar}</div>}
+  return <List title={<Space size={8}><span>{title}</span>{total !== undefined && <Tag>{total}</Tag>}</Space>} canCreate={false}>
+    {!storageKey && <div className="catalog-table-toolbar">{controls}</div>}
     {tableQuery.error && <Alert type="error" showIcon message="Не удалось загрузить каталог" description={tableQuery.error.message} />}
     {storageKey ? <ConfigurableTable<T> {...tableProps} rowKey="id" storageKey={storageKey} defaultHiddenColumns={defaultHiddenColumns}
-      columns={[...sortedColumns, ...actions]}
-      pagination={{ ...tableProps.pagination, showSizeChanger: true, pageSizeOptions: [10, 20, 50], showTotal: total => `Всего: ${total}` }} /> : <ResponsiveTable<T> {...tableProps} rowKey="id" columns={[...sortedColumns, ...actions]}
+      columns={[...sortedColumns, ...actions]} toolbar={controls}
+      pagination={{ ...tableProps.pagination, showSizeChanger: true, pageSizeOptions: [10, 20, 50], showTotal: total => `Всего: ${total}` }} /> : <ResponsiveTable<T> {...tableProps} compact rowKey="id" columns={[...sortedColumns, ...actions]}
       className={layout === 'clients' ? 'clients-table' : undefined}
       tableLayout={layout === 'clients' ? 'fixed' : undefined}
       scroll={layout === 'clients' ? { x: [...sortedColumns, ...actions].reduce((width, column) => width + (typeof column.width === 'number' ? column.width : 0), 0) } : { x: 'max-content' }}

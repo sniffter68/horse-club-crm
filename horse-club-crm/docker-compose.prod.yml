@@ -48,6 +48,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET:?Set a random JWT_SECRET of at least 32 bytes}
       CLUB_TIME_ZONE: ${CLUB_TIME_ZONE:-Europe/Moscow}
+      DEMO_MODE: ${DEMO_MODE:-false}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_API_ROOT: ${TELEGRAM_API_ROOT:-}
       TELEGRAM_WEBAPP_URL: ${TELEGRAM_WEBAPP_URL:-https://crm.horseclub68.ru/tma}
