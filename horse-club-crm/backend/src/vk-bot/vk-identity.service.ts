@@ -50,7 +50,7 @@ export class VkIdentityService {
     const [client, user, trainer] = await Promise.all([
       tx.client.findFirst({ where: { OR: [{ vkId }, { vkUserId: BigInt(vkId) }] }, select: { id: true, deletedAt: true } }),
       tx.user.findFirst({ where: { OR: [{ vkId }, { vkUserId: BigInt(vkId) }] }, select: { id: true, trainerId: true, staffProfile: { select: { isActive: true } } } }),
-      tx.trainer.findUnique({ where: { vkId: BigInt(vkId) }, select: { id: true, deletedAt: true } }),
+      tx.trainer.findUnique({ where: { vkId: BigInt(vkId) }, select: { id: true, isActive: true } }),
     ]);
     // Release legacy archived bindings inside the same serializable transaction.
     // Filtering them out alone still leaves PostgreSQL's unique constraints occupied.
@@ -64,7 +64,7 @@ export class VkIdentityService {
       if (user.trainerId) await tx.trainer.updateMany({ where: { id: user.trainerId, vkId: BigInt(vkId) }, data: { vkId: null } });
       released = true;
     }
-    if (trainer?.deletedAt) {
+    if (trainer?.isActive === false) {
       await tx.trainer.update({ where: { id: trainer.id }, data: { vkId: null } });
       released = true;
     }

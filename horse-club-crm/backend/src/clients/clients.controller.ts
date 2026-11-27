@@ -22,6 +22,7 @@ import { setRefineTotalHeaders } from '../common/refine';
 import { ClientsService, type ClientDetailsResponse, type ClientListResponse } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
+import { UpdateClientVkDto } from './dto/update-client-vk.dto';
 
 @RequireModule('SCHEDULE')
 @ApiTags('Clients')
@@ -84,6 +85,12 @@ export class ClientsController {
   @Patch(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
   update(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateClientDto): Promise<Client> {
+    return this.clientsService.update(id, dto);
+  }
+
+  @Patch(':id/vk')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  updateVk(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateClientVkDto): Promise<Client> {
     return this.clientsService.update(id, dto);
   }
 
